@@ -5,9 +5,11 @@ import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -23,13 +25,13 @@ public class JwtUtil {
         this.expirationMs = expirationMs;
     }
 
-    public String generateToken(String email, Long userId, String role) {
+    public String generateToken(String email, UUID userId, String role) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
 
         return Jwts.builder()
                 .subject(email)
-                .claim("userId", userId)
+                .claim("userId", userId.toString())
                 .claim("role", role)
                 .issuedAt(now)
                 .expiration(expiryDate)
@@ -39,7 +41,7 @@ public class JwtUtil {
 
     public String generateRefreshToken(String email) {
         Date now = new Date();
-        long refreshExpiration = expirationMs * 7; // 7x longer than access token
+        long refreshExpiration = expirationMs * 7;
         Date expiryDate = new Date(now.getTime() + refreshExpiration);
 
         return Jwts.builder()
@@ -60,13 +62,13 @@ public class JwtUtil {
         return claims.getSubject();
     }
 
-    public Long getUserIdFromToken(String token) {
+    public UUID getUserIdFromToken(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return claims.get("userId", Long.class);
+        return UUID.fromString(claims.get("userId", String.class));
     }
 
     public String getRoleFromToken(String token) {

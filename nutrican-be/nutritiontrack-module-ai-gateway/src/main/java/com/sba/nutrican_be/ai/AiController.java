@@ -1,5 +1,7 @@
 package com.sba.nutrican_be.ai;
 
+import com.sba.nutrican_be.ai.service.MealRecognitionService;
+import com.sba.nutrican_be.ai.service.NutritionChatbotService;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 

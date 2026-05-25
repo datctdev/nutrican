@@ -16,9 +16,11 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -36,7 +38,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (StringUtils.hasText(jwt) && jwtUtil.validateToken(jwt) && !jwtUtil.isRefreshToken(jwt)) {
                 String email = jwtUtil.getEmailFromToken(jwt);
-                Long userId = jwtUtil.getUserIdFromToken(jwt);
+                UUID userId = jwtUtil.getUserIdFromToken(jwt);
                 String role = jwtUtil.getRoleFromToken(jwt);
 
                 Optional<User> userOpt = userRepository.findById(userId);

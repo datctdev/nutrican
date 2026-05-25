@@ -14,6 +14,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/profile")
 @RequiredArgsConstructor
@@ -56,7 +58,7 @@ public class UserProfileController {
 
     @GetMapping("/{userId}")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getPublicProfile(
-            @PathVariable Long userId) {
+            @PathVariable UUID userId) {
         return ResponseEntity.ok(userProfileService.getProfile(userId));
     }
 }

@@ -6,13 +6,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class AnalyzeMealResponse {
-    private Long logId;
+    private UUID logId;
     private String foodName;
     private BigDecimal portionSize;
     private String portionUnit;

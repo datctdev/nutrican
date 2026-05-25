@@ -13,7 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 import java.time.LocalDate;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/workspace")
@@ -47,7 +49,7 @@ public class PtWorkspaceController {
 
     @PutMapping("/diet-logs/{id}/review")
     public ResponseEntity<ApiResponse<DietLogReviewResponse>> reviewLog(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             @AuthenticationPrincipal User user,
             @RequestBody ReviewActionRequest request) {
         return ResponseEntity.ok(ptWorkspaceService.reviewLog(id, user.getId(), request));
@@ -55,7 +57,7 @@ public class PtWorkspaceController {
 
     @GetMapping("/progress/{clientId}")
     public ResponseEntity<ApiResponse<ProgressDataDto>> getClientProgress(
-            @PathVariable Long clientId,
+            @PathVariable UUID clientId,
             @AuthenticationPrincipal User user,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -64,7 +66,7 @@ public class PtWorkspaceController {
 
     @PostMapping("/clients/{clientId}/assign")
     public ResponseEntity<ApiResponse<Void>> assignClient(
-            @PathVariable Long clientId,
+            @PathVariable UUID clientId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ptWorkspaceService.assignClient(user.getId(), clientId));
     }

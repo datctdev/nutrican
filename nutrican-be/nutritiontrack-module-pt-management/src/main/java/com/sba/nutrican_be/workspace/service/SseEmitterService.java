@@ -3,8 +3,10 @@ package com.sba.nutrican_be.workspace.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 import java.io.IOException;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -12,9 +14,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Service
 public class SseEmitterService {
 
-    private final Map<Long, CopyOnWriteArrayList<SseEmitter>> userEmitters = new ConcurrentHashMap<>();
+    private final Map<UUID, CopyOnWriteArrayList<SseEmitter>> userEmitters = new ConcurrentHashMap<>();
 
-    public SseEmitter createEmitter(Long userId) {
+    public SseEmitter createEmitter(UUID userId) {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
         userEmitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
@@ -35,7 +37,7 @@ public class SseEmitterService {
         return emitter;
     }
 
-    public void sendToUser(Long userId, String eventName, Object data) {
+    public void sendToUser(UUID userId, String eventName, Object data) {
         CopyOnWriteArrayList<SseEmitter> emitters = userEmitters.get(userId);
         if (emitters == null || emitters.isEmpty()) {
             log.debug("No SSE emitters for user: {}", userId);
@@ -64,16 +66,16 @@ public class SseEmitterService {
         }
     }
 
-    public void notifyPtOfNewDietLog(Long ptId, Long clientId, String clientName, Long logId, String mealType) {
+    public void notifyPtOfNewDietLog(UUID ptId, UUID clientId, String clientName, UUID logId, String mealType) {
         String data = String.format(
-            "{\"client_id\":%d,\"client_name\":\"%s\",\"log_id\":%d,\"message\":\"%s logged %s\",\"status_color\":\"RED\"}",
+            "{\"client_id\":\"%s\",\"client_name\":\"%s\",\"log_id\":\"%s\",\"message\":\"%s logged %s\",\"status_color\":\"RED\"}",
             clientId, clientName, logId, clientName, mealType != null ? mealType.toLowerCase() : "meal"
         );
         sendToUser(ptId, "NEW_DIET_LOG", data);
         log.info("SSE notification sent to PT: {} for client: {} new log", ptId, clientId);
     }
 
-    private void removeEmitter(Long userId, SseEmitter emitter) {
+    private void removeEmitter(UUID userId, SseEmitter emitter) {
         CopyOnWriteArrayList<SseEmitter> emitters = userEmitters.get(userId);
         if (emitters != null) {
             emitters.remove(emitter);
@@ -84,9 +86,9 @@ public class SseEmitterService {
         log.debug("SSE emitter removed for user: {}", userId);
     }
 
-    public void broadcastSos(Long ptId, Long clientId, String clientName, String priority) {
+    public void broadcastSos(UUID ptId, UUID clientId, String clientName, String priority) {
         String data = String.format(
-            "{\"client_id\":%d,\"client_name\":\"%s\",\"priority\":\"%s\",\"type\":\"SOS\"}",
+            "{\"client_id\":\"%s\",\"client_name\":\"%s\",\"priority\":\"%s\",\"type\":\"SOS\"}",
             clientId, clientName, priority
         );
         sendToUser(ptId, "SOS_TICKET", data);

@@ -10,11 +10,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface PtProfileRepository extends JpaRepository<PtProfile, Long> {
+public interface PtProfileRepository extends JpaRepository<PtProfile, UUID> {
 
-    Optional<PtProfile> findByUserId(Long userId);
+    Optional<PtProfile> findByUserId(UUID userId);
 
     Page<PtProfile> findByIsVerifiedTrue(Pageable pageable);
 
@@ -23,7 +24,7 @@ public interface PtProfileRepository extends JpaRepository<PtProfile, Long> {
     Page<PtProfile> findByVerificationStatus(UserStatus status, Pageable pageable);
 
     @Query("SELECT p FROM PtProfile p JOIN FETCH p.user WHERE p.id = :id")
-    Optional<PtProfile> findByIdWithUser(@Param("id") Long id);
+    Optional<PtProfile> findByIdWithUser(@Param("id") UUID id);
 
     @Query("SELECT p FROM PtProfile p JOIN FETCH p.user u WHERE u.email = :email")
     Optional<PtProfile> findByUserEmail(@Param("email") String email);

@@ -8,16 +8,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.List;
+import java.util.UUID;
 
 @Repository
-public interface ReviewRepository extends JpaRepository<Review, Long> {
+public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
-    Page<Review> findByPtId(Long ptId, Pageable pageable);
+    Page<Review> findByPtId(UUID ptId, Pageable pageable);
 
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.pt.id = :ptId")
-    Double findAverageRatingByPtId(@Param("ptId") Long ptId);
+    Double findAverageRatingByPtId(@Param("ptId") UUID ptId);
 
-    long countByPtId(Long ptId);
+    long countByPtId(UUID ptId);
 
-    List<Review> findByReviewerId(Long reviewerId);
+    List<Review> findByReviewerId(UUID reviewerId);
 }

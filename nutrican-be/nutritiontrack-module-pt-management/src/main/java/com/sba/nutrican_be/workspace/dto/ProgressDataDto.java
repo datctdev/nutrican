@@ -7,13 +7,14 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProgressDataDto {
-    private Long clientId;
+    private UUID clientId;
     private String clientName;
     private List<DailyCalorieData> calorieHistory;
     private List<BodyMetricData> bodyMetrics;

@@ -11,15 +11,12 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserProfileResponse {
+public class ReviewResponse {
     private UUID id;
-    private String email;
-    private String fullName;
-    private String phoneNumber;
-    private String address;
-    private String dateOfBirth;
-    private String avatarUrl;
-    private String role;
-    private String status;
+    private UUID ptId;
+    private UUID reviewerId;
+    private String reviewerName;
+    private Double rating;
+    private String comment;
     private LocalDateTime createdAt;
 }

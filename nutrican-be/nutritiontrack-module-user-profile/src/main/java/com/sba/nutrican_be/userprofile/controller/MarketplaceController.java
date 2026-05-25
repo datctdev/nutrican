@@ -6,13 +6,15 @@ import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.userprofile.dto.CreateReviewRequest;
 import com.sba.nutrican_be.userprofile.dto.PtProfileResponse;
 import com.sba.nutrican_be.userprofile.dto.PtSearchRequest;
+import com.sba.nutrican_be.userprofile.dto.ReviewResponse;
 import com.sba.nutrican_be.userprofile.service.MarketplaceService;
-import com.sba.nutrican_be.userprofile.service.MarketplaceService.ReviewResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/marketplace")
@@ -46,13 +48,13 @@ public class MarketplaceController {
     }
 
     @GetMapping("/pts/{ptId}")
-    public ResponseEntity<ApiResponse<PtProfileResponse>> getPtDetail(@PathVariable Long ptId) {
+    public ResponseEntity<ApiResponse<PtProfileResponse>> getPtDetail(@PathVariable UUID ptId) {
         return ResponseEntity.ok(marketplaceService.getPtDetail(ptId));
     }
 
     @GetMapping("/pts/{ptId}/reviews")
     public ResponseEntity<ApiResponse<PageResponse<ReviewResponse>>> getPtReviews(
-            @PathVariable Long ptId,
+            @PathVariable UUID ptId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(marketplaceService.getPtReviews(ptId, page, size));
@@ -60,7 +62,7 @@ public class MarketplaceController {
 
     @PostMapping("/pts/{ptId}/reviews")
     public ResponseEntity<ApiResponse<ReviewResponse>> createReview(
-            @PathVariable Long ptId,
+            @PathVariable UUID ptId,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody CreateReviewRequest request) {
         return ResponseEntity.ok(marketplaceService.createReview(ptId, user.getId(), request));

@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
@@ -33,7 +35,7 @@ public class AdminController {
 
     @PutMapping("/users/{userId}/status")
     public ResponseEntity<ApiResponse<Void>> updateUserStatus(
-            @PathVariable Long userId,
+            @PathVariable UUID userId,
             @RequestBody java.util.Map<String, String> body) {
         return ResponseEntity.ok(adminService.updateUserStatus(userId, body.get("status")));
     }
@@ -47,13 +49,13 @@ public class AdminController {
 
     @PutMapping("/pts/{userId}/verify")
     public ResponseEntity<ApiResponse<Void>> verifyPt(
-            @PathVariable Long userId,
+            @PathVariable UUID userId,
             @RequestBody PtVerificationRequest request) {
         return ResponseEntity.ok(adminService.verifyPt(userId, request));
     }
 
     @GetMapping("/pts/{ptId}/documents")
-    public ResponseEntity<ApiResponse<PageResponse<PendingPtDto>>> getPtDocuments(@PathVariable Long ptId) {
+    public ResponseEntity<ApiResponse<PageResponse<PendingPtDto>>> getPtDocuments(@PathVariable UUID ptId) {
         return ResponseEntity.ok(adminService.getPendingPts(0, 1000));
     }
 
@@ -67,8 +69,8 @@ public class AdminController {
 
     @PutMapping("/sos-tickets/{ticketId}/assign")
     public ResponseEntity<ApiResponse<Void>> assignSosTicket(
-            @PathVariable Long ticketId,
-            @RequestBody java.util.Map<String, Long> body) {
+            @PathVariable UUID ticketId,
+            @RequestBody java.util.Map<String, UUID> body) {
         return ResponseEntity.ok(adminService.assignSosTicket(ticketId, body.get("ptId")));
     }
 

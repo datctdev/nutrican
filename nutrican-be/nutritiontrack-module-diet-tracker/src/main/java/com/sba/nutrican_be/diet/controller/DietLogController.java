@@ -13,7 +13,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.time.LocalDate;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/diet")
@@ -49,13 +51,13 @@ public class DietLogController {
     }
 
     @GetMapping("/logs/{id}")
-    public ResponseEntity<ApiResponse<DietLogResponse>> getLogById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<DietLogResponse>> getLogById(@PathVariable UUID id) {
         return ResponseEntity.ok(dietLogService.getLogById(id));
     }
 
     @PutMapping("/logs/{id}")
     public ResponseEntity<ApiResponse<DietLogResponse>> updateLog(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             @AuthenticationPrincipal User user,
             @Valid @RequestBody CreateDietLogRequest request) {
         return ResponseEntity.ok(dietLogService.updateLog(id, user.getId(), request));
@@ -63,7 +65,7 @@ public class DietLogController {
 
     @DeleteMapping("/logs/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteLog(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(dietLogService.deleteLog(id, user.getId()));
     }

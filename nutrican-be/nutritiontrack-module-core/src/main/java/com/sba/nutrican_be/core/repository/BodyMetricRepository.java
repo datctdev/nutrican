@@ -10,17 +10,18 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
-public interface BodyMetricRepository extends JpaRepository<BodyMetric, Long> {
+public interface BodyMetricRepository extends JpaRepository<BodyMetric, UUID> {
 
-    Page<BodyMetric> findByUserIdOrderByRecordDateDesc(Long userId, Pageable pageable);
+    Page<BodyMetric> findByUserIdOrderByRecordDateDesc(UUID userId, Pageable pageable);
 
     @Query("SELECT b FROM BodyMetric b WHERE b.user.id = :userId AND b.recordDate BETWEEN :start AND :end ORDER BY b.recordDate ASC")
     List<BodyMetric> findByUserIdAndDateRange(
-            @Param("userId") Long userId,
+            @Param("userId") UUID userId,
             @Param("start") LocalDate start,
             @Param("end") LocalDate end);
 
-    Optional<BodyMetric> findTopByUserIdOrderByRecordDateDesc(Long userId);
+    Optional<BodyMetric> findTopByUserIdOrderByRecordDateDesc(UUID userId);
 }

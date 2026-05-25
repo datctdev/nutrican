@@ -10,14 +10,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class DietLogResponse {
-    private Long id;
-    private Long customerId;
+    private UUID id;
+    private UUID customerId;
     private String customerName;
     private String imageUrl;
     private BigDecimal aiConfidenceScore;
@@ -26,7 +27,7 @@ public class DietLogResponse {
     private DietLogStatus status;
     private String foodDescription;
     private Boolean sosTicketFlag;
-    private Long ptReviewerId;
+    private UUID ptReviewerId;
     private String ptNote;
     private LocalDate logDate;
     private LocalDateTime createdAt;
