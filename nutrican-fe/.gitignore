@@ -1,0 +1,61 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ==========================================
+# CẤU HÌNH GITIGNORE CHO FRONTEND (REACT/VITE)
+# ==========================================
+
+# Thư mục thư viện (Nặng nhất, tuyệt đối không push)
+node_modules/
+
+# Thư mục Build production
+dist/
+dist-ssr/
+build/
+out/
+
+# File môi trường nhạy cảm
+.env
+.env.local
+.env.*.local
+
+# Các file log của npm/yarn/pnpm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Các thư mục cache của Vite / TypeScript
+.vite/
+.eslintcache
+*.tsbuildinfo
+
+# Môi trường IDE (VS Code, WebStorm)
+.vscode/
+.idea/
+
+# Các file hệ điều hành sinh ra
+.DS_Store
+Thumbs.db
