@@ -1,0 +1,669 @@
+# NutriCan PT - Architecture Documentation
+
+## 1. System Overview
+
+NutriCan PT là hệ thống theo dõi dinh dưỡng có tích hợp AI, kết nối người dùng với Personal Trainer (PT).
+
+### 1.1 High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              CLIENTS                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                 │
+│   │   Browser   │     │   Mobile    │     │   Desktop   │                 │
+│   │   (React)   │     │   (PWA)     │     │   (React)   │                 │
+│   └──────┬──────┘     └──────┬──────┘     └──────┬──────┘                 │
+│          │                    │                    │                          │
+│          └────────────────────┼────────────────────┘                        │
+│                               │                                              │
+│                          HTTPS/REST                                         │
+│                               │                                              │
+└───────────────────────────────┼─────────────────────────────────────────────┘
+                                │
+┌───────────────────────────────┼─────────────────────────────────────────────┐
+│                           INTERNET                                          │
+└───────────────────────────────┼─────────────────────────────────────────────┘
+                                │
+┌───────────────────────────────┼─────────────────────────────────────────────┐
+│                          LOAD BALANCER                                       │
+│                         (Nginx/Traefik)                                      │
+└───────────────────────────────┼─────────────────────────────────────────────┘
+                                │
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+        ▼                       ▼                       ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│   Frontend    │     │    Backend    │     │   External    │
+│   (React)     │     │ (Spring Boot) │     │   Services    │
+│               │     │               │     │               │
+│ - React 19    │     │ - Java 17     │     │ - Ollama AI  │
+│ - Vite        │     │ - Spring 4.x  │     │ - MinIO      │
+│ - Tailwind    │     │ - PostgreSQL  │     │               │
+│ - Zustand     │     │               │     │               │
+└───────────────┘     └───────┬───────┘     └───────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+        ▼                     ▼                     ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│  PostgreSQL   │     │    MinIO      │     │   Ollama      │
+│   Database    │     │  Object Store │     │   AI Engine   │
+│               │     │               │     │               │
+│ - Users       │     │ - Meal Images │     │ - Meal Recog  │
+│ - Diet Logs   │     │ - Avatars     │     │ - Chatbot     │
+│ - PT Profiles │     │ - Documents   │     │               │
+└───────────────┘     └───────────────┘     └───────────────┘
+```
+
+---
+
+## 2. Backend Architecture
+
+### 2.1 Module Structure (Multi-Module Maven)
+
+```
+nutrican-be/
+├── pom.xml                           # Parent POM
+├── nutritiontrack-module-core/       # Shared entities, utils
+│   ├── pom.xml
+│   └── src/main/java/
+│       ├── entity/                   # JPA Entities
+│       ├── repository/               # Spring Data Repositories
+│       ├── enums/                    # Enumerations
+│       ├── util/                     # Utilities (JWT, MacroUtils)
+│       ├── service/                  # MinIO Service
+│       ├── dto/                      # Common DTOs
+│       └── exception/                # Exception handling
+│
+├── nutritiontrack-module-auth/        # Authentication
+│   ├── pom.xml
+│   └── src/main/java/com/sba/nutrican_be/auth/
+│       ├── controller/
+│       ├── service/
+│       ├── dto/
+│       └── security/
+│
+├── nutritiontrack-module-user-profile/ # User profiles
+│   ├── pom.xml
+│   └── src/main/java/com/sba/nutrican_be/userprofile/
+│       ├── controller/
+│       ├── service/
+│       └── dto/
+│
+├── nutritiontrack-module-diet-tracker/ # Diet logging
+│   ├── pom.xml
+│   └── src/main/java/com/sba/nutrican_be/diet/
+│       ├── controller/
+│       ├── service/
+│       └── dto/
+│
+├── nutritiontrack-module-ai-gateway/  # AI Integration
+│   ├── pom.xml
+│   └── src/main/java/com/sba/nutrican_be/ai/
+│       ├── controller/
+│       ├── service/
+│       └── dto/
+│
+├── nutritiontrack-module-pt-management/ # PT Workspace
+│   ├── pom.xml
+│   └── src/main/java/com/sba/nutrican_be/workspace/
+│       ├── controller/
+│       ├── service/
+│       └── dto/
+│
+├── nutritiontrack-module-admin/      # Admin Dashboard
+│   ├── pom.xml
+│   └── src/main/java/com/sba/nutrican_be/admin/
+│       ├── controller/
+│       ├── service/
+│       └── dto/
+│
+└── nutritiontrack-module-application/ # Main Application
+    ├── pom.xml
+    └── src/main/java/com/sba/nutrican_be/
+        └── NutritionTrackApplication.java
+```
+
+### 2.2 Module Dependencies
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   nutritiontrack-module-application              │
+│                         (Entry Point)                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+         ┌────────────────────┼────────────────────┐
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│     Admin       │ │  PT Management  │ │  User Profile   │
+│                 │ │                 │ │                 │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+         │                    │                    │
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│  Diet Tracker   │ │   AI Gateway    │ │     Auth        │
+│                 │ │                 │ │                 │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+         │                    │                    │
+         │                    │                    │
+         └────────────────────┼────────────────────┘
+                              │
+         ┌────────────────────┼────────────────────┐
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   nutritiontrack-module-core                   │
+│         (Entities, Repositories, Utils, Exceptions)          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2.3 Technology Stack
+
+| Component | Technology | Version |
+|-----------|------------|---------|
+| Framework | Spring Boot | 4.0.6 |
+| Language | Java | 17 |
+| ORM | Spring Data JPA | - |
+| Security | Spring Security + JWT | - |
+| Database | PostgreSQL | 17 |
+| Object Storage | MinIO | 8.5.12 |
+| API Documentation | SpringDoc OpenAPI | 2.5.0 |
+| JWT Library | jjwt | 0.12.6 |
+| Build Tool | Maven | 3.9+ |
+
+---
+
+## 3. Frontend Architecture
+
+### 3.1 Project Structure
+
+```
+nutrican-fe/
+├── src/
+│   ├── components/
+│   │   ├── ui/                    # Radix UI primitives
+│   │   │   ├── button.jsx
+│   │   │   ├── card.jsx
+│   │   │   ├── input.jsx
+│   │   │   ├── label.jsx
+│   │   │   ├── badge.jsx
+│   │   │   └── toaster.jsx
+│   │   ├── common/               # Shared components
+│   │   │   ├── Button.jsx
+│   │   │   ├── Card.jsx
+│   │   │   ├── Input.jsx
+│   │   │   ├── Avatar.jsx
+│   │   │   ├── Modal.jsx
+│   │   │   └── Spinner.jsx
+│   │   └── layout/
+│   │       ├── MainLayout.jsx
+│   │       └── AuthLayout.jsx
+│   │
+│   ├── pages/
+│   │   ├── auth/
+│   │   │   ├── LoginPage.jsx
+│   │   │   ├── RegisterPage.jsx
+│   │   │   └── PtRegistrationPage.jsx
+│   │   ├── customer/
+│   │   │   ├── MarketplacePage.jsx
+│   │   │   ├── PtDetailPage.jsx
+│   │   │   ├── DietTrackerPage.jsx
+│   │   │   └── ProfilePage.jsx
+│   │   ├── pt/
+│   │   │   ├── PtDashboardPage.jsx
+│   │   │   ├── ClientListPage.jsx
+│   │   │   └── ReviewDietLogPage.jsx
+│   │   ├── admin/
+│   │   │   ├── AdminDashboardPage.jsx
+│   │   │   └── PtVerificationPage.jsx
+│   │   └── LandingPage.jsx
+│   │
+│   ├── services/
+│   │   ├── api.js               # Axios instance
+│   │   ├── authService.js
+│   │   ├── userService.js
+│   │   ├── dietService.js
+│   │   ├── marketplaceService.js
+│   │   ├── workspaceService.js
+│   │   ├── adminService.js
+│   │   └── sseService.js
+│   │
+│   ├── stores/
+│   │   ├── authStore.js         # Zustand auth store
+│   │   ├── dietStore.js         # Diet state
+│   │   └── notificationStore.js
+│   │
+│   ├── hooks/
+│   │   ├── useToast.js
+│   │   └── useSSE.js
+│   │
+│   ├── App.jsx                  # Router configuration
+│   ├── main.jsx                 # Entry point
+│   └── index.css                # Tailwind CSS
+│
+├── package.json
+├── vite.config.js
+├── tailwind.config.js
+└── eslint.config.js
+```
+
+### 3.2 Frontend Tech Stack
+
+| Component | Technology | Version |
+|-----------|------------|---------|
+| UI Framework | React | 19.2.6 |
+| Build Tool | Vite | 8.0.12 |
+| Routing | React Router | 7.15.1 |
+| State Management | Zustand | 5.0.13 |
+| Data Fetching | TanStack Query | 5.100.14 |
+| HTTP Client | Axios | 1.16.1 |
+| CSS Framework | Tailwind CSS | 3.4.19 |
+| UI Primitives | Radix UI | - |
+| Icons | Lucide React | 1.16.0 |
+| Toast | Sonner | 2.0.7 |
+
+---
+
+## 4. Database Architecture
+
+### 4.1 Entity Relationship Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              users                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ id (PK, UUID)                                                              │
+│ email (UNIQUE, NOT NULL)                                                   │
+│ password_hash                                                              │
+│ role (ENUM: CUSTOMER, PT_CERTIFIED, PT_FREELANCE, ADMIN)                   │
+│ status (ENUM: ACTIVE, INACTIVE, PENDING_APPROVAL, SUSPENDED)              │
+│ full_name, avatar_url, phone_number, address, date_of_birth                 │
+│ created_at, updated_at                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │
+         ├──────────────────┬───────────────────┬──────────────────┐
+         │                  │                   │                  │
+         ▼                  ▼                   ▼                  ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│   pt_profiles   │ │  macro_targets  │ │   diet_logs     │ │ pt_client_mappi │
+├─────────────────┤ ├─────────────────┤ ├─────────────────┤ ├─────────────────┤
+│ id (PK)         │ │ id (PK)         │ │ id (PK)         │ │ id (PK)         │
+│ user_id (FK,1:1)│ │ user_id (FK,1:1)│ │ customer_id (FK) │ │ pt_id (FK)      │
+│ is_verified     │ │ daily_calories  │ │ image_url       │ │ client_id (FK)  │
+│ bio, certifs    │ │ protein, carb   │ │ macros_json     │ │ status          │
+│ tier            │ │ fat             │ │ meal_type       │ │ assigned_at     │
+│ rating, reviews │ │                 │ │ status          │ │                 │
+└─────────────────┘ └─────────────────┘ └────────┬────────┘ └─────────────────┘
+                                                  │
+                                                  │ 1:many
+                                                  ▼
+                                         ┌─────────────────┐
+                                         │  sos_tickets     │
+                                         ├─────────────────┤
+                                         │ id (PK)         │
+                                         │ diet_log_id (FK)│
+                                         │ pt_id (FK)      │
+                                         │ assigned_by     │
+                                         │ status, priority│
+                                         │ note            │
+                                         └─────────────────┘
+
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│  body_metrics   │ │    reviews      │ │ notifications   │
+├─────────────────┤ ├─────────────────┤ ├─────────────────┤
+│ id (PK)         │ │ id (PK)         │ │ id (PK)         │
+│ user_id (FK)    │ │ pt_id (FK)      │ │ user_id (FK)    │
+│ record_date     │ │ reviewer_id(FK) │ │ type, message   │
+│ weight, body_fat│ │ rating, comment │ │ is_read         │
+│ lbm, muscle_mass│ │ created_at       │ │ reference_id    │
+└─────────────────┘ └─────────────────┘ └─────────────────┘
+```
+
+### 4.2 Database Schema Summary
+
+| Table | Primary Key | Foreign Keys | Description |
+|-------|-------------|--------------|-------------|
+| `users` | id | - | User accounts |
+| `pt_profiles` | id | user_id (1:1) | PT extended profiles |
+| `macro_targets` | id | user_id (1:1) | Daily macro targets |
+| `diet_logs` | id | customer_id, pt_reviewer_id | Meal entries |
+| `pt_client_mappings` | id | pt_id, client_id | PT-Client relationships |
+| `sos_tickets` | id | diet_log_id, pt_id, assigned_by | SOS support tickets |
+| `body_metrics` | id | user_id | Body measurements |
+| `reviews` | id | pt_id, reviewer_id | PT reviews |
+| `notifications` | id | user_id | User notifications |
+
+---
+
+## 5. Security Architecture
+
+### 5.1 Authentication Flow
+
+```
+┌──────────┐          ┌──────────┐          ┌──────────┐          ┌──────────┐
+│  Client  │          │  Backend  │          │    DB    │          │   JWT    │
+└────┬─────┘          └────┬─────┘          └────┬─────┘          └────┬─────┘
+     │                     │                     │                     │
+     │  1. Login Request   │                     │                     │
+     │  (email, password)  │                     │                     │
+     │────────────────────>│                     │                     │
+     │                     │                     │                     │
+     │                     │  2. Find User       │                     │
+     │                     │────────────────────>│                     │
+     │                     │                     │                     │
+     │                     │  3. User Data       │                     │
+     │                     │<────────────────────│                     │
+     │                     │                     │                     │
+     │                     │  4. Validate Password (BCrypt)            │
+     │                     │                     │                     │
+     │                     │  5. Generate Tokens │                     │
+     │                     │───────────────────────────────────────────>│
+     │                     │                     │                     │
+     │  6. AuthResponse    │                     │                     │
+     │  (accessToken,      │                     │                     │
+     │   refreshToken)     │                     │                     │
+     │<────────────────────│                     │                     │
+     │                     │                     │                     │
+     │  7. API Request     │                     │                     │
+     │  + Bearer Token      │                     │                     │
+     │────────────────────>│                     │                     │
+     │                     │                     │                     │
+     │                     │  8. Validate JWT    │                     │
+     │                     │───────────────────────────────────────────>│
+     │                     │                     │                     │
+     │                     │  9. Load User       │                     │
+     │                     │────────────────────>│                     │
+     │                     │                     │                     │
+     │                     │ 10. Set SecurityContext                    │
+     │                     │                     │                     │
+     │ 11. Response        │                     │                     │
+     │<────────────────────│                     │                     │
+```
+
+### 5.2 JWT Token Structure
+
+**Access Token:**
+```json
+{
+  "sub": "user@example.com",
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "role": "CUSTOMER",
+  "iat": 1706400000,
+  "exp": 1706403600
+}
+```
+
+**Refresh Token:**
+```json
+{
+  "sub": "user@example.com",
+  "type": "refresh",
+  "iat": 1706400000,
+  "exp": 1706662800
+}
+```
+
+### 5.3 Role-Based Access Control
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           ACCESS CONTROL MATRIX                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Endpoint Pattern          │ CUSTOMER │ PT_FREELANCE │ PT_CERTIFIED │ ADMIN │
+│ ──────────────────────────┼──────────┼──────────────┼──────────────┼───────│
+│  /api/v1/auth/**          │    ✓     │      ✓       │      ✓       │   ✓   │
+│  /api/v1/profile/**       │    ✓     │      ✓       │      ✓       │   ✓   │
+│  /api/v1/diet/**          │    ✓     │      ✗       │      ✗       │   ✗   │
+│  /api/v1/marketplace/**   │    ✓     │      ✓       │      ✓       │   ✓   │
+│  /api/v1/workspace/**     │    ✗     │      ✓       │      ✓       │   ✗   │
+│  /api/v1/admin/**         │    ✗     │      ✗       │      ✗       │   ✓   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+✓ = Allowed, ✗ = Denied
+```
+
+---
+
+## 6. Real-Time Architecture (SSE)
+
+### 6.1 Server-Sent Events Flow
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Client    │     │   Backend   │     │   Trigger   │
+│   (React)   │     │  (SSE API)  │     │   Events    │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                   │
+       │  1. GET /stream   │                   │
+       │──────────────────>│                   │
+       │                   │                   │
+       │                   │  2. Create Emitter│
+       │                   │  3. Store in Map  │
+       │                   │                   │
+       │  4. CONNECTED     │                   │
+       │<──────────────────│                   │
+       │                   │                   │
+       │                   │<───── Diet Log Created ─────│
+       │                   │                   │
+       │  5. NEW_DIET_LOG  │                   │
+       │<──────────────────│                   │
+       │                   │                   │
+       │                   │<───── SOS Ticket ──────────│
+       │                   │                   │
+       │  6. SOS_TICKET    │                   │
+       │<──────────────────│                   │
+       │                   │                   │
+       │  7. (on error)    │                   │
+       │  Reconnect after 5s                   │
+       │──────────────────>│                   │
+```
+
+### 6.2 SSE Events
+
+| Event | Trigger | Payload |
+|-------|---------|---------|
+| `CONNECTED` | Connection established | `{ status: "connected" }` |
+| `NEW_DIET_LOG` | Client creates diet log | `{ client_id, client_name, log_id, meal_type }` |
+| `SOS_TICKET` | Client creates SOS | `{ client_id, client_name, priority, type: "SOS" }` |
+
+---
+
+## 7. AI Integration Architecture
+
+### 7.1 Meal Recognition Flow
+
+```
+┌─────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│ Client  │     │  Backend    │     │   MinIO     │     │  Ollama    │
+└────┬────┘     └──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+     │                  │                  │                   │
+     │  1. POST /diet/logs/analyze       │                   │
+     │  + Image File   │                  │                   │
+     │─────────────────>│                  │                   │
+     │                  │                  │                   │
+     │                  │  2. Upload to MinIO                 │
+     │                  │─────────────────────────────────────>│
+     │                  │                  │                   │
+     │                  │  3. Presigned URL│                   │
+     │                  │<─────────────────────────────────────│
+     │                  │                  │                   │
+     │                  │  4. POST /api/chat                   │
+     │                  │  { model: "qwen2.5-vl",             │
+     │                  │    messages: [{                     │
+     │                  │      role: "user",                  │
+     │                  │      content: [                    │
+     │                  │        {type: "image_url",          │
+     │                  │         url: "<presigned_url>"},     │
+     │                  │        {type: "text",                │
+     │                  │         text: "Analyze this meal"}   │
+     │                  │      ]                               │
+     │                  │    }]                                │
+     │                  │  }                                   │
+     │                  │─────────────────────────────────────>│
+     │                  │                  │                   │
+     │                  │  5. AI Response (JSON)               │
+     │                  │<─────────────────────────────────────│
+     │                  │                  │                   │
+     │  6. AnalyzeMealResponse           │                   │
+     │  { foodName, calories, protein,   │                   │
+     │    confidenceScore, fallback }     │                   │
+     │<─────────────────│                  │                   │
+```
+
+### 7.2 AI Model Configuration
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Model | `qwen2.5-vl` | Vision-language model |
+| Base URL | `http://localhost:11434` | Ollama endpoint |
+| Temperature (Meal) | 0.1 | Low for consistent nutrition data |
+| Temperature (Chat) | 0.7 | Balanced creativity |
+| Fallback | 300 cal, 15g protein | Default when AI fails |
+
+---
+
+## 8. Deployment Architecture
+
+### 8.1 Docker Compose Services
+
+```yaml
+services:
+  postgres:
+    image: postgres:17-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: nutrican_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    networks:
+      - backend
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - backend
+```
+
+### 8.2 Production Deployment
+
+```
+                    ┌─────────────────────────────────────┐
+                    │           Load Balancer              │
+                    │          (Nginx/HAProxy)             │
+                    └──────────────────┬──────────────────┘
+                                       │
+           ┌───────────────────────────┼───────────────────────────┐
+           │                           │                           │
+           ▼                           ▼                           ▼
+┌─────────────────────┐   ┌─────────────────────┐   ┌─────────────────────┐
+│   Frontend CDN      │   │     Backend         │   │    Backend          │
+│   (Static Files)   │   │     (Instance 1)   │   │    (Instance 2)     │
+│                     │   │     Spring Boot    │   │    Spring Boot      │
+│  - Nginx           │   │     Java 17        │   │    Java 17          │
+│  - React Build     │   │                     │   │                     │
+└─────────────────────┘   └─────────┬─────────┘   └─────────┬─────────┘
+                                    │                         │
+                                    └────────────┬────────────┘
+                                                 │
+                                    ┌────────────┴────────────┐
+                                    │                         │
+                                    ▼                         ▼
+                           ┌─────────────┐           ┌─────────────┐
+                           │ PostgreSQL  │           │    MinIO    │
+                           │  (RDS/Multi │           │  (S3-like)  │
+                           │   AZ)       │           │             │
+                           └─────────────┘           └─────────────┘
+```
+
+---
+
+## 9. Monitoring & Observability
+
+### 9.1 Health Check Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `/actuator/health` | Application health |
+| `/actuator/info` | Application info |
+| `/actuator/metrics` | Prometheus metrics |
+
+### 9.2 Logging Strategy
+
+- **Framework**: SLF4J + Logback
+- **Format**: JSON for production
+- **Levels**: DEBUG, INFO, WARN, ERROR
+- **Rotation**: Daily + size-based
+
+---
+
+## 10. Performance Considerations
+
+### 10.1 Caching Strategy
+
+| Data | Cache | TTL |
+|------|-------|-----|
+| User Profile | In-memory | Request-scoped |
+| PT Listings | None (DB query) | - |
+| Static Assets | CDN | 1 year |
+
+### 10.2 Database Optimization
+
+- **Indexes**: On frequently queried columns (user_id, status, dates)
+- **Pagination**: Default 20 items, max 100
+- **Connection Pool**: HikariCP with sensible defaults
+
+### 10.3 Image Optimization
+
+- **Max Size**: 500KB
+- **Formats**: JPEG, PNG
+- **Storage**: MinIO with CDN
+- **Thumbnails**: Generated client-side
+
+---
+
+## 11. Backup & Recovery
+
+### 11.1 Backup Strategy
+
+| Data | Frequency | Retention |
+|------|-----------|-----------|
+| Database | Daily | 30 days |
+| MinIO | Daily | 90 days |
+| Config | On change | Git |
+
+### 11.2 Recovery Procedures
+
+1. Database restore from pg_dump
+2. MinIO restore from S3-compatible backup
+3. Configuration from Git
+
+---
+
+*Document Version: 1.0.0*
+*Last Updated: 2026-05-29*
