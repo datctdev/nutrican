@@ -73,11 +73,13 @@ export const useAuthStore = create(
           isAuthenticated: false,
           error: null,
         });
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
       },
 
       clearError: () => set({ error: null }),
+
+      setUser: (userData) => set({ user: userData }),
+
+      setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
     }),
     {
       name: 'nutrican-auth',

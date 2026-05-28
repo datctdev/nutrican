@@ -3,8 +3,6 @@ import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import { Menu, X, ChevronDown, Bell, LogOut, User, Settings, LayoutDashboard } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '../common/Avatar';
-import { Badge } from '../ui/badge';
 
 export default function Header() {
   const { user, logout, isAuthenticated } = useAuthStore();
@@ -98,12 +96,18 @@ export default function Header() {
                     onClick={() => setProfileMenuOpen(!profileMenuOpen)}
                     className="flex items-center gap-2 p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
                   >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.avatarUrl} />
-                      <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
+                    {user?.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.fullName || 'User'}
+                        className="h-8 w-8 rounded-full object-cover"
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm">
                         {getInitials(user?.fullName)}
-                      </AvatarFallback>
-                    </Avatar>
+                      </div>
+                    )}
                     <div className="hidden lg:block text-left">
                       <p className="text-sm font-medium text-gray-900">{user?.fullName}</p>
                       <p className="text-xs text-gray-500 capitalize">{user?.role?.toLowerCase().replace('_', ' ')}</p>

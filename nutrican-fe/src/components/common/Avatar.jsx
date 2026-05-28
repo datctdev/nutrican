@@ -2,7 +2,7 @@ import * as React from "react";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
 import { cn } from "../../lib/utils";
 
-const Avatar = React.forwardRef(({ src, alt, size = 'md', className = '', ...props }, ref) => {
+const Avatar = React.forwardRef(({ src, alt, size = 'md', className = '', onClick, ...props }, ref) => {
   const sizes = {
     sm: 'h-8 w-8 text-xs',
     md: 'h-10 w-10 text-sm',
@@ -15,7 +15,8 @@ const Avatar = React.forwardRef(({ src, alt, size = 'md', className = '', ...pro
   return (
     <AvatarPrimitive.Root
       ref={ref}
-      className={cn("relative flex shrink-0 overflow-hidden rounded-full", sizes[size], className)}
+      className={cn("relative flex shrink-0 overflow-hidden rounded-full cursor-pointer", sizes[size], className)}
+      onClick={onClick}
       {...props}
     >
       {src && (
