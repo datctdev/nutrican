@@ -87,20 +87,53 @@ public class AdminServiceImpl implements AdminService {
         PtProfile profile = ptProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT Profile for user", userId));
 
-        switch (request.getAction().toUpperCase()) {
+        // Support both new format (approved/isVerified boolean + role string) and legacy format (action + ptType)
+        String action = request.getAction();
+        String ptType = request.getPtType();
+
+        // New format: approved/isVerified boolean + role string
+        if (action == null) {
+            Boolean isApproved = request.getIsVerified();
+            if (isApproved == null) {
+                isApproved = request.getApproved();
+            }
+
+            if (isApproved != null) {
+                if (isApproved) {
+                    action = "APPROVE";
+                    // Extract type from ptType (e.g., "PT_CERTIFIED" -> "CERTIFIED")
+                    if (request.getPtType() != null) {
+                        ptType = request.getPtType().replace("PT_", "");
+                    }
+                } else {
+                    action = "REJECT";
+                }
+            }
+        }
+
+        if (action == null) {
+            throw new BadRequestException("Action is required");
+        }
+
+        switch (action.toUpperCase()) {
             case "APPROVE" -> {
-                if ("CERTIFIED".equalsIgnoreCase(request.getPtType())) {
+                if ("CERTIFIED".equalsIgnoreCase(ptType)) {
                     user.setRole(UserRole.PT_CERTIFIED);
                     profile.setIsVerified(true);
                     profile.setTier(Tier.TIER_1);
-                } else if ("FREELANCE".equalsIgnoreCase(request.getPtType())) {
+                } else if ("FREELANCE".equalsIgnoreCase(ptType)) {
                     user.setRole(UserRole.PT_FREELANCE);
                     profile.setIsVerified(true);
                     profile.setTier(Tier.TIER_2);
+                } else {
+                    // Default to CERTIFIED if no type specified
+                    user.setRole(UserRole.PT_CERTIFIED);
+                    profile.setIsVerified(true);
+                    profile.setTier(Tier.TIER_1);
                 }
                 user.setStatus(UserStatus.ACTIVE);
                 profile.setVerificationStatus(UserStatus.ACTIVE);
-                log.info("PT {} approved as {} by admin", userId, request.getPtType());
+                log.info("PT {} approved as {} by admin", userId, ptType);
             }
             case "REJECT" -> {
                 user.setStatus(UserStatus.SUSPENDED);
@@ -108,7 +141,7 @@ public class AdminServiceImpl implements AdminService {
                 profile.setIsVerified(false);
                 log.info("PT {} rejected by admin", userId);
             }
-            default -> throw new BadRequestException("Invalid action: " + request.getAction());
+            default -> throw new BadRequestException("Invalid action: " + action);
         }
 
         userRepository.save(user);

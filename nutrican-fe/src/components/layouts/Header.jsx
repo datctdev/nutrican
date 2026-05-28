@@ -48,6 +48,8 @@ export default function Header() {
     ADMIN: [
       { label: 'Dashboard', href: '/admin' },
       { label: 'PT Management', href: '/admin/pts' },
+      { label: 'Users', href: '/admin/users' },
+      { label: 'SOS Tickets', href: '/admin/sos' },
     ],
   };
 

@@ -16,6 +16,8 @@ import ClientListPage from './pages/pt/ClientListPage';
 import ReviewDietLogPage from './pages/pt/ReviewDietLogPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import PtVerificationPage from './pages/admin/PtVerificationPage';
+import UserManagementPage from './pages/admin/UserManagementPage';
+import SosTicketsPage from './pages/admin/SosTicketsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 
 function App() {
@@ -62,6 +64,14 @@ function App() {
         {
           path: '/admin/pts',
           element: <ProtectedRoute allowedRoles={['ADMIN']}><PtVerificationPage /></ProtectedRoute>,
+        },
+        {
+          path: '/admin/users',
+          element: <ProtectedRoute allowedRoles={['ADMIN']}><UserManagementPage /></ProtectedRoute>,
+        },
+        {
+          path: '/admin/sos',
+          element: <ProtectedRoute allowedRoles={['ADMIN']}><SosTicketsPage /></ProtectedRoute>,
         },
       ],
     },
