@@ -16,7 +16,7 @@ public class DietSummaryResponse {
     private LocalDate date;
     private BigDecimal totalCalories;
     private BigDecimal totalProtein;
-    private BigDecimal totalCarb;
+    private BigDecimal totalCarbs;
     private BigDecimal totalFat;
     private List<DietLogResponse> logs;
 }

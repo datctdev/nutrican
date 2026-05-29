@@ -16,7 +16,7 @@ public class MealRecognitionResult {
     private String portionUnit;
     private BigDecimal calories;
     private BigDecimal protein;
-    private BigDecimal carb;
+    private BigDecimal carbs;
     private BigDecimal fat;
     private BigDecimal confidenceScore;
     private boolean fallback;

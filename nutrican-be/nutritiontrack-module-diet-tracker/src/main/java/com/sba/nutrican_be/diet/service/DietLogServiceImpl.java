@@ -63,7 +63,7 @@ public class DietLogServiceImpl implements DietLogService {
             Map<String, Object> macros = MacroUtils.newMacroMap();
             macros.put("calories", request.getCalories());
             macros.put("protein", request.getProtein());
-            macros.put("carb", request.getCarb());
+            macros.put("carbs", request.getCarb());
             macros.put("fat", request.getFat());
             dietLog.setMacrosJson(macros);
         }
@@ -97,7 +97,7 @@ public class DietLogServiceImpl implements DietLogService {
             Map<String, Object> macros = MacroUtils.newMacroMap();
             macros.put("calories", aiResult.getCalories());
             macros.put("protein", aiResult.getProtein());
-            macros.put("carb", aiResult.getCarb());
+            macros.put("carbs", aiResult.getCarbs());
             macros.put("fat", aiResult.getFat());
 
             DietLog dietLog = DietLog.builder()
@@ -123,7 +123,7 @@ public class DietLogServiceImpl implements DietLogService {
                     .portionUnit(aiResult.getPortionUnit())
                     .calories(aiResult.getCalories())
                     .protein(aiResult.getProtein())
-                    .carb(aiResult.getCarb())
+                    .carb(aiResult.getCarbs())
                     .fat(aiResult.getFat())
                     .confidenceScore(aiResult.getConfidenceScore())
                     .fallback(aiResult.isFallback())
@@ -181,7 +181,7 @@ public class DietLogServiceImpl implements DietLogService {
             Map<String, Object> macros = MacroUtils.newMacroMap();
             macros.put("calories", request.getCalories());
             macros.put("protein", request.getProtein());
-            macros.put("carb", request.getCarb());
+            macros.put("carbs", request.getCarb());
             macros.put("fat", request.getFat());
             dietLog.setMacrosJson(macros);
             dietLog.setStatus(DietLogStatus.LOGGED);
@@ -223,7 +223,7 @@ public class DietLogServiceImpl implements DietLogService {
             if (dietLog.getMacrosJson() != null) {
                 totalCalories = MacroUtils.add(totalCalories, MacroUtils.getMacro(dietLog, "calories"));
                 totalProtein = MacroUtils.add(totalProtein, MacroUtils.getMacro(dietLog, "protein"));
-                totalCarb = MacroUtils.add(totalCarb, MacroUtils.getMacro(dietLog, "carb"));
+                totalCarb = MacroUtils.add(totalCarb, MacroUtils.getMacro(dietLog, "carbs"));
                 totalFat = MacroUtils.add(totalFat, MacroUtils.getMacro(dietLog, "fat"));
             }
         }
@@ -232,7 +232,7 @@ public class DietLogServiceImpl implements DietLogService {
                 .date(date)
                 .totalCalories(totalCalories)
                 .totalProtein(totalProtein)
-                .totalCarb(totalCarb)
+                .totalCarbs(totalCarb)
                 .totalFat(totalFat)
                 .logs(logs.stream().map(this::toResponse).toList())
                 .build();

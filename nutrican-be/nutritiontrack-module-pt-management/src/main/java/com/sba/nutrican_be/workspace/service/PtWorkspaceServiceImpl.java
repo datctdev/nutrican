@@ -130,7 +130,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
 
                 totalCalories = MacroUtils.add(totalCalories, MacroUtils.toBd(log.getMacrosJson().get("calories")));
                 totalProtein = MacroUtils.add(totalProtein, MacroUtils.toBd(log.getMacrosJson().get("protein")));
-                totalCarb = MacroUtils.add(totalCarb, MacroUtils.toBd(log.getMacrosJson().get("carb")));
+                totalCarb = MacroUtils.add(totalCarb, MacroUtils.toBd(log.getMacrosJson().get("carbs")));
                 totalFat = MacroUtils.add(totalFat, MacroUtils.toBd(log.getMacrosJson().get("fat")));
                 logCount++;
             }

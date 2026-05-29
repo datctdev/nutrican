@@ -4,6 +4,7 @@ export const dietService = {
   createLog: (data) => api.post('/diet/logs', data),
   analyzeMeal: (formData) => api.post('/diet/logs/analyze', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000, // AI analysis can take up to 2 minutes
   }),
   getLogs: (params) => api.get('/diet/logs', { params }),
   getLogById: (id) => api.get(`/diet/logs/${id}`),

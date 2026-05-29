@@ -20,7 +20,7 @@ public class MacroUtils {
         Map<String, Object> macros = new HashMap<>();
         macros.put("calories", ZERO);
         macros.put("protein", ZERO);
-        macros.put("carb", ZERO);
+        macros.put("carbs", ZERO);
         macros.put("fat", ZERO);
         return macros;
     }
@@ -30,7 +30,7 @@ public class MacroUtils {
         Map<String, Object> macros = new HashMap<>();
         macros.put("calories", calories != null ? calories : ZERO);
         macros.put("protein", protein != null ? protein : ZERO);
-        macros.put("carb", carb != null ? carb : ZERO);
+        macros.put("carbs", carb != null ? carb : ZERO);
         macros.put("fat", fat != null ? fat : ZERO);
         macros.put("adjusted", true);
         return macros;
