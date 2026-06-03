@@ -5,6 +5,7 @@ import com.sba.nutrican_be.ai.service.MealRecognitionService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
 import com.sba.nutrican_be.core.entity.DietLog;
+import com.sba.nutrican_be.core.entity.DietLogImage;
 import com.sba.nutrican_be.core.entity.SOSTicket;
 import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.core.enums.DietLogStatus;
@@ -12,6 +13,7 @@ import com.sba.nutrican_be.core.enums.MealType;
 import com.sba.nutrican_be.core.enums.SOSTicketStatus;
 import com.sba.nutrican_be.core.exception.BadRequestException;
 import com.sba.nutrican_be.core.exception.ResourceNotFoundException;
+import com.sba.nutrican_be.core.repository.DietLogImageRepository;
 import com.sba.nutrican_be.core.repository.DietLogRepository;
 import com.sba.nutrican_be.core.repository.SOSTicketRepository;
 import com.sba.nutrican_be.core.repository.UserRepository;
@@ -33,6 +35,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -40,6 +43,7 @@ import java.util.UUID;
 public class DietLogServiceImpl implements DietLogService {
 
     private final DietLogRepository dietLogRepository;
+    private final DietLogImageRepository dietLogImageRepository;
     private final SOSTicketRepository sosTicketRepository;
     private final UserRepository userRepository;
     private final MealRecognitionService mealRecognitionService;
@@ -204,6 +208,11 @@ public class DietLogServiceImpl implements DietLogService {
         if (dietLog.getImageObjectName() != null) {
             minioService.deleteFile(dietLog.getImageObjectName());
         }
+        List<DietLogImage> additionalImages = dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(logId);
+        for (DietLogImage img : additionalImages) {
+            minioService.deleteFile(img.getImageObjectName());
+        }
+        dietLogImageRepository.deleteAll(additionalImages);
         dietLogRepository.delete(dietLog);
         return ApiResponse.success(null, "Diet log deleted");
     }
@@ -267,6 +276,23 @@ public class DietLogServiceImpl implements DietLogService {
     }
 
     private DietLogResponse toResponse(DietLog dietLog) {
+        List<DietLogImageDTO> additionalImages = null;
+        if (dietLog.getAdditionalImages() != null && !dietLog.getAdditionalImages().isEmpty()) {
+            additionalImages = dietLog.getAdditionalImages().stream()
+                    .map(img -> DietLogImageDTO.builder()
+                            .id(img.getId())
+                            .dietLogId(dietLog.getId())
+                            .imageUrl(img.getImageUrl())
+                            .imageObjectName(img.getImageObjectName())
+                            .isPrimary(img.getIsPrimary())
+                            .sortOrder(img.getSortOrder())
+                            .fileSize(img.getFileSize())
+                            .contentType(img.getContentType())
+                            .aiConfidenceScore(img.getAiConfidenceScore())
+                            .macrosJson(img.getMacrosJson())
+                            .build())
+                    .collect(Collectors.toList());
+        }
         return DietLogResponse.builder()
                 .id(dietLog.getId())
                 .customerId(dietLog.getCustomer().getId())
@@ -282,6 +308,7 @@ public class DietLogServiceImpl implements DietLogService {
                 .ptNote(dietLog.getPtNote())
                 .logDate(dietLog.getLogDate())
                 .createdAt(dietLog.getCreatedAt())
+                .additionalImages(additionalImages)
                 .build();
     }
 }

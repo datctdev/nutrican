@@ -1,6 +1,7 @@
 package com.sba.nutrican_be.admin.service;
 
 import com.sba.nutrican_be.admin.dto.AdminDashboardDto;
+import com.sba.nutrican_be.admin.dto.PendingKycDto;
 import com.sba.nutrican_be.admin.dto.PendingPtDto;
 import com.sba.nutrican_be.admin.dto.PtVerificationRequest;
 import com.sba.nutrican_be.core.dto.ApiResponse;
@@ -19,6 +20,12 @@ public interface AdminService {
     ApiResponse<PageResponse<PendingPtDto>> getPendingPts(int page, int size);
 
     ApiResponse<Void> verifyPt(UUID userId, PtVerificationRequest request);
+
+    ApiResponse<PageResponse<PendingKycDto>> getPendingKycs(int page, int size);
+
+    ApiResponse<Void> approveKyc(UUID userId);
+
+    ApiResponse<Void> rejectKyc(UUID userId, String reason);
 
     ApiResponse<PageResponse<SOSTicket>> getSosTickets(String status, int page, int size);
 

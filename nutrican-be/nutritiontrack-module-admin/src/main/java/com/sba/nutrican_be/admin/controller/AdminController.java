@@ -1,6 +1,7 @@
 package com.sba.nutrican_be.admin.controller;
 
 import com.sba.nutrican_be.admin.dto.AdminDashboardDto;
+import com.sba.nutrican_be.admin.dto.PendingKycDto;
 import com.sba.nutrican_be.admin.dto.PendingPtDto;
 import com.sba.nutrican_be.admin.dto.PtVerificationRequest;
 import com.sba.nutrican_be.admin.service.AdminService;
@@ -52,6 +53,25 @@ public class AdminController {
             @PathVariable UUID userId,
             @RequestBody PtVerificationRequest request) {
         return ResponseEntity.ok(adminService.verifyPt(userId, request));
+    }
+
+    @GetMapping("/kyc/pending")
+    public ResponseEntity<ApiResponse<PageResponse<PendingKycDto>>> getPendingKycs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(adminService.getPendingKycs(page, size));
+    }
+
+    @PutMapping("/users/{userId}/kyc/approve")
+    public ResponseEntity<ApiResponse<Void>> approveKyc(@PathVariable UUID userId) {
+        return ResponseEntity.ok(adminService.approveKyc(userId));
+    }
+
+    @PutMapping("/users/{userId}/kyc/reject")
+    public ResponseEntity<ApiResponse<Void>> rejectKyc(
+            @PathVariable UUID userId,
+            @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(adminService.rejectKyc(userId, body.get("reason")));
     }
 
     @GetMapping("/pts/{ptId}/documents")

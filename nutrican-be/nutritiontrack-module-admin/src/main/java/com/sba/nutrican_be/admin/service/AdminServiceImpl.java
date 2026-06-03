@@ -1,6 +1,7 @@
 package com.sba.nutrican_be.admin.service;
 
 import com.sba.nutrican_be.admin.dto.AdminDashboardDto;
+import com.sba.nutrican_be.admin.dto.PendingKycDto;
 import com.sba.nutrican_be.admin.dto.PendingPtDto;
 import com.sba.nutrican_be.admin.dto.PtVerificationRequest;
 import com.sba.nutrican_be.core.dto.ApiResponse;
@@ -8,6 +9,7 @@ import com.sba.nutrican_be.core.dto.PageResponse;
 import com.sba.nutrican_be.core.entity.PtProfile;
 import com.sba.nutrican_be.core.entity.SOSTicket;
 import com.sba.nutrican_be.core.entity.User;
+import com.sba.nutrican_be.core.entity.UserKyc;
 import com.sba.nutrican_be.core.enums.SOSTicketStatus;
 import com.sba.nutrican_be.core.enums.Tier;
 import com.sba.nutrican_be.core.enums.UserRole;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +38,7 @@ public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
     private final PtProfileRepository ptProfileRepository;
+    private final UserKycRepository userKycRepository;
     private final SOSTicketRepository sosTicketRepository;
     private final ReviewRepository reviewRepository;
 
@@ -72,7 +76,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public ApiResponse<PageResponse<PendingPtDto>> getPendingPts(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<PtProfile> profilePage = ptProfileRepository.findByVerificationStatus(
+        Page<PtProfile> profilePage = ptProfileRepository.findByPtRequestStatus(
                 UserStatus.PENDING_APPROVAL, pageable);
 
         return ApiResponse.success(PageResponse.from(profilePage.map(this::toPendingPtDto)));
@@ -133,11 +137,13 @@ public class AdminServiceImpl implements AdminService {
                 }
                 user.setStatus(UserStatus.ACTIVE);
                 profile.setVerificationStatus(UserStatus.ACTIVE);
+                profile.setPtRequestStatus(UserStatus.ACTIVE);
                 log.info("PT {} approved as {} by admin", userId, ptType);
             }
             case "REJECT" -> {
                 user.setStatus(UserStatus.SUSPENDED);
                 profile.setVerificationStatus(UserStatus.SUSPENDED);
+                profile.setPtRequestStatus(UserStatus.SUSPENDED);
                 profile.setIsVerified(false);
                 log.info("PT {} rejected by admin", userId);
             }
@@ -148,6 +154,60 @@ public class AdminServiceImpl implements AdminService {
         ptProfileRepository.save(profile);
 
         return ApiResponse.success(null, "PT verification processed");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<PageResponse<PendingKycDto>> getPendingKycs(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<UserKyc> kycPage = userKycRepository.findByVerificationStatus(
+                UserStatus.PENDING_APPROVAL, pageable);
+
+        return ApiResponse.success(PageResponse.from(kycPage.map(this::toPendingKycDto)));
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Void> approveKyc(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        UserKyc userKyc = userKycRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("KYC record for user", userId));
+
+        user.setIsKycVerified(true);
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
+
+        userKyc.setIsVerified(true);
+        userKyc.setVerificationStatus(UserStatus.ACTIVE);
+        userKyc.setReviewedAt(LocalDateTime.now());
+        userKycRepository.save(userKyc);
+
+        log.info("KYC approved for user {} by admin", userId);
+        return ApiResponse.success(null, "KYC approved successfully");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Void> rejectKyc(UUID userId, String reason) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        UserKyc userKyc = userKycRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("KYC record for user", userId));
+
+        user.setStatus(UserStatus.SUSPENDED);
+        userRepository.save(user);
+
+        userKyc.setIsVerified(false);
+        userKyc.setVerificationStatus(UserStatus.SUSPENDED);
+        userKyc.setRejectionReason(reason);
+        userKyc.setReviewedAt(LocalDateTime.now());
+        userKycRepository.save(userKyc);
+
+        log.info("KYC rejected for user {} by admin: {}", userId, reason);
+        return ApiResponse.success(null, "KYC rejected");
     }
 
     @Override
@@ -194,7 +254,9 @@ public class AdminServiceImpl implements AdminService {
         long totalPts = userRepository.findByRole(UserRole.PT_CERTIFIED, PageRequest.of(0, 1)).getTotalElements()
                 + userRepository.findByRole(UserRole.PT_FREELANCE, PageRequest.of(0, 1)).getTotalElements();
         long totalCustomers = userRepository.findByRole(UserRole.CUSTOMER, PageRequest.of(0, 1)).getTotalElements();
-        long pendingPts = ptProfileRepository.findByVerificationStatus(
+        long pendingKyc = userKycRepository.findByVerificationStatus(
+                UserStatus.PENDING_APPROVAL, PageRequest.of(0, 1)).getTotalElements();
+        long pendingPts = ptProfileRepository.findByPtRequestStatus(
                 UserStatus.PENDING_APPROVAL, PageRequest.of(0, 1)).getTotalElements();
         long activeSos = sosTicketRepository.findByStatus(
                 SOSTicketStatus.OPEN, PageRequest.of(0, 1)).getTotalElements();
@@ -204,6 +266,7 @@ public class AdminServiceImpl implements AdminService {
                 .totalCustomers(totalCustomers)
                 .totalPts(totalPts)
                 .pendingPtVerifications(pendingPts)
+                .pendingKycVerifications(pendingKyc)
                 .activeSosTickets(activeSos)
                 .totalDietLogs(0)
                 .averageRating(BigDecimal.valueOf(4.5))
@@ -228,6 +291,25 @@ public class AdminServiceImpl implements AdminService {
                 .documentUrls(profile.getDocumentUrls())
                 .verificationStatus(profile.getVerificationStatus().name())
                 .createdAt(profile.getCreatedAt())
+                .build();
+    }
+
+    private PendingKycDto toPendingKycDto(UserKyc kyc) {
+        User user = kyc.getUser();
+        return PendingKycDto.builder()
+                .id(kyc.getId())
+                .userId(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
+                .idCardNumber(kyc.getIdCardNumber())
+                .fullNameOnCard(kyc.getFullNameOnCard())
+                .dateOfBirthOnCard(kyc.getDateOfBirthOnCard())
+                .addressOnCard(kyc.getAddressOnCard())
+                .idCardFrontUrl(kyc.getIdCardFrontUrl())
+                .idCardBackUrl(kyc.getIdCardBackUrl())
+                .verificationStatus(kyc.getVerificationStatus().name())
+                .createdAt(kyc.getCreatedAt())
                 .build();
     }
 }

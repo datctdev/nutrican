@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -30,4 +31,17 @@ public class DietLogReviewResponse {
     private Boolean sosTicketFlag;
     private LocalDate logDate;
     private LocalDateTime createdAt;
+
+    private List<AdditionalImageInfo> additionalImages;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AdditionalImageInfo {
+        private UUID id;
+        private String imageUrl;
+        private Boolean isPrimary;
+        private Integer sortOrder;
+    }
 }

@@ -4,6 +4,7 @@ import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
 import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.diet.dto.*;
+import com.sba.nutrican_be.diet.service.DietLogImageService;
 import com.sba.nutrican_be.diet.service.DietLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public class DietLogController {
 
     private final DietLogService dietLogService;
+    private final DietLogImageService dietLogImageService;
 
     @PostMapping("/logs")
     public ResponseEntity<ApiResponse<DietLogResponse>> createLog(
@@ -68,6 +70,37 @@ public class DietLogController {
             @PathVariable UUID id,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(dietLogService.deleteLog(id, user.getId()));
+    }
+
+    @PostMapping(value = "/logs/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<java.util.List<DietLogImageDTO>>> uploadImages(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
+            @RequestParam("files") MultipartFile[] files) {
+        return ResponseEntity.ok(dietLogImageService.uploadImages(id, files, user.getId()));
+    }
+
+    @GetMapping("/logs/{id}/images")
+    public ResponseEntity<ApiResponse<java.util.List<DietLogImageDTO>>> getImages(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(dietLogImageService.getImages(id, user.getId()));
+    }
+
+    @PutMapping("/logs/{id}/images/{imageId}/primary")
+    public ResponseEntity<ApiResponse<DietLogImageDTO>> setPrimaryImage(
+            @PathVariable UUID id,
+            @PathVariable UUID imageId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(dietLogImageService.setPrimaryImage(id, imageId, user.getId()));
+    }
+
+    @DeleteMapping("/logs/{id}/images/{imageId}")
+    public ResponseEntity<ApiResponse<Void>> deleteImage(
+            @PathVariable UUID id,
+            @PathVariable UUID imageId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(dietLogImageService.deleteImage(id, imageId, user.getId()));
     }
 
     @GetMapping("/summary")

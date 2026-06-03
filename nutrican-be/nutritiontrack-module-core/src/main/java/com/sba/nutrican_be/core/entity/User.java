@@ -49,6 +49,10 @@ public class User extends BaseEntity {
     @Column(name = "google_id", unique = true)
     private String googleId;
 
+    @Column(name = "is_kyc_verified")
+    @Builder.Default
+    private Boolean isKycVerified = false;
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private PtProfile ptProfile;
 

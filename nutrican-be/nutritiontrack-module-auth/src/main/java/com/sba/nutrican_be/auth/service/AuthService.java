@@ -7,8 +7,6 @@ public interface AuthService {
 
     ApiResponse<AuthResponse> registerCustomer(RegisterRequest request);
 
-    ApiResponse<AuthResponse> registerPt(RegisterPtRequest request);
-
     ApiResponse<AuthResponse> login(LoginRequest request);
 
     ApiResponse<AuthResponse> refreshToken(RefreshTokenRequest request);

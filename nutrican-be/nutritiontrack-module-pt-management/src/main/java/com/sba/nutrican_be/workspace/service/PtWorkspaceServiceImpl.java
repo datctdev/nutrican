@@ -34,6 +34,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final DietLogRepository dietLogRepository;
     private final BodyMetricRepository bodyMetricRepository;
     private final UserRepository userRepository;
+    private final DietLogImageRepository dietLogImageRepository;
     private final SseEmitterService sseEmitterService;
 
     @Override
@@ -243,6 +244,14 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
 
     private DietLogReviewResponse toReviewResponse(DietLog log) {
         User customer = log.getCustomer();
+        List<DietLogReviewResponse.AdditionalImageInfo> additionalImages = log.getAdditionalImages() == null ? null : log.getAdditionalImages().stream()
+                .map(img -> DietLogReviewResponse.AdditionalImageInfo.builder()
+                        .id(img.getId())
+                        .imageUrl(img.getImageUrl())
+                        .isPrimary(img.getIsPrimary())
+                        .sortOrder(img.getSortOrder())
+                        .build())
+                .toList();
         return DietLogReviewResponse.builder()
                 .id(log.getId())
                 .customerId(customer.getId())
@@ -257,6 +266,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .sosTicketFlag(log.getSosTicketFlag())
                 .logDate(log.getLogDate())
                 .createdAt(log.getCreatedAt())
+                .additionalImages(additionalImages)
                 .build();
     }
 

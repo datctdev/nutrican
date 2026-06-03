@@ -21,6 +21,8 @@ public interface PtProfileRepository extends JpaRepository<PtProfile, UUID> {
 
     Page<PtProfile> findByIsVerifiedTrueAndTier(Tier tier, Pageable pageable);
 
+    Page<PtProfile> findByPtRequestStatus(UserStatus status, Pageable pageable);
+
     Page<PtProfile> findByVerificationStatus(UserStatus status, Pageable pageable);
 
     @Query("SELECT p FROM PtProfile p JOIN FETCH p.user WHERE p.id = :id")

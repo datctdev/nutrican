@@ -70,6 +70,11 @@ public class PtProfile extends BaseEntity {
     private String documentUrls;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "pt_request_status", length = 50)
+    @Builder.Default
+    private UserStatus ptRequestStatus = UserStatus.PENDING_APPROVAL;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", length = 50)
     @Builder.Default
     private UserStatus verificationStatus = UserStatus.PENDING_APPROVAL;

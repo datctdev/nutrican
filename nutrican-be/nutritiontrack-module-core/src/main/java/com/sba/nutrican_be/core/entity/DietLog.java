@@ -17,7 +17,6 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
-@ToString(exclude = {"customer", "ptReviewer"})
 public class DietLog extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -62,4 +61,10 @@ public class DietLog extends BaseEntity {
 
     @Column(name = "log_date")
     private LocalDate logDate;
+
+    @OneToMany(mappedBy = "dietLog", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
+    @Builder.Default
+    @ToString.Exclude
+    private java.util.List<DietLogImage> additionalImages = new java.util.ArrayList<>();
 }

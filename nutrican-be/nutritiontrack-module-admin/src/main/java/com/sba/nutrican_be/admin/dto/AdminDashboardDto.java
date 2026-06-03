@@ -15,6 +15,7 @@ public class AdminDashboardDto {
     private long totalCustomers;
     private long totalPts;
     private long pendingPtVerifications;
+    private long pendingKycVerifications;
     private long activeSosTickets;
     private long totalDietLogs;
     private BigDecimal averageRating;

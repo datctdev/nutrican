@@ -6,7 +6,7 @@ import Spinner from '../../components/common/Spinner';
 import { dietService } from '../../services/dietService';
 import { userService } from '../../services/userService';
 import { toast } from 'sonner';
-import { Upload, Camera, FileText, AlertTriangle, RefreshCw, Trash2, Check, Clock, X } from 'lucide-react';
+import { Upload, Camera, FileText, AlertTriangle, RefreshCw, Trash2, Check, Clock, X, Star } from 'lucide-react';
 
 export default function DietTrackerPage() {
   const [logs, setLogs] = useState([]);
@@ -14,11 +14,10 @@ export default function DietTrackerPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [showManualForm, setShowManualForm] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Manual form state
   const [manualFood, setManualFood] = useState('');
   const [manualMealType, setManualMealType] = useState('LUNCH');
   const [manualCalories, setManualCalories] = useState('');
@@ -40,7 +39,6 @@ export default function DietTrackerPage() {
       ]);
       setLogs(logsRes.data.data.content || []);
       setSummary(summaryRes.data.data);
-      // Merge macro targets from user profile
       if (macroRes.data.data) {
         setSummary(prev => ({
           ...prev,
@@ -58,33 +56,31 @@ export default function DietTrackerPage() {
   };
 
   const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter(file => {
       if (file.size > 500 * 1024) {
-        toast.error('File too large. Maximum size is 500KB.');
-        return;
+        toast.error(`${file.name} is too large. Maximum size is 500KB.`);
+        return false;
       }
-      setSelectedFile(file);
-    }
+      return true;
+    });
+    setSelectedFiles(validFiles);
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile) {
-      toast.error('Please select an image first');
+    if (!selectedFiles.length) {
+      toast.error('Please select at least one image');
       return;
     }
-
     try {
       setAnalyzing(true);
       const formData = new FormData();
-      formData.append('file', selectedFile);
-      
+      selectedFiles.forEach((file) => formData.append('files', file));
+
       const response = await dietService.analyzeMeal(formData);
       toast.success('Meal analyzed successfully!');
-      
-      // Refresh data
       fetchData();
-      setSelectedFile(null);
+      setSelectedFiles([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -138,6 +134,61 @@ export default function DietTrackerPage() {
     }
   };
 
+  const handleUploadAdditionalImages = async (logId) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files || []);
+      const validFiles = files.filter(file => {
+        if (file.size > 500 * 1024) {
+          toast.error(`${file.name} is too large. Maximum size is 500KB.`);
+          return false;
+        }
+        return true;
+      });
+      if (!validFiles.length) return;
+
+      try {
+        setUploading(true);
+        const formData = new FormData();
+        validFiles.forEach((file) => formData.append('files', file));
+        await dietService.uploadImages(logId, formData);
+        toast.success('Images uploaded successfully!');
+        fetchData();
+      } catch (err) {
+        console.error('Error uploading images:', err);
+        toast.error(err.response?.data?.message || 'Failed to upload images');
+      } finally {
+        setUploading(false);
+      }
+    };
+    input.click();
+  };
+
+  const handleSetPrimary = async (logId, imageId) => {
+    try {
+      await dietService.setPrimaryImage(logId, imageId);
+      toast.success('Primary image updated');
+      fetchData();
+    } catch (err) {
+      console.error('Error setting primary image:', err);
+      toast.error(err.response?.data?.message || 'Failed to set primary image');
+    }
+  };
+
+  const handleDeleteImage = async (logId, imageId) => {
+    try {
+      await dietService.deleteImage(logId, imageId);
+      toast.success('Image deleted');
+      fetchData();
+    } catch (err) {
+      console.error('Error deleting image:', err);
+      toast.error(err.response?.data?.message || 'Failed to delete image');
+    }
+  };
+
   const resetManualForm = () => {
     setManualFood('');
     setManualMealType('LUNCH');
@@ -171,35 +222,89 @@ export default function DietTrackerPage() {
     return Math.min(100, (current / target) * 100);
   };
 
+  const renderLogImages = (log) => {
+    const images = [
+      { url: log.imageUrl, isPrimary: true, id: null },
+      ...(log.additionalImages || []).map(img => ({ url: img.imageUrl, isPrimary: img.isPrimary, id: img.id })),
+    ].filter(img => img.url);
+
+    if (images.length === 0) return null;
+
+    return (
+      <div className="flex gap-2 mt-2 flex-wrap">
+        {images.map((img, idx) => (
+          <div key={img.id || `primary-${idx}`} className="relative group">
+            <img
+              src={img.url}
+              alt="meal"
+              className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 rounded-lg ring-1 ring-inset ring-black/5" />
+            {img.isPrimary && (
+              <div className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 rounded-full p-1">
+                <Star className="w-3 h-3 fill-current" />
+              </div>
+            )}
+            {img.id && (
+              <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                <button
+                  onClick={() => handleSetPrimary(log.id, img.id)}
+                  className="bg-yellow-500 text-white rounded-full p-1 hover:bg-yellow-600"
+                  title="Set as primary"
+                >
+                  <Star className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => handleDeleteImage(log.id, img.id)}
+                  className="bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                  title="Delete"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (loading) return <Spinner />;
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Diet Tracker</h1>
-      
+
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Upload Card */}
         <Card className="p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Log Your Meal</h3>
-          
+
           {!showManualForm ? (
             <>
               <div
                 className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <input 
+                <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={handleFileSelect}
                 />
                 <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600">Upload a photo of your meal</p>
-                <p className="text-sm text-gray-400 mt-1">Image should be less than 500KB</p>
-                {selectedFile && (
-                  <p className="mt-2 text-sm text-green-600 font-medium">{selectedFile.name}</p>
+                <p className="text-gray-600">Upload photos of your meal</p>
+                <p className="text-sm text-gray-400 mt-1">Select one or more images (max 500KB each)</p>
+                {selectedFiles.length > 0 && (
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {selectedFiles.map((file, idx) => (
+                      <span key={idx} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
+                        {file.name} ({Math.round(file.size / 1024)}KB)
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
 
@@ -208,7 +313,7 @@ export default function DietTrackerPage() {
                   variant="default"
                   className="flex-1"
                   onClick={handleAnalyze}
-                  disabled={!selectedFile || analyzing}
+                  disabled={!selectedFiles.length || analyzing}
                 >
                   {analyzing ? (
                     <>
@@ -320,7 +425,6 @@ export default function DietTrackerPage() {
           )}
         </Card>
 
-        {/* Summary Card */}
         <Card className="p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Today's Summary</h3>
           <div className="space-y-4">
@@ -353,7 +457,6 @@ export default function DietTrackerPage() {
         </Card>
       </div>
 
-      {/* Recent Logs */}
       <Card className="p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Recent Logs</h3>
         {logs.length === 0 ? (
@@ -361,27 +464,42 @@ export default function DietTrackerPage() {
         ) : (
           <div className="space-y-3">
             {logs.map((log) => (
-              <div key={log.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Badge>{log.mealType}</Badge>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">
-                      {log.foods?.map(f => f.name).join(', ') || 'Meal'}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {formatTime(log.loggedAt)} - {log.totalCalories || 0} kcal
-                    </p>
+              <div key={log.id} className="flex flex-col gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Badge>{log.mealType}</Badge>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">
+                        {log.foods?.map(f => f.name).join(', ') || 'Meal'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {formatTime(log.loggedAt)} - {log.totalCalories || 0} kcal
+                        {log.additionalImages && log.additionalImages.length > 0 && (
+                          <span className="ml-2 text-blue-600 text-xs">
+                            +{log.additionalImages.length} photos
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(log.status)}
+                    <button
+                      onClick={() => handleUploadAdditionalImages(log.id)}
+                      className="p-1 text-gray-400 hover:text-blue-500"
+                      title="Add more images"
+                    >
+                      <Upload className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(log.id)}
+                      className="p-1 text-gray-400 hover:text-red-500"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {getStatusBadge(log.status)}
-                  <button
-                    onClick={() => handleDelete(log.id)}
-                    className="p-1 text-gray-400 hover:text-red-500"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                {renderLogImages(log)}
               </div>
             ))}
           </div>
