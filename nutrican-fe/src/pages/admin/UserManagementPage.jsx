@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import Card from '../../components/ui/card';
-import Button from '../../components/ui/button';
+import Card from '../../components/common/Card';
+import Button from '../../components/common/Button';
 import Input from '../../components/ui/input';
 import Badge from '../../components/common/Badge';
 import Spinner from '../../components/common/Spinner';
 import { toast } from 'sonner';
 import { adminService } from '../../services/adminService';
-import { Search, Filter, User as UserIcon, Mail, Shield } from 'lucide-react';
+import { Search, RefreshCw, User as UserIcon, Mail } from 'lucide-react';
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState([]);
@@ -85,7 +85,15 @@ export default function UserManagementPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-        <span className="text-sm text-gray-500">{totalElements} total users</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{totalElements} total users</span>
+          <button
+            onClick={() => { setPage(0); fetchUsers(); }}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -125,7 +133,7 @@ export default function UserManagementPage() {
             <option value="SUSPENDED">Suspended</option>
           </select>
           <Button type="submit" variant="outline" size="sm">
-            <Filter className="w-4 h-4 mr-1" /> Filter
+            <Search className="w-4 h-4 mr-1" /> Search
           </Button>
         </form>
       </Card>

@@ -6,7 +6,23 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock, User, Phone, ArrowRight, UserCircle } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Phone, ArrowRight, Eye, EyeOff, Check, X } from 'lucide-react';
+
+const PASSWORD_RULES = [
+  { key: 'length', label: 'At least 6 characters', test: (p) => p.length >= 6 },
+  { key: 'upper', label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
+  { key: 'lower', label: 'One lowercase letter', test: (p) => /[a-z]/.test(p) },
+  { key: 'number', label: 'One number', test: (p) => /\d/.test(p) },
+];
+
+const getPasswordStrength = (password) => {
+  if (!password) return { score: 0, label: '', color: '' };
+  const passed = PASSWORD_RULES.filter((r) => r.test(password)).length;
+  if (passed <= 1) return { score: 1, label: 'Weak', color: 'bg-red-500', textColor: 'text-red-600' };
+  if (passed <= 2) return { score: 2, label: 'Fair', color: 'bg-yellow-500', textColor: 'text-yellow-600' };
+  if (passed <= 3) return { score: 3, label: 'Good', color: 'bg-blue-500', textColor: 'text-blue-600' };
+  return { score: 4, label: 'Strong', color: 'bg-green-500', textColor: 'text-green-600' };
+};
 
 export default function RegisterPage() {
   const { register, isLoading } = useAuthStore();
@@ -14,10 +30,14 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     fullName: '',
-    phoneNumber: ''
+    phoneNumber: '',
   });
   const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const strength = getPasswordStrength(formData.password);
 
   const validate = () => {
     const newErrors = {};
@@ -26,6 +46,7 @@ export default function RegisterPage() {
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Invalid email format';
     if (!formData.password) newErrors.password = 'Password is required';
     else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -35,12 +56,13 @@ export default function RegisterPage() {
     if (!validate()) return;
 
     try {
-      await register(formData);
+      const { confirmPassword: _, ...payload } = formData;
+      await register(payload);
       toast.success('Account created!', { description: 'Please check your email to verify' });
       navigate('/login');
     } catch (error) {
       toast.error('Registration failed', {
-        description: error.response?.data?.message || 'Something went wrong'
+        description: error.response?.data?.message || 'Something went wrong',
       });
     }
   };
@@ -104,14 +126,81 @@ export default function RegisterPage() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     id="password"
-                    type="password"
-                    placeholder="Min 6 characters"
-                    className="pl-10"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Create a strong password"
+                    className="pl-10 pr-10"
                     value={formData.password}
                     onChange={handleChange('password')}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
                 {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+
+                {formData.password && (
+                  <div className="space-y-2 mt-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden flex gap-0.5">
+                        {[1, 2, 3, 4].map((level) => (
+                          <div
+                            key={level}
+                            className={`h-full flex-1 rounded-full transition-colors ${
+                              level <= strength.score ? strength.color : 'bg-gray-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className={`text-xs font-medium ${strength.textColor || 'text-gray-400'}`}>
+                        {strength.label}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                      {PASSWORD_RULES.map((rule) => {
+                        const passed = rule.test(formData.password);
+                        return (
+                          <div key={rule.key} className="flex items-center gap-1.5">
+                            {passed ? (
+                              <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            ) : (
+                              <X className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                            )}
+                            <span className={`text-xs ${passed ? 'text-green-600' : 'text-gray-400'}`}>
+                              {rule.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirm ? 'text' : 'password'}
+                    placeholder="Re-enter your password"
+                    className="pl-10 pr-10"
+                    value={formData.confirmPassword}
+                    onChange={handleChange('confirmPassword')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <p className="text-sm text-red-500">{errors.confirmPassword}</p>}
               </div>
 
               <div className="space-y-2">
@@ -143,14 +232,7 @@ export default function RegisterPage() {
               </Button>
             </form>
 
-            <div className="mt-6 space-y-3 text-center text-sm">
-              <p className="text-gray-600">
-                Are you a Personal Trainer?{' '}
-                <Link to="/register/pt" className="text-blue-600 font-medium hover:underline inline-flex items-center gap-1">
-                  <UserCircle className="h-4 w-4" />
-                  Register as PT
-                </Link>
-              </p>
+            <div className="mt-6 text-center text-sm">
               <p className="text-gray-600">
                 Already have an account?{' '}
                 <Link to="/login" className="text-blue-600 font-medium hover:underline">

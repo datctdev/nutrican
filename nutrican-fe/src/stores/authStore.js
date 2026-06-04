@@ -53,7 +53,7 @@ export const useAuthStore = create(
       registerPt: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          const response = await authService.registerPt(data);
+          const response = await authService.requestPt(data);
           set({ isLoading: false });
           return response;
         } catch (error) {

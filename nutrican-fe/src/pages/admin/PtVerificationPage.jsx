@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import Card from '../../components/ui/card';
-import Button from '../../components/ui/button';
+import Card from '../../components/common/Card';
+import Button from '../../components/common/Button';
 import Avatar from '../../components/common/Avatar';
 import Spinner from '../../components/common/Spinner';
 import { toast } from 'sonner';
 import { adminService } from '../../services/adminService';
-import { Check, X, FileText, Clock } from 'lucide-react';
+import { Check, X, FileText, Clock, Shield } from 'lucide-react';
 
 export default function PtVerificationPage() {
   const [pts, setPts] = useState([]);
@@ -22,7 +22,7 @@ export default function PtVerificationPage() {
     try {
       setLoading(true);
       const response = await adminService.getPendingPts({ page, size: 10 });
-      setPts(response.data.data.content);
+      setPts(response.data.data.content || []);
       setTotalPages(response.data.data.totalPages);
     } catch (err) {
       console.error('Error fetching pending PTs:', err);
@@ -32,14 +32,16 @@ export default function PtVerificationPage() {
     }
   };
 
-  const handleVerify = async (userId, role) => {
+  const handleVerify = async (userId, ptType) => {
     try {
       setActionLoading(userId);
-      await adminService.verifyPt(userId, { 
-        approved: true, 
-        role: role 
+      await adminService.verifyPt(userId, {
+        isVerified: true,
+        ptType: ptType,
       });
-      toast.success('PT verified successfully');
+      toast.success(
+        `PT verified successfully as ${ptType === 'PT_CERTIFIED' ? 'Certified' : 'Freelance'} PT`
+      );
       fetchPendingPts();
     } catch (err) {
       console.error('Error verifying PT:', err);
@@ -52,7 +54,9 @@ export default function PtVerificationPage() {
   const handleReject = async (userId) => {
     try {
       setActionLoading(userId);
-      await adminService.verifyPt(userId, { approved: false });
+      await adminService.verifyPt(userId, {
+        action: 'REJECT',
+      });
       toast.success('PT application rejected');
       fetchPendingPts();
     } catch (err) {
@@ -63,19 +67,31 @@ export default function PtVerificationPage() {
     }
   };
 
-  if (loading) return <Spinner />;
+  if (loading) {
+    return <Spinner />;
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">PT Verification</h1>
-        <span className="text-sm text-gray-500">{pts.length} pending</span>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+          <Shield className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">PT Verification</h1>
+          <p className="text-sm text-gray-500">Review and approve PT registration requests</p>
+        </div>
+        <span className="ml-auto px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">
+          {pts.length} pending
+        </span>
       </div>
 
       {pts.length === 0 ? (
-        <Card className="p-8 text-center">
-          <Check className="w-12 h-12 text-green-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900">All caught up!</h3>
+        <Card className="p-12 text-center">
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+            <Check className="w-8 h-8 text-green-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900">All caught up!</h3>
           <p className="text-gray-500 mt-1">No pending PT applications</p>
         </Card>
       ) : (
@@ -83,20 +99,17 @@ export default function PtVerificationPage() {
           {pts.map((pt) => (
             <Card key={pt.id} className="p-6">
               <div className="flex items-start gap-4">
-                <Avatar 
-                  src={pt.avatarUrl} 
-                  alt={pt.fullName} 
-                  size="lg" 
-                />
+                <Avatar src={pt.avatarUrl} alt={pt.fullName} size="lg" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-gray-900">{pt.fullName}</h3>
                     <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded-full flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Pending
+                      <Clock className="w-3 h-3" />
+                      Pending
                     </span>
                   </div>
                   <p className="text-sm text-gray-500">{pt.email}</p>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-sm">
                     <div>
                       <span className="text-gray-500">Experience: </span>
@@ -116,33 +129,31 @@ export default function PtVerificationPage() {
                     </div>
                   </div>
 
-                  {/* Documents */}
                   {(pt.cvUrl || pt.documentUrls) && (
                     <div className="mt-4">
                       <p className="text-sm text-gray-500 mb-2">Documents:</p>
                       <div className="flex gap-2">
                         {pt.cvUrl && (
-                          <a 
-                            href={pt.cvUrl} 
-                            target="_blank" 
+                          <a
+                            href={pt.cvUrl}
+                            target="_blank"
                             rel="noopener noreferrer"
-                            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1"
+                            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-1 transition-colors"
                           >
-                            <FileText className="w-4 h-4" /> CV
+                            <FileText className="w-4 h-4" />
+                            CV
                           </a>
                         )}
                       </div>
                     </div>
                   )}
 
-                  {/* Actions */}
                   <div className="flex flex-wrap gap-2 mt-4">
                     <Button
-                      variant="default"
                       size="sm"
+                      className="bg-green-600 hover:bg-green-700"
                       onClick={() => handleVerify(pt.userId, 'PT_CERTIFIED')}
                       disabled={actionLoading === pt.userId}
-                      className="bg-green-600 hover:bg-green-700"
                     >
                       <Check className="w-4 h-4 mr-1" />
                       {actionLoading === pt.userId ? 'Processing...' : 'Approve as Certified PT'}
@@ -170,13 +181,12 @@ export default function PtVerificationPage() {
             </Card>
           ))}
 
-          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-4">
+            <div className="flex justify-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage(p => Math.max(0, p - 1))}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
               >
                 Previous
@@ -187,7 +197,7 @@ export default function PtVerificationPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
               >
                 Next

@@ -6,13 +6,14 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
+  const [showPassword, setShowPassword] = useState(false);
 
   const validate = () => {
     const newErrors = {};
@@ -23,14 +24,24 @@ export default function LoginPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const getRedirectPath = (role) => {
+    switch (role) {
+      case 'ADMIN': return '/admin';
+      case 'PT_CERTIFIED':
+      case 'PT_FREELANCE': return '/pt';
+      default: return '/diet';
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
     try {
-      await login(formData);
+      const response = await login(formData);
       toast.success('Welcome back!', { description: 'Login successful' });
-      navigate('/');
+      const user = response?.data?.data?.user;
+      navigate(user ? getRedirectPath(user.role) : '/');
     } catch (error) {
       toast.error('Login failed', { description: error.response?.data?.message || 'Invalid credentials' });
     }
@@ -80,12 +91,19 @@ export default function LoginPage() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="Enter your password"
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
                 {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
               </div>

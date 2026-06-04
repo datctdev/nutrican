@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { userService } from '../../services/userService';
+import { useAuthStore } from '../../stores/authStore';
 import Card from '../../components/ui/card';
 import Input from '../../components/ui/input';
 import Label from '../../components/ui/label';
@@ -9,6 +10,7 @@ import { toast } from 'sonner';
 import { Loader2, Upload } from 'lucide-react';
 
 export default function ProfilePage() {
+  const { user, setUser } = useAuthStore();
   const fileInputRef = useRef(null);
   
   // Profile state

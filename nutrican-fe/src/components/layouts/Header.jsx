@@ -33,23 +33,27 @@ export default function Header() {
 
   const navItems = {
     CUSTOMER: [
-      { label: 'Find PT', href: '/marketplace' },
       { label: 'Diet Tracker', href: '/diet' },
+      { label: 'Find PT', href: '/marketplace' },
+      { label: 'KYC', href: '/kyc' },
       { label: 'Profile', href: '/profile' },
     ],
     PT_CERTIFIED: [
       { label: 'Dashboard', href: '/pt' },
       { label: 'Clients', href: '/pt/clients' },
+      { label: 'Reviews', href: '/pt/reviews' },
     ],
     PT_FREELANCE: [
       { label: 'Dashboard', href: '/pt' },
       { label: 'Clients', href: '/pt/clients' },
+      { label: 'Reviews', href: '/pt/reviews' },
     ],
     ADMIN: [
       { label: 'Dashboard', href: '/admin' },
       { label: 'PT Management', href: '/admin/pts' },
+      { label: 'KYC', href: '/admin/kyc' },
       { label: 'Users', href: '/admin/users' },
-      { label: 'SOS Tickets', href: '/admin/sos' },
+      { label: 'SOS', href: '/admin/sos' },
     ],
   };
 

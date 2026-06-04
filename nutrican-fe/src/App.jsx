@@ -11,11 +11,13 @@ import MarketplacePage from './pages/customer/MarketplacePage';
 import PtDetailPage from './pages/customer/PtDetailPage';
 import DietTrackerPage from './pages/customer/DietTrackerPage';
 import ProfilePage from './pages/customer/ProfilePage';
+import KycPage from './pages/customer/KycPage';
 import PtDashboardPage from './pages/pt/PtDashboardPage';
 import ClientListPage from './pages/pt/ClientListPage';
 import ReviewDietLogPage from './pages/pt/ReviewDietLogPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import PtVerificationPage from './pages/admin/PtVerificationPage';
+import KycAdminPage from './pages/admin/KycAdminPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import SosTicketsPage from './pages/admin/SosTicketsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -46,6 +48,10 @@ function App() {
           element: <ProtectedRoute><ProfilePage /></ProtectedRoute>,
         },
         {
+          path: '/kyc',
+          element: <ProtectedRoute><KycPage /></ProtectedRoute>,
+        },
+        {
           path: '/pt',
           element: <ProtectedRoute allowedRoles={['PT_CERTIFIED', 'PT_FREELANCE']}><PtDashboardPage /></ProtectedRoute>,
         },
@@ -64,6 +70,10 @@ function App() {
         {
           path: '/admin/pts',
           element: <ProtectedRoute allowedRoles={['ADMIN']}><PtVerificationPage /></ProtectedRoute>,
+        },
+        {
+          path: '/admin/kyc',
+          element: <ProtectedRoute allowedRoles={['ADMIN']}><KycAdminPage /></ProtectedRoute>,
         },
         {
           path: '/admin/users',

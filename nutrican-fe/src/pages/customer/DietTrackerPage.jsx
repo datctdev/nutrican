@@ -6,7 +6,7 @@ import Spinner from '../../components/common/Spinner';
 import { dietService } from '../../services/dietService';
 import { userService } from '../../services/userService';
 import { toast } from 'sonner';
-import { Upload, Camera, FileText, AlertTriangle, RefreshCw, Trash2, Check, Clock, X, Star } from 'lucide-react';
+import { Upload, Camera, FileText, AlertTriangle, RefreshCw, Trash2, Check, Clock, X, Star, MessageSquare, Send } from 'lucide-react';
 
 export default function DietTrackerPage() {
   const [logs, setLogs] = useState([]);
@@ -24,6 +24,9 @@ export default function DietTrackerPage() {
   const [manualProtein, setManualProtein] = useState('');
   const [manualCarb, setManualCarb] = useState('');
   const [manualFat, setManualFat] = useState('');
+  const [showSosForm, setShowSosForm] = useState(false);
+  const [sosMessage, setSosMessage] = useState('');
+  const [sosSubmitting, setSosSubmitting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -198,6 +201,25 @@ export default function DietTrackerPage() {
     setManualFat('');
   };
 
+  const handleSosSubmit = async (e) => {
+    e.preventDefault();
+    if (!sosMessage.trim()) {
+      toast.error('Please describe your question');
+      return;
+    }
+    try {
+      setSosSubmitting(true);
+      await dietService.createSos({ message: sosMessage });
+      toast.success('SOS ticket created! A PT will respond shortly.');
+      setShowSosForm(false);
+      setSosMessage('');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create SOS ticket');
+    } finally {
+      setSosSubmitting(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'APPROVED':
@@ -339,8 +361,39 @@ export default function DietTrackerPage() {
 
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-2">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-                <p className="text-sm text-yellow-700">Having trouble estimating? Create an SOS ticket and your PT will help.</p>
+                <p className="text-sm text-yellow-700 flex-1">Having trouble estimating? Create an SOS ticket and your PT will help.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowSosForm(true)}
+                  className="text-sm font-medium text-yellow-700 hover:text-yellow-800 underline"
+                >
+                  Create SOS
+                </button>
               </div>
+
+              {showSosForm && (
+                <form onSubmit={handleSosSubmit} className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageSquare className="w-4 h-4 text-yellow-600" />
+                    <h4 className="font-medium text-yellow-800 text-sm">Create SOS Ticket</h4>
+                  </div>
+                  <textarea
+                    value={sosMessage}
+                    onChange={(e) => setSosMessage(e.target.value)}
+                    rows="3"
+                    placeholder="Describe your nutrition question or the meal you're unsure about..."
+                    className="w-full px-3 py-2 border border-yellow-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  />
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" loading={sosSubmitting}>
+                      <Send className="w-4 h-4 mr-1" /> Send SOS
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setShowSosForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
             </>
           ) : (
             <form onSubmit={handleManualSubmit} className="space-y-4">
