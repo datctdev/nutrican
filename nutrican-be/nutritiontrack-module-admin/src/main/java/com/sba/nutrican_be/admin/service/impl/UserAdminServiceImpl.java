@@ -1,5 +1,6 @@
 package com.sba.nutrican_be.admin.service.impl;
 
+import com.sba.nutrican_be.admin.dto.UserAdminDto;
 import com.sba.nutrican_be.admin.service.UserAdminService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
@@ -28,7 +29,7 @@ public class UserAdminServiceImpl implements UserAdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse<PageResponse<User>> getUsers(
+    public ApiResponse<PageResponse<UserAdminDto>> getUsers(
             String role, String status, String search, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<User> userPage;
@@ -38,11 +39,16 @@ public class UserAdminServiceImpl implements UserAdminService {
                     UserRole.valueOf(role), UserStatus.valueOf(status), pageable);
         } else if (role != null) {
             userPage = userRepository.findByRole(UserRole.valueOf(role), pageable);
+        } else if (status != null) {
+            userPage = userRepository.findByStatus(UserStatus.valueOf(status), pageable);
+        } else if (search != null && !search.isBlank()) {
+            userPage = userRepository.findBySearch(search, pageable);
         } else {
             userPage = userRepository.findAll(pageable);
         }
 
-        return ApiResponse.success(PageResponse.from(userPage));
+        Page<UserAdminDto> dtoPage = userPage.map(this::toDto);
+        return ApiResponse.success(PageResponse.from(dtoPage));
     }
 
     @Override
@@ -55,5 +61,20 @@ public class UserAdminServiceImpl implements UserAdminService {
         userRepository.save(user);
         log.info("User {} status updated to {}", userId, newStatus);
         return ApiResponse.success(null, "User status updated");
+    }
+
+    private UserAdminDto toDto(User user) {
+        return UserAdminDto.builder()
+                .id(user.getId().toString())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
+                .phoneNumber(user.getPhoneNumber())
+                .address(user.getAddress())
+                .role(user.getRole() != null ? user.getRole().name() : null)
+                .status(user.getStatus() != null ? user.getStatus().name() : null)
+                .isKycVerified(user.getIsKycVerified())
+                .createdAt(user.getCreatedAt())
+                .build();
     }
 }

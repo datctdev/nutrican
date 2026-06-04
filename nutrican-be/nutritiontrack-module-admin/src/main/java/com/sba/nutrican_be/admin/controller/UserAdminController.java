@@ -3,7 +3,7 @@ package com.sba.nutrican_be.admin.controller;
 import com.sba.nutrican_be.admin.service.UserAdminService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
-import com.sba.nutrican_be.core.entity.User;
+import com.sba.nutrican_be.admin.dto.UserAdminDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,7 +21,7 @@ public class UserAdminController {
     private final UserAdminService userAdminService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<PageResponse<User>>> getUsers(
+    public ResponseEntity<ApiResponse<PageResponse<UserAdminDto>>> getUsers(
             @RequestParam(required = false) String role,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,

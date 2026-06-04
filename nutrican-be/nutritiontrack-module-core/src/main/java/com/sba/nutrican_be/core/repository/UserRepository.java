@@ -24,6 +24,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Page<User> findByRoleAndStatus(UserRole role, com.sba.nutrican_be.core.enums.UserStatus status, Pageable pageable);
 
+    Page<User> findByStatus(com.sba.nutrican_be.core.enums.UserStatus status, Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<User> findBySearch(@Param("search") String search, Pageable pageable);
+
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.ptProfile WHERE u.id = :id")
     Optional<User> findByIdWithPtProfile(@Param("id") UUID id);
 }
