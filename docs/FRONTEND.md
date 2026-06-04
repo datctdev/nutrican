@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The NutriCan PT frontend is a React 19 application built with Vite, providing a modern, responsive user interface for the nutrition tracking platform.
+The NutriCan PT frontend is a React 19 application built with Vite, providing a modern, responsive user interface for the AI-powered nutrition tracking platform.
 
 ---
 
@@ -14,8 +14,8 @@ nutrican-fe/
 │   └── vite.svg
 │
 ├── src/
-│   ├── components/                 # Reusable UI components
-│   │   ├── ui/                    # Radix UI primitives
+│   ├── components/
+│   │   ├── ui/                        # Radix UI primitives
 │   │   │   ├── button.jsx
 │   │   │   ├── card.jsx
 │   │   │   ├── input.jsx
@@ -31,65 +31,69 @@ nutrican-fe/
 │   │   │   ├── toast.jsx
 │   │   │   └── toaster.jsx
 │   │   │
-│   │   ├── common/                # Custom shared components
+│   │   ├── common/                    # Custom shared components
 │   │   │   ├── Button.jsx
 │   │   │   ├── Card.jsx
 │   │   │   ├── Input.jsx
 │   │   │   ├── Avatar.jsx
+│   │   │   ├── Badge.jsx
 │   │   │   ├── Modal.jsx
-│   │   │   └── Spinner.jsx
+│   │   │   ├── Spinner.jsx
+│   │   │   └── ProtectedRoute.jsx
 │   │   │
-│   │   └── layout/                # Layout components
-│   │       ├── MainLayout.jsx
-│   │       ├── AuthLayout.jsx
-│   │       └── ProtectedRoute.jsx
+│   │   └── layouts/                   # Layout components
+│   │       ├── MainLayout.jsx         # Main app layout with nav
+│   │       ├── AuthLayout.jsx          # Auth pages layout
+│   │       └── Header.jsx              # Top navigation bar
 │   │
-│   ├── pages/                     # Page components
-│   │   ├── auth/
+│   ├── pages/
+│   │   ├── auth/                      # Authentication pages
 │   │   │   ├── LoginPage.jsx
 │   │   │   ├── RegisterPage.jsx
 │   │   │   └── PtRegistrationPage.jsx
 │   │   │
-│   │   ├── customer/
-│   │   │   ├── MarketplacePage.jsx
-│   │   │   ├── PtDetailPage.jsx
-│   │   │   ├── DietTrackerPage.jsx
-│   │   │   └── ProfilePage.jsx
+│   │   ├── customer/                  # Customer-facing pages
+│   │   │   ├── DietTrackerPage.jsx    # Meal logging + AI analysis
+│   │   │   ├── MarketplacePage.jsx    # Browse PTs
+│   │   │   ├── PtDetailPage.jsx       # PT profile + reviews
+│   │   │   └── ProfilePage.jsx         # User profile + macro targets
 │   │   │
-│   │   ├── pt/
-│   │   │   ├── PtDashboardPage.jsx
-│   │   │   ├── ClientListPage.jsx
-│   │   │   └── ReviewDietLogPage.jsx
+│   │   ├── pt/                       # Personal Trainer pages
+│   │   │   ├── PtDashboardPage.jsx     # PT overview + stats
+│   │   │   ├── ClientListPage.jsx      # Client management
+│   │   │   └── ReviewDietLogPage.jsx   # Review client diet logs
 │   │   │
-│   │   ├── admin/
-│   │   │   ├── AdminDashboardPage.jsx
-│   │   │   └── PtVerificationPage.jsx
+│   │   ├── admin/                     # Admin pages
+│   │   │   ├── AdminDashboardPage.jsx  # Dashboard + stats
+│   │   │   ├── PtVerificationPage.jsx   # PT KYC verification
+│   │   │   ├── UserManagementPage.jsx   # User management
+│   │   │   └── SosTicketsPage.jsx       # SOS ticket management
 │   │   │
-│   │   └── LandingPage.jsx
+│   │   └── LandingPage.jsx             # Landing/home page
 │   │
-│   ├── services/                  # API services
-│   │   ├── api.js                 # Axios instance
-│   │   ├── authService.js
-│   │   ├── userService.js
-│   │   ├── dietService.js
-│   │   ├── marketplaceService.js
-│   │   ├── workspaceService.js
-│   │   ├── adminService.js
-│   │   └── sseService.js
+│   ├── services/                      # API services
+│   │   ├── api.js                     # Axios instance + interceptors
+│   │   ├── authService.js             # Auth API calls
+│   │   ├── userService.js             # Profile API calls
+│   │   ├── dietService.js             # Diet log API calls
+│   │   ├── marketplaceService.js      # Marketplace API calls
+│   │   ├── workspaceService.js        # PT workspace API calls
+│   │   ├── adminService.js            # Admin API calls
+│   │   └── sseService.js              # Server-Sent Events
 │   │
-│   ├── stores/                    # Zustand state stores
-│   │   ├── authStore.js
-│   │   ├── dietStore.js
-│   │   └── notificationStore.js
+│   ├── stores/                        # Zustand state stores
+│   │   ├── authStore.js               # Auth state + persist
+│   │   ├── dietStore.js               # Diet log state
+│   │   └── notificationStore.js       # Notifications + SSE state
 │   │
-│   ├── hooks/                    # Custom hooks
-│   │   ├── useToast.js
-│   │   └── useSSE.js
+│   ├── hooks/                        # Custom hooks
+│   │   ├── useToast.js                # Sonner toast wrapper
+│   │   └── useSSE.js                  # SSE connection hook
 │   │
-│   ├── App.jsx                   # Main app with router
-│   ├── App.css                   # Global styles
-│   ├── main.jsx                  # Entry point
-│   └── index.css                 # Tailwind imports
+│   ├── App.jsx                       # Router configuration
+│   ├── App.css                       # Global styles
+│   ├── main.jsx                      # Entry point
+│   └── index.css                     # Tailwind imports
 │
 ├── package.json
 ├── vite.config.js
@@ -105,45 +109,32 @@ nutrican-fe/
 
 ### 3.1 Route Configuration
 
-Routes are configured in `src/App.jsx` using React Router v7.
-
-```jsx
-// src/App.jsx
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <LandingPage />,
-  },
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
-  // ... more routes
-]);
-```
+Routes are configured in `src/App.jsx` using React Router v7 (createBrowserRouter).
 
 ### 3.2 Route List
 
 | Route | Component | Access | Description |
 |-------|-----------|--------|-------------|
-| `/` | LandingPage | Public | Landing page |
+| `/` | LandingPage | Public | Landing/home page |
 | `/login` | LoginPage | Public | User login |
 | `/register` | RegisterPage | Public | Customer registration |
 | `/register/pt` | PtRegistrationPage | Public | PT registration |
 | `/marketplace` | MarketplacePage | CUSTOMER | Browse PTs |
-| `/pt-profile/:id` | PtDetailPage | CUSTOMER | PT profile view |
-| `/diet` | DietTrackerPage | CUSTOMER | Diet logging |
-| `/profile` | ProfilePage | All | User profile |
-| `/pt` | PtDashboardPage | PT | PT overview |
-| `/pt/clients` | ClientListPage | PT | Client management |
+| `/pt-profile/:id` | PtDetailPage | CUSTOMER | PT profile + reviews |
+| `/diet` | DietTrackerPage | CUSTOMER | Meal logging + AI |
+| `/profile` | ProfilePage | All authenticated | User profile + macros |
+| `/pt` | PtDashboardPage | PT | PT overview + stats |
+| `/pt/clients` | ClientListPage | PT | Client list + status |
 | `/pt/reviews` | ReviewDietLogPage | PT | Review diet logs |
-| `/admin` | AdminDashboardPage | ADMIN | Admin dashboard |
+| `/admin` | AdminDashboardPage | ADMIN | Dashboard + statistics |
 | `/admin/pts` | PtVerificationPage | ADMIN | PT verification |
+| `/admin/users` | UserManagementPage | ADMIN | User management |
+| `/admin/sos` | SosTicketsPage | ADMIN | SOS ticket management |
 
 ### 3.3 Protected Routes
 
 ```jsx
-// src/components/layout/ProtectedRoute.jsx
+// src/components/common/ProtectedRoute.jsx
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { isAuthenticated, user } = useAuthStore();
   const location = useLocation();
@@ -160,15 +151,23 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 };
 ```
 
+**Dashboard path by role:**
+```jsx
+const dashboardPath = {
+  CUSTOMER: '/diet',
+  PT_CERTIFIED: '/pt',
+  PT_FREELANCE: '/pt',
+  ADMIN: '/admin',
+}[user?.role];
+```
+
 ---
 
 ## 4. State Management
 
 ### 4.1 Zustand Stores
 
-The application uses Zustand for lightweight state management.
-
-#### 4.1.1 Auth Store
+#### 4.1.1 Auth Store (with Persistence)
 
 ```javascript
 // src/stores/authStore.js
@@ -215,6 +214,7 @@ const useAuthStore = create(
       },
 
       clearError: () => set({ error: null }),
+      setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
     }),
     {
       name: 'nutrican-auth',
@@ -229,11 +229,7 @@ const useAuthStore = create(
 );
 ```
 
-**Persisted State:**
-- `user`: User object
-- `accessToken`: JWT access token
-- `refreshToken`: JWT refresh token
-- `isAuthenticated`: Boolean flag
+**Persisted to localStorage:** user, accessToken, refreshToken, isAuthenticated
 
 #### 4.1.2 Diet Store
 
@@ -361,33 +357,26 @@ export default api;
 
 ### 5.2 Service Functions
 
-#### Auth Service
-
 ```javascript
-// src/services/authService.js
-import api from './api';
-
+// Auth Service
 export const authService = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
   registerPt: (data) => api.post('/auth/register/pt', data),
   refreshToken: (data) => api.post('/auth/refresh', data),
   logout: () => api.post('/auth/logout'),
+  submitKyc: (formData) => api.post('/auth/kyc', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  getKycStatus: () => api.get('/auth/kyc/status'),
 };
-```
 
-#### Diet Service
-
-```javascript
-// src/services/dietService.js
-import api from './api';
-
+// Diet Service
 export const dietService = {
   createLog: (data) => api.post('/diet/logs', data),
-  analyzeMeal: (formData) =>
-    api.post('/diet/logs/analyze', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+  analyzeMeal: (formData) => api.post('/diet/logs/analyze', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   getLogs: (params) => api.get('/diet/logs', { params }),
   getLog: (id) => api.get(`/diet/logs/${id}`),
   updateLog: (id, data) => api.put(`/diet/logs/${id}`, data),
@@ -395,54 +384,33 @@ export const dietService = {
   getSummary: (params) => api.get('/diet/summary', { params }),
   createSos: (data) => api.post('/diet/sos', data),
 };
-```
 
-#### Marketplace Service
-
-```javascript
-// src/services/marketplaceService.js
-import api from './api';
-
+// Marketplace Service
 export const marketplaceService = {
   getPts: (params) => api.get('/marketplace/pts', { params }),
   getPtDetail: (id) => api.get(`/marketplace/pts/${id}`),
   getPtReviews: (id, params) => api.get(`/marketplace/pts/${id}/reviews`, { params }),
   createReview: (id, data) => api.post(`/marketplace/pts/${id}/reviews`, data),
 };
-```
 
-#### Workspace Service
-
-```javascript
-// src/services/workspaceService.js
-import api from './api';
-
+// Workspace Service (PT)
 export const workspaceService = {
   getClients: (params) => api.get('/workspace/clients', { params }),
   getPendingLogs: (params) => api.get('/workspace/diet-logs/pending', { params }),
   reviewLog: (id, data) => api.put(`/workspace/diet-logs/${id}/review`, data),
-  getClientProgress: (clientId, params) =>
-    api.get(`/workspace/progress/${clientId}`, { params }),
+  getClientProgress: (clientId, params) => api.get(`/workspace/progress/${clientId}`, { params }),
   assignClient: (clientId) => api.post(`/workspace/clients/${clientId}/assign`),
   getStats: () => api.get('/workspace/stats'),
 };
-```
 
-#### Admin Service
-
-```javascript
-// src/services/adminService.js
-import api from './api';
-
+// Admin Service
 export const adminService = {
   getUsers: (params) => api.get('/admin/users', { params }),
-  updateUserStatus: (userId, data) =>
-    api.put(`/admin/users/${userId}/status`, data),
+  updateUserStatus: (userId, data) => api.put(`/admin/users/${userId}/status`, data),
   getPendingPts: (params) => api.get('/admin/pts/pending', { params }),
   verifyPt: (userId, data) => api.put(`/admin/pts/${userId}/verify`, data),
   getSosTickets: (params) => api.get('/admin/sos-tickets', { params }),
-  assignSosTicket: (ticketId, data) =>
-    api.put(`/admin/sos-tickets/${ticketId}/assign`, data),
+  assignSosTicket: (ticketId, data) => api.put(`/admin/sos-tickets/${ticketId}/assign`, data),
   getStats: () => api.get('/admin/stats'),
 };
 ```
@@ -459,7 +427,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 export const sseService = {
   connect: () => {
     const { accessToken } = useAuthStore.getState();
-    
+
     const eventSource = new EventSourcePolyfill(
       `${API_URL}/workspace/stream`,
       {
@@ -519,301 +487,9 @@ export const sseService = {
 
 ---
 
-## 6. Components
+## 6. Hooks
 
-### 6.1 Layout Components
-
-#### MainLayout
-
-```jsx
-// src/components/layout/MainLayout.jsx
-const MainLayout = ({ children }) => {
-  const { user, logout } = useAuthStore();
-  
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <nav className="container mx-auto px-4">
-          {/* Navigation items based on user role */}
-          <NavItems user={user} />
-          {/* User menu */}
-          <UserMenu user={user} onLogout={logout} />
-        </nav>
-      </header>
-      <main className="container mx-auto px-4 py-8">
-        {children}
-      </main>
-    </div>
-  );
-};
-```
-
-#### ProtectedRoute
-
-```jsx
-// src/components/layout/ProtectedRoute.jsx
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user } = useAuthStore();
-  const location = useLocation();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    const dashboardPath = {
-      CUSTOMER: '/diet',
-      PT_CERTIFIED: '/pt',
-      PT_FREELANCE: '/pt',
-      ADMIN: '/admin',
-    }[user?.role];
-    
-    return <Navigate to={dashboardPath} replace />;
-  }
-
-  return children;
-};
-```
-
-### 6.2 UI Components
-
-All UI components are built using Radix UI primitives with Tailwind CSS styling.
-
-#### Button Component
-
-```jsx
-// src/components/ui/button.jsx
-import * as React from 'react';
-import { Slot } from '@radix-ui/react-slot';
-import { cva } from 'class-variance-authority';
-import { cn } from '@/lib/utils';
-
-const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
-  {
-    variants: {
-      variant: {
-        default: 'bg-primary-600 text-white hover:bg-primary-700',
-        outline: 'border border-gray-300 bg-white hover:bg-gray-50',
-        ghost: 'hover:bg-gray-100',
-        destructive: 'bg-red-600 text-white hover:bg-red-700',
-      },
-      size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 rounded-md px-3',
-        lg: 'h-11 rounded-md px-8',
-        icon: 'h-10 w-10',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
-  }
-);
-
-const Button = React.forwardRef(({ className, variant, size, asChild = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : 'button';
-  return (
-    <Comp
-      className={cn(buttonVariants({ variant, size, className }))}
-      ref={ref}
-      {...props}
-    />
-  );
-});
-
-Button.displayName = 'Button';
-```
-
-#### Card Component
-
-```jsx
-// src/components/ui/card.jsx
-import * as React from 'react';
-import { cn } from '@/lib/utils';
-
-const Card = React.forwardRef(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'rounded-lg border bg-white text-gray-950 shadow-sm',
-      className
-    )}
-    {...props}
-  />
-));
-Card.displayName = 'Card';
-
-const CardHeader = React.forwardRef(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('flex flex-col space-y-1.5 p-6', className)}
-    {...props}
-  />
-));
-CardHeader.displayName = 'CardHeader';
-
-const CardTitle = React.forwardRef(({ className, ...props }, ref) => (
-  <h3
-    ref={ref}
-    className={cn('font-semibold leading-none tracking-tight', className)}
-    {...props}
-  />
-));
-CardTitle.displayName = 'CardTitle';
-
-const CardContent = React.forwardRef(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('p-6 pt-0', className)} {...props} />
-));
-CardContent.displayName = 'CardContent';
-```
-
----
-
-## 7. Pages
-
-### 7.1 Authentication Pages
-
-#### LoginPage
-
-```jsx
-// src/pages/auth/LoginPage.jsx
-const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const { login, isLoading, error, clearError } = useAuthStore();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await login({ email, password });
-      navigate('/');
-    } catch (err) {
-      // Error handled by store
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Card className="w-[400px]">
-        <CardHeader>
-          <CardTitle>Login</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Form fields */}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Login'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-```
-
-### 7.2 Customer Pages
-
-#### DietTrackerPage
-
-```jsx
-// src/pages/customer/DietTrackerPage.jsx
-const DietTrackerPage = () => {
-  const [file, setFile] = useState(null);
-  const [mealType, setMealType] = useState('LUNCH');
-  const { logs, setLogs, analyzeMeal, isLoading } = useDietStore();
-
-  const handleFileUpload = async (e) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('mealType', mealType);
-    
-    try {
-      await analyzeMeal(formData);
-      // Refresh logs
-    } catch (err) {
-      // Handle error
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Image upload section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Log Meal</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-          <select value={mealType} onChange={(e) => setMealType(e.target.value)}>
-            <option value="BREAKFAST">Breakfast</option>
-            <option value="LUNCH">Lunch</option>
-            <option value="DINNER">Dinner</option>
-            <option value="SNACK">Snack</option>
-          </select>
-          <Button onClick={handleFileUpload} disabled={!file || isLoading}>
-            Analyze Meal
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Daily summary */}
-      <SummaryCard />
-
-      {/* Logs list */}
-      <LogsList logs={logs} />
-    </div>
-  );
-};
-```
-
-### 7.3 PT Pages
-
-#### PtDashboardPage
-
-```jsx
-// src/pages/pt/PtDashboardPage.jsx
-const PtDashboardPage = () => {
-  const [stats, setStats] = useState(null);
-  const [clients, setClients] = useState([]);
-
-  useEffect(() => {
-    const loadData = async () => {
-      const [statsRes, clientsRes] = await Promise.all([
-        workspaceService.getStats(),
-        workspaceService.getClients(),
-      ]);
-      setStats(statsRes.data.data);
-      setClients(clientsRes.data.data.content);
-    };
-    loadData();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Total Clients" value={stats?.totalClients} />
-        <StatCard title="Pending Reviews" value={stats?.pendingReviews} />
-        <StatCard title="SOS Tickets" value={stats?.pendingSosTickets} />
-        <StatCard title="Adherence Rate" value={`${stats?.averageAdherenceRate}%`} />
-      </div>
-
-      {/* Client list with status */}
-      <ClientList clients={clients} />
-    </div>
-  );
-};
-```
-
----
-
-## 8. Hooks
-
-### 8.1 useSSE Hook
+### 6.1 useSSE Hook
 
 ```javascript
 // src/hooks/useSSE.js
@@ -833,7 +509,7 @@ export const useSSE = () => {
 };
 ```
 
-### 8.2 useToast Hook
+### 6.2 useToast Hook
 
 ```javascript
 // src/hooks/useToast.js
@@ -850,7 +526,7 @@ export const useToast = () => {
 
 ---
 
-## 9. Environment Variables
+## 7. Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -865,9 +541,9 @@ VITE_API_URL=http://localhost:8080/api/v1
 
 ---
 
-## 10. Styling
+## 8. Styling
 
-### 10.1 Tailwind Configuration
+### 8.1 Tailwind Configuration
 
 ```javascript
 // tailwind.config.js
@@ -898,7 +574,7 @@ export default {
 };
 ```
 
-### 10.2 CSS Variables
+### 8.2 CSS Variables
 
 ```css
 /* src/index.css */
@@ -910,7 +586,6 @@ export default {
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
-    /* ... */
   }
 }
 
@@ -923,80 +598,18 @@ export default {
 
 ---
 
-## 11. Testing
+## 9. Troubleshooting
 
-### 11.1 Component Testing
-
-```javascript
-// src/__tests__/LoginPage.test.jsx
-import { render, screen, fireEvent } from '@testing-library/react';
-import { LoginPage } from '../pages/auth/LoginPage';
-
-describe('LoginPage', () => {
-  it('renders login form', () => {
-    render(<LoginPage />);
-    expect(screen.getByText('Login')).toBeInTheDocument();
-  });
-
-  it('handles form submission', async () => {
-    render(<LoginPage />);
-    const button = screen.getByRole('button', { name: 'Login' });
-    fireEvent.click(button);
-    // Assert expected behavior
-  });
-});
-```
-
-### 11.2 Running Tests
-
-```bash
-npm test
-npm test -- --coverage
-```
-
----
-
-## 12. Build & Deployment
-
-### 12.1 Build for Production
-
-```bash
-npm run build
-```
-
-Output will be in the `dist/` folder.
-
-### 12.2 Preview Production Build
-
-```bash
-npm run preview
-```
-
-### 12.3 Deploy to Static Hosting
-
-```bash
-# Copy dist contents to web server
-scp -r dist/* user@server:/var/www/nutrican
-```
-
----
-
-## 13. Troubleshooting
-
-### 13.1 Common Issues
+### 9.1 Common Issues
 
 #### CORS Error
 
 ```
-Access to XMLHttpRequest at 'http://localhost:8080/api/v1/auth/login' 
+Access to XMLHttpRequest at 'http://localhost:8080/api/v1/auth/login'
 from origin 'http://localhost:5173' has been blocked by CORS policy
 ```
 
-**Solution:** Ensure backend CORS is configured:
-```java
-// SecurityConfig.java
-.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-```
+**Solution:** Ensure backend CORS is configured in SecurityConfig.
 
 #### Token Expiration
 
@@ -1008,12 +621,12 @@ Tokens expire and user is logged out unexpectedly.
 
 SSE events not being received.
 
-**Solution:** 
+**Solution:**
 1. Check network tab for EventSource connection
 2. Verify SSE endpoint returns correct content-type: `text/event-stream`
 3. Check if proxy is blocking SSE
 
 ---
 
-*Document Version: 1.0.0*
-*Last Updated: 2026-05-29*
+*Document Version: 2.0.0*
+*Last Updated: 2026-06-04*

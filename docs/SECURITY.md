@@ -615,5 +615,5 @@ docker run -t owasp/zap2docker-stable zap-baseline.py -t http://localhost:8080
 
 ---
 
-*Document Version: 1.0.0*
-*Last Updated: 2026-05-29*
+*Document Version: 2.0.0*
+*Last Updated: 2026-06-04*

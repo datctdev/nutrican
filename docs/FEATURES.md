@@ -14,6 +14,7 @@ This document describes the key features of the NutriCan PT application in detai
 4. [SOS System](#5-sos-system)
 5. [Marketplace](#6-marketplace)
 6. [Admin Management](#7-admin-management)
+7. [KYC Verification](#8-kyc-verification)
 
 ---
 
@@ -35,29 +36,16 @@ The AI Meal Recognition feature uses computer vision and natural language proces
 ### 2.3 How It Works
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   User     │     │   Backend   │     │   MinIO     │     │  Ollama     │
-│  (Upload)  │     │   Service   │     │  (Storage)  │     │   (AI)      │
-└─────┬──────┘     └──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-      │                    │                   │                   │
-      │  1. Upload Image   │                   │                   │
-      │───────────────────>│                   │                   │
-      │                    │                   │                   │
-      │                    │  2. Store Image   │                   │
-      │                    │───────────────────────────────────────>│
-      │                    │                   │                   │
-      │                    │  3. Presigned URL│                   │
-      │                    │<──────────────────────────────────────│
-      │                    │                   │                   │
-      │                    │  4. Analyze Request                  │
-      │                    │                   │                   │
-      │                    │──────────────────────────────────────>│
-      │                    │                   │                   │
-      │                    │  5. AI Response   │                   │
-      │                    │<──────────────────────────────────────│
-      │                    │                   │                   │
-      │  6. Results        │                   │                   │
-      │<───────────────────│                   │                   │
+User (Upload)  →  Backend Service  →  MinIO (Storage)
+                                  │
+                                  ▼
+                          Ollama (qwen2.5-vl)
+                          { vision + nutrition prompt }
+                                  │
+                                  ▼
+                          AnalyzeMealResponse
+                          { foodName, calories, protein,
+                            carb, fat, confidenceScore }
 ```
 
 ### 2.4 AI Prompt
@@ -108,26 +96,6 @@ When AI confidence is low (fallback mode):
 | JPEG | image/jpeg | 500KB |
 | PNG | image/png | 500KB |
 
-### 2.8 Response Example
-
-**Success Response:**
-```json
-{
-  "logId": "550e8400-e29b-41d4-a716-446655440000",
-  "foodName": "Grilled Chicken Salad",
-  "portionSize": 350,
-  "portionUnit": "grams",
-  "calories": 485,
-  "protein": 42,
-  "carb": 18,
-  "fat": 28,
-  "confidenceScore": 0.85,
-  "fallback": false,
-  "message": "Meal analyzed successfully",
-  "mealType": "LUNCH"
-}
-```
-
 ---
 
 ## 3. Diet Tracking
@@ -140,31 +108,11 @@ The Diet Tracking feature allows users to log their meals, track macronutrients,
 
 #### 3.2.1 Manual Entry
 
-Users can manually enter their meals with nutritional information:
-
-```json
-{
-  "mealType": "LUNCH",
-  "foodDescription": "Grilled chicken breast with brown rice",
-  "calories": 550,
-  "protein": 45,
-  "carb": 60,
-  "fat": 12,
-  "logDate": "2026-05-29"
-}
-```
+Users can manually enter their meals with nutritional information.
 
 #### 3.2.2 AI Analysis
 
-Users upload a photo of their meal for automatic analysis:
-
-```
-POST /api/v1/diet/logs/analyze
-Content-Type: multipart/form-data
-
-file: [meal-image.jpg]
-mealType: LUNCH
-```
+Users upload a photo of their meal for automatic analysis via Ollama.
 
 ### 3.3 Meal Types
 
@@ -186,27 +134,9 @@ mealType: LUNCH
 
 ### 3.5 Daily Summary
 
-Users can view their daily nutritional summary:
-
-```json
-{
-  "date": "2026-05-29",
-  "totalCalories": 1850,
-  "totalProtein": 142,
-  "totalCarb": 198,
-  "totalFat": 58,
-  "logs": [
-    { "mealType": "BREAKFAST", "calories": 450, ... },
-    { "mealType": "LUNCH", "calories": 550, ... },
-    { "mealType": "DINNER", "calories": 650, ... },
-    { "mealType": "SNACK", "calories": 200, ... }
-  ]
-}
-```
+Users can view their daily nutritional summary with totals vs targets.
 
 ### 3.6 Macro Target Configuration
-
-Users can set their daily macro targets:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -244,18 +174,8 @@ The PT Workflow feature enables Personal Trainers to manage clients, review diet
 
 ### 4.2 Client Assignment
 
-#### 4.2.1 Finding a PT
-
-Customers browse the marketplace to find suitable PTs:
-
-1. Search by specialization
-2. Filter by experience
-3. Check ratings and reviews
-4. View PT profiles
-
-#### 4.2.2 Client Request
-
-Customers can request to connect with a PT through the marketplace or directly assign via PT workspace (admin-managed).
+- Customers browse the marketplace to find suitable PTs
+- Client request through marketplace or direct assignment via PT workspace (admin-managed)
 
 ### 4.3 PT Workspace
 
@@ -268,33 +188,7 @@ PTs see their assigned clients with status indicators:
 | GREEN | #22c55e | Client logged meal today |
 | YELLOW | #eab308 | No meal logged today |
 
-#### 4.3.2 Pending Reviews
-
-PTs review diet logs awaiting approval:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    PENDING DIET LOGS                        │
-├─────────────────────────────────────────────────────────────┤
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ Client: Nguyen Van A                                    │ │
-│ │ Meal: Lunch                                             │ │
-│ │ Date: 2026-05-29                                       │ │
-│ │ Image: [thumbnail]                                      │ │
-│ │ AI Analysis: 485 cal, 42g protein                      │ │
-│ │ Confidence: 85%                                        │ │
-│ │                                                         │ │
-│ │ Actions: [Approve] [Adjust] [Reject]                  │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ Client: Tran Thi B                                      │ │
-│ │ ...                                                     │ │
-│ └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
-
-#### 4.3.3 Review Actions
+#### 4.3.2 Review Actions
 
 | Action | Description | Result |
 |--------|-------------|--------|
@@ -304,40 +198,7 @@ PTs review diet logs awaiting approval:
 
 ### 4.4 Progress Tracking
 
-#### 4.4.1 Client Progress View
-
 PTs can view detailed progress data for each client:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   PROGRESS: Nguyen Van A                   │
-├─────────────────────────────────────────────────────────────┤
-│ Date Range: 2026-04-29 to 2026-05-29 (Last 30 days)        │
-│                                                              │
-│ CALORIE TREND                                               │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ 2500 ┤                                                 │ │
-│ │ 2000 ┤                    ┌───┐                       │ │
-│ │ 1500 ┤        ┌───┐        │   │  ┌───┐               │ │
-│ │ 1000 ┤  ┌───┐ │   │  ┌───┐ │   │  │   │  ┌───┐        │ │
-│ │  500 ┤  │   │ │   │  │   │ │   │  │   │  │   │        │ │
-│ │    0 ┼──┴───┴─┴───┴──┴───┴─┴───┴──┴───┴──┴───┴────────│ │
-│ │        M   T   W   T   F   S   S                        │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│ Target: 2000 kcal ─────────────────────────                  │
-│                                                              │
-│ MACRO SUMMARY                                               │
-│ ┌──────────────────┬──────────────────┐                   │
-│ │ Avg Calories     │ 1657 kcal        │                   │
-│ │ Avg Protein      │ 115g             │                   │
-│ │ Avg Carbs        │ 164g             │                   │
-│ │ Avg Fat          │ 52g              │                   │
-│ │ Adherence Rate   │ 85.5%            │                   │
-│ └──────────────────┴──────────────────┘                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-#### 4.4.2 Metrics Tracked
 
 | Metric | Description |
 |--------|-------------|
@@ -366,29 +227,16 @@ The SOS (Support) System allows customers to request help from PTs when they hav
 ### 5.2 SOS Ticket Flow
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Customer   │     │   Backend   │     │   Admin     │     │     PT      │
-└──────┬──────┘     └──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-       │                    │                   │                   │
-       │  1. Create SOS    │                   │                   │
-       │──────────────────>│                   │                   │
-       │                    │                   │                   │
-       │  2. Status = OPEN│                   │                   │
-       │                    │                   │                   │
-       │                    │  3. View Tickets │                   │
-       │                    │───────────────────────────────────────>│
-       │                    │                   │                   │
-       │                    │  4. Assign to PT │                   │
-       │                    │<──────────────────────────────────────│
-       │                    │                   │                   │
-       │  5. Notification  │                   │                   │
-       │<──────────────────│                   │                   │
-       │                    │                   │                   │
-       │                    │  6. PT Handles  │                   │
-       │                    │<──────────────────────────────────────│
-       │                    │                   │                   │
-       │                    │  7. Status = RESOLVED/CLOSED        │
-       │                    │                   │                   │
+Customer  →  Create SOS  →  Backend (status=OPEN)
+                            │
+                            ▼
+                    Admin View Tickets
+                            │
+                            ▼
+                    Assign to PT  →  PT Handles
+                            │
+                            ▼
+                    Status=RESOLVED/CLOSED
 ```
 
 ### 5.3 SOS Priority Levels
@@ -408,25 +256,6 @@ The SOS (Support) System allows customers to request help from PTs when they hav
 | RESOLVED | Issue addressed |
 | CLOSED | Ticket closed |
 
-### 5.5 Creating SOS Ticket
-
-```json
-POST /api/v1/diet/sos
-{
-  "dietLogId": "550e8400-e29b-41d4-a716-446655440000",
-  "note": "I'm confused about the macros in this meal",
-  "priority": "HIGH"
-}
-```
-
-### 5.6 Linking to Diet Log
-
-SOS tickets can be linked to specific diet logs for context:
-
-1. User creates SOS from a diet log
-2. Ticket is flagged with `sosTicketFlag = true` on the log
-3. PT can view the related diet log when handling the ticket
-
 ---
 
 ## 6. Marketplace
@@ -436,8 +265,6 @@ SOS tickets can be linked to specific diet logs for context:
 The Marketplace allows customers to discover and connect with Personal Trainers.
 
 ### 6.2 PT Profile
-
-#### 6.2.1 Profile Information
 
 | Field | Description |
 |-------|-------------|
@@ -461,7 +288,6 @@ The Marketplace allows customers to discover and connect with Personal Trainers.
 | Verified | true/false | Show only verified PTs |
 | Tier | TIER_1, TIER_2 | PT tier level |
 | Sort By | tier, rating, experience | Sort results |
-| Sort Direction | asc, desc | Sort order |
 
 ### 6.4 PT Tiers
 
@@ -472,33 +298,7 @@ The Marketplace allows customers to discover and connect with Personal Trainers.
 
 ### 6.5 Review System
 
-#### 6.5.1 Creating a Review
-
-Customers can leave reviews for PTs:
-
-```json
-POST /api/v1/marketplace/pts/{ptId}/reviews
-{
-  "rating": 5,
-  "comment": "Excellent guidance on meal planning!"
-}
-```
-
-#### 6.5.2 Rating Calculation
-
-The PT's average rating is calculated from all reviews:
-
-```
-averageRating = SUM(all ratings) / COUNT(reviews)
-```
-
-#### 6.5.3 Review Display
-
-Reviews show:
-- Reviewer name
-- Rating (1-5 stars)
-- Comment
-- Date
+Customers can leave reviews for PTs with rating (1-5) and comments.
 
 ---
 
@@ -510,37 +310,18 @@ The Admin module provides system administration features for managing users, PT 
 
 ### 7.2 User Management
 
-#### 7.2.1 View Users
-
-Admins can view all users with filters:
-
-| Filter | Description |
-|--------|-------------|
-| Role | CUSTOMER, PT_FREELANCE, PT_CERTIFIED, ADMIN |
-| Status | ACTIVE, INACTIVE, PENDING_APPROVAL, SUSPENDED |
-| Search | Search by name/email |
-
-#### 7.2.2 Update User Status
-
-| Status | Description |
-|--------|-------------|
-| ACTIVE | Normal account |
-| INACTIVE | Deactivated |
-| SUSPENDED | Temporarily blocked |
+Admins can view all users with filters by role, status, and search by name/email.
 
 ### 7.3 PT Verification
 
-#### 7.3.1 Verification Process
-
 ```
 1. PT submits registration with documents
-2. Admin reviews pending PTs
-3. Admin verifies documents
-4. Admin approves or rejects
-5. PT receives notification
+2. PT submits KYC documents (ID card, etc.)
+3. Admin reviews pending PTs
+4. Admin verifies KYC documents
+5. Admin approves or rejects
+6. PT receives notification
 ```
-
-#### 7.3.2 Verification Decision
 
 | Action | Result |
 |--------|--------|
@@ -548,17 +329,7 @@ Admins can view all users with filters:
 | APPROVE + FREELANCE | Role = PT_FREELANCE, Tier = TIER_2 |
 | REJECT | Status = SUSPENDED, isVerified = false |
 
-#### 7.3.3 Documents Reviewed
-
-| Document | Description |
-|----------|-------------|
-| CV | Professional resume |
-| Certifications | Proof of certifications |
-| ID | Identity verification |
-
 ### 7.4 Dashboard Statistics
-
-Admins can view platform statistics:
 
 | Metric | Description |
 |--------|-------------|
@@ -572,116 +343,68 @@ Admins can view platform statistics:
 
 ---
 
-## 8. User Interactions
+## 8. KYC Verification
 
-### 8.1 Customer Journey
+### 8.1 Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         CUSTOMER JOURNEY                                     │
-└─────────────────────────────────────────────────────────────────────────────┘
+The KYC (Know Your Customer) system collects and verifies identity documents for PT registration.
 
-┌─────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Register│────>│Set Macro    │────>│Find PT in   │────>│Connect with │
-│         │     │Targets      │     │Marketplace  │     │PT           │
-└─────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
-                                                                   │
-┌─────────┐     ┌─────────────┐     ┌─────────────┐                │
-│ View    │<────│Log Diet    │<────│Review       │<───────────────┤
-│ Progress│     │Daily       │     │Approved Logs│                │
-└─────────┘     └──────┬──────┘     └─────────────┘                │
-                       │                                           │
-                       ▼                                           │
-                ┌─────────────┐                                    │
-                │Create SOS if│                                    │
-                │Need Help    │───────────────────────────────────┘
-                └─────────────┘
-```
+### 8.2 Documents Collected
 
-### 8.2 PT Journey
+| Document | Description |
+|----------|-------------|
+| ID Card Number | Government-issued ID number |
+| ID Card Front | Front side of ID card image |
+| ID Card Back | Back side of ID card image |
+| Full Name on Card | Name as printed on ID |
+| Date of Birth on Card | DOB as on ID |
+| Address on Card | Address as on ID |
+
+### 8.3 KYC Status Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           PT JOURNEY                                        │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│ Register    │────>│Admin        │────>│View Client  │────>│Review Diet  │
-│             │     │Verifies     │     │List         │     │Logs         │
-└─────────────┘     └─────────────┘     └──────┬──────┘     └──────┬──────┘
-                                               │                     │
-                    ┌──────────────────────────┴────────────────────┤
-                    │                                                 │
-                    ▼                                                 ▼
-             ┌─────────────┐                                   ┌─────────────┐
-             │Track Client │                                   │Approve/     │
-             │Progress     │                                   │Reject Logs  │
-             └──────┬──────┘                                   └─────────────┘
-                    │
-                    ▼
-             ┌─────────────┐
-             │Handle SOS   │
-             │Tickets      │
-             └─────────────┘
+SUBMITTED → PENDING_APPROVAL → APPROVED
+                │
+                └──→ REJECTED (with rejectionReason)
 ```
 
-### 8.3 Admin Journey
+### 8.4 KYC Review (Admin)
+
+- Admin views submitted KYC documents
+- Admin can approve or reject with notes
+- KYC approval is a prerequisite for PT verification
+
+---
+
+## 9. User Interactions
+
+### 9.1 Customer Journey
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          ADMIN JOURNEY                                      │
-└─────────────────────────────────────────────────────────────────────────────┘
+Register → Set Macro Targets → Find PT in Marketplace → Connect with PT
+    │
+    └→ Log Diet Daily ─→ View Progress ─→ Receive PT Review
+              │
+              └→ Create SOS if Need Help
+```
 
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│Login        │────>│View         │────>│Verify PT    │────>│Assign SOS   │
-│             │     │Dashboard    │     │Applications │     │Tickets      │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-                                                                    │
-                    ┌───────────────────────────────────────────────┘
-                    │
-                    ▼
-             ┌─────────────┐
-             │Manage Users│
-             │(Suspend/   │
-             │Activate)   │
-             └─────────────┘
+### 9.2 PT Journey
+
+```
+Register → Submit KYC → Admin Verifies → View Clients → Review Diet Logs
+    │                                              │
+    └→ Track Client Progress ←─── Approve/Reject Logs ←──┘
+              │
+              └→ Handle SOS Tickets
+```
+
+### 9.3 Admin Journey
+
+```
+Login → View Dashboard → Verify PT (KYC + docs) → Assign SOS Tickets → Manage Users
 ```
 
 ---
 
-## 9. Data Flows
-
-### 9.1 Diet Log Creation Flow
-
-```
-User ──> POST /diet/logs/analyze ──> Backend
-                                    │
-                                    ├── Upload Image ──> MinIO
-                                    │
-                                    ├── Get Presigned URL
-                                    │
-                                    ├── Call Ollama AI
-                                    │
-                                    └── Save Diet Log (status=PT_REVIEWING)
-                                         │
-                                         └── SSE Notification ──> PT
-```
-
-### 9.2 PT Review Flow
-
-```
-PT ──> PUT /workspace/diet-logs/{id}/review ──> Backend
-                                            │
-                                            ├── Update DietLog status
-                                            │
-                                            ├── Save PT note (if any)
-                                            │
-                                            ├── Send Notification ──> Client
-                                            │
-                                            └── Update SSE status
-```
-
----
-
-*Document Version: 1.0.0*
-*Last Updated: 2026-05-29*
+*Document Version: 2.0.0*
+*Last Updated: 2026-06-04*

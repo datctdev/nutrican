@@ -53,11 +53,12 @@ Register a new customer account.
     }
   },
   "message": "Registration successful",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
 **Validation:**
+
 | Field | Rules |
 |-------|-------|
 | email | Required, valid email format |
@@ -71,7 +72,7 @@ Register a new customer account.
 
 **Endpoint:** `POST /api/v1/auth/register/pt`
 
-Register a new Personal Trainer account (requires admin approval).
+Register a new Personal Trainer account. Requires subsequent KYC submission and admin approval.
 
 **Request Body:**
 ```json
@@ -104,19 +105,88 @@ Register a new Personal Trainer account (requires admin approval).
       "avatarUrl": null
     }
   },
-  "message": "PT registration submitted for approval",
-  "timestamp": "2026-05-29T04:45:00"
+  "message": "PT registration submitted. Please submit KYC documents to complete verification.",
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
 **Notes:**
 - New PTs are created with `PENDING_APPROVAL` status
-- Admin must approve before PT can access workspace
+- PT must submit KYC documents via `POST /api/v1/auth/kyc`
+- Admin must approve before PT can access full workspace
 - Initial role is `PT_FREELANCE` (tier 2)
 
 ---
 
-### 1.3 Login
+### 1.3 Submit KYC Documents
+
+**Endpoint:** `POST /api/v1/auth/kyc`
+
+Submit KYC (Know Your Customer) documents for PT verification. Requires PT_FREELANCE or PT_CERTIFIED role.
+
+**Content-Type:** `multipart/form-data`
+
+**Form Data:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| idCardNumber | String | No | ID card number |
+| idCardFront | File | No | Front side of ID card (JPEG, PNG, max 500KB) |
+| idCardBack | File | No | Back side of ID card (JPEG, PNG, max 500KB) |
+| fullNameOnCard | String | No | Name as on ID card |
+| dateOfBirthOnCard | String | No | DOB as on ID card (YYYY-MM-DD) |
+| addressOnCard | String | No | Address as on ID card |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "KYC documents submitted successfully",
+  "timestamp": "2026-06-04T04:50:00"
+}
+```
+
+---
+
+### 1.4 Get KYC Status
+
+**Endpoint:** `GET /api/v1/auth/kyc/status`
+
+Get the current KYC verification status.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "idCardNumber": "012345678901",
+    "idCardFrontUrl": "https://minio.example.com/kyc/xxx-front.jpg",
+    "idCardBackUrl": "https://minio.example.com/kyc/xxx-back.jpg",
+    "fullNameOnCard": "Tran PT B",
+    "dateOfBirthOnCard": "1990-01-15",
+    "addressOnCard": "123 Main St, Ho Chi Minh City",
+    "isVerified": false,
+    "verificationStatus": "PENDING_APPROVAL",
+    "rejectionReason": null,
+    "reviewedAt": null,
+    "reviewedBy": null,
+    "createdAt": "2026-06-04T04:50:00"
+  },
+  "timestamp": "2026-06-04T04:51:00"
+}
+```
+
+**Status Values:**
+| Status | Description |
+|--------|-------------|
+| `PENDING_APPROVAL` | Submitted, awaiting admin review |
+| `APPROVED` | KYC approved by admin |
+| `REJECTED` | KYC rejected (see rejectionReason) |
+
+---
+
+### 1.5 Login
 
 **Endpoint:** `POST /api/v1/auth/login`
 
@@ -148,7 +218,7 @@ Authenticate user and receive JWT tokens.
     }
   },
   "message": "Login successful",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -162,7 +232,7 @@ Authenticate user and receive JWT tokens.
 
 ---
 
-### 1.4 Refresh Token
+### 1.6 Refresh Token
 
 **Endpoint:** `POST /api/v1/auth/refresh`
 
@@ -187,13 +257,13 @@ Get new access token using refresh token.
     "user": { ... }
   },
   "message": "Token refreshed successfully",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
 ---
 
-### 1.5 Logout
+### 1.7 Logout
 
 **Endpoint:** `POST /api/v1/auth/logout`
 
@@ -210,7 +280,7 @@ Authorization: Bearer <accessToken>
   "success": true,
   "data": null,
   "message": "Logout successful",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -242,7 +312,7 @@ All endpoints require authentication.
     "status": "ACTIVE",
     "createdAt": "2026-01-15T10:30:00"
   },
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -270,7 +340,7 @@ All endpoints require authentication.
   "success": true,
   "data": { ... },
   "message": "Profile updated successfully",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -293,7 +363,7 @@ All endpoints require authentication.
   "success": true,
   "data": "https://minio.example.com/avatars/yyy.jpg",
   "message": "Avatar updated successfully",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -313,7 +383,7 @@ All endpoints require authentication.
     "carb": 200,
     "fat": 65
   },
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -348,7 +418,7 @@ All endpoints require authentication.
     "fat": 60
   },
   "message": "Macro target updated successfully",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -371,7 +441,7 @@ Get any user's public profile by ID.
     "role": "CUSTOMER",
     "createdAt": "2026-01-15T10:30:00"
   },
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -394,7 +464,7 @@ All endpoints require `CUSTOMER` role.
   "protein": 45,
   "carb": 60,
   "fat": 12,
-  "logDate": "2026-05-29"
+  "logDate": "2026-06-04"
 }
 ```
 
@@ -430,11 +500,11 @@ All endpoints require `CUSTOMER` role.
     "sosTicketFlag": false,
     "ptReviewerId": null,
     "ptNote": null,
-    "logDate": "2026-05-29",
-    "createdAt": "2026-05-29T12:30:00"
+    "logDate": "2026-06-04",
+    "createdAt": "2026-06-04T12:30:00"
   },
   "message": "Diet log created successfully",
-  "timestamp": "2026-05-29T12:30:00"
+  "timestamp": "2026-06-04T12:30:00"
 }
 ```
 
@@ -444,7 +514,7 @@ All endpoints require `CUSTOMER` role.
 
 **Endpoint:** `POST /api/v1/diet/logs/analyze`
 
-Upload meal image and get AI analysis.
+Upload meal image and get AI analysis via Ollama (qwen2.5-vl).
 
 **Content-Type:** `multipart/form-data`
 
@@ -473,7 +543,7 @@ Upload meal image and get AI analysis.
     "mealType": "LUNCH"
   },
   "message": "Meal analyzed successfully",
-  "timestamp": "2026-05-29T12:35:00"
+  "timestamp": "2026-06-04T12:35:00"
 }
 ```
 
@@ -496,7 +566,7 @@ Upload meal image and get AI analysis.
     "mealType": "LUNCH"
   },
   "message": "Meal analyzed with fallback values",
-  "timestamp": "2026-05-29T12:35:00"
+  "timestamp": "2026-06-04T12:35:00"
 }
 ```
 
@@ -543,8 +613,8 @@ Upload meal image and get AI analysis.
         "sosTicketFlag": false,
         "ptReviewerId": null,
         "ptNote": null,
-        "logDate": "2026-05-29",
-        "createdAt": "2026-05-29T12:35:00"
+        "logDate": "2026-06-04",
+        "createdAt": "2026-06-04T12:35:00"
       }
     ],
     "page": 0,
@@ -554,7 +624,7 @@ Upload meal image and get AI analysis.
     "first": true,
     "last": true
   },
-  "timestamp": "2026-05-29T12:40:00"
+  "timestamp": "2026-06-04T12:40:00"
 }
 ```
 
@@ -569,7 +639,7 @@ Upload meal image and get AI analysis.
 {
   "success": true,
   "data": { ... },
-  "timestamp": "2026-05-29T12:45:00"
+  "timestamp": "2026-06-04T12:45:00"
 }
 ```
 
@@ -599,7 +669,7 @@ Upload meal image and get AI analysis.
   "success": true,
   "data": { ... },
   "message": "Diet log updated successfully",
-  "timestamp": "2026-05-29T12:50:00"
+  "timestamp": "2026-06-04T12:50:00"
 }
 ```
 
@@ -615,7 +685,7 @@ Upload meal image and get AI analysis.
   "success": true,
   "data": null,
   "message": "Diet log deleted successfully",
-  "timestamp": "2026-05-29T12:55:00"
+  "timestamp": "2026-06-04T12:55:00"
 }
 ```
 
@@ -637,14 +707,14 @@ Upload meal image and get AI analysis.
 {
   "success": true,
   "data": {
-    "date": "2026-05-29",
+    "date": "2026-06-04",
     "totalCalories": 1535,
     "totalProtein": 127,
     "totalCarb": 173,
     "totalFat": 55,
     "logs": [ ... ]
   },
-  "timestamp": "2026-05-29T13:00:00"
+  "timestamp": "2026-06-04T13:00:00"
 }
 ```
 
@@ -677,7 +747,7 @@ Create an SOS support request (sent to admin for PT assignment).
   "success": true,
   "data": null,
   "message": "SOS ticket created, your PT has been notified",
-  "timestamp": "2026-05-29T13:05:00"
+  "timestamp": "2026-06-04T13:05:00"
 }
 ```
 
@@ -733,7 +803,7 @@ All endpoints require authentication.
     "first": true,
     "last": true
   },
-  "timestamp": "2026-05-29T13:10:00"
+  "timestamp": "2026-06-04T13:10:00"
 }
 ```
 
@@ -763,7 +833,7 @@ All endpoints require authentication.
     "tier": "TIER_1",
     "hourlyRate": 150.00
   },
-  "timestamp": "2026-05-29T13:15:00"
+  "timestamp": "2026-06-04T13:15:00"
 }
 ```
 
@@ -802,7 +872,7 @@ All endpoints require authentication.
     "first": true,
     "last": true
   },
-  "timestamp": "2026-05-29T13:20:00"
+  "timestamp": "2026-06-04T13:20:00"
 }
 ```
 
@@ -836,10 +906,10 @@ All endpoints require authentication.
     "reviewerName": "Nguyen Van A",
     "rating": 5.0,
     "comment": "Excellent guidance on meal planning!",
-    "createdAt": "2026-05-29T13:25:00"
+    "createdAt": "2026-06-04T13:25:00"
   },
   "message": "Review submitted successfully",
-  "timestamp": "2026-05-29T13:25:00"
+  "timestamp": "2026-06-04T13:25:00"
 }
 ```
 
@@ -873,7 +943,7 @@ All endpoints require `PT_CERTIFIED` or `PT_FREELANCE` role.
         "status": "GREEN",
         "statusLabel": "On Track",
         "statusColor": "#22c55e",
-        "lastLogTime": "2026-05-29T12:35:00",
+        "lastLogTime": "2026-06-04T12:35:00",
         "avgCalories": 1650
       }
     ],
@@ -884,7 +954,7 @@ All endpoints require `PT_CERTIFIED` or `PT_FREELANCE` role.
     "first": true,
     "last": true
   },
-  "timestamp": "2026-05-29T13:30:00"
+  "timestamp": "2026-06-04T13:30:00"
 }
 ```
 
@@ -960,8 +1030,8 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
         },
         "status": "PT_REVIEWING",
         "sosTicketFlag": false,
-        "logDate": "2026-05-29",
-        "createdAt": "2026-05-29T12:35:00"
+        "logDate": "2026-06-04",
+        "createdAt": "2026-06-04T12:35:00"
       }
     ],
     "page": 0,
@@ -971,7 +1041,7 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
     "first": true,
     "last": true
   },
-  "timestamp": "2026-05-29T13:35:00"
+  "timestamp": "2026-06-04T13:35:00"
 }
 ```
 
@@ -1005,7 +1075,7 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
   "success": true,
   "data": { ... },
   "message": "Diet log reviewed successfully",
-  "timestamp": "2026-05-29T13:40:00"
+  "timestamp": "2026-06-04T13:40:00"
 }
 ```
 
@@ -1030,19 +1100,19 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
     "clientName": "Nguyen Van A",
     "calorieHistory": [
       {
-        "date": "2026-05-29",
+        "date": "2026-06-04",
         "calories": 1535,
         "target": 2000
       },
       {
-        "date": "2026-05-28",
+        "date": "2026-06-03",
         "calories": 1780,
         "target": 2000
       }
     ],
     "bodyMetrics": [
       {
-        "date": "2026-05-29",
+        "date": "2026-06-04",
         "weight": 70.5,
         "bodyFatPercent": 18.5,
         "lbm": 57.5
@@ -1056,7 +1126,7 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
       "adherenceRate": 85.5
     }
   },
-  "timestamp": "2026-05-29T13:45:00"
+  "timestamp": "2026-06-04T13:45:00"
 }
 ```
 
@@ -1072,7 +1142,7 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
   "success": true,
   "data": null,
   "message": "Client assigned successfully",
-  "timestamp": "2026-05-29T13:50:00"
+  "timestamp": "2026-06-04T13:50:00"
 }
 ```
 
@@ -1093,7 +1163,7 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
     "reviewsThisWeek": 28,
     "averageAdherenceRate": 85
   },
-  "timestamp": "2026-05-29T13:55:00"
+  "timestamp": "2026-06-04T13:55:00"
 }
 ```
 
@@ -1139,7 +1209,7 @@ All endpoints require `ADMIN` role.
     "first": true,
     "last": true
   },
-  "timestamp": "2026-05-29T14:00:00"
+  "timestamp": "2026-06-04T14:00:00"
 }
 ```
 
@@ -1168,7 +1238,7 @@ All endpoints require `ADMIN` role.
   "success": true,
   "data": null,
   "message": "User status updated successfully",
-  "timestamp": "2026-05-29T14:05:00"
+  "timestamp": "2026-06-04T14:05:00"
 }
 ```
 
@@ -1203,6 +1273,7 @@ All endpoints require `ADMIN` role.
         "cvUrl": "https://minio.example.com/cv/pt.pdf",
         "documentUrls": "https://minio.example.com/docs/xxx.pdf",
         "verificationStatus": "PENDING_APPROVAL",
+        "kycStatus": "PENDING_APPROVAL",
         "createdAt": "2026-05-20T10:00:00"
       }
     ],
@@ -1213,7 +1284,7 @@ All endpoints require `ADMIN` role.
     "first": true,
     "last": true
   },
-  "timestamp": "2026-05-29T14:10:00"
+  "timestamp": "2026-06-04T14:10:00"
 }
 ```
 
@@ -1249,7 +1320,7 @@ All endpoints require `ADMIN` role.
   "success": true,
   "data": null,
   "message": "PT verification processed successfully",
-  "timestamp": "2026-05-29T14:15:00"
+  "timestamp": "2026-06-04T14:15:00"
 }
 ```
 
@@ -1283,7 +1354,7 @@ All endpoints require `ADMIN` role.
         "status": "OPEN",
         "priority": "HIGH",
         "note": "Confused about macros",
-        "createdAt": "2026-05-29T13:05:00"
+        "createdAt": "2026-06-04T13:05:00"
       }
     ],
     "page": 0,
@@ -1293,7 +1364,7 @@ All endpoints require `ADMIN` role.
     "first": true,
     "last": true
   },
-  "timestamp": "2026-05-29T14:20:00"
+  "timestamp": "2026-06-04T14:20:00"
 }
 ```
 
@@ -1316,7 +1387,7 @@ All endpoints require `ADMIN` role.
   "success": true,
   "data": null,
   "message": "SOS ticket assigned successfully",
-  "timestamp": "2026-05-29T14:25:00"
+  "timestamp": "2026-06-04T14:25:00"
 }
 ```
 
@@ -1339,7 +1410,7 @@ All endpoints require `ADMIN` role.
     "totalDietLogs": 2500,
     "averageRating": 4.5
   },
-  "timestamp": "2026-05-29T14:30:00"
+  "timestamp": "2026-06-04T14:30:00"
 }
 ```
 
@@ -1354,7 +1425,7 @@ All API responses follow this format:
   "success": true,
   "data": { ... },
   "message": "Operation successful",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -1365,7 +1436,7 @@ All API responses follow this format:
   "success": false,
   "data": null,
   "message": "Error description",
-  "timestamp": "2026-05-29T04:45:00"
+  "timestamp": "2026-06-04T04:45:00"
 }
 ```
 
@@ -1458,7 +1529,13 @@ RESOLVED
 CLOSED
 ```
 
+### PtType
+```
+CERTIFIED
+FREELANCE
+```
+
 ---
 
-*Document Version: 1.0.0*
-*Last Updated: 2026-05-29*
+*Document Version: 2.0.0*
+*Last Updated: 2026-06-04*

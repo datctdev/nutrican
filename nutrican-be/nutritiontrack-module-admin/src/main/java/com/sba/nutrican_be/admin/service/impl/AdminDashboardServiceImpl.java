@@ -1,0 +1,55 @@
+package com.sba.nutrican_be.admin.service.impl;
+
+import com.sba.nutrican_be.admin.dto.AdminDashboardDto;
+import com.sba.nutrican_be.admin.service.AdminDashboardService;
+import com.sba.nutrican_be.core.dto.ApiResponse;
+import com.sba.nutrican_be.core.enums.SOSTicketStatus;
+import com.sba.nutrican_be.core.enums.UserRole;
+import com.sba.nutrican_be.core.enums.UserStatus;
+import com.sba.nutrican_be.core.repository.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AdminDashboardServiceImpl implements AdminDashboardService {
+
+    private final UserRepository userRepository;
+    private final PtProfileRepository ptProfileRepository;
+    private final UserKycRepository userKycRepository;
+    private final SOSTicketRepository sosTicketRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<AdminDashboardDto> getDashboardStats() {
+        long totalUsers = userRepository.count();
+        long totalPts = userRepository.findByRole(UserRole.PT_CERTIFIED, PageRequest.of(0, 1)).getTotalElements()
+                + userRepository.findByRole(UserRole.PT_FREELANCE, PageRequest.of(0, 1)).getTotalElements();
+        long totalCustomers = userRepository.findByRole(UserRole.CUSTOMER, PageRequest.of(0, 1)).getTotalElements();
+        long pendingKyc = userKycRepository.findByVerificationStatus(
+                UserStatus.PENDING_APPROVAL, PageRequest.of(0, 1)).getTotalElements();
+        long pendingPts = ptProfileRepository.findByPtRequestStatus(
+                UserStatus.PENDING_APPROVAL, PageRequest.of(0, 1)).getTotalElements();
+        long activeSos = sosTicketRepository.findByStatus(
+                SOSTicketStatus.OPEN, PageRequest.of(0, 1)).getTotalElements();
+
+        AdminDashboardDto stats = AdminDashboardDto.builder()
+                .totalUsers(totalUsers)
+                .totalCustomers(totalCustomers)
+                .totalPts(totalPts)
+                .pendingPtVerifications(pendingPts)
+                .pendingKycVerifications(pendingKyc)
+                .activeSosTickets(activeSos)
+                .totalDietLogs(0)
+                .averageRating(BigDecimal.valueOf(4.5))
+                .build();
+
+        return ApiResponse.success(stats);
+    }
+}

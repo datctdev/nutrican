@@ -1,35 +1,35 @@
 # NutriCan PT - Documentation
 
-Mục lục toàn bộ tài liệu dự án NutriCan PT.
+Muc luc toan bo tai lieu du an NutriCan PT.
 
 ---
 
-## 📚 Danh Mục Tài Liệu
+## Muc Luc Tai Lieu
 
-### Tổng Quan
-| Tài liệu | Mô tả |
+### Tong Quan
+| Tai lieu | Mo ta |
 |-----------|--------|
-| [README](./README.md) | Tổng quan dự án, công nghệ sử dụng |
-| [ARCHITECTURE](./ARCHITECTURE.md) | Kiến trúc hệ thống chi tiết |
-| [SECURITY](./SECURITY.md) | Bảo mật, JWT, RBAC |
+| [README](../README.md) | Tong quan du an, cong nghe su dung |
+| [ARCHITECTURE](./ARCHITECTURE.md) | Kien truc he thong chi tiet |
+| [SECURITY](./SECURITY.md) | Bao mat, JWT, RBAC |
 
 ### Backend
-| Tài liệu | Mô tả |
+| Tai lieu | Mo ta |
 |-----------|--------|
-| [API_DOCUMENTATION](./API_DOCUMENTATION.md) | Tài liệu API đầy đủ |
-| [DATABASE_SCHEMA](./DATABASE_SCHEMA.md) | Thiết kế database, ERD |
-| [FEATURES](./FEATURES.md) | Mô tả tính năng chi tiết |
+| [API_DOCUMENTATION](./API_DOCUMENTATION.md) | Tai lieu API day du |
+| [DATABASE_SCHEMA](./DATABASE_SCHEMA.md) | Thiet ke database, ERD |
+| [FEATURES](./FEATURES.md) | Mo ta tinh nang chi tiet |
 
-### Triển Khai & Phát Triển
-| Tài liệu | Mô tả |
+### Trien Khai & Phat Trien
+| Tai lieu | Mo ta |
 |-----------|--------|
-| [DEPLOYMENT](./DEPLOYMENT.md) | Hướng dẫn triển khai |
-| [DEVELOPMENT](./DEVELOPMENT.md) | Hướng dẫn phát triển |
-| [FRONTEND](./FRONTEND.md) | Tài liệu frontend React |
+| [DEPLOYMENT](./DEPLOYMENT.md) | Huong dan trien khai |
+| [DEVELOPMENT](./DEVELOPMENT.md) | Huong dan phat trien |
+| [FRONTEND](./FRONTEND.md) | Tai lieu frontend React |
 
 ---
 
-## 🔗 Liên Kết Nhanh
+## Lien Ket Nhanh
 
 ### Backend (Spring Boot)
 - **Base URL**: `http://localhost:8080/api/v1`
@@ -48,32 +48,48 @@ Mục lục toàn bộ tài liệu dự án NutriCan PT.
 
 ---
 
-## 👥 User Roles
+## User Roles
 
-| Role | Mô tả | Truy cập |
+| Role | Mo ta | Truy cap |
 |------|--------|----------|
-| `CUSTOMER` | Người dùng thông thường | Diet tracking, Marketplace |
-| `PT_FREELANCE` | PT chưa xác minh | PT Workspace |
-| `PT_CERTIFIED` | PT đã xác minh | PT Workspace |
-| `ADMIN` | Quản trị viên | Admin Dashboard |
+| `CUSTOMER` | Nguoi dung thong thuong | Diet tracking, Marketplace |
+| `PT_FREELANCE` | PT chua xac minh | PT Workspace |
+| `PT_CERTIFIED` | PT da xac minh | PT Workspace |
+| `ADMIN` | Quan tri vien | Admin Dashboard |
 
 ---
 
-## 🚀 Quick Start
+## Kien Truc Module (Maven Multi-Module)
+
+```
+nutrican-be (Parent POM)
+  nutritiontrack-module-application (Entry Point)
+    nutritiontrack-module-admin
+    nutritiontrack-module-pt-management
+      nutritiontrack-module-diet-tracker
+        nutritiontrack-module-ai-gateway
+    nutritiontrack-module-user-profile
+    nutritiontrack-module-auth
+    nutritiontrack-module-core (Shared)
+```
+
+---
+
+## Quick Start
 
 ```bash
 # 1. Clone repository
 git clone <repo-url>
 cd nutrican-pt-workspace
 
-# 2. Khởi động infrastructure
+# 2. Khoi dong infrastructure
 cd nutrican-be
 docker-compose up -d
 
-# 3. Chạy Backend
+# 3. Chay Backend
 ./mvnw spring-boot:run
 
-# 4. Chạy Frontend
+# 4. Chay Frontend
 cd ../nutrican-fe
 npm install
 npm run dev
@@ -81,13 +97,39 @@ npm run dev
 
 ---
 
-## 📞 Liên Hệ
+## Tai Khoan Mac Dinh
+
+| Vai tro | Email | Mat khau |
+|---------|-------|----------|
+| Admin | admin@nutrican.com | Admin123! |
+
+---
+
+## Lien He
 
 - **Email**: support@nutrican.com
 - **Website**: https://nutrican.com
 
 ---
 
-## 📄 Giấy Phép
+## Giao Dien Quan Tri (Admin Pages)
 
-Copyright © 2026 NutriCan PT. All rights reserved.
+| Route | Mo ta |
+|-------|-------|
+| `/admin` | Dashboard + thong ke |
+| `/admin/pts` | Xac minh PT |
+| `/admin/users` | Quan ly nguoi dung |
+| `/admin/sos` | Quan ly SOS tickets |
+
+## Giao Dien PT Pages
+
+| Route | Mo ta |
+|-------|-------|
+| `/pt` | Dashboard + thong ke |
+| `/pt/clients` | Danh sach khach hang |
+| `/pt/reviews` | Xem xet diet logs |
+
+---
+
+*Document Version: 2.0.0*
+*Last Updated: 2026-06-04*

@@ -17,9 +17,11 @@ This document describes the complete database schema for NutriCan PT application
 | Table | Primary Key | Foreign Keys | Description |
 |-------|-------------|--------------|-------------|
 | `users` | id (UUID) | - | User accounts |
+| `user_kyc` | id (UUID) | user_id (1:1) | KYC verification documents |
 | `pt_profiles` | id (UUID) | user_id (1:1) | PT extended profiles |
 | `macro_targets` | id (UUID) | user_id (1:1) | Daily macro targets |
 | `diet_logs` | id (UUID) | customer_id, pt_reviewer_id | Meal entries |
+| `diet_log_images` | id (UUID) | diet_log_id (N:1) | Meal images (multi-image support) |
 | `pt_client_mappings` | id (UUID) | pt_id, client_id | PT-Client relationships |
 | `sos_tickets` | id (UUID) | diet_log_id, pt_id, assigned_by | SOS support tickets |
 | `body_metrics` | id (UUID) | user_id | Body measurements |
@@ -31,135 +33,18 @@ This document describes the complete database schema for NutriCan PT application
 ## 2. Entity Relationship Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                                    users                                          │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│ id                    │ UUID          │ PK, NOT NULL                              │
-│ email                 │ VARCHAR(255)  │ UNIQUE, NOT NULL                         │
-│ password_hash         │ VARCHAR(255)  │ NOT NULL                                 │
-│ role                  │ VARCHAR(50)   │ NOT NULL                                 │
-│ status                │ VARCHAR(50)   │ NOT NULL, DEFAULT 'ACTIVE'               │
-│ full_name             │ VARCHAR(255)  │                                          │
-│ avatar_url            │ VARCHAR(500)  │                                          │
-│ phone_number          │ VARCHAR(50)   │                                          │
-│ address               │ TEXT          │                                          │
-│ date_of_birth         │ TIMESTAMP    │                                          │
-│ google_id             │ VARCHAR(255)  │ UNIQUE                                   │
-│ created_at            │ TIMESTAMP    │ NOT NULL, DEFAULT CURRENT_TIMESTAMP       │
-│ updated_at            │ TIMESTAMP    │ NOT NULL                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-         │
-         │ 1:1
-         ├──────────────────────────────────────────────────────────────────────────┐
-         │                                                                          │
-         ▼                                                                          ▼
-┌─────────────────────────────┐                              ┌─────────────────────────────┐
-│       pt_profiles           │                              │      macro_targets          │
-├─────────────────────────────┤                              ├─────────────────────────────┤
-│ id                         │                              │ id                         │
-│ user_id (FK)               │◄────────────────────────────│ user_id (FK)               │
-│ is_verified                │                              │ daily_calories             │
-│ bio                        │                              │ protein                    │
-│ training_philosophy        │                              │ carb                       │
-│ years_of_experience        │                              │ fat                        │
-│ portfolio_showcase (JSONB) │                              │ created_at                 │
-│ specializations (JSONB)     │                              │ updated_at                 │
-│ rating                     │                              └─────────────────────────────┘
-│ total_reviews              │
-│ tier                       │
-│ hourly_rate                │
-│ certifications             │
-│ cv_url                     │
-│ document_urls              │
-│ verification_status        │
-│ created_at                 │
-│ updated_at                 │
-└─────────────────────────────┘
+users (1) ── (1) user_kyc
+         ── (1) pt_profiles
+         ── (1) macro_targets
+         ── (1) body_metrics
+         ── (many) notifications
+         ── (many) reviews (given)
+         ── (many) diet_logs
+         ── (many) pt_client_mappings (as PT)
+         ── (many) pt_client_mappings (as client)
 
-┌─────────────────────────────┐
-│         diet_logs           │
-├─────────────────────────────┤
-│ id                         │
-│ customer_id (FK)           │◄───────────────────────────────────┐
-│ image_url                  │                                    │
-│ image_object_name          │                                    │
-│ ai_confidence_score        │                                    │
-│ macros_json (JSONB)        │                                    │
-│ meal_type                  │                                    │
-│ status                     │                                    │
-│ food_description           │                                    │
-│ sos_ticket_flag            │                                    │
-│ pt_reviewer_id (FK)        │                                    │
-│ pt_note                    │                                    │
-│ log_date                   │                                    │
-│ created_at                 │                                    │
-│ updated_at                 │                                    │
-└─────────────────────────────┘                                    │
-         │                                                      │
-         │ 1:many                                             │
-         ▼                                                      │
-┌─────────────────────────────┐                                  │
-│        sos_tickets           │                                  │
-├─────────────────────────────┤                                  │
-│ id                         │                                  │
-│ diet_log_id (FK)           │◄─────────────────────────────────┘
-│ pt_id (FK)                 │──────────────────────────────────────┐
-│ assigned_by (FK)            │                                       │
-│ status                     │                                       │
-│ priority                   │                                       │
-│ note                       │                                       │
-│ created_at                 │                                       │
-│ updated_at                 │                                       │
-└─────────────────────────────┘                                       │
-                                                                     │
-┌─────────────────────────────┐                                       │
-│    pt_client_mappings       │                                       │
-├─────────────────────────────┤                                       │
-│ id                         │                                       │
-│ pt_id (FK)                 │◄─────────────────────────────────────┘
-│ client_id (FK)             │◄─────────────────────────────────────┐
-│ status                     │                                       │
-│ assigned_at                │                                       │
-│ created_at                 │                                       │
-│ updated_at                 │                                       │
-└─────────────────────────────┘                                       │
-                                                                     │
-┌─────────────────────────────┐                                       │
-│       body_metrics          │                                       │
-├─────────────────────────────┤                                       │
-│ id                         │                                       │
-│ user_id (FK)               │◄─────────────────────────────────────┘
-│ record_date                │                                       │
-│ weight                     │                                       │
-│ body_fat_percent           │                                       │
-│ lbm                        │                                       │
-│ muscle_mass                │                                       │
-│ created_at                 │                                       │
-└─────────────────────────────┘
-
-┌─────────────────────────────┐
-│         reviews             │
-├─────────────────────────────┤
-│ id                         │
-│ pt_id (FK)                 │◄─────────────────────────────────────┐
-│ reviewer_id (FK)            │                                       │
-│ rating                     │                                       │
-│ comment                    │                                       │
-│ created_at                 │                                       │
-│ updated_at                 │                                       │
-└─────────────────────────────┘                                       │
-
-┌─────────────────────────────┐                                       │
-│      notifications          │                                       │
-├─────────────────────────────┤                                       │
-│ id                         │                                       │
-│ user_id (FK)               │◄─────────────────────────────────────┘
-│ type                       │                                       │
-│ message                    │                                       │
-│ is_read                    │                                       │
-│ reference_id               │                                       │
-│ created_at                 │                                       │
-└─────────────────────────────┘
+diet_logs (1) ── (many) diet_log_images
+             ── (1) sos_tickets
 ```
 
 ---
@@ -187,14 +72,11 @@ CREATE TABLE users (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_status ON users(status);
 CREATE INDEX idx_users_google_id ON users(google_id);
 ```
-
-**Columns:**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -214,7 +96,56 @@ CREATE INDEX idx_users_google_id ON users(google_id);
 
 ---
 
-### 3.2 pt_profiles
+### 3.2 user_kyc
+
+KYC (Know Your Customer) verification documents for PT registration.
+
+```sql
+CREATE TABLE user_kyc (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL UNIQUE,
+    id_card_number VARCHAR(20),
+    id_card_front_url VARCHAR(500),
+    id_card_back_url VARCHAR(500),
+    full_name_on_card VARCHAR(255),
+    date_of_birth_on_card DATE,
+    address_on_card TEXT,
+    is_verified BOOLEAN DEFAULT FALSE,
+    verification_status VARCHAR(50) DEFAULT 'PENDING_APPROVAL',
+    rejection_reason TEXT,
+    reviewed_at TIMESTAMP,
+    reviewed_by UUID,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_kyc_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_user_kyc_user_id ON user_kyc(user_id);
+CREATE INDEX idx_user_kyc_status ON user_kyc(verification_status);
+```
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK, NOT NULL | Unique identifier |
+| user_id | UUID | FK, UNIQUE, NOT NULL | Reference to users table |
+| id_card_number | VARCHAR(20) | - | ID card number |
+| id_card_front_url | VARCHAR(500) | - | Front side of ID card image |
+| id_card_back_url | VARCHAR(500) | - | Back side of ID card image |
+| full_name_on_card | VARCHAR(255) | - | Name as on ID card |
+| date_of_birth_on_card | DATE | - | DOB as on ID card |
+| address_on_card | TEXT | - | Address as on ID card |
+| is_verified | BOOLEAN | DEFAULT FALSE | KYC verification status |
+| verification_status | VARCHAR(50) | DEFAULT 'PENDING_APPROVAL' | Admin review status |
+| rejection_reason | TEXT | - | Reason if rejected |
+| reviewed_at | TIMESTAMP | - | When admin reviewed |
+| reviewed_by | UUID | - | Admin who reviewed |
+| created_at | TIMESTAMP | NOT NULL | Creation timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Last update timestamp |
+
+---
+
+### 3.3 pt_profiles
 
 Extended profile information for Personal Trainers.
 
@@ -238,18 +169,15 @@ CREATE TABLE pt_profiles (
     verification_status VARCHAR(50) DEFAULT 'PENDING_APPROVAL',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_pt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Indexes
 CREATE INDEX idx_pt_profiles_user_id ON pt_profiles(user_id);
 CREATE INDEX idx_pt_profiles_is_verified ON pt_profiles(is_verified);
 CREATE INDEX idx_pt_profiles_tier ON pt_profiles(tier);
 CREATE INDEX idx_pt_profiles_verification_status ON pt_profiles(verification_status);
 ```
-
-**Columns:**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -274,7 +202,7 @@ CREATE INDEX idx_pt_profiles_verification_status ON pt_profiles(verification_sta
 
 ---
 
-### 3.3 macro_targets
+### 3.4 macro_targets
 
 Daily macro nutrient targets for users.
 
@@ -288,15 +216,12 @@ CREATE TABLE macro_targets (
     fat DECIMAL(10,2) DEFAULT 65.00,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_macro_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Indexes
 CREATE UNIQUE INDEX idx_macro_targets_user_id ON macro_targets(user_id);
 ```
-
-**Columns:**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -311,7 +236,7 @@ CREATE UNIQUE INDEX idx_macro_targets_user_id ON macro_targets(user_id);
 
 ---
 
-### 3.4 diet_logs
+### 3.5 diet_logs
 
 Records of user meals/diet entries.
 
@@ -332,12 +257,11 @@ CREATE TABLE diet_logs (
     log_date DATE NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_diet_customer FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_diet_pt_reviewer FOREIGN KEY (pt_reviewer_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- Indexes
 CREATE INDEX idx_diet_logs_customer_id ON diet_logs(customer_id);
 CREATE INDEX idx_diet_logs_log_date ON diet_logs(log_date);
 CREATE INDEX idx_diet_logs_status ON diet_logs(status);
@@ -345,13 +269,11 @@ CREATE INDEX idx_diet_logs_pt_reviewer_id ON diet_logs(pt_reviewer_id);
 CREATE INDEX idx_diet_logs_sos_ticket_flag ON diet_logs(sos_ticket_flag) WHERE sos_ticket_flag = TRUE;
 ```
 
-**Columns:**
-
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | UUID | PK, NOT NULL | Unique identifier |
 | customer_id | UUID | FK, NOT NULL | User who logged |
-| image_url | VARCHAR(500) | - | Meal image URL |
+| image_url | VARCHAR(500) | - | Meal image URL (primary) |
 | image_object_name | VARCHAR(500) | - | MinIO object name |
 | ai_confidence_score | DECIMAL(5,4) | - | AI recognition confidence (0.0000-1.0000) |
 | macros_json | JSONB | - | Macro nutrients data |
@@ -367,7 +289,50 @@ CREATE INDEX idx_diet_logs_sos_ticket_flag ON diet_logs(sos_ticket_flag) WHERE s
 
 ---
 
-### 3.5 pt_client_mappings
+### 3.6 diet_log_images
+
+Stores multiple images per diet log (supports multi-image uploads).
+
+```sql
+CREATE TABLE diet_log_images (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    diet_log_id UUID NOT NULL,
+    image_url VARCHAR(500) NOT NULL,
+    image_object_name VARCHAR(500) NOT NULL,
+    is_primary BOOLEAN DEFAULT FALSE,
+    sort_order INTEGER DEFAULT 0,
+    file_size BIGINT,
+    content_type VARCHAR(100),
+    ai_confidence_score DECIMAL(3,2),
+    macros_json JSONB,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_diet_log_images_diet_log FOREIGN KEY (diet_log_id) REFERENCES diet_logs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_diet_log_images_diet_log_id ON diet_log_images(diet_log_id);
+CREATE INDEX idx_diet_log_images_is_primary ON diet_log_images(diet_log_id, is_primary) WHERE is_primary = TRUE;
+```
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK, NOT NULL | Unique identifier |
+| diet_log_id | UUID | FK, NOT NULL | Reference to diet_logs |
+| image_url | VARCHAR(500) | NOT NULL | Image URL in MinIO |
+| image_object_name | VARCHAR(500) | NOT NULL | MinIO object name |
+| is_primary | BOOLEAN | DEFAULT FALSE | Primary image flag |
+| sort_order | INTEGER | DEFAULT 0 | Display order |
+| file_size | BIGINT | - | File size in bytes |
+| content_type | VARCHAR(100) | - | MIME type |
+| ai_confidence_score | DECIMAL(3,2) | - | AI confidence score |
+| macros_json | JSONB | - | Per-image macro data |
+| created_at | TIMESTAMP | NOT NULL | Creation timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Last update timestamp |
+
+---
+
+### 3.7 pt_client_mappings
 
 Maps Personal Trainers to their clients.
 
@@ -380,19 +345,16 @@ CREATE TABLE pt_client_mappings (
     assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_mapping_pt FOREIGN KEY (pt_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_mapping_client FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uk_pt_client UNIQUE (pt_id, client_id)
 );
 
--- Indexes
 CREATE INDEX idx_pt_client_pt_id ON pt_client_mappings(pt_id);
 CREATE INDEX idx_pt_client_client_id ON pt_client_mappings(client_id);
 CREATE INDEX idx_pt_client_status ON pt_client_mappings(status);
 ```
-
-**Columns:**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -406,7 +368,7 @@ CREATE INDEX idx_pt_client_status ON pt_client_mappings(status);
 
 ---
 
-### 3.6 sos_tickets
+### 3.8 sos_tickets
 
 SOS/urgent support tickets from diet logs.
 
@@ -421,20 +383,17 @@ CREATE TABLE sos_tickets (
     note TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_sos_diet_log FOREIGN KEY (diet_log_id) REFERENCES diet_logs(id) ON DELETE SET NULL,
     CONSTRAINT fk_sos_pt FOREIGN KEY (pt_id) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT fk_sos_assigned_by FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- Indexes
 CREATE INDEX idx_sos_tickets_diet_log_id ON sos_tickets(diet_log_id);
 CREATE INDEX idx_sos_tickets_pt_id ON sos_tickets(pt_id);
 CREATE INDEX idx_sos_tickets_status ON sos_tickets(status);
 CREATE INDEX idx_sos_tickets_priority ON sos_tickets(priority);
 ```
-
-**Columns:**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -450,7 +409,7 @@ CREATE INDEX idx_sos_tickets_priority ON sos_tickets(priority);
 
 ---
 
-### 3.7 body_metrics
+### 3.9 body_metrics
 
 Tracks user body measurements over time.
 
@@ -464,17 +423,14 @@ CREATE TABLE body_metrics (
     lbm DECIMAL(5,2),
     muscle_mass DECIMAL(5,2),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_metrics_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Indexes
 CREATE INDEX idx_body_metrics_user_id ON body_metrics(user_id);
 CREATE INDEX idx_body_metrics_record_date ON body_metrics(record_date);
 CREATE INDEX idx_body_metrics_user_date ON body_metrics(user_id, record_date DESC);
 ```
-
-**Columns:**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -489,7 +445,7 @@ CREATE INDEX idx_body_metrics_user_date ON body_metrics(user_id, record_date DES
 
 ---
 
-### 3.8 reviews
+### 3.10 reviews
 
 Client reviews for Personal Trainers.
 
@@ -502,18 +458,15 @@ CREATE TABLE reviews (
     comment TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_review_pt FOREIGN KEY (pt_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT fk_review_reviewer FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Indexes
 CREATE INDEX idx_reviews_pt_id ON reviews(pt_id);
 CREATE INDEX idx_reviews_reviewer_id ON reviews(reviewer_id);
 CREATE INDEX idx_reviews_rating ON reviews(rating);
 ```
-
-**Columns:**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -527,7 +480,7 @@ CREATE INDEX idx_reviews_rating ON reviews(rating);
 
 ---
 
-### 3.9 notifications
+### 3.11 notifications
 
 User notifications system.
 
@@ -540,17 +493,14 @@ CREATE TABLE notifications (
     is_read BOOLEAN DEFAULT FALSE,
     reference_id VARCHAR(255),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Indexes
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
 CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
 ```
-
-**Columns:**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -690,6 +640,8 @@ CREATE TYPE sos_ticket_status AS ENUM ('OPEN', 'ASSIGNED', 'RESOLVED', 'CLOSED')
 | users | idx_users_role | role | B-tree |
 | users | idx_users_status | status | B-tree |
 | users | idx_users_google_id | google_id | B-tree |
+| user_kyc | idx_user_kyc_user_id | user_id | B-tree |
+| user_kyc | idx_user_kyc_status | verification_status | B-tree |
 | pt_profiles | idx_pt_profiles_user_id | user_id | B-tree |
 | pt_profiles | idx_pt_profiles_is_verified | is_verified | B-tree |
 | pt_profiles | idx_pt_profiles_tier | tier | B-tree |
@@ -697,6 +649,7 @@ CREATE TYPE sos_ticket_status AS ENUM ('OPEN', 'ASSIGNED', 'RESOLVED', 'CLOSED')
 | diet_logs | idx_diet_logs_log_date | log_date | B-tree |
 | diet_logs | idx_diet_logs_status | status | B-tree |
 | diet_logs | idx_diet_logs_sos_ticket_flag | sos_ticket_flag | Partial |
+| diet_log_images | idx_diet_log_images_diet_log_id | diet_log_id | B-tree |
 | body_metrics | idx_body_metrics_user_date | user_id, record_date | B-tree |
 | reviews | idx_reviews_pt_id | pt_id | B-tree |
 | notifications | idx_notifications_user_unread | user_id, is_read | Partial |
@@ -708,7 +661,6 @@ CREATE TYPE sos_ticket_status AS ENUM ('OPEN', 'ASSIGNED', 'RESOLVED', 'CLOSED')
 ### 7.1 Auto-update Timestamps
 
 ```sql
--- Function to auto-update updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -717,42 +669,21 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Apply to all tables with updated_at
-CREATE TRIGGER update_users_updated_at
-    BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_pt_profiles_updated_at
-    BEFORE UPDATE ON pt_profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_macro_targets_updated_at
-    BEFORE UPDATE ON macro_targets
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_diet_logs_updated_at
-    BEFORE UPDATE ON diet_logs
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_pt_client_mappings_updated_at
-    BEFORE UPDATE ON pt_client_mappings
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_sos_tickets_updated_at
-    BEFORE UPDATE ON sos_tickets
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
-CREATE TRIGGER update_reviews_updated_at
-    BEFORE UPDATE ON reviews
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_user_kyc_updated_at BEFORE UPDATE ON user_kyc FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_pt_profiles_updated_at BEFORE UPDATE ON pt_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_macro_targets_updated_at BEFORE UPDATE ON macro_targets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_diet_logs_updated_at BEFORE UPDATE ON diet_logs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_diet_log_images_updated_at BEFORE UPDATE ON diet_log_images FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_pt_client_mappings_updated_at BEFORE UPDATE ON pt_client_mappings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_sos_tickets_updated_at BEFORE UPDATE ON sos_tickets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_reviews_updated_at BEFORE UPDATE ON reviews FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 ```
 
 ### 7.2 Check Constraints
 
 ```sql
--- Reviews rating range
-ALTER TABLE reviews ADD CONSTRAINT chk_rating_range
-    CHECK (rating >= 1 AND rating <= 5);
+ALTER TABLE reviews ADD CONSTRAINT chk_rating_range CHECK (rating >= 1 AND rating <= 5);
 ```
 
 ---
@@ -776,23 +707,6 @@ VALUES (
 );
 ```
 
-### 8.2 Default Macro Targets
-
-```sql
--- Default macro target template
-INSERT INTO macro_targets (id, user_id, daily_calories, protein, carb, fat, created_at, updated_at)
-VALUES (
-    gen_random_uuid(),
-    '<user_id>',
-    2000.00,
-    120.00,
-    200.00,
-    65.00,
-    CURRENT_TIMESTAMP,
-    CURRENT_TIMESTAMP
-);
-```
-
 ---
 
 ## 9. Maintenance
@@ -800,7 +714,6 @@ VALUES (
 ### 9.1 Vacuum & Analyze
 
 ```sql
--- Regular maintenance
 VACUUM ANALYZE users;
 VACUUM ANALYZE diet_logs;
 VACUUM ANALYZE body_metrics;
@@ -819,5 +732,5 @@ spring.datasource.hikari.max-lifetime=1800000
 
 ---
 
-*Document Version: 1.0.0*
-*Last Updated: 2026-05-29*
+*Document Version: 2.0.0*
+*Last Updated: 2026-06-04*

@@ -719,5 +719,5 @@ location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
 
 ---
 
-*Document Version: 1.0.0*
-*Last Updated: 2026-05-29*
+*Document Version: 2.0.0*
+*Last Updated: 2026-06-04*
