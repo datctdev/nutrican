@@ -105,8 +105,17 @@ public class PtAdminServiceImpl implements PtAdminService {
     public ApiResponse<PageResponse<PendingPtDto>> getPtDocuments(UUID ptId) {
         PtProfile profile = ptProfileRepository.findByIdWithUser(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
-        return ApiResponse.success(PageResponse.from(
-                Page.of(java.util.List.of(toPendingPtDto(profile)), 0, 1, 1));
+        PendingPtDto dto = toPendingPtDto(profile);
+        PageResponse<PendingPtDto> response = PageResponse.<PendingPtDto>builder()
+                .content(java.util.List.of(dto))
+                .page(0)
+                .size(1)
+                .totalElements(1)
+                .totalPages(1)
+                .first(true)
+                .last(true)
+                .build();
+        return ApiResponse.success(response);
     }
 
     private PendingPtDto toPendingPtDto(PtProfile profile) {

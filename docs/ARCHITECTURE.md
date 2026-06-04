@@ -108,7 +108,9 @@ nutrican-be/
 │   ├── pom.xml
 │   └── src/main/java/com/sba/nutrican_be/auth/
 │       ├── controller/
-│       │   └── AuthController.java          # Auth + KYC endpoints
+│       │   ├── AuthController.java          # Auth endpoints (register, login, refresh, logout)
+│       │   ├── KycController.java          # KYC submission & status
+│       │   └── PtRequestController.java    # PT registration request
 │       ├── service/
 │       │   ├── AuthService.java
 │       │   ├── AuthServiceImpl.java
@@ -117,7 +119,6 @@ nutrican-be/
 │       ├── dto/
 │       │   ├── LoginRequest.java
 │       │   ├── RegisterRequest.java
-│       │   ├── RegisterPtRequest.java
 │       │   ├── RefreshTokenRequest.java
 │       │   ├── AuthResponse.java
 │       │   ├── PtRequestDto.java
@@ -202,10 +203,23 @@ nutrican-be/
 │   ├── pom.xml
 │   └── src/main/java/com/sba/nutrican_be/admin/
 │       ├── controller/
-│       │   └── AdminController.java
+│       │   ├── UserAdminController.java     # User management
+│       │   ├── PtAdminController.java       # PT verification
+│       │   ├── KycAdminController.java     # KYC verification
+│       │   ├── SosAdminController.java     # SOS ticket management
+│       │   └── DashboardController.java     # Dashboard stats
 │       ├── service/
-│       │   ├── AdminService.java
-│       │   └── AdminServiceImpl.java
+│       │   ├── impl/
+│       │   │   ├── UserAdminServiceImpl.java
+│       │   │   ├── PtAdminServiceImpl.java
+│       │   │   ├── KycAdminServiceImpl.java
+│       │   │   ├── SosAdminServiceImpl.java
+│       │   │   └── AdminDashboardServiceImpl.java
+│       │   ├── UserAdminService.java
+│       │   ├── PtAdminService.java
+│       │   ├── KycAdminService.java
+│       │   ├── SosAdminService.java
+│       │   └── AdminDashboardService.java
 │       ├── dto/
 │       │   ├── AdminDashboardDto.java
 │       │   ├── PendingPtDto.java
@@ -676,5 +690,5 @@ services:
 
 ---
 
-*Document Version: 2.0.0*
+*Document Version: 2.1.0*
 *Last Updated: 2026-06-04*

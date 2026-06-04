@@ -68,44 +68,32 @@ Register a new customer account.
 
 ---
 
-### 1.2 Register PT
+### 1.2 PT Request (Become a PT)
 
-**Endpoint:** `POST /api/v1/auth/register/pt`
+**Endpoint:** `POST /api/v1/auth/pt/request`
 
-Register a new Personal Trainer account. Requires subsequent KYC submission and admin approval.
+Request PT status after completing KYC. Requires authenticated user with KYC verified.
 
 **Request Body:**
 ```json
 {
-  "email": "pt@example.com",
-  "password": "SecurePass123!",
-  "fullName": "Tran PT B",
-  "phoneNumber": "0923456789",
   "bio": "Certified personal trainer with 5 years experience",
   "trainingPhilosophy": "Holistic approach to fitness and nutrition",
   "yearsOfExperience": 5,
-  "certifications": "ACE, NASM, ISSA"
+  "certifications": "ACE, NASM, ISSA",
+  "cvUrl": "https://minio.example.com/cv/pt.pdf",
+  "specializations": ["Weight Loss", "Muscle Building"]
 }
 ```
 
-**Response (201 Created):**
+**Response (200 OK):**
 ```json
 {
   "success": true,
-  "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiJ9...",
-    "tokenType": "Bearer",
-    "expiresIn": 3600,
-    "user": {
-      "id": "660e8400-e29b-41d4-a716-446655440001",
-      "email": "pt@example.com",
-      "fullName": "Tran PT B",
-      "role": "PT_FREELANCE",
-      "avatarUrl": null
-    }
-  },
-  "message": "PT registration submitted. Please submit KYC documents to complete verification.",
+  "data": null,
+  "message": "PT request submitted successfully, pending admin approval",
+  "timestamp": "2026-06-04T04:45:00"
+}
   "timestamp": "2026-06-04T04:45:00"
 }
 ```
@@ -1171,7 +1159,7 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
 
 ## 6. Admin
 
-All endpoints require `ADMIN` role.
+All endpoints require `ADMIN` role. Admin endpoints are organized into: User Management (`/admin/users`), PT Verification (`/admin/pts`), KYC Verification (`/admin/kyc`), SOS Tickets (`/admin/sos-tickets`), and Dashboard (`/admin/stats`).
 
 ### 6.1 Get Users
 
@@ -1326,7 +1314,89 @@ All endpoints require `ADMIN` role.
 
 ---
 
-### 6.5 Get SOS Tickets
+### 6.5 KYC Management
+
+### 6.5.1 Get Pending KYC Verifications
+
+**Endpoint:** `GET /api/v1/admin/kyc/pending`
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| page | int | 0 | Page number |
+| size | int | 20 | Items per page |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "id": "...",
+        "userId": "...",
+        "email": "user@example.com",
+        "fullName": "Nguyen Van A",
+        "avatarUrl": "...",
+        "idCardNumber": "012345678901",
+        "fullNameOnCard": "Nguyen Van A",
+        "dateOfBirthOnCard": "1990-01-15",
+        "addressOnCard": "123 Main St",
+        "idCardFrontUrl": "https://minio.example.com/kyc/xxx-front.jpg",
+        "idCardBackUrl": "https://minio.example.com/kyc/xxx-back.jpg",
+        "verificationStatus": "PENDING_APPROVAL",
+        "createdAt": "2026-06-04T04:50:00"
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1,
+    "first": true,
+    "last": true
+  },
+  "timestamp": "2026-06-04T14:05:00"
+}
+```
+
+### 6.5.2 Approve KYC
+
+**Endpoint:** `PUT /api/v1/admin/kyc/{userId}/approve`
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "KYC approved successfully",
+  "timestamp": "2026-06-04T14:10:00"
+}
+```
+
+### 6.5.3 Reject KYC
+
+**Endpoint:** `PUT /api/v1/admin/kyc/{userId}/reject`
+
+**Request Body:**
+```json
+{
+  "reason": "ID card information does not match"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "KYC rejected",
+  "timestamp": "2026-06-04T14:15:00"
+}
+```
+
+---
+
+### 6.6 Get SOS Tickets
 
 **Endpoint:** `GET /api/v1/admin/sos-tickets`
 
@@ -1370,7 +1440,7 @@ All endpoints require `ADMIN` role.
 
 ---
 
-### 6.6 Assign SOS Ticket to PT
+### 6.7 Assign SOS Ticket to PT
 
 **Endpoint:** `PUT /api/v1/admin/sos-tickets/{ticketId}/assign`
 
@@ -1537,5 +1607,5 @@ FREELANCE
 
 ---
 
-*Document Version: 2.0.0*
+*Document Version: 2.1.0*
 *Last Updated: 2026-06-04*
