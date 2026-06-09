@@ -1,3 +1,4 @@
+// src/pages/customer/PtDetailPage.jsx
 import { useParams } from 'react-router-dom';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';

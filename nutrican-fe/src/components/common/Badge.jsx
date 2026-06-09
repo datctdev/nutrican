@@ -1,3 +1,4 @@
+// src/components/common/Badge.jsx
 import { Badge as BadgeRoot } from '../ui/badge';
 
 function Badge({ children, variant = 'default', className = '', ...props }) {

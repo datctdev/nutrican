@@ -1,3 +1,4 @@
+// src/pages/LandingPage.jsx
 import { Link } from 'react-router-dom';
 import { Camera, Users, TrendingUp, ArrowRight, CheckCircle2, Zap, Shield, Heart } from 'lucide-react';
 
