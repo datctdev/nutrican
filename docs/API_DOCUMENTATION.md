@@ -511,6 +511,11 @@ Upload meal image and get AI analysis via Ollama (qwen2.5-vl).
 |-------|------|----------|-------------|
 | file | File | Yes | Meal image (JPEG, PNG, max 500KB) |
 | mealType | String | Yes | BREAKFAST, LUNCH, DINNER, SNACK |
+| mealSource | String | No | HOME_COOKED (default), RESTAURANT, TAKEOUT, CANTEEN |
+| mealComplexity | String | No | SIMPLE (default), HOTPOT, COMPOSITE |
+| restaurantName | String | No | Required when mealSource is RESTAURANT |
+| hotpotBrothId | UUID | No | Selected hotpot broth from food DB |
+| hotpotItemIds | UUID[] | No | Selected hotpot dipping items |
 
 **Response (200 OK):**
 ```json
@@ -561,6 +566,26 @@ Upload meal image and get AI analysis via Ollama (qwen2.5-vl).
 **Status Logic:**
 - High confidence (>=0.6): `PT_REVIEWING`
 - Low confidence (fallback): `DRAFT`
+- Hybrid DB match may set `recognitionSource` to `HYBRID` or `DB_MATCH`
+- Eating out with low confidence returns `suggestSos: true` (customer may create SOS manually)
+
+---
+
+### 3.2.1 Submit Draft for PT Review
+
+**Endpoint:** `PUT /api/v1/diet/logs/{id}/submit-for-review`
+
+Moves a `DRAFT` log to `PT_REVIEWING`. Only the log owner may call this.
+
+**Response (200 OK):** Updated `DietLogResponse`.
+
+---
+
+### 3.2.2 Get Customer SOS Tickets
+
+**Endpoint:** `GET /api/v1/diet/sos`
+
+Returns SOS tickets for the authenticated customer.
 
 ---
 
@@ -738,6 +763,26 @@ Create an SOS support request (sent to admin for PT assignment).
   "timestamp": "2026-06-04T13:05:00"
 }
 ```
+
+---
+
+### 3.9 Food Catalog
+
+All endpoints require authentication.
+
+#### Search Foods
+
+**Endpoint:** `GET /api/v1/foods/search?q=phở&category=RICE`
+
+Returns matching items from internal Vietnamese food database.
+
+#### Hotpot Broths
+
+**Endpoint:** `GET /api/v1/foods/hotpot/broths`
+
+#### Hotpot Items
+
+**Endpoint:** `GET /api/v1/foods/hotpot/items`
 
 ---
 
@@ -1047,17 +1092,23 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
   "adjustedProtein": 40,
   "adjustedCarb": 55,
   "adjustedFat": 15,
-  "note": "Looks good! Keep it up."
+  "note": "Looks good! Keep it up.",
+  "correctionReason": "OTHER"
 }
 ```
 
 | Action | Description |
 |--------|-------------|
-| `APPROVE` | Approve the log as is |
+| `APPROVE` | Approve the log as is; copies ground truth to `pt_adjusted_macros` |
 | `ADJUST_MACROS` | Approve with adjusted macro values |
-| `REJECT` | Reject the log |
+| `REJECT` | Reject the log (negative sample; excluded from MAE) |
 
-**Response (200 OK):**
+| Field | Description |
+|-------|-------------|
+| `correctionReason` | Optional on ADJUST/REJECT: WRONG_FOOD, WRONG_PORTION, WRONG_MACROS, UNCLEAR_IMAGE, RESTAURANT_TOO_COMPLEX, DB_MATCH_INCORRECT, OTHER |
+
+**Response (200 OK):** includes RBL fields (`aiPredictedMacros`, `dbMatchedMacros`, `experimentCohort`, `ptAction`, etc.)
+
 ```json
 {
   "success": true,
@@ -1069,7 +1120,46 @@ data: {"client_id":"550e8400-e29b-41d4-a716-446655440000","client_name":"Nguyen 
 
 ---
 
-### 5.5 Get Client Progress
+### 5.5 Submit Blind Estimate (RBL)
+
+**Endpoint:** `PUT /api/v1/workspace/diet-logs/{id}/blind-estimate`
+
+PT enters macro estimate before viewing AI/DB predictions (optional blind review workflow).
+
+**Request Body:**
+```json
+{
+  "calories": 520,
+  "protein": 35,
+  "carb": 48,
+  "fat": 18
+}
+```
+
+**Response (200 OK):** Updated diet log with `ptBlindMacros` saved; PT UI may then reveal AI/DB columns.
+
+---
+
+### 5.6 Get PT SOS Tickets
+
+**Endpoint:** `GET /api/v1/workspace/sos`
+
+Returns SOS tickets assigned to the authenticated PT.
+
+---
+
+### 5.7 Resolve SOS Ticket
+
+**Endpoint:** `PUT /api/v1/workspace/sos/{ticketId}/resolve`
+
+**Request Body:**
+```json
+{ "note": "I adjusted your macros — check the updated log." }
+```
+
+---
+
+### 5.8 Get Client Progress
 
 **Endpoint:** `GET /api/v1/workspace/progress/{clientId}`
 
@@ -1483,6 +1573,71 @@ All endpoints require `ADMIN` role. Admin endpoints are organized into: User Man
   "timestamp": "2026-06-04T14:30:00"
 }
 ```
+
+---
+
+### 6.8 RBL Export Preview
+
+**Endpoint:** `GET /api/v1/admin/rbl/export/preview`
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| from | date | - | Start date filter |
+| to | date | - | End date filter |
+| cvOnly | boolean | true | Exclude MANUAL logs |
+| includeRejected | boolean | false | Include REJECT samples |
+
+Returns row count and sample rows for labeled CV dataset.
+
+---
+
+### 6.9 RBL Export CSV
+
+**Endpoint:** `GET /api/v1/admin/rbl/export`
+
+**Query Parameters:** Same as preview, plus optional `mealSource`, `recognitionSource`.
+
+**Response:** `text/csv` attachment with columns including `delta_ai_*`, `experiment_cohort`, `prompt_version`, `customer_hash`, `image_object_name`, `pt_blind_macros`, `diet_log_items_json`. No raw customer names (PII anonymized).
+
+---
+
+### 6.10 RBL Stats
+
+**Endpoint:** `GET /api/v1/admin/rbl/stats`
+
+**Query Parameters:** `from`, `to` (optional date range)
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "totalReviewed": 42,
+    "totalLabeledCv": 38,
+    "maeAiCalories": 85.5,
+    "adjustRateByMealSource": { "RESTAURANT": 0.45 },
+    "calibrationBuckets": { "0.0-0.5": { "count": 5, "mae": 120 } },
+    "maeByDbMatchScoreBucket": { "high": 45.2 },
+    "blindVsAiMae": 72.1,
+    "compositeMealCount": 6,
+    "insufficientSample": true,
+    "legacyLogsExcluded": 10
+  }
+}
+```
+
+MAE baseline is always `ai_predicted_macros` vs `pt_adjusted_macros` (APPROVE + ADJUST only).
+
+---
+
+### 6.11 RBL Markdown Report
+
+**Endpoint:** `GET /api/v1/admin/rbl/report`
+
+**Query Parameters:** `from`, `to` (optional)
+
+**Response:** `text/markdown` thesis-ready summary with hypothesis table, MAE, calibration, and cohort breakdown.
 
 ---
 
