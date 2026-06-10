@@ -20,7 +20,9 @@ This document describes the complete database schema for NutriCan PT application
 | `user_kyc` | id (UUID) | user_id (1:1) | KYC verification documents |
 | `pt_profiles` | id (UUID) | user_id (1:1) | PT extended profiles |
 | `macro_targets` | id (UUID) | user_id (1:1) | Daily macro targets |
-| `diet_logs` | id (UUID) | customer_id, pt_reviewer_id | Meal entries |
+| `diet_logs` | id (UUID) | customer_id, pt_reviewer_id | Meal entries (meal context, RBL fields) |
+| `food_items` | id (UUID) | - | Vietnamese food catalog |
+| `diet_log_items` | id (UUID) | diet_log_id (N:1) | Composite meal items (hotpot) |
 | `diet_log_images` | id (UUID) | diet_log_id (N:1) | Meal images (multi-image support) |
 | `pt_client_mappings` | id (UUID) | pt_id, client_id | PT-Client relationships |
 | `sos_tickets` | id (UUID) | diet_log_id, pt_id, assigned_by | SOS support tickets |
@@ -283,9 +285,53 @@ CREATE INDEX idx_diet_logs_sos_ticket_flag ON diet_logs(sos_ticket_flag) WHERE s
 | sos_ticket_flag | BOOLEAN | DEFAULT FALSE | SOS ticket flag |
 | pt_reviewer_id | UUID | FK | PT who reviewed |
 | pt_note | TEXT | - | PT's review notes |
+| meal_source | VARCHAR(20) | DEFAULT 'HOME_COOKED' | HOME_COOKED, RESTAURANT, TAKEOUT, CANTEEN |
+| meal_complexity | VARCHAR(20) | DEFAULT 'SIMPLE' | SIMPLE, HOTPOT, COMPOSITE |
+| restaurant_name | VARCHAR(200) | - | Restaurant name when eating out |
+| recognition_source | VARCHAR(20) | - | AI_ONLY, DB_MATCH, HYBRID, MANUAL, PT_ADJUSTED |
+| food_item_id | UUID | - | Matched food_items record |
+| ai_raw_json | JSONB | - | Raw AI response for RBL |
+| pt_adjusted_macros | JSONB | - | PT ground-truth macros |
+| ai_predicted_macros | JSONB | - | Frozen VLM macro snapshot at analyze |
+| db_matched_macros | JSONB | - | Frozen DB/hybrid candidate (even if not applied) |
+| db_match_score | DECIMAL(5,4) | - | Food DB match score |
+| model_version | VARCHAR(100) | - | VLM model identifier |
+| prompt_version | VARCHAR(64) | - | Hash of analyze prompt for reproducibility |
+| experiment_cohort | VARCHAR(50) | - | Research cohort (e.g. RESTAURANT_HYBRID, COMPOSITE_BUFFET) |
+| pt_action | VARCHAR(30) | - | APPROVE, ADJUST_MACROS, REJECT |
+| pt_reviewed_at | TIMESTAMP | - | When PT completed review |
+| pt_correction_reason | VARCHAR(50) | - | WRONG_FOOD, WRONG_PORTION, OTHER, etc. |
+| macros_at_review | JSONB | - | Macros shown to PT before any adjustment |
+| matched_food_name | VARCHAR(200) | - | Best DB food name at analyze |
+| pt_blind_macros | JSONB | - | PT blind estimate before seeing AI/DB |
 | log_date | DATE | NOT NULL | Date of meal |
 | created_at | TIMESTAMP | NOT NULL | Creation timestamp |
 | updated_at | TIMESTAMP | NOT NULL | Last update timestamp |
+
+---
+
+### 3.5.1 food_items
+
+Vietnamese food catalog (seeded on startup when empty).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| name_vi, name_en | VARCHAR | Food names |
+| aliases | JSONB | Search aliases |
+| category | VARCHAR | SOUP, RICE, HOTPOT_BROTH, HOTPOT_ITEM, etc. |
+| serving_size_g, calories, protein, carb, fat | DECIMAL | Per-serving macros |
+
+### 3.5.2 diet_log_items
+
+Composite meal items (hotpot, multi-item meals).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| diet_log_id | UUID FK | Parent log |
+| food_item_id | UUID | Optional DB reference |
+| item_name, quantity_g | - | Item details |
+| calories, protein, carb, fat | DECIMAL | Item macros |
+| source | VARCHAR | AI, DB, USER_SELECTED, PT |
 
 ---
 

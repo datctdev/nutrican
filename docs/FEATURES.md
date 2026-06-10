@@ -164,6 +164,73 @@ PENDING_AI ──► DRAFT ──► PT_REVIEWING ──► APPROVED
 | APPROVED | Reviewed and approved |
 | REJECTED | Reviewed and rejected |
 
+### 3.8 Meal Context (Ăn ngoài vs Tự nấu)
+
+| MealSource | Description |
+|------------|-------------|
+| HOME_COOKED | User cooked at home |
+| RESTAURANT | Eating at restaurant |
+| TAKEOUT | Takeaway food |
+| CANTEEN | Canteen/cafeteria |
+
+Low AI confidence when eating out triggers SOS suggestion (not auto-created).
+
+### 3.9 Food Database
+
+Internal seed catalog (`food_items`) with Vietnamese dishes. Search API supports name/alias lookup. Used for hybrid CV→DB macro matching.
+
+### 3.10 Hotpot (Lẩu)
+
+Hybrid flow: user selects broth + dipping items from DB, optional photo for AI portion estimate. Macros summed from `diet_log_items`.
+
+### 3.11 DRAFT Submit
+
+Customer can submit DRAFT logs for PT review via `PUT /diet/logs/{id}/submit-for-review`.
+
+### 3.12 RBL Layer (Research Baseline)
+
+The RBL (Research Baseline Layer) freezes AI and DB predictions at analyze time so PT review can produce measurable ground-truth labels for computer-vision evaluation.
+
+**Pipeline:**
+
+```
+Customer upload → VLM analyze → Food DB match → snapshots frozen
+       → PT queue (PT_REVIEWING) → PT reviewLog → pt_adjusted_macros (label)
+       → Admin export CSV / stats (MAE, calibration)
+```
+
+**Frozen snapshots (R0):**
+
+| Field | When set | Purpose |
+|-------|----------|---------|
+| `ai_predicted_macros` | `analyzeMeal` | Immutable VLM output baseline |
+| `db_matched_macros` | `analyzeMeal` | DB candidate even when hybrid not applied |
+| `db_match_score` | `analyzeMeal` | Match confidence |
+| `model_version`, `prompt_version` | `analyzeMeal` | Reproducibility |
+| `experiment_cohort` | `analyzeMeal` | Research grouping (e.g. RESTAURANT_HYBRID, COMPOSITE_BUFFET) |
+| `macros_at_review` | `reviewLog` (before mutate) | Detect which fields PT changed |
+| `pt_adjusted_macros` | APPROVE / ADJUST | Ground-truth label |
+| `pt_blind_macros` | Blind estimate (R5) | PT estimate before seeing AI/DB |
+
+**PT review UX (R1/R5):**
+
+- Side-by-side columns: AI prediction | DB/hybrid | Shown to client
+- `correctionReason` taxonomy on ADJUST/REJECT (WRONG_FOOD, WRONG_PORTION, etc.)
+- Optional blind mode: PT enters macros first, then AI/DB revealed
+
+**Admin research tools (R2/R3):**
+
+- CSV export with `delta_ai_*`, anonymized `customer_hash`, `image_object_name`
+- Stats: MAE from `ai_predicted_macros` vs `pt_adjusted_macros` (not `macros_json`)
+- Calibration buckets, adjust rate by meal source/cohort, SOS linkage metrics
+
+**Composite buffet (R5):**
+
+- Checkbox "Buffet / nhiều món" on restaurant analyze (mirrors hotpot multi-select)
+- `mealComplexity=COMPOSITE` with `compositeItemIds` / `compositePortions`
+
+See `docs/RBL_METHODOLOGY.md` for export filters, cohort rules, and thesis workflow.
+
 ---
 
 ## 4. PT Workflow
@@ -192,9 +259,11 @@ PTs see their assigned clients with status indicators:
 
 | Action | Description | Result |
 |--------|-------------|--------|
-| APPROVE | Accept the diet log as is | Status = APPROVED |
-| ADJUST_MACROS | Modify nutritional values | Status = APPROVED, macros updated |
-| REJECT | Reject the diet log | Status = REJECTED |
+| APPROVE | Accept the diet log as is | Status = APPROVED; `pt_adjusted_macros` = current macros |
+| ADJUST_MACROS | Modify nutritional values | Status = APPROVED; `pt_adjusted_macros` = adjusted values |
+| REJECT | Reject the diet log | Status = REJECTED; excluded from MAE (negative sample) |
+
+PT review also records `pt_action`, `pt_reviewed_at`, `pt_correction_reason`, and optional `pt_blind_macros` (blind mode).
 
 ### 4.4 Progress Tracking
 
