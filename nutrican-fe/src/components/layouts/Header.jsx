@@ -37,30 +37,11 @@ export default function Header() {
     CUSTOMER: [
       { label: 'Diet Tracker', href: '/diet' },
       { label: 'Find PT', href: '/marketplace' },
-<<<<<<< HEAD
-      { label: 'KYC', href: '/kyc' },
-=======
->>>>>>> feature/premium-ui-revamp
       { label: 'Profile', href: '/profile' },
+      { label: 'Verification', href: '/kyc' },
     ],
     PT_CERTIFIED: [
       { label: 'Dashboard', href: '/pt' },
-<<<<<<< HEAD
-      { label: 'Clients', href: '/pt/clients' },
-      { label: 'Reviews', href: '/pt/reviews' },
-    ],
-    PT_FREELANCE: [
-      { label: 'Dashboard', href: '/pt' },
-      { label: 'Clients', href: '/pt/clients' },
-      { label: 'Reviews', href: '/pt/reviews' },
-    ],
-    ADMIN: [
-      { label: 'Dashboard', href: '/admin' },
-      { label: 'PT Management', href: '/admin/pts' },
-      { label: 'KYC', href: '/admin/kyc' },
-      { label: 'Users', href: '/admin/users' },
-      { label: 'SOS', href: '/admin/sos' },
-=======
       { label: 'My Clients', href: '/pt/clients' },
     ],
     PT_FREELANCE: [
@@ -70,9 +51,9 @@ export default function Header() {
     ADMIN: [
       { label: 'Dashboard', href: '/admin' },
       { label: 'PT Approvals', href: '/admin/pts' },
+      { label: 'KYC Approvals', href: '/admin/kyc' },
       { label: 'Users', href: '/admin/users' },
       { label: 'SOS Center', href: '/admin/sos' },
->>>>>>> feature/premium-ui-revamp
     ],
   };
 
@@ -83,7 +64,6 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           
-          {/* Left: Logo & Desktop Nav */}
           <div className="flex items-center gap-10">
             <Link to="/" className="flex items-center gap-2.5 group">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all">
@@ -114,7 +94,6 @@ export default function Header() {
             )}
           </div>
 
-          {/* Right: Notifications & Profile */}
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
@@ -142,7 +121,6 @@ export default function Header() {
                     <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${profileMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
 
-                  {/* Dropdown Menu */}
                   {profileMenuOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setProfileMenuOpen(false)} />
@@ -179,14 +157,12 @@ export default function Header() {
               </div>
             )}
 
-            {/* Mobile Menu Toggle */}
             <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
         {mobileMenuOpen && isAuthenticated && user && (
           <div className="md:hidden border-t border-slate-100 py-4 animate-slide-in">
             <nav className="flex flex-col gap-1">

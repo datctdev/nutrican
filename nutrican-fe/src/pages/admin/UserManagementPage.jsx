@@ -1,22 +1,11 @@
 // src/pages/admin/UserManagementPage.jsx
 import { useState, useEffect } from 'react';
-<<<<<<< HEAD
-import Card from '../../components/common/Card';
-import Button from '../../components/common/Button';
-import Input from '../../components/ui/input';
-import Badge from '../../components/common/Badge';
-import Spinner from '../../components/common/Spinner';
-import { toast } from 'sonner';
-import { adminService } from '../../services/adminService';
-import { Search, RefreshCw, User as UserIcon, Mail } from 'lucide-react';
-=======
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { adminService } from '../../services/adminService';
 import { Search, Filter, Mail, ShieldAlert, Activity, UserIcon } from 'lucide-react';
->>>>>>> feature/premium-ui-revamp
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState([]);
@@ -73,7 +62,6 @@ export default function UserManagementPage() {
       setTotalPages(pagesCount);
     } catch (err) {
       console.error('Lỗi khi fetch API:', err);
-      // MOCK DATA BYPASS: Tự động hiển thị dữ liệu giả nếu Backend bị lỗi 500
       toast.warning('Backend API Error! Đang hiển thị Mock Data tạm thời.');
       setUsers([
         { id: 1, fullName: 'Nguyễn Quốc Huy', email: 'huynguyen@gmail.com', role: 'CUSTOMER', status: 'ACTIVE', avatarUrl: null },
@@ -138,19 +126,6 @@ export default function UserManagementPage() {
   };
 
   return (
-<<<<<<< HEAD
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">{totalElements} total users</span>
-          <button
-            onClick={() => { setPage(0); fetchUsers(); }}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
-=======
     <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -160,7 +135,6 @@ export default function UserManagementPage() {
         </div>
         <div className="bg-white text-slate-600 px-4 py-2.5 rounded-xl border border-slate-200 font-bold text-sm flex items-center shadow-sm">
           <Activity className="w-4 h-4 mr-2 text-blue-500" /> {totalElements} Total Users
->>>>>>> feature/premium-ui-revamp
         </div>
       </div>
 
@@ -178,35 +152,6 @@ export default function UserManagementPage() {
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-medium"
               />
             </div>
-<<<<<<< HEAD
-          </div>
-          <select
-            value={role}
-            onChange={(e) => { setRole(e.target.value); setPage(0); }}
-            className="px-3 py-2 border rounded-lg text-sm"
-          >
-            <option value="">All Roles</option>
-            <option value="CUSTOMER">Customer</option>
-            <option value="PT_CERTIFIED">PT Certified</option>
-            <option value="PT_FREELANCE">PT Freelance</option>
-            <option value="ADMIN">Admin</option>
-          </select>
-          <select
-            value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(0); }}
-            className="px-3 py-2 border rounded-lg text-sm"
-          >
-            <option value="">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-            <option value="PENDING_APPROVAL">Pending</option>
-            <option value="SUSPENDED">Suspended</option>
-          </select>
-          <Button type="submit" variant="outline" size="sm">
-            <Search className="w-4 h-4 mr-1" /> Search
-          </Button>
-        </form>
-=======
             <div className="flex gap-3">
               <select
                 value={role}
@@ -236,7 +181,6 @@ export default function UserManagementPage() {
             </div>
           </form>
         </CardContent>
->>>>>>> feature/premium-ui-revamp
       </Card>
 
       {/* Users Data Table */}
