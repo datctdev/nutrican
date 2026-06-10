@@ -3,7 +3,6 @@ import api from './api';
 export const dietService = {
   createLog: (data) => api.post('/diet/logs', data),
   analyzeMeal: (formData) => api.post('/diet/logs/analyze', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000,
   }),
   getLogs: (params) => api.get('/diet/logs', { params }),
@@ -13,8 +12,11 @@ export const dietService = {
   getSummary: (params) => api.get('/diet/summary', { params }),
   createSos: (data) => api.post('/diet/sos', data),
   getSosTickets: () => api.get('/diet/sos'),
+  submitForReview: (id) => api.put(`/diet/logs/${id}/submit-for-review`),
+  searchFoods: (q, params = {}) => api.get('/foods/search', { params: { q, ...params } }),
+  getHotpotBroths: () => api.get('/foods/hotpot/broths'),
+  getHotpotItems: () => api.get('/foods/hotpot/items'),
   uploadImages: (logId, formData) => api.post(`/diet/logs/${logId}/images`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000,
   }),
   getImages: (logId) => api.get(`/diet/logs/${logId}/images`),

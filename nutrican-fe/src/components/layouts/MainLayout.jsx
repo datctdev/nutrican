@@ -1,8 +1,11 @@
 // src/components/layouts/MainLayout.jsx
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
+import { useSSE } from '../../hooks/useSSE';
 
 export default function MainLayout() {
+  useSSE();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
