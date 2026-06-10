@@ -56,7 +56,8 @@ nutrican-fe/
 │   │   │   ├── DietTrackerPage.jsx    # Meal logging + AI analysis
 │   │   │   ├── MarketplacePage.jsx    # Browse PTs
 │   │   │   ├── PtDetailPage.jsx       # PT profile + reviews
-│   │   │   └── ProfilePage.jsx         # User profile + macro targets
+│   │   │   ├── ProfilePage.jsx         # User profile + macro targets
+│   │   │   └── KycPage.jsx            # KYC submission (CCCD)
 │   │   │
 │   │   ├── pt/                       # Personal Trainer pages
 │   │   │   ├── PtDashboardPage.jsx     # PT overview + stats
@@ -66,8 +67,9 @@ nutrican-fe/
 │   │   ├── admin/                     # Admin pages
 │   │   │   ├── AdminDashboardPage.jsx  # Dashboard + stats
 │   │   │   ├── PtVerificationPage.jsx   # PT KYC verification
-│   │   │   ├── UserManagementPage.jsx   # User management
-│   │   │   └── SosTicketsPage.jsx       # SOS ticket management
+│   │   │   ├── KycAdminPage.jsx        # KYC verification (VNPT)
+│   │   │   ├── UserManagementPage.jsx  # User management
+│   │   │   └── SosTicketsPage.jsx      # SOS ticket management
 │   │   │
 │   │   └── LandingPage.jsx             # Landing/home page
 │   │
@@ -123,11 +125,13 @@ Routes are configured in `src/App.jsx` using React Router v7 (createBrowserRoute
 | `/pt-profile/:id` | PtDetailPage | CUSTOMER | PT profile + reviews |
 | `/diet` | DietTrackerPage | CUSTOMER | Meal logging + AI |
 | `/profile` | ProfilePage | All authenticated | User profile + macros |
+| `/kyc` | KycPage | All authenticated | KYC submission (CCCD) |
 | `/pt` | PtDashboardPage | PT | PT overview + stats |
 | `/pt/clients` | ClientListPage | PT | Client list + status |
 | `/pt/reviews` | ReviewDietLogPage | PT | Review diet logs |
 | `/admin` | AdminDashboardPage | ADMIN | Dashboard + statistics |
 | `/admin/pts` | PtVerificationPage | ADMIN | PT verification |
+| `/admin/kyc` | KycAdminPage | ADMIN | KYC verification |
 | `/admin/users` | UserManagementPage | ADMIN | User management |
 | `/admin/sos` | SosTicketsPage | ADMIN | SOS ticket management |
 
@@ -628,5 +632,5 @@ SSE events not being received.
 
 ---
 
-*Document Version: 2.0.0*
-*Last Updated: 2026-06-04*
+*Document Version: 2.1.0*
+*Last Updated: 2026-06-11*

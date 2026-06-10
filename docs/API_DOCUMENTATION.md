@@ -14,6 +14,7 @@ API Documentation (Swagger UI): `http://localhost:8080/swagger-ui.html`
 4. [Marketplace](#4-marketplace)
 5. [PT Workspace](#5-pt-workspace)
 6. [Admin](#6-admin)
+7. [KYC Verification](#7-kyc-verification)
 
 ---
 
@@ -1641,6 +1642,172 @@ MAE baseline is always `ai_predicted_macros` vs `pt_adjusted_macros` (APPROVE + 
 
 ---
 
+## 7. KYC Verification
+
+All KYC endpoints require authentication. KYC uses VNPT API for OCR and face liveness detection.
+
+### 7.1 KYC Session Flow
+
+```
+1. POST /kyc/sessions:start        → Create KYC session
+2. POST /kyc/sessions/{id}/upload   → Upload front/back/selfie image
+3. POST /kyc/sessions/{id}/attach   → Attach file to session
+4. POST /kyc/sessions/{id}/classify → Classify card type (VNPT)
+5. POST /kyc/sessions/{id}/ocr/front → OCR front of ID card
+6. POST /kyc/sessions/{id}/ocr/back  → OCR back of ID card
+7. POST /kyc/sessions/{id}/ocr/liveness → Face liveness check
+8. POST /kyc/sessions/{id}/compare   → Compare face with ID card
+```
+
+### 7.2 Start KYC Session
+
+**Endpoint:** `POST /api/v1/kyc/sessions:start`
+
+**Response (200 OK):**
+```json
+{
+  "sessionId": "uuid",
+  "status": "DRAFT"
+}
+```
+
+### 7.3 Upload Document
+
+**Endpoint:** `POST /api/v1/kyc/sessions/{id}/upload`
+
+**Form Data:**
+| Field | Type | Description |
+|-------|------|-------------|
+| type | String | FRONT, BACK, SELFIE |
+| file | File | Image file (JPEG, PNG) |
+| title | String | Optional title |
+| description | String | Optional description |
+
+**Response (200 OK):**
+```json
+{
+  "fileHash": "vnpt_hash",
+  "type": "FRONT",
+  "sessionId": "uuid"
+}
+```
+
+### 7.4 Classify Card
+
+**Endpoint:** `POST /api/v1/kyc/sessions/{sessionId}/classify`
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| fileHash | String | Optional - uses active front if omitted |
+
+**Response (200 OK):**
+```json
+{
+  "name": "cmnd",
+  "confidence": 0.95,
+  "source": "LIVE",
+  "type": 1
+}
+```
+
+### 7.5 OCR Front
+
+**Endpoint:** `POST /api/v1/kyc/sessions/{sessionId}/ocr/front`
+
+**Response (200 OK):**
+```json
+{
+  "idNumber": "012345678901",
+  "fullName": "NGUYEN VAN A",
+  "birthDay": "1990-01-15",
+  "cardType": "cmnd",
+  "nationality": "Việt Nam",
+  "gender": "Nam",
+  "recentLocation": "TP. Ho Chi Minh",
+  "originLocation": "TP. Ho Chi Minh",
+  "issueDate": "2010-01-01",
+  "issuePlace": "Cục CS QL XNC",
+  "validDate": "2030-01-01",
+  "source": "LIVE"
+}
+```
+
+### 7.6 OCR Back
+
+**Endpoint:** `POST /api/v1/kyc/sessions/{sessionId}/ocr/back`
+
+**Response (200 OK):**
+```json
+{
+  "issueDate": "2010-01-01",
+  "issuePlace": "Cục CS QL XNC",
+  "backTypeId": "cmnd",
+  "msgBack": "...",
+  "source": "LIVE"
+}
+```
+
+### 7.7 Face Liveness Check
+
+**Endpoint:** `POST /api/v1/kyc/sessions/{sessionId}/ocr/liveness`
+
+**Response (200 OK):**
+```json
+{
+  "isLive": true,
+  "liveness": "success",
+  "livenessMsg": "...",
+  "isEyeOpen": true,
+  "source": "LIVE"
+}
+```
+
+### 7.8 Compare Face
+
+**Endpoint:** `POST /api/v1/kyc/sessions/{sessionId}/compare`
+
+Compares selfie face with ID card photo. If score >= 95, KYC is verified.
+
+**Response (200 OK):**
+```json
+{
+  "isMatch": true,
+  "matchScore": 97.5,
+  "status": "VERIFIED",
+  "verifiedAt": "2026-06-11T02:30:00"
+}
+```
+
+**KYC Status Flow:**
+```
+DRAFT → IN_PROGRESS → VERIFIED (match score >= 95)
+                         └──→ REJECTED (match score < 95 or no match)
+```
+
+### 7.9 Get Session
+
+**Endpoint:** `GET /api/v1/kyc/sessions/{sessionId}`
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "session": {
+    "id": "uuid",
+    "userId": "uuid",
+    "frontHash": "hash",
+    "backHash": "hash",
+    "selfieHash": "hash",
+    "status": "IN_PROGRESS",
+    "createdAt": "2026-06-11T02:00:00",
+    "updatedAt": "2026-06-11T02:30:00"
+  }
+}
+```
+
+---
+
 ## Common Response Format
 
 All API responses follow this format:
@@ -1763,4 +1930,4 @@ FREELANCE
 ---
 
 *Document Version: 2.1.0*
-*Last Updated: 2026-06-04*
+*Last Updated: 2026-06-11*

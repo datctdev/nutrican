@@ -25,7 +25,7 @@ Muc luc toan bo tai lieu du an NutriCan PT.
 |-----------|--------|
 | [DEPLOYMENT](./DEPLOYMENT.md) | Huong dan trien khai |
 | [DEVELOPMENT](./DEVELOPMENT.md) | Huong dan phat trien |
-| [FRONTEND](./FRONTEND.md) | Tai lieu frontend React |
+| [RBL_METHODOLOGY](./RBL_METHODOLOGY.md) | Research Baseline Layer methodology |
 
 ---
 
@@ -68,6 +68,7 @@ nutrican-be (Parent POM)
     nutritiontrack-module-pt-management
       nutritiontrack-module-diet-tracker
         nutritiontrack-module-ai-gateway
+    nutritiontrack-module-kyc (VNPT OCR + Face Liveness)
     nutritiontrack-module-user-profile
     nutritiontrack-module-auth
     nutritiontrack-module-core (Shared)
@@ -118,8 +119,16 @@ npm run dev
 |-------|-------|
 | `/admin` | Dashboard + thong ke |
 | `/admin/pts` | Xac minh PT |
+| `/admin/kyc` | Xac minh KYC |
 | `/admin/users` | Quan ly nguoi dung |
 | `/admin/sos` | Quan ly SOS tickets |
+
+## Giao Dien KYC
+
+| Route | Mo ta |
+|-------|-------|
+| `/kyc` | Gui tai lieu KYC (Customer) |
+| `/admin/kyc` | Xac minh KYC (Admin) |
 
 ## Giao Dien PT Pages
 
@@ -131,5 +140,5 @@ npm run dev
 
 ---
 
-*Document Version: 2.0.0*
-*Last Updated: 2026-06-04*
+*Document Version: 2.1.0*
+*Last Updated: 2026-06-11*

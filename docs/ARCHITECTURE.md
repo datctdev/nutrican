@@ -104,30 +104,47 @@ nutrican-be/
 │           ├── UnauthorizedException.java
 │           └── BadRequestException.java
 
-├── nutritiontrack-module-auth/              # Authentication & KYC
+├── nutritiontrack-module-auth/              # Authentication & JWT
 │   ├── pom.xml
 │   └── src/main/java/com/sba/nutrican_be/auth/
 │       ├── controller/
 │       │   ├── AuthController.java          # Auth endpoints (register, login, refresh, logout)
-│       │   ├── KycController.java          # KYC submission & status
 │       │   └── PtRequestController.java    # PT registration request
 │       ├── service/
 │       │   ├── AuthService.java
-│       │   ├── AuthServiceImpl.java
-│       │   ├── KycService.java
-│       │   └── KycServiceImpl.java
+│       │   └── AuthServiceImpl.java
 │       ├── dto/
 │       │   ├── LoginRequest.java
 │       │   ├── RegisterRequest.java
 │       │   ├── RefreshTokenRequest.java
 │       │   ├── AuthResponse.java
-│       │   ├── PtRequestDto.java
-│       │   ├── KycRequest.java
-│       │   ├── KycStatusDto.java
-│       │   └── RejectRequest.java
+│       │   └── PtRequestDto.java
 │       └── security/
 │           ├── SecurityConfig.java
 │           └── JwtAuthenticationFilter.java
+
+├── nutritiontrack-module-kyc/               # KYC Verification (VNPT OCR + Face Liveness)
+│   ├── pom.xml
+│   └── src/main/java/com/sba/nutrican_be/kyc/
+│       ├── controller/
+│       │   └── KycController.java           # KYC submission & status
+│       ├── service/
+│       │   ├── KycService.java
+│       │   ├── KycServiceImpl.java
+│       │   ├── UploadFileService.java      # File upload handling
+│       │   ├── UploadFileServiceImpl.java
+│       │   ├── CardClassifyService.java    # VNPT card classification
+│       │   ├── CardClassifyServiceImpl.java
+│       │   ├── KycOrchestratorService.java # Orchestrates KYC flow
+│       │   └── KycOrchestratorServiceImpl.java
+│       ├── usecase/
+│       │   └── VNPTClient.java            # VNPT API client
+│       ├── dto/
+│       │   ├── KycRequest.java
+│       │   ├── KycStatusDto.java
+│       │   └── CardLivenessRequest.java
+│       └── config/
+│           └── FaceLivenessConfig.java
 
 ├── nutritiontrack-module-user-profile/        # User profiles & marketplace
 │   ├── pom.xml
@@ -257,13 +274,16 @@ nutritiontrack-module-admin               nutritiontrack-module-pt-management
          │                                              │
          ▼                                              ▼
 nutritiontrack-module-user-profile          nutritiontrack-module-auth
-         │                                              │
-         └──────────────────────┬───────────────────────┘
-                                │
-                                ▼
-                   nutritiontrack-module-core
-         (Entities, Repositories, Utils, Exceptions, MinioService)
+         │                                    │
+         │                                    ├───────────────────────────┐
+         │                                    │                           │
+         ▼                                    ▼                           ▼
+                        nutritiontrack-module-kyc             nutritiontrack-module-core
+                        (VNPT OCR + Face Liveness)     (Entities, Repositories, Utils,
+                                                     Exceptions, MinioService)
 ```
+
+*Note: `nutritiontrack-module-kyc` is independent from auth and can be called by both auth and admin modules.*
 
 ### 2.3 Technology Stack
 
@@ -691,4 +711,4 @@ services:
 ---
 
 *Document Version: 2.1.0*
-*Last Updated: 2026-06-04*
+*Last Updated: 2026-06-11*
