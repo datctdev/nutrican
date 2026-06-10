@@ -3,7 +3,10 @@ package com.sba.nutrican_be.ai.service.impl;
 import com.sba.nutrican_be.ai.MealRecognitionResult;
 import com.sba.nutrican_be.ai.service.MealRecognitionService;
 import com.sba.nutrican_be.ai.service.OllamaService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sba.nutrican_be.core.exception.BadRequestException;
+import com.sba.nutrican_be.core.util.PromptVersionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +15,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +27,7 @@ import java.util.Map;
 public class MealRecognitionServiceImpl implements MealRecognitionService {
 
     private final OllamaService ollamaService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${ai.ollama.default-model:llava}")
     private String modelName;
@@ -39,6 +45,9 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
           "carbs": carbohydrates in grams,
           "fat": fat in grams,
           "confidenceScore": confidence between 0.0 and 1.0,
+          "mealComplexity": "SIMPLE or COMPOSITE or HOTPOT",
+          "detectedItems": [{"name": "item name", "estimatedGrams": number}],
+          "uncertaintyReasons": ["reason if any"],
           "fallback": true if you're uncertain,
           "message": "brief message if needed"
         }
@@ -72,22 +81,23 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
 
     @Override
     public MealRecognitionResult recognizeMealFromFile(MultipartFile file, String mealType) {
+        return recognizeMealFromFile(file, mealType, null, null);
+    }
+
+    @Override
+    public MealRecognitionResult recognizeMealFromFile(MultipartFile file, String mealType, String mealSource, String mealComplexity) {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("Image file is required");
         }
 
-        // Validate file type
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new BadRequestException("File must be an image");
         }
 
         try {
-            // Convert image to base64
             String base64Image = Base64.getEncoder().encodeToString(file.getBytes());
-
-            return recognizeMealFromBase64Image(base64Image, mealType);
-
+            return recognizeMealFromBase64Image(base64Image, mealType, mealSource, mealComplexity);
         } catch (IOException e) {
             log.error("Failed to read image file: {}", e.getMessage(), e);
             return buildFallbackResult("Failed to read image file");
@@ -95,16 +105,19 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
     }
 
     private MealRecognitionResult recognizeMealFromBase64Image(String base64Image, String mealType) {
+        return recognizeMealFromBase64Image(base64Image, mealType, null, null);
+    }
+
+    private MealRecognitionResult recognizeMealFromBase64Image(String base64Image, String mealType, String mealSource, String mealComplexity) {
         if (!ollamaService.isAvailable()) {
             log.warn("Ollama service is not available, returning fallback result");
             return buildFallbackResult("AI service is currently unavailable");
         }
 
         try {
-            String prompt = buildPrompt(mealType);
+            String prompt = buildPrompt(mealType, mealSource, mealComplexity);
 
             Map<String, Object> response;
-            // MiniCPM models use /api/chat with messages format
             if (modelName.startsWith("minicpm")) {
                 Map<String, Object> requestBody = Map.of(
                         "model", modelName,
@@ -155,18 +168,7 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
             String jsonStr = extractJson(contentText);
             Map<String, Object> nutrition = parseJsonToMap(jsonStr);
 
-            return MealRecognitionResult.builder()
-                    .foodName(getString(nutrition, "foodName", "Unknown Food"))
-                    .portionSize(toBd(nutrition.get("portionSize")))
-                    .portionUnit(getString(nutrition, "portionUnit", "grams"))
-                    .calories(toBd(nutrition.get("calories")))
-                    .protein(toBd(nutrition.get("protein")))
-                    .carbs(toBd(nutrition.get("carbs")))
-                    .fat(toBd(nutrition.get("fat")))
-                    .confidenceScore(toBdOrDefault(nutrition.get("confidenceScore"), 0.5))
-                    .fallback(Boolean.TRUE.equals(nutrition.get("fallback")))
-                    .message(getString(nutrition, "message", ""))
-                    .build();
+            return buildResultFromMap(nutrition);
         } catch (Exception e) {
             log.error("Failed to parse chat response: {}", e.getMessage());
             return buildFallbackResult("Failed to parse AI response");
@@ -183,13 +185,25 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
         return modelName;
     }
 
+    @Override
+    public String getPromptVersionHash() {
+        return PromptVersionUtil.hashPrompt(SYSTEM_PROMPT);
+    }
+
     private String buildPrompt(String mealType) {
+        return buildPrompt(mealType, null, null);
+    }
+
+    private String buildPrompt(String mealType, String mealSource, String mealComplexity) {
         return SYSTEM_PROMPT + "\n\n" +
                 String.format(
                 "Analyze this food image and provide nutritional information for a %s meal. " +
+                "Context: mealSource=%s, mealComplexity=%s. " +
                 "Estimate portion size and macros accurately. Be specific about the food type. " +
-                "Respond ONLY with valid JSON.",
-                mealType != null ? mealType : "general"
+                "For HOTPOT meals, list detectedItems separately. Respond ONLY with valid JSON.",
+                mealType != null ? mealType : "general",
+                mealSource != null ? mealSource : "HOME_COOKED",
+                mealComplexity != null ? mealComplexity : "SIMPLE"
         );
     }
 
@@ -206,18 +220,7 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
             String jsonStr = extractJson(contentText);
             Map<String, Object> nutrition = parseJsonToMap(jsonStr);
 
-            return MealRecognitionResult.builder()
-                    .foodName(getString(nutrition, "foodName", "Unknown Food"))
-                    .portionSize(toBd(nutrition.get("portionSize")))
-                    .portionUnit(getString(nutrition, "portionUnit", "grams"))
-                    .calories(toBd(nutrition.get("calories")))
-                    .protein(toBd(nutrition.get("protein")))
-                    .carbs(toBd(nutrition.get("carbs")))
-                    .fat(toBd(nutrition.get("fat")))
-                    .confidenceScore(toBdOrDefault(nutrition.get("confidenceScore"), 0.5))
-                    .fallback(Boolean.TRUE.equals(nutrition.get("fallback")))
-                    .message(getString(nutrition, "message", ""))
-                    .build();
+            return buildResultFromMap(nutrition);
         } catch (Exception e) {
             log.error("Failed to parse AI response: {}", e.getMessage());
             return buildFallbackResult("Failed to parse AI response");
@@ -240,22 +243,45 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
             String jsonStr = extractJson(contentText);
             Map<String, Object> nutrition = parseJsonToMap(jsonStr);
 
-            return MealRecognitionResult.builder()
-                    .foodName(getString(nutrition, "foodName", "Unknown Food"))
-                    .portionSize(toBd(nutrition.get("portionSize")))
-                    .portionUnit(getString(nutrition, "portionUnit", "grams"))
-                    .calories(toBd(nutrition.get("calories")))
-                    .protein(toBd(nutrition.get("protein")))
-                    .carbs(toBd(nutrition.get("carbs")))
-                    .fat(toBd(nutrition.get("fat")))
-                    .confidenceScore(toBdOrDefault(nutrition.get("confidenceScore"), 0.5))
-                    .fallback(Boolean.TRUE.equals(nutrition.get("fallback")))
-                    .message(getString(nutrition, "message", ""))
-                    .build();
+            return buildResultFromMap(nutrition);
         } catch (Exception e) {
             log.error("Failed to parse AI response: {}", e.getMessage());
             return buildFallbackResult("Failed to parse AI response");
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private MealRecognitionResult buildResultFromMap(Map<String, Object> nutrition) {
+        List<Map<String, Object>> detectedItems = Collections.emptyList();
+        Object itemsObj = nutrition.get("detectedItems");
+        if (itemsObj instanceof List<?> list) {
+            detectedItems = new ArrayList<>();
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) {
+                    detectedItems.add((Map<String, Object>) m);
+                }
+            }
+        }
+        List<String> uncertaintyReasons = Collections.emptyList();
+        Object reasonsObj = nutrition.get("uncertaintyReasons");
+        if (reasonsObj instanceof List<?> list) {
+            uncertaintyReasons = list.stream().map(Object::toString).toList();
+        }
+        return MealRecognitionResult.builder()
+                .foodName(getString(nutrition, "foodName", "Unknown Food"))
+                .portionSize(toBd(nutrition.get("portionSize")))
+                .portionUnit(getString(nutrition, "portionUnit", "grams"))
+                .calories(toBd(nutrition.get("calories")))
+                .protein(toBd(nutrition.get("protein")))
+                .carbs(toBd(nutrition.get("carbs")))
+                .fat(toBd(nutrition.get("fat")))
+                .confidenceScore(toBdOrDefault(nutrition.get("confidenceScore"), 0.5))
+                .fallback(Boolean.TRUE.equals(nutrition.get("fallback")))
+                .message(getString(nutrition, "message", ""))
+                .mealComplexityFromAi(getString(nutrition, "mealComplexity", null))
+                .detectedItems(detectedItems)
+                .uncertaintyReasons(uncertaintyReasons)
+                .build();
     }
 
     private MealRecognitionResult buildFallbackResult(String message) {
@@ -287,28 +313,13 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
         return text;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, Object> parseJsonToMap(String json) {
-        Map<String, Object> result = new java.util.HashMap<>();
-        json = json.replaceAll("[{}\"]", "");
-        String[] pairs = json.split(",");
-        for (String pair : pairs) {
-            String[] kv = pair.split(":");
-            if (kv.length >= 2) {
-                String key = kv[0].trim();
-                String value = kv[1].trim();
-                if (key.equals("fallback")) {
-                    result.put(key, Boolean.parseBoolean(value));
-                } else {
-                    try {
-                        result.put(key, Double.parseDouble(value));
-                    } catch (NumberFormatException e) {
-                        result.put(key, value);
-                    }
-                }
-            }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.warn("Jackson parse failed, using empty map: {}", e.getMessage());
+            return Map.of();
         }
-        return result;
     }
 
     private BigDecimal toBd(Object value) {

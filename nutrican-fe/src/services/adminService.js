@@ -21,4 +21,10 @@ export const adminService = {
   // SOS Tickets
   getSosTickets: (params = {}) => api.get('/admin/sos-tickets', { params }),
   assignSosTicket: (ticketId, ptId) => api.put(`/admin/sos-tickets/${ticketId}/assign`, { ptId }),
+
+  // RBL Research
+  getRblStats: (params) => api.get('/admin/rbl/stats', { params }),
+  getRblExportPreview: (params) => api.get('/admin/rbl/export/preview', { params }),
+  downloadRblExport: (params) => api.get('/admin/rbl/export', { params, responseType: 'blob' }),
+  getRblReport: (params) => api.get('/admin/rbl/report', { params, responseType: 'text' }),
 };

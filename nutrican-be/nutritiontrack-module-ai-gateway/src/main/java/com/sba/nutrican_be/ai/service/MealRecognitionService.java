@@ -9,7 +9,11 @@ public interface MealRecognitionService {
 
     MealRecognitionResult recognizeMealFromFile(MultipartFile file, String mealType);
 
+    MealRecognitionResult recognizeMealFromFile(MultipartFile file, String mealType, String mealSource, String mealComplexity);
+
     boolean isAvailable();
 
     String getModelName();
+
+    String getPromptVersionHash();
 }

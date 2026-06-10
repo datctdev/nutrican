@@ -2,6 +2,7 @@ package com.sba.nutrican_be.auth.controller;
 
 import com.sba.nutrican_be.auth.dto.AuthResponse;
 import com.sba.nutrican_be.auth.dto.LoginRequest;
+import com.sba.nutrican_be.auth.dto.LogoutRequest;
 import com.sba.nutrican_be.auth.dto.RefreshTokenRequest;
 import com.sba.nutrican_be.auth.dto.RegisterRequest;
 import com.sba.nutrican_be.auth.service.AuthService;
@@ -9,8 +10,10 @@ import com.sba.nutrican_be.core.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -40,7 +43,18 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        return ResponseEntity.ok(ApiResponse.success(null, "Logout successful"));
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody(required = false) LogoutRequest request) {
+        String accessToken = extractBearerToken(authorization);
+        String refreshToken = request != null ? request.getRefreshToken() : null;
+        return ResponseEntity.ok(authService.logout(accessToken, refreshToken));
+    }
+
+    private String extractBearerToken(String authorization) {
+        if (StringUtils.hasText(authorization) && authorization.startsWith("Bearer ")) {
+            return authorization.substring(7);
+        }
+        return null;
     }
 }

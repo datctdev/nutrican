@@ -24,6 +24,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final TokenRevocationService tokenRevocationService;
 
     @Value("${app.security.jwt.expiration}")
     private Long jwtExpirationMs;
@@ -81,6 +82,10 @@ public class AuthServiceImpl implements AuthService {
             throw new UnauthorizedException("Invalid refresh token");
         }
 
+        if (tokenRevocationService.isRevoked(refreshToken)) {
+            throw new UnauthorizedException("Token has been revoked");
+        }
+
         if (!jwtUtil.isRefreshToken(refreshToken)) {
             throw new UnauthorizedException("Invalid token type");
         }
@@ -93,7 +98,10 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public ApiResponse<Void> logout() {
+    public ApiResponse<Void> logout(String accessToken, String refreshToken) {
+        tokenRevocationService.revoke(accessToken);
+        tokenRevocationService.revoke(refreshToken);
+        log.info("User logged out, tokens revoked");
         return ApiResponse.success(null, "Logout successful");
     }
 

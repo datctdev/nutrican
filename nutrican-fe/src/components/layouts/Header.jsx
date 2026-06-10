@@ -43,10 +43,12 @@ export default function Header() {
     PT_CERTIFIED: [
       { label: 'Dashboard', href: '/pt' },
       { label: 'My Clients', href: '/pt/clients' },
+      { label: 'Reviews', href: '/pt/reviews' },
     ],
     PT_FREELANCE: [
       { label: 'Dashboard', href: '/pt' },
       { label: 'My Clients', href: '/pt/clients' },
+      { label: 'Reviews', href: '/pt/reviews' },
     ],
     ADMIN: [
       { label: 'Dashboard', href: '/admin' },

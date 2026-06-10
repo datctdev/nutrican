@@ -5,13 +5,16 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { adminService } from '../../services/adminService';
-import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, UserPlus, Star } from 'lucide-react';
+import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, UserPlus, Star, Download, BarChart3 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
+  const [rblStats, setRblStats] = useState(null);
+  const [rblPreview, setRblPreview] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchStats(); }, []);
+  useEffect(() => { fetchStats(); fetchRbl(); }, []);
 
   const fetchStats = async () => {
     try {
@@ -22,6 +25,47 @@ export default function AdminDashboardPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRbl = async () => {
+    try {
+      const [statsRes, previewRes] = await Promise.all([
+        adminService.getRblStats({}),
+        adminService.getRblExportPreview({ cvOnly: true }),
+      ]);
+      setRblStats(statsRes.data.data);
+      setRblPreview(previewRes.data);
+    } catch (err) {
+      console.error('RBL stats unavailable', err);
+    }
+  };
+
+  const handleDownloadRbl = async () => {
+    try {
+      const res = await adminService.downloadRblExport({ cvOnly: true });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rbl_export.csv';
+      a.click();
+      toast.success('RBL dataset downloaded');
+    } catch (err) {
+      toast.error('Failed to download export');
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    try {
+      const res = await adminService.getRblReport({});
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/markdown' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'rbl_report.md';
+      a.click();
+      toast.success('RBL report downloaded');
+    } catch (err) {
+      toast.error('Failed to download report');
     }
   };
 
@@ -167,6 +211,81 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* RBL Research Section */}
+      <Card className="bg-white border-slate-200 shadow-sm">
+        <CardContent className="p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <BarChart3 className="w-6 h-6 text-indigo-600" />
+            <h3 className="text-xl font-bold text-slate-900">RBL Research (CV + PT Ground Truth)</h3>
+          </div>
+          {rblStats ? (
+            <div className="grid md:grid-cols-4 gap-4 mb-6">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase">Reviewed logs</p>
+                <p className="text-2xl font-black text-slate-900">{rblStats.totalReviewed}</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase">CV labeled</p>
+                <p className="text-2xl font-black text-slate-900">{rblStats.totalLabeledCv}</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase">MAE AI (kcal)</p>
+                <p className="text-2xl font-black text-indigo-600">{rblStats.maeAiCalories}</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase">Adjust rate (restaurant)</p>
+                <p className="text-2xl font-black text-amber-600">
+                  {rblStats.adjustRateByMealSource?.RESTAURANT != null
+                    ? `${Math.round(rblStats.adjustRateByMealSource.RESTAURANT * 100)}%` : '—'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 mb-4">No reviewed logs yet — collect PT reviews to populate RBL metrics.</p>
+          )}
+          {rblStats?.insufficientSample && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4">
+              Sample size &lt; 30 — collect more reviewed CV logs before writing Results.
+            </p>
+          )}
+          {rblStats?.calibrationBuckets && Object.keys(rblStats.calibrationBuckets).length > 0 && (
+            <div className="mb-6 overflow-x-auto">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Calibration buckets</p>
+              <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold text-slate-600">Confidence</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-600">Count</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-600">MAE kcal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(rblStats.calibrationBuckets).map(([bucket, data]) => (
+                    <tr key={bucket} className="border-t border-slate-100">
+                      <td className="px-3 py-2">{bucket}</td>
+                      <td className="px-3 py-2 text-right">{data?.count ?? '—'}</td>
+                      <td className="px-3 py-2 text-right">{data?.mae ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleDownloadRbl} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
+              <Download className="w-4 h-4 mr-2" /> Download CSV
+            </Button>
+            <Button variant="outline" onClick={handleDownloadReport} className="rounded-xl border-slate-200">
+              Download Report (.md)
+            </Button>
+            <Button variant="outline" onClick={fetchRbl} className="rounded-xl border-slate-200">Refresh stats</Button>
+          </div>
+          {rblPreview?.message && (
+            <p className="text-xs text-slate-400 mt-3">{rblPreview.message}</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

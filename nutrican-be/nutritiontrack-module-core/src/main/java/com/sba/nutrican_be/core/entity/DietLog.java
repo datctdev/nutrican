@@ -1,13 +1,20 @@
 package com.sba.nutrican_be.core.entity;
 
 import com.sba.nutrican_be.core.enums.DietLogStatus;
+import com.sba.nutrican_be.core.enums.ExperimentCohort;
+import com.sba.nutrican_be.core.enums.MealComplexity;
+import com.sba.nutrican_be.core.enums.MealSource;
 import com.sba.nutrican_be.core.enums.MealType;
+import com.sba.nutrican_be.core.enums.PtCorrectionReason;
+import com.sba.nutrican_be.core.enums.PtReviewAction;
+import com.sba.nutrican_be.core.enums.RecognitionSource;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Entity
@@ -67,4 +74,80 @@ public class DietLog extends BaseEntity {
     @Builder.Default
     @ToString.Exclude
     private java.util.List<DietLogImage> additionalImages = new java.util.ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "meal_source", length = 20)
+    @Builder.Default
+    private MealSource mealSource = MealSource.HOME_COOKED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "meal_complexity", length = 20)
+    @Builder.Default
+    private MealComplexity mealComplexity = MealComplexity.SIMPLE;
+
+    @Column(name = "restaurant_name", length = 200)
+    private String restaurantName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recognition_source", length = 20)
+    private RecognitionSource recognitionSource;
+
+    @Column(name = "food_item_id")
+    private java.util.UUID foodItemId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "ai_raw_json", columnDefinition = "jsonb")
+    private Map<String, Object> aiRawJson;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "pt_adjusted_macros", columnDefinition = "jsonb")
+    private Map<String, Object> ptAdjustedMacros;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "ai_predicted_macros", columnDefinition = "jsonb")
+    private Map<String, Object> aiPredictedMacros;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "db_matched_macros", columnDefinition = "jsonb")
+    private Map<String, Object> dbMatchedMacros;
+
+    @Column(name = "db_match_score")
+    private Integer dbMatchScore;
+
+    @Column(name = "model_version", length = 100)
+    private String modelVersion;
+
+    @Column(name = "prompt_version", length = 16)
+    private String promptVersion;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "experiment_cohort", length = 30)
+    private ExperimentCohort experimentCohort;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pt_action", length = 20)
+    private PtReviewAction ptAction;
+
+    @Column(name = "pt_reviewed_at")
+    private LocalDateTime ptReviewedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pt_correction_reason", length = 30)
+    private PtCorrectionReason ptCorrectionReason;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "macros_at_review", columnDefinition = "jsonb")
+    private Map<String, Object> macrosAtReview;
+
+    @Column(name = "matched_food_name", length = 200)
+    private String matchedFoodName;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "pt_blind_macros", columnDefinition = "jsonb")
+    private Map<String, Object> ptBlindMacros;
+
+    @OneToMany(mappedBy = "dietLog", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    private java.util.List<DietLogItem> items = new java.util.ArrayList<>();
 }

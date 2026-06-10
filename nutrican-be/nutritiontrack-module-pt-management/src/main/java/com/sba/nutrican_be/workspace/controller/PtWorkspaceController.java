@@ -75,4 +75,32 @@ public class PtWorkspaceController {
     public ResponseEntity<ApiResponse<PtStatsDto>> getStats(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ptWorkspaceService.getStats(user.getId()));
     }
+
+    @GetMapping("/sos")
+    public ResponseEntity<ApiResponse<java.util.List<com.sba.nutrican_be.core.dto.SosTicketResponse>>> getSosTickets(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.getSosTickets(user.getId()));
+    }
+
+    @PutMapping("/sos/{ticketId}/resolve")
+    public ResponseEntity<ApiResponse<Void>> resolveSosTicket(
+            @PathVariable UUID ticketId,
+            @AuthenticationPrincipal User user,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String note = body != null ? body.get("note") : null;
+        return ResponseEntity.ok(ptWorkspaceService.resolveSosTicket(ticketId, user.getId(), note));
+    }
+
+    @PutMapping("/diet-logs/{id}/blind-estimate")
+    public ResponseEntity<ApiResponse<DietLogReviewResponse>> submitBlindEstimate(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
+            @RequestBody BlindEstimateRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.submitBlindEstimate(id, user.getId(), request));
+    }
+
+    @GetMapping("/rbl/stats")
+    public ResponseEntity<ApiResponse<PtRblStatsDto>> getRblStats(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.getRblStats(user.getId()));
+    }
 }

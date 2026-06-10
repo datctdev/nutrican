@@ -11,5 +11,5 @@ public interface AuthService {
 
     ApiResponse<AuthResponse> refreshToken(RefreshTokenRequest request);
 
-    ApiResponse<Void> logout();
+    ApiResponse<Void> logout(String accessToken, String refreshToken);
 }

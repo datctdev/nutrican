@@ -1,9 +1,9 @@
 package com.sba.nutrican_be.auth.security;
 
-import com.sba.nutrican_be.core.config.CurrentUserInfo;
-import com.sba.nutrican_be.core.util.JwtUtil;
+import com.sba.nutrican_be.auth.service.TokenRevocationService;
 import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.core.repository.UserRepository;
+import com.sba.nutrican_be.core.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +30,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final TokenRevocationService tokenRevocationService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -37,22 +38,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = extractJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && jwtUtil.validateToken(jwt) && !jwtUtil.isRefreshToken(jwt)) {
+            if (StringUtils.hasText(jwt) && jwtUtil.validateToken(jwt) && !jwtUtil.isRefreshToken(jwt)
+                    && !tokenRevocationService.isRevoked(jwt)) {
                 String email = jwtUtil.getEmailFromToken(jwt);
                 UUID userId = jwtUtil.getUserIdFromToken(jwt);
                 String role = jwtUtil.getRoleFromToken(jwt);
 
                 Optional<User> userOpt = userRepository.findById(userId);
-                CurrentUserInfo userInfo = new CurrentUserInfo();
 
                 if (userOpt.isPresent()) {
                     User user = userOpt.get();
-                    userInfo.setUserId(user.getId());
-                    userInfo.setUsername(user.getEmail());
-                    userInfo.setRole(role);
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    userInfo,
+                                    user,
                                     null,
                                     Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role)));
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

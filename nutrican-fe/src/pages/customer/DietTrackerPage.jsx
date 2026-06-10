@@ -4,9 +4,10 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { dietService } from '../../services/dietService';
-import { userService } from '../../services/userService';
 import { toast } from 'sonner';
 import { Upload, Camera, FileText, AlertTriangle, RefreshCw, Trash2, CheckCircle2, Clock, XCircle, Activity, Sparkles, Keyboard, Star, X, MessageSquare, Send } from 'lucide-react';
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export default function DietTrackerPage() {
   const [logs, setLogs] = useState([]);
@@ -14,7 +15,7 @@ export default function DietTrackerPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   
   // Tab Mode: 'ai' or 'manual'
@@ -29,34 +30,68 @@ export default function DietTrackerPage() {
   const [manualCarb, setManualCarb] = useState('');
   const [manualFat, setManualFat] = useState('');
   
+  // Meal context
+  const [mealSource, setMealSource] = useState('HOME_COOKED');
+  const [restaurantName, setRestaurantName] = useState('');
+  const [isHotpot, setIsHotpot] = useState(false);
+  const [aiMealType, setAiMealType] = useState('LUNCH');
+  const [hotpotBroths, setHotpotBroths] = useState([]);
+  const [hotpotItems, setHotpotItems] = useState([]);
+  const [selectedBrothId, setSelectedBrothId] = useState('');
+  const [selectedHotpotItems, setSelectedHotpotItems] = useState([]);
+  const [isComposite, setIsComposite] = useState(false);
+  const [selectedCompositeItems, setSelectedCompositeItems] = useState([]);
+  const [compositeSearchQuery, setCompositeSearchQuery] = useState('');
+  const [compositeSearchResults, setCompositeSearchResults] = useState([]);
+  const [foodSearchQuery, setFoodSearchQuery] = useState('');
+  const [foodSearchResults, setFoodSearchResults] = useState([]);
+
   // SOS Ticket State
   const [showSosForm, setShowSosForm] = useState(false);
   const [sosMessage, setSosMessage] = useState('');
   const [sosSubmitting, setSosSubmitting] = useState(false);
+  const [sosTickets, setSosTickets] = useState([]);
+  const [sosDietLogId, setSosDietLogId] = useState(null);
 
   useEffect(() => {
     fetchData();
+    loadHotpotData();
   }, []);
+
+  const todayStr = () => new Date().toISOString().split('T')[0];
+
+  const loadHotpotData = async () => {
+    try {
+      const [brothsRes, itemsRes] = await Promise.all([
+        dietService.getHotpotBroths(),
+        dietService.getHotpotItems(),
+      ]);
+      setHotpotBroths(brothsRes.data.data || []);
+      setHotpotItems(itemsRes.data.data || []);
+    } catch (err) {
+      console.error('Failed to load hotpot data', err);
+    }
+  };
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [logsRes, summaryRes, macroRes] = await Promise.all([
-        dietService.getLogs({ page: 0, size: 10 }),
-        dietService.getSummary(),
-        userService.getMacroTarget().catch(() => ({ data: { data: null } })),
+      const today = todayStr();
+      const [logsRes, summaryRes, sosRes] = await Promise.all([
+        dietService.getLogs({ page: 0, size: 10, startDate: today, endDate: today }),
+        dietService.getSummary({ date: today }),
+        dietService.getSosTickets().catch(() => ({ data: { data: [] } })),
       ]);
       setLogs(logsRes.data.data.content || []);
-      setSummary(summaryRes.data.data);
-      if (macroRes.data.data) {
-        setSummary(prev => ({
-          ...prev,
-          targetCalories: macroRes.data.data.dailyCalories,
-          targetProtein: macroRes.data.data.protein,
-          targetCarbs: macroRes.data.data.carbs,
-          targetFat: macroRes.data.data.fat,
-        }));
-      }
+      const summaryData = summaryRes.data.data || {};
+      setSummary({
+        ...summaryData,
+        targetCalories: summaryData.targetCalories || 2000,
+        targetProtein: summaryData.targetProtein || 120,
+        targetCarbs: summaryData.targetCarb || summaryData.targetCarbs || 200,
+        targetFat: summaryData.targetFat || 65,
+      });
+      setSosTickets(sosRes.data.data || []);
     } catch (err) {
       console.error('Error fetching diet data:', err);
     } finally {
@@ -64,33 +99,87 @@ export default function DietTrackerPage() {
     }
   };
 
+  const searchFoods = async (q) => {
+    setFoodSearchQuery(q);
+    if (!q || q.length < 2) {
+      setFoodSearchResults([]);
+      return;
+    }
+    try {
+      const res = await dietService.searchFoods(q);
+      setFoodSearchResults(res.data.data || []);
+    } catch (err) {
+      console.error('Food search failed', err);
+    }
+  };
+
+  const searchCompositeFoods = async (q) => {
+    setCompositeSearchQuery(q);
+    if (!q || q.length < 2) {
+      setCompositeSearchResults([]);
+      return;
+    }
+    try {
+      const res = await dietService.searchFoods(q);
+      setCompositeSearchResults(res.data.data || []);
+    } catch (err) {
+      console.error('Composite food search failed', err);
+    }
+  };
+
+  const selectFoodFromDb = (food) => {
+    setManualFood(food.nameVi);
+    setManualCalories(String(food.calories || ''));
+    setManualProtein(String(food.protein || ''));
+    setManualCarb(String(food.carb || ''));
+    setManualFat(String(food.fat || ''));
+    setFoodSearchResults([]);
+    setFoodSearchQuery('');
+  };
+
   const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files || e.dataTransfer?.files || []);
-    const validFiles = files.filter(file => {
-      if (file.size > 500 * 1024) {
-        toast.error(`${file.name} is too large. Maximum size is 500KB.`);
-        return false;
-      }
-      return true;
-    });
-    setSelectedFiles(validFiles);
+    const file = (e.target.files || e.dataTransfer?.files)?.[0];
+    if (!file) return;
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error(`${file.name} is too large. Maximum size is 5MB.`);
+      return;
+    }
+    setSelectedFile(file);
   };
 
   const handleAnalyze = async (e) => {
     e.stopPropagation();
-    if (!selectedFiles.length) {
-      toast.error('Please select at least one image');
+    if (!selectedFile) {
+      toast.error('Please select an image');
       return;
     }
     try {
       setAnalyzing(true);
       const formData = new FormData();
-      selectedFiles.forEach((file) => formData.append('files', file));
+      formData.append('file', selectedFile);
+      formData.append('meal_type', aiMealType);
+      formData.append('mealSource', mealSource);
+      if (restaurantName) formData.append('restaurantName', restaurantName);
+      if (isHotpot && mealSource === 'RESTAURANT') {
+        formData.append('mealComplexity', 'HOTPOT');
+        if (selectedBrothId) formData.append('hotpotBrothId', selectedBrothId);
+        selectedHotpotItems.forEach(id => formData.append('hotpotItemIds', id));
+        const portions = selectedHotpotItems.map(() => '100').join(',');
+        if (portions) formData.append('hotpotPortions', portions);
+      } else if (isComposite && mealSource === 'RESTAURANT') {
+        formData.append('mealComplexity', 'COMPOSITE');
+        selectedCompositeItems.forEach(id => formData.append('compositeItemIds', id));
+        const portions = selectedCompositeItems.map(() => '100').join(',');
+        if (portions) formData.append('compositePortions', portions);
+      }
 
-      await dietService.analyzeMeal(formData);
+      const res = await dietService.analyzeMeal(formData);
+      if (res.data.data?.suggestSos) {
+        toast.warning('Low confidence — consider sending an SOS to your PT');
+      }
       toast.success('Meal analyzed successfully!');
       fetchData();
-      setSelectedFiles([]);
+      setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -111,13 +200,13 @@ export default function DietTrackerPage() {
       setUploading(true);
       await dietService.createLog({
         mealType: manualMealType,
-        foods: [{
-          name: manualFood,
-          calories: parseFloat(manualCalories) || 0,
-          protein: parseFloat(manualProtein) || 0,
-          carbs: parseFloat(manualCarb) || 0,
-          fat: parseFloat(manualFat) || 0,
-        }],
+        foodDescription: manualFood,
+        calories: parseFloat(manualCalories) || 0,
+        protein: parseFloat(manualProtein) || 0,
+        carb: parseFloat(manualCarb) || 0,
+        fat: parseFloat(manualFat) || 0,
+        mealSource,
+        restaurantName: mealSource === 'RESTAURANT' ? restaurantName : undefined,
       });
       toast.success('Meal logged successfully!');
       setManualFood(''); setManualCalories(''); setManualProtein(''); setManualCarb(''); setManualFat('');
@@ -147,8 +236,8 @@ export default function DietTrackerPage() {
     input.onchange = async (e) => {
       const files = Array.from(e.target.files || []);
       const validFiles = files.filter(file => {
-        if (file.size > 500 * 1024) {
-          toast.error(`${file.name} is too large. Max 500KB.`);
+        if (file.size > MAX_IMAGE_SIZE) {
+          toast.error(`${file.name} is too large. Max 5MB.`);
           return false;
         }
         return true;
@@ -196,10 +285,18 @@ export default function DietTrackerPage() {
     if (!sosMessage.trim()) return toast.error('Please enter a message');
     try {
       setSosSubmitting(true);
-      await dietService.createSos({ message: sosMessage });
+      await dietService.createSos({
+        note: sosMessage,
+        dietLogId: sosDietLogId || undefined,
+        priority: 'HIGH',
+        mealSource: mealSource === 'RESTAURANT' ? 'RESTAURANT' : 'HOME_COOKED',
+        reasonCode: 'USER_REQUEST',
+      });
       toast.success('SOS Ticket Created!');
       setShowSosForm(false);
       setSosMessage('');
+      setSosDietLogId(null);
+      fetchData();
     } catch (error) {
       toast.error('Failed to create SOS ticket');
     } finally {
@@ -279,6 +376,8 @@ export default function DietTrackerPage() {
       'PENDING_AI': { color: 'bg-blue-100 text-blue-700 border-blue-200', icon: Activity },
       'PT_REVIEWING': { color: 'bg-amber-100 text-amber-700 border-amber-200', icon: Clock },
       'REJECTED': { color: 'bg-red-100 text-red-700 border-red-200', icon: XCircle },
+      'DRAFT': { color: 'bg-slate-100 text-slate-600 border-slate-200', icon: FileText },
+      'LOGGED': { color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
     };
     const config = map[status] || { color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Activity };
     const Icon = config.icon;
@@ -309,10 +408,88 @@ export default function DietTrackerPage() {
           <Card className="overflow-hidden border-slate-200 shadow-sm bg-white">
             <CardContent className="p-8">
               
+              <div className="flex p-1 bg-slate-100 rounded-xl w-full sm:w-max mb-4 border border-slate-200/50">
+                <button onClick={() => setMealSource('HOME_COOKED')} className={`flex-1 sm:w-36 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${mealSource === 'HOME_COOKED' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Tự nấu</button>
+                <button onClick={() => setMealSource('RESTAURANT')} className={`flex-1 sm:w-36 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${mealSource === 'RESTAURANT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Ăn ngoài</button>
+              </div>
+
+              {mealSource === 'RESTAURANT' && (
+                <div className="mb-4 space-y-3">
+                  <input
+                    type="text"
+                    value={restaurantName}
+                    onChange={(e) => setRestaurantName(e.target.value)}
+                    placeholder="Tên quán / nhà hàng"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  />
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+                    <input type="checkbox" checked={isHotpot} onChange={(e) => { setIsHotpot(e.target.checked); if (e.target.checked) setIsComposite(false); }} className="rounded" />
+                    Đây là lẩu
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+                    <input type="checkbox" checked={isComposite} onChange={(e) => { setIsComposite(e.target.checked); if (e.target.checked) setIsHotpot(false); }} className="rounded" />
+                    Buffet / nhiều món
+                  </label>
+                  {isComposite && (
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                      <input
+                        type="text"
+                        value={compositeSearchQuery}
+                        onChange={(e) => searchCompositeFoods(e.target.value)}
+                        placeholder="Tìm món buffet (≥2 ký tự)..."
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                      />
+                      <select
+                        multiple
+                        value={selectedCompositeItems}
+                        onChange={(e) => setSelectedCompositeItems(Array.from(e.target.selectedOptions, o => o.value))}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm min-h-[100px]"
+                      >
+                        {compositeSearchResults.map(item => (
+                          <option key={item.id} value={item.id}>
+                            {item.nameVi}{item.matchScore != null ? ` (score ${item.matchScore})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedCompositeItems.length > 0 && (
+                        <p className="text-xs text-slate-500">{selectedCompositeItems.length} món đã chọn</p>
+                      )}
+                    </div>
+                  )}
+                  {isHotpot && (
+                    <div className="grid sm:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <select value={selectedBrothId} onChange={(e) => setSelectedBrothId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm">
+                        <option value="">Chọn nước lẩu...</option>
+                        {hotpotBroths.map(b => <option key={b.id} value={b.id}>{b.nameVi}</option>)}
+                      </select>
+                      <select
+                        multiple
+                        value={selectedHotpotItems}
+                        onChange={(e) => setSelectedHotpotItems(Array.from(e.target.selectedOptions, o => o.value))}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm min-h-[80px]"
+                      >
+                        {hotpotItems.map(item => <option key={item.id} value={item.id}>{item.nameVi}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex p-1 bg-slate-100 rounded-xl w-full sm:w-max mb-8 border border-slate-200/50">
                 <button onClick={() => setInputMode('ai')} className={`flex-1 sm:w-40 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'ai' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Sparkles className="w-4 h-4" /> AI Snapshot</button>
                 <button onClick={() => setInputMode('manual')} className={`flex-1 sm:w-40 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'manual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Keyboard className="w-4 h-4" /> Manual Entry</button>
               </div>
+
+              {inputMode === 'ai' && (
+                <div className="mb-4">
+                  <select value={aiMealType} onChange={(e) => setAiMealType(e.target.value)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700">
+                    <option value="BREAKFAST">Breakfast</option>
+                    <option value="LUNCH">Lunch</option>
+                    <option value="DINNER">Dinner</option>
+                    <option value="SNACK">Snack</option>
+                  </select>
+                </div>
+              )}
 
               {inputMode === 'ai' ? (
                 <div 
@@ -322,18 +499,14 @@ export default function DietTrackerPage() {
                   onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFileSelect(e); }}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileSelect} />
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
                   <div className="w-20 h-20 mx-auto bg-white rounded-full flex items-center justify-center mb-6 shadow-md border border-slate-100"><Camera className="w-8 h-8 text-blue-500" /></div>
                   <h3 className="text-xl font-bold mb-2 text-slate-800">Upload Meal Photo</h3>
-                  <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm">Drag & drop or click to browse. Select one or more images.</p>
+                  <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm">Drag & drop or click to browse. One image per AI analysis.</p>
 
-                  {selectedFiles.length > 0 ? (
+                  {selectedFile ? (
                     <div className="flex flex-col items-center justify-center gap-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-wrap justify-center gap-2">
-                        {selectedFiles.map((file, idx) => (
-                          <span key={idx} className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full font-bold border border-blue-100">{file.name}</span>
-                        ))}
-                      </div>
+                      <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full font-bold border border-blue-100">{selectedFile.name}</span>
                       <Button onClick={handleAnalyze} disabled={analyzing} className="shadow-md bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 h-12">
                         {analyzing ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</> : 'Process with AI'}
                       </Button>
@@ -354,9 +527,18 @@ export default function DietTrackerPage() {
                         <option value="SNACK">Snack</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="relative">
                       <label className="block text-sm font-bold text-slate-700 mb-1.5">Food Name</label>
-                      <input type="text" value={manualFood} onChange={(e) => setManualFood(e.target.value)} placeholder="e.g. Avocado Toast" required className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all" />
+                      <input type="text" value={foodSearchQuery || manualFood} onChange={(e) => { setManualFood(e.target.value); searchFoods(e.target.value); }} placeholder="e.g. Phở bò" required className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all" />
+                      {foodSearchResults.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-auto">
+                          {foodSearchResults.map(food => (
+                            <button key={food.id} type="button" onClick={() => selectFoodFromDb(food)} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 text-slate-700">
+                              {food.nameVi} <span className="text-slate-400">({food.calories} kcal)</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -392,11 +574,12 @@ export default function DietTrackerPage() {
             ) : (
               <div className="space-y-5 relative before:absolute before:inset-y-0 before:left-[23px] before:w-0.5 before:bg-slate-200">
                 {logs.map((log, idx) => {
-                  const logDate = new Date(log.loggedAt);
+                  const logDate = new Date(log.createdAt || log.logDate);
                   const displayTime = isNaN(logDate) ? '--' : `${logDate.getHours()}h`;
+                  const macros = log.macrosJson || {};
                   
                   return (
-                  <div key={log.id} className="relative flex items-start gap-6 animate-slide-in" style={{ animationDelay: `${idx * 100}ms` }}>
+                  <div key={log.id} id={`log-${log.id}`} className="relative flex items-start gap-6 animate-slide-in" style={{ animationDelay: `${idx * 100}ms` }}>
                     <div className="w-12 h-12 rounded-full bg-white border-[3px] border-blue-500 flex items-center justify-center flex-shrink-0 z-10 shadow-md">
                       <span className="text-xs font-extrabold text-blue-600">{displayTime}</span>
                     </div>
@@ -407,14 +590,35 @@ export default function DietTrackerPage() {
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-xs font-extrabold tracking-widest text-slate-400 uppercase">{log.mealType}</span>
                             <StatusBadge status={log.status} />
+                            {log.mealSource && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                {log.mealSource === 'HOME_COOKED' ? 'Tự nấu' : 'Ăn ngoài'}
+                              </span>
+                            )}
+                            {log.recognitionSource === 'HYBRID' && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">DB match</span>
+                            )}
+                            {log.suggestSos && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Cần SOS?</span>
+                            )}
                           </div>
                           <p className="text-lg font-bold text-slate-800 capitalize">
-                            {log.foods?.map(f => f.name).join(', ') || 'Processing AI Data...'}
+                            {log.foodDescription || 'Processing AI Data...'}
                           </p>
                           <div className="flex items-center gap-4 mt-2.5 text-sm font-semibold text-slate-600">
-                            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />{log.totalCalories || 0} kcal</span>
-                            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />{log.totalProtein || 0}g Pro</span>
+                            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />{macros.calories || 0} kcal</span>
+                            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />{macros.protein || 0}g Pro</span>
                           </div>
+                          {log.status === 'DRAFT' && (
+                            <Button size="sm" onClick={async () => { await dietService.submitForReview(log.id); toast.success('Submitted for PT review'); fetchData(); }} className="mt-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs h-8">
+                              Xác nhận & gửi PT
+                            </Button>
+                          )}
+                          {log.suggestSos && (
+                            <Button size="sm" variant="outline" onClick={() => { setSosDietLogId(log.id); setShowSosForm(true); }} className="mt-2 border-amber-300 text-amber-700 rounded-lg text-xs h-8">
+                              Gửi SOS
+                            </Button>
+                          )}
                         </div>
                         
                         <div className="flex items-center gap-2">
@@ -503,6 +707,28 @@ export default function DietTrackerPage() {
               </form>
             )}
           </div>
+
+          {sosTickets.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+              <h4 className="text-sm font-bold text-slate-800 mb-3">My SOS Tickets</h4>
+              <div className="space-y-2 max-h-40 overflow-auto">
+                {sosTickets.map(ticket => (
+                  <button
+                    key={ticket.id}
+                    type="button"
+                    onClick={() => ticket.dietLogId && document.getElementById(`log-${ticket.dietLogId}`)?.scrollIntoView({ behavior: 'smooth' })}
+                    className="w-full text-left p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-600">{ticket.status}</span>
+                      <span className="text-[10px] text-slate-400">{ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : ''}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 truncate">{ticket.note}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           
         </div>
       </div>

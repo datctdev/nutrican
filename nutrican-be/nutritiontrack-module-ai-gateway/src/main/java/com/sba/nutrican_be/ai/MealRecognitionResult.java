@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -21,4 +23,7 @@ public class MealRecognitionResult {
     private BigDecimal confidenceScore;
     private boolean fallback;
     private String message;
+    private String mealComplexityFromAi;
+    private List<Map<String, Object>> detectedItems;
+    private List<String> uncertaintyReasons;
 }

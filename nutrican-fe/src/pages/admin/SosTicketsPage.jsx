@@ -9,12 +9,16 @@ import { AlertTriangle, Clock, CheckCircle2, ArrowRight, ShieldAlert, FileText, 
 
 export default function SosTicketsPage() {
   const [tickets, setTickets] = useState([]);
+  const [pts, setPts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [status, setStatus] = useState('');
+  const [assigningId, setAssigningId] = useState(null);
+  const [selectedPtId, setSelectedPtId] = useState('');
 
   useEffect(() => { fetchTickets(); }, [page, status]);
+  useEffect(() => { fetchPts(); }, []);
 
   const fetchTickets = async () => {
     try {
@@ -24,12 +28,37 @@ export default function SosTicketsPage() {
       const response = await adminService.getSosTickets(params);
       setTickets(response.data.data.content);
       setTotalPages(response.data.data.totalPages);
-    } catch (err) { toast.error('Failed to load SOS tickets'); } 
+    } catch (err) { toast.error('Failed to load SOS tickets'); }
     finally { setLoading(false); }
   };
 
+  const fetchPts = async () => {
+    try {
+      const [cert, free] = await Promise.all([
+        adminService.getUsers({ role: 'PT_CERTIFIED', size: 50 }),
+        adminService.getUsers({ role: 'PT_FREELANCE', size: 50 }),
+      ]);
+      const all = [
+        ...(cert.data.data.content || []),
+        ...(free.data.data.content || []),
+      ];
+      setPts(all);
+    } catch (err) {
+      console.error('Failed to load PTs', err);
+    }
+  };
+
   const handleAssign = async (ticketId) => {
-    toast.info('PT Assignment feature coming soon', { description: 'This will open a modal to select an available PT.' });
+    if (!selectedPtId) return toast.error('Please select a PT');
+    try {
+      await adminService.assignSosTicket(ticketId, selectedPtId);
+      toast.success('SOS ticket assigned');
+      setAssigningId(null);
+      setSelectedPtId('');
+      fetchTickets();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to assign ticket');
+    }
   };
 
   const getStatusConfig = (s) => {
@@ -50,8 +79,7 @@ export default function SosTicketsPage() {
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">SOS Center</h1>
           <p className="text-slate-500 mt-1 font-medium">Manage and assign emergency nutrition requests.</p>
         </div>
-        
-        {/* Status Filter */}
+
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
           {[{val: '', label:'All'}, {val:'OPEN', label:'Open'}, {val:'ASSIGNED', label:'Assigned'}, {val:'RESOLVED', label:'Resolved'}].map(s => (
             <button
@@ -80,7 +108,7 @@ export default function SosTicketsPage() {
           {tickets.map((ticket) => {
             const config = getStatusConfig(ticket.status);
             const Icon = config.icon;
-            
+
             return (
               <Card key={ticket.id} className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
                 <CardContent className="p-6">
@@ -93,15 +121,15 @@ export default function SosTicketsPage() {
                         <span className="text-xs font-bold text-slate-400">TICKET #{ticket.id?.slice(0, 8)}</span>
                         <span className="text-xs font-medium text-slate-400 flex items-center"><Clock className="w-3 h-3 mr-1"/> {formatDate(ticket.createdAt)}</span>
                       </div>
-                      
+
                       <p className="text-lg font-bold text-slate-800 mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                        "{ticket.message}"
+                        "{ticket.note || 'No message'}"
                       </p>
-                      
+
                       <div className="flex items-center gap-6 text-sm font-semibold text-slate-600">
-                        <span className="flex items-center"><User className="w-4 h-4 mr-2 text-slate-400" /> {ticket.userName || 'Unknown User'}</span>
-                        {ticket.assignedPtName && (
-                          <span className="flex items-center text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full"><ShieldAlert className="w-4 h-4 mr-1.5" /> Assigned to: {ticket.assignedPtName}</span>
+                        <span className="flex items-center"><User className="w-4 h-4 mr-2 text-slate-400" /> {ticket.customerName || 'Unknown User'}</span>
+                        {ticket.ptName && (
+                          <span className="flex items-center text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full"><ShieldAlert className="w-4 h-4 mr-1.5" /> Assigned to: {ticket.ptName}</span>
                         )}
                         {ticket.dietLogId && (
                           <span className="text-slate-500">Related Log: #{ticket.dietLogId?.slice(0, 8)}</span>
@@ -110,10 +138,29 @@ export default function SosTicketsPage() {
                     </div>
 
                     {ticket.status === 'OPEN' && (
-                      <div className="border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
-                        <Button onClick={() => handleAssign(ticket.id)} className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-12 shadow-sm">
-                          Assign Trainer <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
+                      <div className="border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[220px]">
+                        {assigningId === ticket.id ? (
+                          <div className="space-y-2">
+                            <select
+                              value={selectedPtId}
+                              onChange={(e) => setSelectedPtId(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm"
+                            >
+                              <option value="">Select PT...</option>
+                              {pts.map(pt => (
+                                <option key={pt.id} value={pt.id}>{pt.fullName}</option>
+                              ))}
+                            </select>
+                            <div className="flex gap-2">
+                              <Button onClick={() => handleAssign(ticket.id)} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-10 text-xs">Confirm</Button>
+                              <Button onClick={() => { setAssigningId(null); setSelectedPtId(''); }} variant="outline" className="rounded-xl h-10 text-xs">Cancel</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button onClick={() => setAssigningId(ticket.id)} className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-12 shadow-sm">
+                            Assign Trainer <ArrowRight className="w-4 h-4 ml-2" />
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -122,7 +169,6 @@ export default function SosTicketsPage() {
             );
           })}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex justify-center gap-3 pt-6">
               <Button variant="outline" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="rounded-xl border-slate-200 bg-white shadow-sm">Previous</Button>

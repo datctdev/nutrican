@@ -18,5 +18,9 @@ public class DietSummaryResponse {
     private BigDecimal totalProtein;
     private BigDecimal totalCarbs;
     private BigDecimal totalFat;
+    private BigDecimal targetCalories;
+    private BigDecimal targetProtein;
+    private BigDecimal targetCarb;
+    private BigDecimal targetFat;
     private List<DietLogResponse> logs;
 }
