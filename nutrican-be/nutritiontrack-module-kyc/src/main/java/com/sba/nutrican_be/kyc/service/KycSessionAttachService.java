@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface KycSessionAttachService {
 
-    AttachDecision attachFile(UUID sessionId, UUID accountId, String fileHash, String classifyName);
+    AttachDecision attachFile(UUID sessionId, UUID userId, String fileHash, String classifyName);
 }

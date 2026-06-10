@@ -68,9 +68,9 @@ public class CompareKycServiceImpl implements CompareKycService {
         return out;
     }
 
-    public EKycSession get(UUID sessionId, UUID accountId) {
-        return sessions.findByIdAndAccountId(sessionId, accountId)
-                .orElseThrow(() -> new RuntimeException(sessionId.toString() + accountId.toString()));
+    public EKycSession get(UUID sessionId, UUID userId) {
+        return sessions.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new RuntimeException(sessionId.toString() + userId.toString()));
     }
 
     private String toJsonSafe(Object obj) {

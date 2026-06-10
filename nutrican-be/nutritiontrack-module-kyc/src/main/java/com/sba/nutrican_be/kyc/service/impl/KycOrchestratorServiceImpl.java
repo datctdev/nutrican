@@ -33,7 +33,7 @@ public class KycOrchestratorServiceImpl implements KycOrchestratorService {
 
     public Map<String, Object> uploadFileAndAttach(
             UUID sessionId,
-            UUID accountId,
+            UUID userId,
             MultipartFile file,
             String title,
             String description
@@ -101,7 +101,7 @@ public class KycOrchestratorServiceImpl implements KycOrchestratorService {
             );
         }
 
-        AttachDecision decision = attachService.attachFile(sessionId, accountId, hash, name);
+        AttachDecision decision = attachService.attachFile(sessionId, userId, hash, name);
         if (decision == null || !decision.attached()) {
             return Map.of(
                     "ok", false,

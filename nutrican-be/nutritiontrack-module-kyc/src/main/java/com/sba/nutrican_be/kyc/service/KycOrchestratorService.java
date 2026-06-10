@@ -8,7 +8,7 @@ import java.util.UUID;
 public interface KycOrchestratorService {
     Map<String, Object> uploadFileAndAttach(
             UUID sessionId,
-            UUID accountId,
+            UUID userId,
             MultipartFile file,
             String title,
             String description

@@ -1,5 +1,6 @@
 package com.sba.nutrican_be.auth.security;
 
+import com.sba.nutrican_be.core.config.CurrentUserInfo;
 import com.sba.nutrican_be.core.util.JwtUtil;
 import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.core.repository.UserRepository;
@@ -42,11 +43,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String role = jwtUtil.getRoleFromToken(jwt);
 
                 Optional<User> userOpt = userRepository.findById(userId);
+                CurrentUserInfo userInfo = new CurrentUserInfo();
+
                 if (userOpt.isPresent()) {
                     User user = userOpt.get();
+                    userInfo.setUserId(user.getId());
+                    userInfo.setUsername(user.getEmail());
+                    userInfo.setRole(role);
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    user,
+                                    userInfo,
                                     null,
                                     Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role)));
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

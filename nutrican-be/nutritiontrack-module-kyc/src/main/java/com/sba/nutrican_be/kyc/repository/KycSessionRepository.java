@@ -10,7 +10,5 @@ import java.util.UUID;
 @Repository
 public interface KycSessionRepository extends JpaRepository<EKycSession, UUID> {
 
-    Optional<EKycSession> findByIdAndAccountId(
-            UUID id,
-            UUID accountId);
+    Optional<EKycSession> findByIdAndUserId(UUID id, UUID userId);
 }

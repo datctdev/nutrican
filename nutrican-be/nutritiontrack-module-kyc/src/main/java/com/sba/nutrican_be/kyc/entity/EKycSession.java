@@ -17,7 +17,7 @@ import java.util.UUID;
 public class EKycSession extends BaseEntity {
 
     @Column(nullable = false)
-    private UUID accountId;
+    private UUID userId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

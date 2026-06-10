@@ -19,9 +19,9 @@ public class KycSessionAttachServiceImpl implements KycSessionAttachService {
     private final KycDocumentRepository docs;
 
     @Override
-    public AttachDecision attachFile(UUID sessionId, UUID accountId, String fileHash, String classifyName) {
-        EKycSession s = sessions.findByIdAndAccountId(sessionId, accountId)
-                .orElseThrow(() -> new RuntimeException(sessionId.toString() +  accountId.toString()));
+    public AttachDecision attachFile(UUID sessionId, UUID userId, String fileHash, String classifyName) {
+        EKycSession s = sessions.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new RuntimeException(sessionId.toString() +  userId.toString()));
 
         if (classifyName == null || classifyName.isBlank()) {
             return new AttachDecision(false, "Classify returned empty name", null);

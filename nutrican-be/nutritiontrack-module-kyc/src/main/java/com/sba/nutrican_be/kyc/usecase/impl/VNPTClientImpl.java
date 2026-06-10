@@ -50,6 +50,9 @@ public class VNPTClientImpl implements VNPTClient {
 
             UploadResponse res = vnptRestClient.post()
                     .uri("/file-service/v1/addFile")
+                    .header("Authorization", "Bearer " + cfg.getAccessToken())
+                    .header("Token-id", cfg.getTokenId())
+                    .header("Token-key", cfg.getTokenKey())
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(form)
                     .retrieve()
@@ -69,6 +72,9 @@ public class VNPTClientImpl implements VNPTClient {
 
         CardLivenessResponse res = vnptRestClient.post()
                 .uri("/ai/v1/card/liveness")
+                .header("Authorization", "Bearer " + cfg.getAccessToken())
+                .header("Token-id", cfg.getTokenId())
+                .header("Token-key", cfg.getTokenKey())
                 .body(req)
                 .retrieve()
                 .body(CardLivenessResponse.class);
@@ -88,6 +94,9 @@ public class VNPTClientImpl implements VNPTClient {
 
         ClassifyResponse res = vnptRestClient.post()
                 .uri("/ai/v1/classify/id")
+                .header("Authorization", "Bearer " + cfg.getAccessToken())
+                .header("Token-id", cfg.getTokenId())
+                .header("Token-key", cfg.getTokenKey())
                 .body(req)
                 .retrieve()
                 .body(ClassifyResponse.class);
@@ -106,6 +115,9 @@ public class VNPTClientImpl implements VNPTClient {
 
             OcrFrontResponse res = vnptRestClient.post()
                     .uri("/ai/v1/ocr/id/front")
+                    .header("Authorization", "Bearer " + cfg.getAccessToken())
+                    .header("Token-id", cfg.getTokenId())
+                    .header("Token-key", cfg.getTokenKey())
                     .body(req)
                     .retrieve()
                     .body(OcrFrontResponse.class);
@@ -132,6 +144,9 @@ public class VNPTClientImpl implements VNPTClient {
 
         OcrBackResponse res = vnptRestClient.post()
                 .uri("/ai/v1/ocr/id/back")
+                .header("Authorization", "Bearer " + cfg.getAccessToken())
+                .header("Token-id", cfg.getTokenId())
+                .header("Token-key", cfg.getTokenKey())
                 .body(req)
                 .retrieve()
                 .body(OcrBackResponse.class);
@@ -148,6 +163,9 @@ public class VNPTClientImpl implements VNPTClient {
 
         LivenessResponse res = vnptRestClient.post()
                 .uri("/ai/v1/face/liveness")
+                .header("Authorization", "Bearer " + cfg.getAccessToken())
+                .header("Token-id", cfg.getTokenId())
+                .header("Token-key", cfg.getTokenKey())
                 .body(req)
                 .retrieve()
                 .body(LivenessResponse.class);
@@ -165,6 +183,9 @@ public class VNPTClientImpl implements VNPTClient {
 
         CompareResponse res = vnptRestClient.post()
                 .uri("/ai/v1/face/compare")
+                .header("Authorization", "Bearer " + cfg.getAccessToken())
+                .header("Token-id", cfg.getTokenId())
+                .header("Token-key", cfg.getTokenKey())
                 .body(req)
                 .retrieve()
                 .body(CompareResponse.class);

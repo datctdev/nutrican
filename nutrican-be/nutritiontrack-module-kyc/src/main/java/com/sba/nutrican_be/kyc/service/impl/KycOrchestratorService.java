@@ -54,9 +54,9 @@ public class KycOrchestratorService implements KycOrchestrator {
         return hash;
     }
 
-    public UUID start(UUID accountId) {
+    public UUID start(UUID userId) {
         EKycSession s = new EKycSession();
-        s.setAccountId(accountId);
+        s.setUserId(userId);
         s.setStatus(KycStatus.DRAFT);
         sessions.save(s);
         return s.getId();
@@ -228,9 +228,9 @@ public class KycOrchestratorService implements KycOrchestrator {
         return out;
     }
 
-    public EKycSession get(UUID sessionId, UUID accountId) {
-        return sessions.findByIdAndAccountId(sessionId, accountId)
-                .orElseThrow(() -> new RuntimeException(sessionId.toString() + accountId.toString()));
+    public EKycSession get(UUID sessionId, UUID userId) {
+        return sessions.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new RuntimeException(sessionId.toString() + userId.toString()));
     }
 
     private String getActiveHash(UUID sessionId, UUID accountId, KycDocumentType type) {
