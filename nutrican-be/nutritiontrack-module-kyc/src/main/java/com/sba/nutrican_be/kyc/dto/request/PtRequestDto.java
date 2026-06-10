@@ -1,4 +1,4 @@
-package com.sba.nutrican_be.auth.dto;
+package com.sba.nutrican_be.kyc.dto.request;
 
 import lombok.Data;
 

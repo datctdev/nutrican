@@ -1,6 +1,5 @@
-package com.sba.nutrican_be.auth.service;
+package com.sba.nutrican_be.kyc.service.impl;
 
-import com.sba.nutrican_be.auth.dto.*;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.entity.PtProfile;
 import com.sba.nutrican_be.core.entity.User;
@@ -11,6 +10,10 @@ import com.sba.nutrican_be.core.exception.ResourceNotFoundException;
 import com.sba.nutrican_be.core.repository.PtProfileRepository;
 import com.sba.nutrican_be.core.repository.UserKycRepository;
 import com.sba.nutrican_be.core.repository.UserRepository;
+import com.sba.nutrican_be.kyc.dto.request.KycRequest;
+import com.sba.nutrican_be.kyc.dto.request.PtRequestDto;
+import com.sba.nutrican_be.kyc.dto.response.KycStatusDto;
+import com.sba.nutrican_be.kyc.service.KycService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

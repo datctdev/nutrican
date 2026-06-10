@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping(version = "1", path = "/kyc")
+@RequestMapping(path = "/api/v1/kyc")
 @RequiredArgsConstructor
 public class KycController {
     private final KycOrchestrator orchestrator;

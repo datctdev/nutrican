@@ -4,19 +4,17 @@ import com.sba.nutrican_be.core.entity.BaseEntity;
 import com.sba.nutrican_be.kyc.valueObjects.KycStatus;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
+
 @Data
 @Entity
 @Table(name = "sessions")
+@EqualsAndHashCode(callSuper = false)
 public class EKycSession extends BaseEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id", nullable = false, updatable = false)
-    private UUID id;
 
     @Column(nullable = false)
     private UUID accountId;
