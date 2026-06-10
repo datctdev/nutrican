@@ -5,24 +5,32 @@ import com.sba.nutrican_be.core.dto.PageResponse;
 import com.sba.nutrican_be.core.entity.*;
 import com.sba.nutrican_be.core.enums.ClientMappingStatus;
 import com.sba.nutrican_be.core.enums.DietLogStatus;
+import com.sba.nutrican_be.core.enums.PtCorrectionReason;
+import com.sba.nutrican_be.core.enums.PtReviewAction;
+import com.sba.nutrican_be.core.enums.SOSTicketStatus;
 import com.sba.nutrican_be.core.exception.BadRequestException;
 import com.sba.nutrican_be.core.exception.ResourceNotFoundException;
 import com.sba.nutrican_be.core.repository.*;
 import com.sba.nutrican_be.core.util.MacroUtils;
+import com.sba.nutrican_be.core.util.RblDatasetFilter;
+import com.sba.nutrican_be.core.util.RblMetricsUtil;
 import com.sba.nutrican_be.workspace.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -35,6 +43,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final BodyMetricRepository bodyMetricRepository;
     private final UserRepository userRepository;
     private final DietLogImageRepository dietLogImageRepository;
+    private final SOSTicketRepository sosTicketRepository;
     private final SseEmitterService sseEmitterService;
 
     @Override
@@ -56,9 +65,18 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<PageResponse<DietLogReviewResponse>> getPendingLogs(UUID ptId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-        Page<DietLog> logPage = dietLogRepository.findByPtReviewerIdAndStatus(
-                ptId, DietLogStatus.PT_REVIEWING, pageable);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        List<UUID> clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                .map(m -> m.getClient().getId())
+                .toList();
+
+        if (clientIds.isEmpty()) {
+            return ApiResponse.success(PageResponse.from(Page.empty(pageable)));
+        }
+
+        Page<DietLog> logPage = dietLogRepository.findByCustomerIdInAndStatus(
+                clientIds, DietLogStatus.PT_REVIEWING, pageable);
         return ApiResponse.success(PageResponse.from(logPage.map(this::toReviewResponse)));
     }
 
@@ -71,25 +89,41 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         User pt = userRepository.findById(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
 
+        if (!mappingRepository.existsByPt_IdAndClient_Id(ptId, dietLog.getCustomer().getId())) {
+            throw new BadRequestException("You can only review logs from your assigned clients");
+        }
+
         dietLog.setPtReviewer(pt);
+        dietLog.setMacrosAtReview(MacroUtils.copyMacroMap(dietLog.getMacrosJson()));
+        PtCorrectionReason reason = request.getCorrectionReason() != null
+                ? request.getCorrectionReason() : PtCorrectionReason.OTHER;
+        dietLog.setPtCorrectionReason(reason);
+        dietLog.setPtReviewedAt(LocalDateTime.now());
 
         switch (request.getAction().toUpperCase()) {
             case "APPROVE" -> {
                 dietLog.setStatus(DietLogStatus.APPROVED);
+                dietLog.setPtAction(PtReviewAction.APPROVE);
+                dietLog.setPtAdjustedMacros(MacroUtils.copyMacroMap(dietLog.getMacrosAtReview()));
                 if (request.getNote() != null) dietLog.setPtNote(request.getNote());
             }
             case "ADJUST_MACROS" -> {
                 dietLog.setStatus(DietLogStatus.APPROVED);
-                dietLog.setMacrosJson(MacroUtils.buildAdjustedMacroMap(
+                dietLog.setPtAction(PtReviewAction.ADJUST);
+                Map<String, Object> adjusted = MacroUtils.buildAdjustedMacroMap(
                         request.getAdjustedCalories(),
                         request.getAdjustedProtein(),
                         request.getAdjustedCarb(),
                         request.getAdjustedFat()
-                ));
+                );
+                dietLog.setMacrosJson(adjusted);
+                dietLog.setPtAdjustedMacros(adjusted);
                 dietLog.setPtNote(request.getNote());
             }
             case "REJECT" -> {
                 dietLog.setStatus(DietLogStatus.REJECTED);
+                dietLog.setPtAction(PtReviewAction.REJECT);
+                dietLog.setPtAdjustedMacros(null);
                 dietLog.setPtNote(request.getNote());
             }
             default -> throw new BadRequestException("Invalid action: " + request.getAction());
@@ -201,13 +235,17 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     @Transactional(readOnly = true)
     public ApiResponse<PtStatsDto> getStats(UUID ptId) {
         Page<PtClientMapping> allClients = mappingRepository.findByPt_Id(ptId, PageRequest.of(0, 1));
-        Page<DietLog> pendingReviews = dietLogRepository.findByPtReviewerIdAndStatus(
-                ptId, DietLogStatus.PT_REVIEWING, PageRequest.of(0, 1));
+        List<UUID> clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                .map(m -> m.getClient().getId()).toList();
+        long pendingCount = clientIds.isEmpty() ? 0
+                : dietLogRepository.findByCustomerIdInAndStatus(clientIds, DietLogStatus.PT_REVIEWING, PageRequest.of(0, 1)).getTotalElements();
+        long pendingSos = sosTicketRepository.findByPt_IdAndStatus(ptId, SOSTicketStatus.ASSIGNED, PageRequest.of(0, 1)).getTotalElements();
 
         PtStatsDto stats = PtStatsDto.builder()
                 .totalClients((int) allClients.getTotalElements())
-                .pendingReviews((int) pendingReviews.getTotalElements())
-                .pendingSosTickets(0)
+                .pendingReviews((int) pendingCount)
+                .pendingSosTickets((int) pendingSos)
                 .reviewsThisWeek(0)
                 .averageAdherenceRate(BigDecimal.valueOf(85))
                 .build();
@@ -267,7 +305,102 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .logDate(log.getLogDate())
                 .createdAt(log.getCreatedAt())
                 .additionalImages(additionalImages)
+                .mealSource(log.getMealSource())
+                .mealComplexity(log.getMealComplexity())
+                .restaurantName(log.getRestaurantName())
+                .recognitionSource(log.getRecognitionSource())
+                .aiRawJson(log.getAiRawJson())
+                .aiPredictedMacros(log.getAiPredictedMacros())
+                .dbMatchedMacros(log.getDbMatchedMacros())
+                .macrosAtReview(log.getMacrosAtReview())
+                .ptAdjustedMacros(log.getPtAdjustedMacros())
+                .ptBlindMacros(log.getPtBlindMacros())
+                .dbMatchScore(log.getDbMatchScore())
+                .modelVersion(log.getModelVersion())
+                .matchedFoodName(log.getMatchedFoodName())
+                .experimentCohort(log.getExperimentCohort())
+                .ptAction(log.getPtAction())
+                .ptCorrectionReason(log.getPtCorrectionReason())
+                .blindSubmitted(log.getPtBlindMacros() != null)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<List<com.sba.nutrican_be.core.dto.SosTicketResponse>> getSosTickets(UUID ptId) {
+        List<com.sba.nutrican_be.core.dto.SosTicketResponse> tickets = sosTicketRepository
+                .findByPt_Id(ptId, PageRequest.of(0, 50, Sort.by("createdAt").descending()))
+                .map(this::toSosResponse).getContent();
+        return ApiResponse.success(tickets);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<DietLogReviewResponse> submitBlindEstimate(UUID logId, UUID ptId, BlindEstimateRequest request) {
+        DietLog dietLog = dietLogRepository.findByIdWithCustomer(logId)
+                .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
+        if (!mappingRepository.existsByPt_IdAndClient_Id(ptId, dietLog.getCustomer().getId())) {
+            throw new BadRequestException("You can only estimate logs from your assigned clients");
+        }
+        Map<String, Object> blind = MacroUtils.buildAdjustedMacroMap(
+                request.getCalories(), request.getProtein(), request.getCarb(), request.getFat());
+        dietLog.setPtBlindMacros(blind);
+        dietLog = dietLogRepository.save(dietLog);
+        return ApiResponse.success(toReviewResponse(dietLog), "Blind estimate saved");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Void> resolveSosTicket(UUID ticketId, UUID ptId, String note) {
+        SOSTicket ticket = sosTicketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("SOS Ticket", ticketId));
+        if (ticket.getPt() == null || !ticket.getPt().getId().equals(ptId)) {
+            throw new BadRequestException("You can only resolve tickets assigned to you");
+        }
+        ticket.setStatus(SOSTicketStatus.RESOLVED);
+        if (note != null) {
+            ticket.setNote(note);
+        }
+        sosTicketRepository.save(ticket);
+        return ApiResponse.success(null, "SOS ticket resolved");
+    }
+
+    private com.sba.nutrican_be.core.dto.SosTicketResponse toSosResponse(SOSTicket ticket) {
+        return com.sba.nutrican_be.core.dto.SosTicketResponse.builder()
+                .id(ticket.getId())
+                .dietLogId(ticket.getDietLog() != null ? ticket.getDietLog().getId() : null)
+                .note(ticket.getNote())
+                .priority(ticket.getPriority())
+                .status(ticket.getStatus())
+                .reasonCode(ticket.getReasonCode())
+                .mealSource(ticket.getMealSource())
+                .autoCreated(ticket.getAutoCreated())
+                .customerName(ticket.getDietLog() != null && ticket.getDietLog().getCustomer() != null
+                        ? ticket.getDietLog().getCustomer().getFullName() : null)
+                .ptName(ticket.getPt() != null ? ticket.getPt().getFullName() : null)
+                .createdAt(ticket.getCreatedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<PtRblStatsDto> getRblStats(UUID ptId) {
+        LocalDate start = LocalDate.now().minusMonths(1);
+        LocalDate end = LocalDate.now();
+        List<UUID> clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
+                .map(m -> m.getClient().getId()).toList();
+        List<DietLog> reviewed = clientIds.isEmpty()
+                ? List.of()
+                : dietLogRepository.findReviewedByCustomersBetween(clientIds, start, end);
+        List<DietLog> labeled = reviewed.stream()
+                .filter(l -> RblDatasetFilter.isLabeledForMae(l) && RblDatasetFilter.isCvOnly(l))
+                .toList();
+        return ApiResponse.success(PtRblStatsDto.builder()
+                .totalReviewed(reviewed.size())
+                .totalLabeledCv(labeled.size())
+                .maeAiCalories(RblMetricsUtil.mae(labeled, "ai", "pt"))
+                .adjustRate(RblMetricsUtil.adjustRate(reviewed))
+                .build());
     }
 
     private void notifyClientOfReview(UUID clientId, UUID logId, String status) {

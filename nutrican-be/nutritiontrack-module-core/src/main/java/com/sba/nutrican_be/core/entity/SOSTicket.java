@@ -1,6 +1,8 @@
 package com.sba.nutrican_be.core.entity;
 
+import com.sba.nutrican_be.core.enums.MealSource;
 import com.sba.nutrican_be.core.enums.SOSTicketStatus;
+import com.sba.nutrican_be.core.enums.SosReasonCode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -41,7 +43,15 @@ public class SOSTicket extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String note;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "reason_code", length = 30)
+    private SosReasonCode reasonCode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "meal_source", length = 20)
+    private MealSource mealSource;
+
+    @Column(name = "auto_created")
+    @Builder.Default
+    private Boolean autoCreated = false;
 }

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -62,5 +63,38 @@ public class MacroUtils {
 
     public static BigDecimal defaultIfNull(BigDecimal value, BigDecimal defaultValue) {
         return value != null ? value : defaultValue;
+    }
+
+    public static Map<String, Object> copyMacroMap(Map<String, Object> source) {
+        if (source == null) {
+            return null;
+        }
+        return new HashMap<>(source);
+    }
+
+    public static Map<String, Object> fromValues(BigDecimal calories, BigDecimal protein,
+                                                 BigDecimal carbs, BigDecimal fat) {
+        Map<String, Object> macros = newMacroMap();
+        macros.put("calories", calories != null ? calories : ZERO);
+        macros.put("protein", protein != null ? protein : ZERO);
+        macros.put("carbs", carbs != null ? carbs : ZERO);
+        macros.put("fat", fat != null ? fat : ZERO);
+        return macros;
+    }
+
+    public static String fieldsChanged(Map<String, Object> before, Map<String, Object> after) {
+        if (before == null || after == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String key : List.of("calories", "protein", "carbs", "fat")) {
+            BigDecimal b = toBd(before.get(key));
+            BigDecimal a = toBd(after.get(key));
+            if (b.compareTo(a) != 0) {
+                if (!sb.isEmpty()) sb.append(",");
+                sb.append(key);
+            }
+        }
+        return sb.toString();
     }
 }

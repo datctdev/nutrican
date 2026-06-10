@@ -1,5 +1,6 @@
 package com.sba.nutrican_be.core.config;
 
+import com.sba.nutrican_be.core.entity.User;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -32,6 +33,16 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
         Object principal = auth.getPrincipal();
 
         if (principal instanceof CurrentUserInfo info) {
+            return info;
+        }
+
+        if (principal instanceof User user) {
+            CurrentUserInfo info = new CurrentUserInfo();
+            info.setUserId(user.getId());
+            info.setUsername(user.getEmail());
+            if (user.getRole() != null) {
+                info.setRole(user.getRole().name());
+            }
             return info;
         }
 

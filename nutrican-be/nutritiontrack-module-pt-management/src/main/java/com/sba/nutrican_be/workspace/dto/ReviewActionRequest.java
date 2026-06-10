@@ -1,5 +1,6 @@
 package com.sba.nutrican_be.workspace.dto;
 
+import com.sba.nutrican_be.core.enums.PtCorrectionReason;
 import lombok.Data;
 import java.math.BigDecimal;
 
@@ -11,4 +12,5 @@ public class ReviewActionRequest {
     private BigDecimal adjustedCarb;
     private BigDecimal adjustedFat;
     private String note;
+    private PtCorrectionReason correctionReason;
 }

@@ -7,6 +7,7 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 @Entity
@@ -42,7 +43,7 @@ public class PtProfile extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "specializations", columnDefinition = "jsonb")
-    private String[] specializations;
+    private List<String> specializations;
 
     @Column(precision = 2, scale = 1)
     @Builder.Default

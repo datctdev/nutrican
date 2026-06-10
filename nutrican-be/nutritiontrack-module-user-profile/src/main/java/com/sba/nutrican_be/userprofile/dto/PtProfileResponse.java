@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -21,7 +22,7 @@ public class PtProfileResponse {
     private String bio;
     private String trainingPhilosophy;
     private Integer yearsOfExperience;
-    private String[] specializations;
+    private List<String> specializations;
     private BigDecimal rating;
     private Integer totalReviews;
     private String tier;
