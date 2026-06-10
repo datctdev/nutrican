@@ -30,6 +30,8 @@
 	    <module>nutritiontrack-module-pt-management</module>
 	    <module>nutritiontrack-module-admin</module>
 	    <module>nutritiontrack-module-application</module>
+		<module>nutritiontrack-module-kyc</module>
+
 	</modules>
     <scm>
 		<connection/>

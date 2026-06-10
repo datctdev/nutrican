@@ -54,6 +54,12 @@
             <artifactId>nutritiontrack-module-admin</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.sba</groupId>
+            <artifactId>nutritiontrack-module-kyc</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
 
         <!-- Spring Boot Starters -->
         <dependency>

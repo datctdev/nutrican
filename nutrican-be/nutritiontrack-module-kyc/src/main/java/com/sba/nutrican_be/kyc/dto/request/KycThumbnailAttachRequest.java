@@ -1,0 +1,16 @@
+package com.sba.nutrican_be.kyc.dto.request;
+
+import com.sba.nutrican_be.kyc.valueObjects.KycDocumentType;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+import org.jetbrains.annotations.NotNull;
+
+@Data
+public class KycThumbnailAttachRequest {
+    @NotNull
+    private KycDocumentType type;
+
+    @NotBlank
+    private String fileHash;
+}
+
