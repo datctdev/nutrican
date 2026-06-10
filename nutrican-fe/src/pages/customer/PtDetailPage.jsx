@@ -1,13 +1,12 @@
+// src/pages/customer/PtDetailPage.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Card from '../../components/common/Card';
-import Badge from '../../components/common/Badge';
-import Avatar from '../../components/common/Avatar';
-import Button from '../../components/common/Button';
-import Spinner from '../../components/common/Spinner';
-import { marketplaceService } from '../../services/marketplaceService';
+import { Card, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
-import { Star, Shield, Award, BookOpen, MessageSquare, ChevronLeft } from 'lucide-react';
+import { marketplaceService } from '../../services/marketplaceService';
+import { Star, ShieldCheck, Award, FileText, CheckCircle2, ArrowLeft, MessageSquare } from 'lucide-react';
 
 export default function PtDetailPage() {
   const { id } = useParams();
@@ -15,8 +14,6 @@ export default function PtDetailPage() {
   const [pt, setPt] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [reviewPage, setReviewPage] = useState(0);
-  const [reviewTotalPages, setReviewTotalPages] = useState(0);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -32,7 +29,6 @@ export default function PtDetailPage() {
       const response = await marketplaceService.getPtDetail(id);
       setPt(response.data.data);
     } catch (err) {
-      console.error('Error fetching PT detail:', err);
       toast.error('Failed to load PT profile');
       navigate('/marketplace');
     } finally {
@@ -44,11 +40,7 @@ export default function PtDetailPage() {
     try {
       const response = await marketplaceService.getPtReviews(id, { page, size: 10 });
       setReviews(response.data.data.content || []);
-      setReviewTotalPages(response.data.data.totalPages);
-      setReviewPage(page);
-    } catch (err) {
-      console.error('Error fetching reviews:', err);
-    }
+    } catch (err) { console.error('Error fetching reviews:', err); }
   };
 
   const handleSubmitReview = async (e) => {
@@ -58,189 +50,74 @@ export default function PtDetailPage() {
       await marketplaceService.createReview(id, reviewData);
       toast.success('Review submitted!');
       setShowReviewForm(false);
-      setReviewData({ rating: 5, comment: '' });
       fetchReviews(0);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit review');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const getTierBadge = (tier) => {
-    switch (tier) {
-      case 'TIER_1': return <Badge variant="default" className="bg-purple-100 text-purple-700">Certified PT</Badge>;
-      case 'TIER_2': return <Badge variant="outline">Freelance PT</Badge>;
-      default: return <Badge>{tier}</Badge>;
-    }
+    } catch (err) { toast.error('Failed to submit review'); } 
+    finally { setSubmitting(false); }
   };
 
   const renderStars = (rating, interactive = false) => (
-    <div className="flex gap-0.5">
+    <div className="flex gap-1">
       {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          onClick={interactive ? () => setReviewData(prev => ({ ...prev, rating: star })) : undefined}
-          className={`${interactive ? 'cursor-pointer hover:scale-110' : 'cursor-default'} transition-transform`}
-        >
-          <Star
-            className={`w-5 h-5 ${star <= (interactive ? reviewData.rating : rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-          />
-        </button>
+        <Star key={star} onClick={interactive ? () => setReviewData({ ...reviewData, rating: star }) : undefined} className={`w-5 h-5 ${interactive ? 'cursor-pointer' : ''} ${star <= (interactive ? reviewData.rating : rating) ? 'fill-amber-400 text-amber-500' : 'text-slate-200'}`} />
       ))}
     </div>
   );
 
-  if (loading) return <Spinner />;
+  if (loading) return <div className="max-w-6xl mx-auto space-y-6 pb-12 p-4"><Skeleton className="h-64 w-full rounded-3xl" /></div>;
   if (!pt) return null;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <button
-        onClick={() => navigate(-1)}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-      >
-        <ChevronLeft className="w-4 h-4" /> Back to marketplace
-      </button>
-
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row items-start gap-6">
-          <Avatar src={pt.avatarUrl} alt={pt.fullName} size="xl" />
-          <div className="flex-1">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h1 className="text-2xl font-bold text-gray-900">{pt.fullName}</h1>
-              {pt.isVerified && <Badge variant="success" className="flex items-center gap-1"><Shield className="w-3 h-3" /> Verified</Badge>}
-              {getTierBadge(pt.tier)}
+    <div className="max-w-6xl mx-auto space-y-8 pb-12 animate-fade-in">
+      <button onClick={() => navigate(-1)} className="flex items-center text-sm font-bold text-slate-500 hover:text-slate-900"><ArrowLeft className="w-4 h-4 mr-1.5" /> Back to Marketplace</button>
+      
+      <Card className="bg-white border-slate-200 shadow-sm overflow-hidden rounded-3xl">
+        <div className="h-40 md:h-56 bg-gradient-to-r from-blue-600 to-indigo-600" />
+        <CardContent className="p-8 pt-0 relative sm:flex gap-8">
+          <div className="-mt-16 relative inline-block shrink-0">
+            <div className="w-32 h-32 rounded-3xl bg-white p-1.5 shadow-lg">
+              {pt.avatarUrl ? <img src={pt.avatarUrl} alt={pt.fullName} className="w-full h-full rounded-2xl object-cover" /> : <div className="w-full h-full rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-3xl">PT</div>}
             </div>
-            <p className="text-gray-500">{pt.email}</p>
-
-            {pt.rating != null && (
-              <div className="flex items-center gap-2 mt-2">
-                {renderStars(Math.round(pt.rating))}
-                <span className="text-sm font-medium text-gray-700">{pt.rating?.toFixed(1)}</span>
-                <span className="text-sm text-gray-500">({pt.totalReviews || 0} reviews)</span>
-              </div>
-            )}
-
-            {pt.bio && <p className="mt-3 text-gray-700">{pt.bio}</p>}
+            {pt.isVerified && <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-1"><CheckCircle2 className="w-7 h-7 text-emerald-500 fill-emerald-50" /></div>}
           </div>
-        </div>
-
-        <div className="mt-6 flex gap-3 flex-wrap">
-          <Button
-            variant="default"
-            onClick={() => toast.info('Consultation request sent!')}
-          >
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Request Consultation
-          </Button>
-        </div>
+          <div className="flex-1 pt-4 sm:pt-6">
+            <div className="flex justify-between">
+              <div>
+                <h1 className="text-3xl font-black text-slate-900">{pt.fullName}</h1>
+                <p className="text-lg font-bold text-slate-500 mt-1">{pt.email}</p>
+              </div>
+              <Button onClick={() => setShowReviewForm(!showReviewForm)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm">Write Review</Button>
+            </div>
+          </div>
+        </CardContent>
       </Card>
 
-      {pt.trainingPhilosophy && (
-        <Card className="p-6">
-          <h2 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-blue-600" />
-            Training Philosophy
-          </h2>
-          <p className="text-gray-700">{pt.trainingPhilosophy}</p>
+      {showReviewForm && (
+        <Card className="p-6 bg-slate-50 border-slate-200 rounded-3xl">
+          <form onSubmit={handleSubmitReview} className="space-y-4">
+            <div><label className="font-bold text-slate-700 block mb-2">Rating</label>{renderStars(reviewData.rating, true)}</div>
+            <div>
+              <label className="font-bold text-slate-700 block mb-2">Comment</label>
+              <textarea value={reviewData.comment} onChange={(e) => setReviewData({...reviewData, comment: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-blue-500" rows="3" placeholder="Share your experience..." />
+            </div>
+            <div className="flex gap-2"><Button type="submit" disabled={submitting} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl">Submit</Button><Button type="button" variant="outline" onClick={() => setShowReviewForm(false)} className="rounded-xl">Cancel</Button></div>
+          </form>
         </Card>
       )}
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {pt.specializations && pt.specializations.length > 0 && (
-          <Card className="p-6">
-            <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Award className="w-4 h-4 text-blue-600" />
-              Specializations
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {pt.specializations.map((s) => (
-                <Badge key={s} variant="outline">{s}</Badge>
-              ))}
-            </div>
-          </Card>
-        )}
-
-        {pt.certifications && (
-          <Card className="p-6">
-            <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Shield className="w-4 h-4 text-blue-600" />
-              Certifications
-            </h2>
-            <p className="text-gray-700">{pt.certifications}</p>
-            {pt.yearsOfExperience != null && (
-              <p className="text-sm text-gray-500 mt-2">{pt.yearsOfExperience} years of experience</p>
-            )}
-          </Card>
-        )}
-      </div>
-
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">Reviews</h2>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowReviewForm(!showReviewForm)}
-          >
-            Write a Review
-          </Button>
-        </div>
-
-        {showReviewForm && (
-          <form onSubmit={handleSubmitReview} className="mb-6 p-4 bg-gray-50 rounded-lg space-y-3">
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Your Rating</label>
-              {renderStars(reviewData.rating, true)}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Comment</label>
-              <textarea
-                value={reviewData.comment}
-                onChange={(e) => setReviewData(prev => ({ ...prev, comment: e.target.value }))}
-                rows="3"
-                placeholder="Share your experience..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" size="sm" loading={submitting}>Submit Review</Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setShowReviewForm(false)}>Cancel</Button>
-            </div>
-          </form>
-        )}
-
-        {reviews.length === 0 ? (
-          <p className="text-gray-500 text-sm text-center py-4">No reviews yet. Be the first to review!</p>
-        ) : (
-          <div className="space-y-4">
-            {reviews.map((review) => (
-              <div key={review.id} className="border-b pb-4 last:border-0 last:pb-0">
-                <div className="flex items-start gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-xs flex-shrink-0">
-                    {review.reviewerName?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm text-gray-900">{review.reviewerName}</p>
-                    {renderStars(review.rating)}
-                  </div>
-                  <span className="text-xs text-gray-400">
-                    {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}
-                  </span>
+      {/* Render Reviews List */}
+      <Card className="p-8 rounded-3xl bg-white shadow-sm border-slate-200">
+        <h3 className="text-xl font-bold mb-6">Client Reviews</h3>
+        {reviews.length === 0 ? <p className="text-slate-500">No reviews yet.</p> : (
+          <div className="space-y-6">
+            {reviews.map(rev => (
+              <div key={rev.id} className="border-b border-slate-100 pb-6 last:border-0">
+                <div className="flex gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 font-bold flex items-center justify-center">{rev.reviewerName?.slice(0,2).toUpperCase()}</div>
+                  <div><p className="font-bold text-slate-900">{rev.reviewerName}</p>{renderStars(rev.rating)}</div>
                 </div>
-                {review.comment && <p className="text-sm text-gray-600 mt-2">{review.comment}</p>}
+                <p className="text-slate-600 ml-13 mt-2 font-medium bg-slate-50 p-4 rounded-xl">{rev.comment}</p>
               </div>
             ))}
-
-            {reviewTotalPages > 1 && (
-              <div className="flex justify-center gap-2 mt-4">
-                <Button variant="outline" size="sm" onClick={() => fetchReviews(reviewPage - 1)} disabled={reviewPage === 0}>Previous</Button>
-                <span className="text-sm text-gray-500 py-2">{reviewPage + 1} / {reviewTotalPages}</span>
-                <Button variant="outline" size="sm" onClick={() => fetchReviews(reviewPage + 1)} disabled={reviewPage >= reviewTotalPages - 1}>Next</Button>
-              </div>
-            )}
           </div>
         )}
       </Card>

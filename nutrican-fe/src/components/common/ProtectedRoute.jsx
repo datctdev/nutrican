@@ -1,3 +1,4 @@
+// src/components/common/ProtectedRoute.jsx
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 

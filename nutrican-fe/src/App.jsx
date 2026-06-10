@@ -1,3 +1,4 @@
+// src/App.jsx
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import MainLayout from './components/layouts/MainLayout';
