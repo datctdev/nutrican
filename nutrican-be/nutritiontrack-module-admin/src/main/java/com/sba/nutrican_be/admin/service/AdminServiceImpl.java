@@ -3,6 +3,7 @@ package com.sba.nutrican_be.admin.service;
 import com.sba.nutrican_be.admin.dto.AdminDashboardDto;
 import com.sba.nutrican_be.admin.dto.PendingPtDto;
 import com.sba.nutrican_be.admin.dto.PtVerificationRequest;
+import com.sba.nutrican_be.admin.dto.UserAdminDto;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
 import com.sba.nutrican_be.core.entity.PtProfile;
@@ -40,20 +41,21 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse<PageResponse<User>> getUsers(String role, String status, String search, int page, int size) {
+    public ApiResponse<PageResponse<UserAdminDto>> getUsers(String role, String status, String search, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<User> userPage;
 
         if (role != null && status != null) {
-            userPage = userRepository.findByRoleAndStatus(
-                    UserRole.valueOf(role), UserStatus.valueOf(status), pageable);
+            userPage = userRepository.findByRoleAndStatus(UserRole.valueOf(role), UserStatus.valueOf(status), pageable);
         } else if (role != null) {
             userPage = userRepository.findByRole(UserRole.valueOf(role), pageable);
         } else {
             userPage = userRepository.findAll(pageable);
         }
 
-        return ApiResponse.success(PageResponse.from(userPage));
+        Page<UserAdminDto> dtoPage = userPage.map(UserAdminDto::fromEntity);
+
+        return ApiResponse.success(PageResponse.from(dtoPage));
     }
 
     @Override

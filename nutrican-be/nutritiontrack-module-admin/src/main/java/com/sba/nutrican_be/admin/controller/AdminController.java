@@ -3,6 +3,7 @@ package com.sba.nutrican_be.admin.controller;
 import com.sba.nutrican_be.admin.dto.AdminDashboardDto;
 import com.sba.nutrican_be.admin.dto.PendingPtDto;
 import com.sba.nutrican_be.admin.dto.PtVerificationRequest;
+import com.sba.nutrican_be.admin.dto.UserAdminDto;
 import com.sba.nutrican_be.admin.service.AdminService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
@@ -24,12 +25,12 @@ public class AdminController {
     private final AdminService adminService;
 
     @GetMapping("/users")
-    public ResponseEntity<ApiResponse<PageResponse<User>>> getUsers(
-            @RequestParam(required = false) String role,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+    public ResponseEntity<ApiResponse<PageResponse<UserAdminDto>>> getUsers( 
+                                                                             @RequestParam(required = false) String role,
+                                                                             @RequestParam(required = false) String status,
+                                                                             @RequestParam(required = false) String search,
+                                                                             @RequestParam(defaultValue = "0") int page,
+                                                                             @RequestParam(defaultValue = "10") int size) {
         return ResponseEntity.ok(adminService.getUsers(role, status, search, page, size));
     }
 
