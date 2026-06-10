@@ -1,25 +1,15 @@
 // src/pages/customer/ProfilePage.jsx
 import { useState, useEffect, useRef } from 'react';
 import { userService } from '../../services/userService';
-<<<<<<< HEAD
-import { useAuthStore } from '../../stores/authStore';
-import Card from '../../components/ui/card';
-import Input from '../../components/ui/input';
-import Label from '../../components/ui/label';
-import Button from '../../components/ui/button';
-import { Avatar } from '../../components/common/Avatar';
-=======
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
->>>>>>> feature/premium-ui-revamp
 import { toast } from 'sonner';
 import { Loader2, Upload, User, Mail, Phone, MapPin, Target, Flame, Beef, Wheat, Droplet } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
 export default function ProfilePage() {
-  const { user, setUser } = useAuthStore();
-  const fileInputRef = useRef(null);
   const { user: authUser, setUser: setAuthUser } = useAuthStore();
+  const fileInputRef = useRef(null);
   
   const [profile, setProfile] = useState({ fullName: '', email: '', phoneNumber: '', address: '', avatarUrl: '' });
   const [macros, setMacros] = useState({ dailyCalories: 2000, protein: 120, carb: 200, fat: 65 });
@@ -51,10 +41,12 @@ export default function ProfilePage() {
     try {
       const response = await userService.getMacroTarget();
       const data = response.data.data;
-      setMacros({
-        dailyCalories: data.dailyCalories || 2000, protein: data.protein || 120,
-        carb: data.carb || 200, fat: data.fat || 65,
-      });
+      if(data) {
+        setMacros({
+          dailyCalories: data.dailyCalories || 2000, protein: data.protein || 120,
+          carb: data.carb || data.carbs || 200, fat: data.fat || 65,
+        });
+      }
     } catch (error) { toast.error('Failed to load macro targets'); } 
     finally { setIsLoadingMacros(false); }
   };
@@ -109,7 +101,6 @@ export default function ProfilePage() {
     return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
   }
 
-  // Sửa lỗi InputField: Xóa class ghi đè padding, đảm bảo pl-10 (40px) để không bị đè Icon
   const InputField = ({ icon: Icon, label, className = "", ...props }) => (
     <div className="space-y-1.5 w-full">
       <label className="text-sm font-bold text-slate-700">{label}</label>
@@ -131,13 +122,11 @@ export default function ProfilePage() {
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8">
-        {/* Left Column: Personal Info */}
         <div className="lg:col-span-7 space-y-6">
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardContent className="p-8">
               <h3 className="text-xl font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4">Personal Details</h3>
               
-              {/* Avatar Section */}
               <div className="flex items-center gap-6 mb-8">
                 <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                   <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-blue-500 to-indigo-500">
@@ -163,7 +152,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Form */}
               <div className="space-y-5">
                 <InputField icon={User} label="Full Name" value={profile.fullName} onChange={(e) => setProfile(p => ({...p, fullName: e.target.value}))} placeholder="Enter your full name" />
                 <InputField icon={Mail} label="Email Address" type="email" value={profile.email} disabled />
@@ -180,7 +168,6 @@ export default function ProfilePage() {
           </Card>
         </div>
 
-        {/* Right Column: Macro Targets */}
         <div className="lg:col-span-5 space-y-6">
           <Card className="bg-gradient-to-br from-slate-900 to-slate-800 border-slate-800 text-white shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl" />
@@ -201,30 +188,9 @@ export default function ProfilePage() {
                 />
                 
                 <div className="grid grid-cols-3 gap-3">
-                  <InputField 
-                    icon={Beef} 
-                    label={<span className="text-slate-300 text-xs">Protein (g)</span>} 
-                    type="number" 
-                    value={macros.protein} 
-                    onChange={(e) => setMacros(m => ({...m, protein: Number(e.target.value)}))} 
-                    className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" 
-                  />
-                  <InputField 
-                    icon={Wheat} 
-                    label={<span className="text-slate-300 text-xs">Carbs (g)</span>} 
-                    type="number" 
-                    value={macros.carb} 
-                    onChange={(e) => setMacros(m => ({...m, carb: Number(e.target.value)}))} 
-                    className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" 
-                  />
-                  <InputField 
-                    icon={Droplet} 
-                    label={<span className="text-slate-300 text-xs">Fat (g)</span>} 
-                    type="number" 
-                    value={macros.fat} 
-                    onChange={(e) => setMacros(m => ({...m, fat: Number(e.target.value)}))} 
-                    className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" 
-                  />
+                  <InputField icon={Beef} label={<span className="text-slate-300 text-xs">Protein (g)</span>} type="number" value={macros.protein} onChange={(e) => setMacros(m => ({...m, protein: Number(e.target.value)}))} className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" />
+                  <InputField icon={Wheat} label={<span className="text-slate-300 text-xs">Carbs (g)</span>} type="number" value={macros.carb} onChange={(e) => setMacros(m => ({...m, carb: Number(e.target.value)}))} className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" />
+                  <InputField icon={Droplet} label={<span className="text-slate-300 text-xs">Fat (g)</span>} type="number" value={macros.fat} onChange={(e) => setMacros(m => ({...m, fat: Number(e.target.value)}))} className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" />
                 </div>
                 
                 <div className="pt-6">
