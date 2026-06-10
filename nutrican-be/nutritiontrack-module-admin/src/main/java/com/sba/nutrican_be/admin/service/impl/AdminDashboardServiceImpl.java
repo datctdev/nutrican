@@ -22,7 +22,6 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
     private final UserRepository userRepository;
     private final PtProfileRepository ptProfileRepository;
-    private final UserKycRepository userKycRepository;
     private final SOSTicketRepository sosTicketRepository;
 
     @Override
@@ -32,8 +31,6 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         long totalPts = userRepository.findByRole(UserRole.PT_CERTIFIED, PageRequest.of(0, 1)).getTotalElements()
                 + userRepository.findByRole(UserRole.PT_FREELANCE, PageRequest.of(0, 1)).getTotalElements();
         long totalCustomers = userRepository.findByRole(UserRole.CUSTOMER, PageRequest.of(0, 1)).getTotalElements();
-        long pendingKyc = userKycRepository.findByVerificationStatus(
-                UserStatus.PENDING_APPROVAL, PageRequest.of(0, 1)).getTotalElements();
         long pendingPts = ptProfileRepository.findByPtRequestStatus(
                 UserStatus.PENDING_APPROVAL, PageRequest.of(0, 1)).getTotalElements();
         long activeSos = sosTicketRepository.findByStatus(
@@ -44,7 +41,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 .totalCustomers(totalCustomers)
                 .totalPts(totalPts)
                 .pendingPtVerifications(pendingPts)
-                .pendingKycVerifications(pendingKyc)
+                .pendingKycVerifications(0) // KYC được VNPT verify tự động
                 .activeSosTickets(activeSos)
                 .totalDietLogs(0)
                 .averageRating(BigDecimal.valueOf(4.5))
