@@ -964,5 +964,74 @@ npm run dev
 
 ---
 
-*Document Version: 2.0.0*
-*Last Updated: 2026-06-04*
+## 11. Research Data Collection Workflow
+
+Huong dan thu thap du lieu cho nghien cuu CV + RBL. Doc them: [RESEARCH.md](./RESEARCH.md), [RBL_METHODOLOGY.md](./RBL_METHODOLOGY.md).
+
+### 11.1 Prerequisites
+
+- Ollama chay voi `qwen2.5-vl`: `ollama pull qwen2.5-vl && ollama serve`
+- Backend + frontend + PostgreSQL + MinIO dang hoat dong
+- It nhat 1 tai khoan CUSTOMER + 1 PT + 1 ADMIN
+- PT da duoc gan client (`pt_client_mappings`)
+
+### 11.2 Thu thap log CV
+
+1. Dang nhap CUSTOMER → `/diet`
+2. Chon dung **meal source** (HOME_COOKED / RESTAURANT) va **complexity**
+3. Upload anh mon an (< 500KB)
+4. Kiem tra status:
+   - `PT_REVIEWING` — san sang cho PT review
+   - `DRAFT` — confidence thap; customer co the `submit-for-review`
+
+**Tip:** Can doi nhom mau (an nha, nha hang, lau, buffet) de test cohort.
+
+### 11.3 PT labeling
+
+1. Dang nhap PT → `/pt/reviews`
+2. (Tuy chon) Bat blind mode → nhap macro → reveal AI/DB
+3. Review voi APPROVE / ADJUST_MACROS / REJECT
+4. Chon `correctionReason` khi ADJUST hoac REJECT
+
+### 11.4 Export dataset
+
+**Qua UI (Admin):**
+- `/admin` → section RBL Research → Download CSV / Report
+
+**Qua API:**
+```bash
+# Stats
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/api/v1/admin/rbl/stats"
+
+# Export CSV
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8080/api/v1/admin/rbl/export?cvOnly=true" \
+  -o rbl_export.csv
+```
+
+### 11.5 Phan tich Python
+
+```bash
+pip install pandas
+python -c "
+import pandas as pd
+df = pd.read_csv('rbl_export.csv', comment='#')
+labeled = df[df['pt_action'].isin(['APPROVE', 'ADJUST_MACROS'])]
+print('n=', len(labeled))
+print('MAE kcal:', (labeled['ai_cal'] - labeled['pt_cal']).abs().mean())
+"
+```
+
+### 11.6 Checklist truoc khi viet Results (luận văn)
+
+- [ ] ≥ 30 labeled CV samples (`insufficientSample = false`)
+- [ ] Ghi `model_version`, `prompt_version`, `food_db_version` tu CSV header
+- [ ] Bao cao MAE theo cohort va meal_source
+- [ ] Neu dung blind mode: so sanh `blindVsAiMae`
+- [ ] Ghi nhan limitations (xem RESEARCH.md §9)
+
+---
+
+*Document Version: 2.1.0*
+*Last Updated: 2026-06-12*

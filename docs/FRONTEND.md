@@ -402,6 +402,8 @@ export const workspaceService = {
   getClients: (params) => api.get('/workspace/clients', { params }),
   getPendingLogs: (params) => api.get('/workspace/diet-logs/pending', { params }),
   reviewLog: (id, data) => api.put(`/workspace/diet-logs/${id}/review`, data),
+  submitBlindEstimate: (logId, data) => api.put(`/workspace/diet-logs/${logId}/blind-estimate`, data),
+  getPtRblStats: () => api.get('/workspace/rbl/stats'),
   getClientProgress: (clientId, params) => api.get(`/workspace/progress/${clientId}`, { params }),
   assignClient: (clientId) => api.post(`/workspace/clients/${clientId}/assign`),
   getStats: () => api.get('/workspace/stats'),
@@ -416,6 +418,11 @@ export const adminService = {
   getSosTickets: (params) => api.get('/admin/sos-tickets', { params }),
   assignSosTicket: (ticketId, data) => api.put(`/admin/sos-tickets/${ticketId}/assign`, data),
   getStats: () => api.get('/admin/stats'),
+  // RBL Research
+  getRblStats: (params) => api.get('/admin/rbl/stats', { params }),
+  getRblExportPreview: (params) => api.get('/admin/rbl/export/preview', { params }),
+  downloadRblExport: (params) => api.get('/admin/rbl/export', { params, responseType: 'blob' }),
+  getRblReport: (params) => api.get('/admin/rbl/report', { params, responseType: 'text' }),
 };
 ```
 
@@ -632,5 +639,55 @@ SSE events not being received.
 
 ---
 
-*Document Version: 2.1.0*
-*Last Updated: 2026-06-11*
+## 12. Research & RBL UI
+
+Giao dien ho tro thu thap ground truth cho nghien cuu Computer Vision. Chi tiet nghiep vu: [RESEARCH.md](./RESEARCH.md), [RBL_METHODOLOGY.md](./RBL_METHODOLOGY.md).
+
+### 12.1 Customer — Diet Tracker (`/diet`)
+
+**File:** `src/pages/customer/DietTrackerPage.jsx`
+
+| UI element | Research purpose |
+|------------|------------------|
+| Image upload | Input CV dataset |
+| Meal source selector | HOME_COOKED vs RESTAURANT cohort |
+| Meal complexity | SIMPLE / HOTPOT / COMPOSITE |
+| Hotpot / buffet multi-select | Hybrid DB macro path |
+| Submit for review (DRAFT) | Dua log vao PT queue |
+
+Analyze gọi `dietService.analyzeMeal(formData)` → `POST /diet/logs/analyze`.
+
+### 12.2 PT — Review Diet Logs (`/pt/reviews`)
+
+**File:** `src/pages/pt/ReviewDietLogPage.jsx`
+
+**RBL stats bar** (top of page): `workspaceService.getPtRblStats()` hiển thị:
+- `totalReviewed`, `totalLabeledCv`, `maeAiCalories`, `adjustRate`
+
+**Review columns** (side-by-side):
+- AI prediction (`aiPredictedMacros`)
+- DB / hybrid (`dbMatchedMacros`)
+- Shown to client (`macrosJson`)
+
+**Blind mode workflow:**
+1. PT bấm **Blind mode** trên một log pending
+2. Nhập calories/protein/carb/fat (ẩn AI/DB)
+3. **Save & reveal AI/DB** → `submitBlindEstimate`
+4. Hoàn tất APPROVE / ADJUST_MACROS / REJECT + `correctionReason`
+
+### 12.3 Admin — RBL Dashboard (`/admin`)
+
+**File:** `src/pages/admin/AdminDashboardPage.jsx`
+
+Section **RBL Research (CV + PT Ground Truth)**:
+- Stats cards: reviewed count, labeled CV, MAE calories, restaurant adjust rate
+- Warning khi `insufficientSample` (< 30 mẫu)
+- Calibration buckets table
+- **Download CSV** → `downloadRblExport({ cvOnly: true })`
+- **Download Report** → `getRblReport()` (Markdown)
+- **Refresh stats**
+
+---
+
+*Document Version: 2.2.0*
+*Last Updated: 2026-06-12*
