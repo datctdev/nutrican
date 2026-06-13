@@ -1599,7 +1599,7 @@ Returns row count and sample rows for labeled CV dataset.
 
 **Query Parameters:** Same as preview, plus optional `mealSource`, `recognitionSource`.
 
-**Response:** `text/csv` attachment with columns including `delta_ai_*`, `experiment_cohort`, `prompt_version`, `customer_hash`, `image_object_name`, `pt_blind_macros`, `diet_log_items_json`. No raw customer names (PII anonymized).
+**Response:** `text/csv` attachment. First line: `# food_db_version=v2-60`. Full column list: see [RBL_METHODOLOGY.md §6](./RBL_METHODOLOGY.md#6-csv-export-schema). No raw customer names (PII anonymized via `customer_id_hash`).
 
 ---
 

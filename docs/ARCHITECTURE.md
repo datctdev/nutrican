@@ -598,7 +598,20 @@ Client (Upload Image)  →  Backend  →  MinIO (store image)
 | Base URL | `http://localhost:11434` | Ollama endpoint |
 | Temperature (Meal) | 0.1 | Low for consistent nutrition data |
 | Temperature (Chat) | 0.7 | Balanced creativity |
+| Confidence threshold | 0.6 | Below → DRAFT status |
 | Fallback | 300 cal, 15g protein | Default when AI fails |
+| Reproducibility | `model_version`, `prompt_version` | Stored per diet log |
+
+### 7.3 Hybrid CV → Food DB Flow
+
+```
+VLM (foodName + macros) → FoodCatalogService.findBestMatch()
+                        → db_matched_macros snapshot (always if match)
+                        → if confidence ≥ 0.6: apply HYBRID to macros_json
+                        → RblCohortUtil.resolve() → experiment_cohort
+```
+
+See [RBL_METHODOLOGY.md §4](./RBL_METHODOLOGY.md#4-hybrid-cv--food-db-matching) and [RESEARCH.md](./RESEARCH.md).
 
 ---
 
@@ -710,5 +723,5 @@ services:
 
 ---
 
-*Document Version: 2.1.0*
-*Last Updated: 2026-06-11*
+*Document Version: 2.2.0*
+*Last Updated: 2026-06-12*

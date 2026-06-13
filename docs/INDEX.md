@@ -20,12 +20,17 @@ Muc luc toan bo tai lieu du an NutriCan PT.
 | [DATABASE_SCHEMA](./DATABASE_SCHEMA.md) | Thiet ke database, ERD |
 | [FEATURES](./FEATURES.md) | Mo ta tinh nang chi tiet |
 
+### Nghien Cuu (Computer Vision + RBL)
+| Tai lieu | Mo ta |
+|-----------|--------|
+| [RESEARCH](./RESEARCH.md) | Tong quan nghien cuu CV, RQ, limitations, workflow |
+| [RBL_METHODOLOGY](./RBL_METHODOLOGY.md) | Pipeline ground truth, MAE, hybrid matching, CSV export |
+
 ### Trien Khai & Phat Trien
 | Tai lieu | Mo ta |
 |-----------|--------|
 | [DEPLOYMENT](./DEPLOYMENT.md) | Huong dan trien khai |
-| [DEVELOPMENT](./DEVELOPMENT.md) | Huong dan phat trien |
-| [RBL_METHODOLOGY](./RBL_METHODOLOGY.md) | Research Baseline Layer methodology |
+| [DEVELOPMENT](./DEVELOPMENT.md) | Huong dan phat trien (co workflow thu thap du lieu RBL) |
 
 ---
 
@@ -140,5 +145,5 @@ npm run dev
 
 ---
 
-*Document Version: 2.1.0*
-*Last Updated: 2026-06-11*
+*Document Version: 2.2.0*
+*Last Updated: 2026-06-12*

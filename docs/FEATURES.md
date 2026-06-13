@@ -50,9 +50,11 @@ User (Upload)  →  Backend Service  →  MinIO (Storage)
 
 ### 2.4 AI Prompt
 
-**System Prompt:**
+**System prompt** (stored in `MealRecognitionServiceImpl`; hash saved as `prompt_version` on each log):
+
 ```
-You are a nutritional analysis assistant. Analyze the meal image and provide nutritional information.
+You are a nutritional analysis assistant specialized in food recognition.
+Analyze the meal image and provide nutritional information.
 Respond ONLY with valid JSON in this exact format:
 {
   "foodName": "name of the food",
@@ -60,12 +62,23 @@ Respond ONLY with valid JSON in this exact format:
   "portionUnit": "grams",
   "calories": estimated calories,
   "protein": protein in grams,
-  "carb": carbohydrates in grams,
+  "carbs": carbohydrates in grams,
   "fat": fat in grams,
   "confidenceScore": confidence between 0.0 and 1.0,
+  "mealComplexity": "SIMPLE or COMPOSITE or HOTPOT",
+  "detectedItems": [{"name": "item name", "estimatedGrams": number}],
+  "uncertaintyReasons": ["reason if any"],
   "fallback": true if you're uncertain,
   "message": "brief message if needed"
 }
+```
+
+**User prompt** (appended per request):
+```
+Analyze this food image and provide nutritional information for a {mealType} meal.
+Context: mealSource={mealSource}, mealComplexity={mealComplexity}.
+Estimate portion size and macros accurately. Be specific about the food type.
+For HOTPOT meals, list detectedItems separately. Respond ONLY with valid JSON.
 ```
 
 ### 2.5 Confidence Scoring
@@ -229,7 +242,7 @@ Customer upload → VLM analyze → Food DB match → snapshots frozen
 - Checkbox "Buffet / nhiều món" on restaurant analyze (mirrors hotpot multi-select)
 - `mealComplexity=COMPOSITE` with `compositeItemIds` / `compositePortions`
 
-See `docs/RBL_METHODOLOGY.md` for export filters, cohort rules, and thesis workflow.
+See [RESEARCH.md](./RESEARCH.md) for research overview and [RBL_METHODOLOGY.md](./RBL_METHODOLOGY.md) for export filters, cohort rules, and thesis workflow.
 
 ---
 
@@ -475,5 +488,5 @@ Login → View Dashboard → Verify PT (KYC + docs) → Assign SOS Tickets → M
 
 ---
 
-*Document Version: 2.0.0*
-*Last Updated: 2026-06-04*
+*Document Version: 2.1.0*
+*Last Updated: 2026-06-12*
