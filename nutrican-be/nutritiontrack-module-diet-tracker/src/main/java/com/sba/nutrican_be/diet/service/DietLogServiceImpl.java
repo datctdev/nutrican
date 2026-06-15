@@ -144,14 +144,14 @@ public class DietLogServiceImpl implements DietLogService {
                 throw new BadRequestException("restaurantName is required when mealSource is RESTAURANT");
             }
 
-            String objectName = minioService.uploadFile(file, "diet-logs/" + customerId);
-            String imageUrl = minioService.getPresignedUrl(objectName);
-
             MealRecognitionResult aiResult = mealRecognitionService.recognizeMealFromFile(
                     file,
                     ctx.getMealType(),
                     mealSource.name(),
                     mealComplexity.name());
+
+            String objectName = minioService.uploadFile(file, "diet-logs/" + customerId);
+            String imageUrl = minioService.getPresignedUrl(objectName);
 
             User customer = userRepository.findById(customerId)
                     .orElseThrow(() -> new ResourceNotFoundException("User", customerId));

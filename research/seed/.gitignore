@@ -1,0 +1,7 @@
+# Do not commit personal meal photos
+images/*
+!images/.gitkeep
+
+# Local run artifacts
+../output/*.csv
+../output/*.json

@@ -267,6 +267,9 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
         if (reasonsObj instanceof List<?> list) {
             uncertaintyReasons = list.stream().map(Object::toString).toList();
         }
+        BigDecimal confidenceScore = toBdOrDefault(nutrition.get("confidenceScore"), 0.5);
+        boolean fallback = Boolean.TRUE.equals(nutrition.get("fallback"))
+                && confidenceScore.compareTo(new BigDecimal("0.6")) < 0;
         return MealRecognitionResult.builder()
                 .foodName(getString(nutrition, "foodName", "Unknown Food"))
                 .portionSize(toBd(nutrition.get("portionSize")))
@@ -275,8 +278,8 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
                 .protein(toBd(nutrition.get("protein")))
                 .carbs(toBd(nutrition.get("carbs")))
                 .fat(toBd(nutrition.get("fat")))
-                .confidenceScore(toBdOrDefault(nutrition.get("confidenceScore"), 0.5))
-                .fallback(Boolean.TRUE.equals(nutrition.get("fallback")))
+                .confidenceScore(confidenceScore)
+                .fallback(fallback)
                 .message(getString(nutrition, "message", ""))
                 .mealComplexityFromAi(getString(nutrition, "mealComplexity", null))
                 .detectedItems(detectedItems)

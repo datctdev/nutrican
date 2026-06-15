@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin/rbl")
@@ -22,6 +23,11 @@ import java.util.List;
 public class RblAdminController {
 
     private final RblAdminService rblAdminService;
+
+    @GetMapping("/logs/{logId}")
+    public ResponseEntity<ApiResponse<RblExportRowDto>> getLogSnapshot(@PathVariable UUID logId) {
+        return ResponseEntity.ok(rblAdminService.getLogSnapshot(logId));
+    }
 
     @GetMapping("/export/preview")
     public ResponseEntity<ApiResponse<List<RblExportRowDto>>> exportPreview(

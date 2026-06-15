@@ -12,7 +12,16 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
   const [rblStats, setRblStats] = useState(null);
   const [rblPreview, setRblPreview] = useState(null);
+  const [rblFrom, setRblFrom] = useState('');
+  const [rblTo, setRblTo] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const rblParams = () => {
+    const p = { cvOnly: true };
+    if (rblFrom) p.from = rblFrom;
+    if (rblTo) p.to = rblTo;
+    return p;
+  };
 
   useEffect(() => { fetchStats(); fetchRbl(); }, []);
 
@@ -30,9 +39,10 @@ export default function AdminDashboardPage() {
 
   const fetchRbl = async () => {
     try {
+      const params = rblParams();
       const [statsRes, previewRes] = await Promise.all([
-        adminService.getRblStats({}),
-        adminService.getRblExportPreview({ cvOnly: true }),
+        adminService.getRblStats(params),
+        adminService.getRblExportPreview(params),
       ]);
       setRblStats(statsRes.data.data);
       setRblPreview(previewRes.data);
@@ -43,7 +53,7 @@ export default function AdminDashboardPage() {
 
   const handleDownloadRbl = async () => {
     try {
-      const res = await adminService.downloadRblExport({ cvOnly: true });
+      const res = await adminService.downloadRblExport(rblParams());
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
       a.href = url;
@@ -57,7 +67,7 @@ export default function AdminDashboardPage() {
 
   const handleDownloadReport = async () => {
     try {
-      const res = await adminService.getRblReport({});
+      const res = await adminService.getRblReport(rblParams());
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/markdown' }));
       const a = document.createElement('a');
       a.href = url;
@@ -220,7 +230,8 @@ export default function AdminDashboardPage() {
             <h3 className="text-xl font-bold text-slate-900">RBL Research (CV + PT Ground Truth)</h3>
           </div>
           {rblStats ? (
-            <div className="grid md:grid-cols-4 gap-4 mb-6">
+            <>
+            <div className="grid md:grid-cols-4 gap-4 mb-4">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <p className="text-xs font-bold text-slate-500 uppercase">Reviewed logs</p>
                 <p className="text-2xl font-black text-slate-900">{rblStats.totalReviewed}</p>
@@ -230,7 +241,7 @@ export default function AdminDashboardPage() {
                 <p className="text-2xl font-black text-slate-900">{rblStats.totalLabeledCv}</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-xs font-bold text-slate-500 uppercase">MAE AI (kcal)</p>
+                <p className="text-xs font-bold text-slate-500 uppercase">MAE A1.0 (AI kcal)</p>
                 <p className="text-2xl font-black text-indigo-600">{rblStats.maeAiCalories}</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -241,6 +252,29 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
             </div>
+            <div className="grid md:grid-cols-4 gap-4 mb-6">
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <p className="text-xs font-bold text-emerald-700 uppercase">MAE A1.1 (DB kcal)</p>
+                <p className="text-2xl font-black text-emerald-700">{rblStats.maeDbCalories ?? '—'}</p>
+              </div>
+              <div className="p-4 bg-violet-50 rounded-2xl border border-violet-100">
+                <p className="text-xs font-bold text-violet-700 uppercase">ΔA (A1.0 − A1.1)</p>
+                <p className="text-2xl font-black text-violet-700">
+                  {rblStats.maeAiCalories != null && rblStats.maeDbCalories != null
+                    ? (Number(rblStats.maeAiCalories) - Number(rblStats.maeDbCalories)).toFixed(1)
+                    : '—'}
+                </p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase">MAE AI_ONLY</p>
+                <p className="text-2xl font-black text-slate-700">{rblStats.maeByRecognitionSource?.AI_ONLY ?? '—'}</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase">MAE HYBRID</p>
+                <p className="text-2xl font-black text-slate-700">{rblStats.maeByRecognitionSource?.HYBRID ?? '—'}</p>
+              </div>
+            </div>
+            </>
           ) : (
             <p className="text-sm text-slate-500 mb-4">No reviewed logs yet — collect PT reviews to populate RBL metrics.</p>
           )}
@@ -248,6 +282,27 @@ export default function AdminDashboardPage() {
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4">
               Sample size &lt; 30 — collect more reviewed CV logs before writing Results.
             </p>
+          )}
+          {rblStats?.cohortCounts && Object.keys(rblStats.cohortCounts).length > 0 && (
+            <div className="mb-6 overflow-x-auto">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Cohort distribution (target: ≥8 HOME, ≥8 REST, ≥4 HOTPOT, ≥4 COMPOSITE)</p>
+              <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold text-slate-600">Cohort</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-600">Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(rblStats.cohortCounts).map(([cohort, count]) => (
+                    <tr key={cohort} className="border-t border-slate-100">
+                      <td className="px-3 py-2">{cohort}</td>
+                      <td className="px-3 py-2 text-right">{count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           {rblStats?.calibrationBuckets && Object.keys(rblStats.calibrationBuckets).length > 0 && (
             <div className="mb-6 overflow-x-auto">
@@ -272,6 +327,17 @@ export default function AdminDashboardPage() {
               </table>
             </div>
           )}
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">From</label>
+              <input type="date" value={rblFrom} onChange={(e) => setRblFrom(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">To</label>
+              <input type="date" value={rblTo} onChange={(e) => setRblTo(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+            </div>
+            <Button variant="outline" onClick={fetchRbl} className="rounded-xl border-slate-200 h-10">Apply dates</Button>
+          </div>
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleDownloadRbl} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
               <Download className="w-4 h-4 mr-2" /> Download CSV

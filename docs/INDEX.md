@@ -25,6 +25,16 @@ Muc luc toan bo tai lieu du an NutriCan PT.
 |-----------|--------|
 | [RESEARCH](./RESEARCH.md) | Tong quan nghien cuu CV, RQ, limitations, workflow |
 | [RBL_METHODOLOGY](./RBL_METHODOLOGY.md) | Pipeline ground truth, MAE, hybrid matching, CSV export |
+| [research/KE_HOACH](./research/KE_HOACH.md) | Ke hoach Improve 2.2, A1.0/A1.1, script phan tich |
+| [research/PAPER1_JELODAR_SUN](./research/PAPER1_JELODAR_SUN.md) | Paper 1 summary (arXiv 2112.09839) |
+| [research/LO_TRINH](./research/LO_TRINH.md) | Lo trinh G0–G5 hanh dong |
+| [research/G0_VERIFICATION](./research/G0_VERIFICATION.md) | Checklist xac minh ky thuat |
+| [research/DATA_COLLECTION_SOP](./research/DATA_COLLECTION_SOP.md) | SOP thu du lieu G2 |
+| [research/PT_LABELING_SOP](./research/PT_LABELING_SOP.md) | SOP PT label G3 |
+| [research/OPS_CHECKLIST](./research/OPS_CHECKLIST.md) | Checklist team thu + label |
+| [research/THESIS_OUTLINE](./research/THESIS_OUTLINE.md) | Dàn bai luan van |
+
+**Trang thai research (2026-06-14):** G0 pass · G2/G3 seed **30/30** xong · san sang G4 export/analyze
 
 ### Trien Khai & Phat Trien
 | Tai lieu | Mo ta |

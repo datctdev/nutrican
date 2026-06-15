@@ -25,7 +25,20 @@ NutriCan giai quyet bang cach:
 
 ---
 
-## 2. Cau hoi nghien cuu (Research Questions)
+## 2. Anh xa A1.0 / A1.1 / ΔA (Improve 2.2)
+
+| Khai niem | NutriCan | CSV field |
+|-----------|----------|-----------|
+| **A1.0** baseline (VLM truc tiep) | `ai_predicted_macros` | `ai_cal/pro/carb/fat` |
+| **A1.1** cai tien (grounding DB) | `db_matched_macros` | `db_cal/pro/carb/fat` |
+| Ground truth | PT APPROVE/ADJUST | `pt_cal/pro/carb/fat` |
+| **ΔA** | Giam sai so nho grounding | `mean(delta_ai_cal) − mean(delta_db_cal)` |
+
+Chi tiet: [research/KE_HOACH.md](./research/KE_HOACH.md) §2.
+
+---
+
+## 3. Cau hoi nghien cuu (Research Questions)
 
 | ID | Cau hoi | Metric chinh |
 |----|---------|--------------|
@@ -40,7 +53,7 @@ Bang gia thuyet chi tiet: [RBL_METHODOLOGY.md §8](./RBL_METHODOLOGY.md#8-hypoth
 
 ---
 
-## 3. Pham vi Computer Vision
+## 4. Pham vi Computer Vision
 
 ### 3.1 Du an lam gi
 
@@ -79,7 +92,7 @@ Chi tiet thuat toan: [RBL_METHODOLOGY.md §4](./RBL_METHODOLOGY.md#4-hybrid-cv--
 
 ---
 
-## 4. Research Baseline Layer (RBL)
+## 5. Research Baseline Layer (RBL)
 
 RBL la lop nghien cuu **bat bien** — dong bang prediction tai thoi diem `analyzeMeal` de PT review tao nhan do duoc.
 
@@ -102,7 +115,7 @@ Pipeline day du: [RBL_METHODOLOGY.md](./RBL_METHODOLOGY.md).
 
 ---
 
-## 5. Experiment Cohorts
+## 6. Experiment Cohorts
 
 Gan tai `analyzeMeal` qua `RblCohortUtil`:
 
@@ -119,7 +132,7 @@ Gan tai `analyzeMeal` qua `RblCohortUtil`:
 
 ---
 
-## 6. Metrics & Evaluation
+## 7. Metrics & Evaluation
 
 ### 6.1 Primary metrics
 
@@ -148,7 +161,7 @@ Tuong tu cho protein, carb, fat (tinh trong Python tu CSV export).
 
 ---
 
-## 7. Dataset Export
+## 8. Dataset Export
 
 Admin tai dataset qua:
 - `GET /api/v1/admin/rbl/export` — CSV
@@ -163,7 +176,7 @@ Schema CSV day du: [RBL_METHODOLOGY.md §6](./RBL_METHODOLOGY.md#6-csv-export-sc
 
 ---
 
-## 8. Workflow thu thap du lieu
+## 9. Workflow thu thap du lieu
 
 ### Buoc 1 — Chuan bi moi truong
 ```bash
@@ -192,7 +205,7 @@ Chi tiet dev workflow: [DEVELOPMENT.md §11](./DEVELOPMENT.md#11-research-data-c
 
 ---
 
-## 9. Limitations (Han che)
+## 10. Limitations (Han che)
 
 | Han che | Anh huong |
 |---------|-----------|
@@ -206,7 +219,7 @@ Chi tiet dev workflow: [DEVELOPMENT.md §11](./DEVELOPMENT.md#11-research-data-c
 
 ---
 
-## 10. Ethics & Privacy
+## 11. Ethics & Privacy
 
 - Anh mon an luu MinIO, chi admin export `image_object_name` (khong URL public trong CSV)
 - PII anonymize: hash customer ID, khong export ho ten/email
@@ -215,7 +228,7 @@ Chi tiet dev workflow: [DEVELOPMENT.md §11](./DEVELOPMENT.md#11-research-data-c
 
 ---
 
-## 11. Related Work (tham khao)
+## 12. Related Work (tham khao)
 
 | Huong | Vi du | Khac biet voi NutriCan |
 |-------|-------|------------------------|
@@ -226,7 +239,7 @@ Chi tiet dev workflow: [DEVELOPMENT.md §11](./DEVELOPMENT.md#11-research-data-c
 
 ---
 
-## 12. Reproducibility Checklist
+## 13. Reproducibility Checklist
 
 Truoc khi bao cao ket qua, ghi ro:
 
@@ -240,7 +253,7 @@ Truoc khi bao cao ket qua, ghi ro:
 
 ---
 
-## 13. UI lien quan nghien cuu
+## 14. UI lien quan nghien cuu
 
 | Route | Vai tro | Chuc nang RBL |
 |-------|---------|---------------|

@@ -147,8 +147,10 @@ First line is a metadata comment:
 | `fields_changed` | string | Comma-separated macro fields PT changed |
 | `customer_id_hash` | string | SHA-256 anonymized customer ID |
 | `image_object_name` | string | MinIO object key (stable image reference) |
-
-> `pt_blind_macros` is stored in DB and included in stats API; extend CSV export if needed for blind-analysis scripts.
+| `ai_portion_g` | decimal | VLM portion from `ai_raw_json.portionSize` |
+| `db_applied` | boolean | Whether hybrid macros were applied to client view |
+| `blind_cal`, `blind_pro`, `blind_carb`, `blind_fat` | decimal | PT blind estimate (R5) |
+| `diet_log_items_json` | JSON string | Hotpot/composite line items |
 
 ## 7. Export Filters (`RblDatasetFilter`)
 

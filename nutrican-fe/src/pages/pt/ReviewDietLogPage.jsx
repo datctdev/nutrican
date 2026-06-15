@@ -296,7 +296,7 @@ export default function ReviewDietLogPage() {
                             {log.mealType} • {log.logDate ? new Date(log.logDate).toLocaleDateString() : 'Today'}
                             {log.mealSource && ` • ${log.mealSource === 'HOME_COOKED' ? 'Tự nấu' : 'Ăn ngoài'}`}
                           </p>
-                          {(log.restaurantName || log.aiConfidenceScore != null) && (
+                          {(!blindMode[log.id] || blindRevealed[log.id] || log.blindSubmitted) && (log.restaurantName || log.aiConfidenceScore != null) && (
                             <p className="text-xs text-slate-500 mt-1">
                               {log.restaurantName && <span>📍 {log.restaurantName}</span>}
                               {log.aiConfidenceScore != null && (
@@ -312,7 +312,7 @@ export default function ReviewDietLogPage() {
                     <div className="mt-5 p-5 bg-slate-50 rounded-2xl border border-slate-100">
                       <div className="flex flex-wrap items-center gap-2 mb-3">
                         <p className="text-slate-800 font-bold text-lg capitalize flex-1">{log.foodDescription || 'Meal Log'}</p>
-                        {log.experimentCohort && (
+                        {(!blindMode[log.id] || blindRevealed[log.id] || log.blindSubmitted) && log.experimentCohort && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{log.experimentCohort}</span>
                         )}
                         <Button size="sm" variant="outline" onClick={() => setBlindMode((p) => ({ ...p, [log.id]: !p[log.id] }))} className="text-xs h-7 rounded-lg">
@@ -331,17 +331,19 @@ export default function ReviewDietLogPage() {
                           <Button size="sm" onClick={() => handleBlindSubmit(log.id)} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg h-8 text-xs">Save & reveal AI/DB</Button>
                         </div>
                       ) : (
+                        <>
                         <div className="grid grid-cols-3 gap-3 mb-2">
                           <MacroCol label="AI Prediction" macros={log.aiPredictedMacros} color="bg-purple-50 border-purple-100" />
                           <MacroCol label="DB/Hybrid" macros={log.dbMatchedMacros} color="bg-emerald-50 border-emerald-100" />
                           <MacroCol label="Shown to client" macros={log.macrosJson} color="bg-white border-slate-200" />
                         </div>
-                      )}
-                      {(log.modelVersion || log.matchedFoodName) && (
+                        {(log.modelVersion || log.matchedFoodName) && (
                         <p className="text-[10px] text-slate-400 mt-1">
                           {log.modelVersion && <>Model: {log.modelVersion}</>}
                           {log.matchedFoodName && <> • DB match: {log.matchedFoodName} (score {log.dbMatchScore ?? 'N/A'})</>}
                         </p>
+                      )}
+                        </>
                       )}
                     </div>
 

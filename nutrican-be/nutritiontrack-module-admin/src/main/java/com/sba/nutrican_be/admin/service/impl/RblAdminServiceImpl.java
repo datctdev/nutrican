@@ -5,6 +5,7 @@ import com.sba.nutrican_be.admin.dto.RblExportRowDto;
 import com.sba.nutrican_be.admin.dto.RblStatsResponse;
 import com.sba.nutrican_be.admin.service.RblAdminService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
+import com.sba.nutrican_be.core.exception.ResourceNotFoundException;
 import com.sba.nutrican_be.core.entity.DietLog;
 import com.sba.nutrican_be.core.entity.DietLogItem;
 import com.sba.nutrican_be.core.entity.SOSTicket;
@@ -51,6 +52,14 @@ public class RblAdminServiceImpl implements RblAdminService {
 
     @Override
     @Transactional(readOnly = true)
+    public ApiResponse<RblExportRowDto> getLogSnapshot(UUID logId) {
+        DietLog log = dietLogRepository.findByIdWithCustomer(logId)
+                .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
+        return ApiResponse.success(toExportRow(log));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public ApiResponse<byte[]> exportCsv(LocalDate from, LocalDate to, MealSource mealSource,
                                           RecognitionSource recognitionSource, boolean cvOnly, boolean includeRejected) {
         LocalDate start = from != null ? from : LocalDate.now().minusMonths(1);
@@ -61,7 +70,8 @@ public class RblAdminServiceImpl implements RblAdminService {
         csv.append("log_id,log_date,meal_source,meal_complexity,recognition_source,experiment_cohort,ai_confidence,db_match_score,");
         csv.append("model_version,prompt_version,ai_food_name,db_food_name,ai_cal,ai_pro,ai_carb,ai_fat,db_cal,db_pro,db_carb,db_fat,");
         csv.append("pt_cal,pt_pro,pt_carb,pt_fat,delta_ai_cal,delta_db_cal,pt_action,pt_correction_reason,pt_reviewed_at,");
-        csv.append("sos_ticket_flag,sos_reason_code,fields_changed,customer_id_hash,image_object_name\n");
+        csv.append("sos_ticket_flag,sos_reason_code,fields_changed,customer_id_hash,image_object_name,");
+        csv.append("ai_portion_g,db_applied,blind_cal,blind_pro,blind_carb,blind_fat,diet_log_items_json\n");
         for (RblExportRowDto r : rows) {
             csv.append(r.getLogId()).append(',');
             csv.append(r.getLogDate()).append(',');
@@ -96,7 +106,14 @@ public class RblAdminServiceImpl implements RblAdminService {
             csv.append(safe(r.getSosReasonCode())).append(',');
             csv.append(safe(r.getFieldsChanged())).append(',');
             csv.append(safe(r.getCustomerIdHash())).append(',');
-            csv.append(safe(r.getImageObjectName())).append('\n');
+            csv.append(safe(r.getImageObjectName())).append(',');
+            csv.append(r.getAiPortionG() != null ? r.getAiPortionG().toPlainString() : "").append(',');
+            csv.append(r.getDbApplied() != null ? r.getDbApplied() : "").append(',');
+            csv.append(macro(r.getPtBlindMacros(), "calories")).append(',');
+            csv.append(macro(r.getPtBlindMacros(), "protein")).append(',');
+            csv.append(macro(r.getPtBlindMacros(), "carbs")).append(',');
+            csv.append(macro(r.getPtBlindMacros(), "fat")).append(',');
+            csv.append(csvJson(r.getDietLogItemsJson())).append('\n');
         }
         return ApiResponse.success(csv.toString().getBytes(StandardCharsets.UTF_8), "Exported " + rows.size() + " rows");
     }
@@ -111,23 +128,40 @@ public class RblAdminServiceImpl implements RblAdminService {
     @Transactional(readOnly = true)
     public ApiResponse<String> generateReport(LocalDate from, LocalDate to) {
         RblStatsResponse stats = buildStats(loadReviewed(from, to), loadReviewed(from, to));
+        BigDecimal maeAi = stats.getMaeAiCalories() != null ? stats.getMaeAiCalories() : BigDecimal.ZERO;
+        BigDecimal maeDb = stats.getMaeDbCalories() != null ? stats.getMaeDbCalories() : BigDecimal.ZERO;
+        BigDecimal deltaA = maeAi.subtract(maeDb);
+
         StringBuilder md = new StringBuilder();
         md.append("# NutriCan RBL Research Report\n\n");
         md.append("## Summary\n");
         md.append("- Total reviewed: ").append(stats.getTotalReviewed()).append("\n");
         md.append("- CV labeled samples: ").append(stats.getTotalLabeledCv()).append("\n");
-        md.append("- MAE AI calories: ").append(stats.getMaeAiCalories()).append("\n");
-        md.append("- MAE DB calories: ").append(stats.getMaeDbCalories()).append("\n");
         md.append("- Insufficient sample (<30): ").append(stats.isInsufficientSample()).append("\n\n");
+
+        md.append("## A1.0 vs A1.1 (Improve claim)\n\n");
+        md.append("| Model | Role | MAE (kcal) |\n");
+        md.append("|-------|------|------------|\n");
+        md.append("| A1.0 | VLM direct (`ai_predicted_macros`) | ").append(maeAi).append(" |\n");
+        md.append("| A1.1 | Hybrid CV→DB (`db_matched_macros`) | ").append(maeDb).append(" |\n");
+        md.append("| **ΔA** | A1.0 − A1.1 (positive = hybrid helps) | **").append(deltaA).append("** |\n\n");
+        md.append("> Paper 1 reference (Tupc vs Tcalorie): ΔA ≈ 115 kcal, MAE% ≈ 37.5%. ");
+        md.append("Different dataset/domain — magnitude reference only, not direct comparison.\n\n");
+
         md.append("## Adjust rate by meal source\n");
         if (stats.getAdjustRateByMealSource() != null) {
             stats.getAdjustRateByMealSource().forEach((k, v) ->
                     md.append("- ").append(k).append(": ").append(String.format("%.1f%%", v * 100)).append("\n"));
         }
+        if (stats.getCohortCounts() != null && !stats.getCohortCounts().isEmpty()) {
+            md.append("\n## Cohort counts (labeled CV)\n");
+            stats.getCohortCounts().forEach((k, v) -> md.append("- ").append(k).append(": ").append(v).append("\n"));
+        }
         md.append("\n## Hypothesis checklist\n");
-        md.append("- [ ] Restaurant MAE > Home MAE\n");
-        md.append("- [ ] Hybrid MAE < AI-only MAE\n");
-        md.append("- [ ] High confidence → lower adjust rate\n");
+        md.append("- [ ] H1: ΔA > 0 (A1.1 MAE < A1.0 MAE)\n");
+        md.append("- [ ] H2: High db_match_score → lower MAE\n");
+        md.append("- [ ] H3: COMPOSITE/HOTPOT benefit most from grounding\n");
+        md.append("- [ ] H4: RESTAURANT MAE > HOME_COOKED\n");
         return ApiResponse.success(md.toString(), "Report generated");
     }
 
@@ -167,6 +201,18 @@ public class RblAdminServiceImpl implements RblAdminService {
             sosReason = tickets.get(0).getReasonCode();
         }
         String fieldsChanged = MacroUtils.fieldsChanged(log.getMacrosAtReview(), log.getPtAdjustedMacros());
+        BigDecimal aiPortionG = null;
+        Boolean dbApplied = null;
+        if (log.getAiRawJson() != null) {
+            Object portion = log.getAiRawJson().get("portionSize");
+            if (portion instanceof Number n) {
+                aiPortionG = BigDecimal.valueOf(n.doubleValue());
+            }
+            Object applied = log.getAiRawJson().get("db_applied");
+            if (applied instanceof Boolean b) {
+                dbApplied = b;
+            }
+        }
         return RblExportRowDto.builder()
                 .logId(log.getId())
                 .logDate(log.getLogDate())
@@ -196,6 +242,8 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .customerIdHash(RblMetricsUtil.customerHash(log.getCustomer() != null ? log.getCustomer().getId() : null))
                 .imageObjectName(log.getImageObjectName())
                 .dietLogItemsJson(itemsJson(log.getItems()))
+                .aiPortionG(aiPortionG)
+                .dbApplied(dbApplied)
                 .build();
     }
 
@@ -253,6 +301,11 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .collect(Collectors.groupingBy(l -> l.getExperimentCohort().name(),
                         Collectors.collectingAndThen(Collectors.toList(), RblMetricsUtil::adjustRate)));
 
+        Map<String, Integer> cohortCounts = cvLabeled.stream()
+                .filter(l -> l.getExperimentCohort() != null)
+                .collect(Collectors.groupingBy(l -> l.getExperimentCohort().name(),
+                        Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+
         return RblStatsResponse.builder()
                 .totalReviewed(reviewed.size())
                 .totalLabeledCv(cvLabeled.size())
@@ -276,6 +329,7 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .compositeMealCount((int) reviewed.stream().filter(l -> l.getMealComplexity() != null
                         && l.getMealComplexity().name().equals("COMPOSITE")).count())
                 .avgTimeToReviewHours(BigDecimal.valueOf(avgHours).setScale(2, RoundingMode.HALF_UP).doubleValue())
+                .cohortCounts(cohortCounts)
                 .build();
     }
 
@@ -365,5 +419,15 @@ public class RblAdminServiceImpl implements RblAdminService {
     private String macro(Map<String, Object> m, String key) {
         if (m == null) return "";
         return MacroUtils.toBd(m.get(key)).toPlainString();
+    }
+
+    private String csvJson(Object value) {
+        if (value == null) return "\"[]\"";
+        try {
+            String json = objectMapper.writeValueAsString(value);
+            return "\"" + json.replace("\"", "\"\"") + "\"";
+        } catch (Exception e) {
+            return "\"[]\"";
+        }
     }
 }

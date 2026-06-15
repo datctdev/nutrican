@@ -30,4 +30,5 @@ public class RblStatsResponse {
     private BigDecimal blindVsPtMae;
     private int compositeMealCount;
     private double avgTimeToReviewHours;
+    private Map<String, Integer> cohortCounts;
 }

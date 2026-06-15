@@ -1,0 +1,31 @@
+filename,meal_source,meal_complexity,restaurant_name,hotpot_broth_id,hotpot_item_ids,composite_item_ids,pt_cal,pt_pro,pt_carb,pt_fat,cohort_target,blind_estimate,notes
+home_01.png,HOME_COOKED,SIMPLE,,,,,450,25,55,12,HOME_HYBRID_DB,false,Pho bo
+home_02.png,HOME_COOKED,SIMPLE,,,,,620,30,75,20,HOME_HYBRID_DB,false,Com tam suon
+home_03.png,HOME_COOKED,SIMPLE,,,,,480,28,58,14,HOME_HYBRID_DB,false,Bun bo Hue
+home_04.png,HOME_COOKED,SIMPLE,,,,,380,15,45,14,HOME_HYBRID_DB,false,Banh mi thit
+home_05.png,HOME_COOKED,SIMPLE,,,,,420,22,50,12,HOME_HYBRID_DB,false,Hu tieu Nam Vang
+home_06.png,HOME_COOKED,SIMPLE,,,,,480,24,58,16,HOME_HYBRID_DB,false,Mi Quang
+home_07.png,HOME_COOKED,SIMPLE,,,,,450,28,48,12,HOME_HYBRID_DB,true,Pho ga
+home_08.png,HOME_COOKED,SIMPLE,,,,,420,14,45,20,HOME_HYBRID_DB,false,Banh xeo
+home_09.png,HOME_COOKED,SIMPLE,,,,,520,28,60,16,HOME_HYBRID_DB,false,Bun cha
+home_10.png,HOME_COOKED,SIMPLE,,,,,500,26,62,14,HOME_HYBRID_DB,false,Bun thit nuong
+home_11.png,HOME_COOKED,SIMPLE,,,,,280,12,42,6,HOME_HYBRID_DB,false,Banh cuon
+home_12.png,HOME_COOKED,SIMPLE,,,,,550,32,65,15,HOME_HYBRID_DB,false,Com ga chien nuoc mam
+rest_01.png,RESTAURANT,SIMPLE,Pizza 4P,,,,720,35,75,28,RESTAURANT_AI_ONLY,false,Pizza
+rest_02.png,RESTAURANT,SIMPLE,KFC,,,,850,40,80,35,RESTAURANT_AI_ONLY,true,Burger
+rest_03.png,RESTAURANT,SIMPLE,Pho Thin,,,,540,28,56,16,RESTAURANT_HYBRID,false,Pho bo quan
+rest_04.png,RESTAURANT,SIMPLE,Ga Nuong Quan,,,,680,45,20,38,RESTAURANT_AI_ONLY,false,Ga nuong nguyen con
+rest_05.png,RESTAURANT,SIMPLE,Heo Quay Quan,,,,720,35,5,55,RESTAURANT_AI_ONLY,false,Thit heo quay
+rest_06.png,RESTAURANT,SIMPLE,Com Binh Dan,,,,580,32,25,35,RESTAURANT_AI_ONLY,false,Thit kho trung
+rest_07.png,RESTAURANT,SIMPLE,Ca Nuong Quan,,,,650,48,30,28,RESTAURANT_AI_ONLY,false,Ca nuong cuon banh trang
+rest_08.png,RESTAURANT,SIMPLE,Street food,,,,320,8,52,6,RESTAURANT_AI_ONLY,true,Xoi ngu sac
+buffet_01.png,RESTAURANT,COMPOSITE,Korean BBQ King,,,,920,42,45,52,COMPOSITE_BUFFET,false,Korean BBQ spread 1
+buffet_02.png,RESTAURANT,COMPOSITE,Korean BBQ King,,,,880,40,48,48,COMPOSITE_BUFFET,false,Korean BBQ spread 2
+buffet_03.png,RESTAURANT,COMPOSITE,Korean BBQ King,,,,900,41,46,50,COMPOSITE_BUFFET,false,Korean BBQ spread 3
+buffet_04.png,RESTAURANT,COMPOSITE,Korean BBQ King,,,,910,43,44,51,COMPOSITE_BUFFET,true,Korean BBQ spread 4
+hotpot_01.png,HOME_COOKED,HOTPOT,,,,,900,45,60,35,HOTPOT_HYBRID,false,Lau ga la e
+mix_01.png,HOME_COOKED,SIMPLE,,,,,350,10,58,8,HOME_AI_ONLY,false,Xoi xeo (ngoai DB)
+mix_02.png,HOME_COOKED,SIMPLE,,,,,380,12,55,10,HOME_AI_ONLY,false,Banh khot
+mix_03.png,HOME_COOKED,SIMPLE,,,,,180,14,4,10,HOME_AI_ONLY,false,Cha lua
+mix_04.png,HOME_COOKED,SIMPLE,,,,,220,14,6,14,HOME_AI_ONLY,false,Cha trung
+mix_05.png,HOME_COOKED,SIMPLE,,,,,360,11,52,11,HOME_AI_ONLY,false,Banh khot variant

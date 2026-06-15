@@ -40,4 +40,6 @@ public class RblExportRowDto {
     private String customerIdHash;
     private String imageObjectName;
     private Object dietLogItemsJson;
+    private BigDecimal aiPortionG;
+    private Boolean dbApplied;
 }
