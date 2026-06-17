@@ -36,28 +36,6 @@ const benefits = [
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-blue-100 selection:text-blue-900">
-      {/* Navigation Bar */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200 supports-[backdrop-filter]:bg-white/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-extrabold text-xl tracking-tight text-slate-900">Nutrican<span className="text-blue-600">.</span></span>
-            </Link>
-            <div className="flex items-center gap-4">
-              <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors hidden sm:block">Log in</Link>
-              <Link to="/register">
-                <Button className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-sm transition-all hover:shadow-md h-10 px-5">
-                  Get Started
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-gradient-to-b from-blue-100/50 to-transparent rounded-full blur-3xl -z-10" />
