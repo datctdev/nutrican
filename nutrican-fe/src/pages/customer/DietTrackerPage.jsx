@@ -23,13 +23,13 @@ export default function DietTrackerPage() {
   const fileInputRef = useRef(null);
 
   // Manual form state
-  const [manualFood, setManualFood] = useState('');
   const [manualMealType, setManualMealType] = useState('LUNCH');
-  const [manualCalories, setManualCalories] = useState('');
-  const [manualProtein, setManualProtein] = useState('');
-  const [manualCarb, setManualCarb] = useState('');
-  const [manualFat, setManualFat] = useState('');
-  
+  // Ingredient-based manual entry (HOME_COOKED): pick raw ingredients + grams, app auto-calculates macros.
+  // Backend already supports this via CreateDietLogRequest.items[] (DietLogItemRequest with foodItemId + quantityG).
+  const [ingredientItems, setIngredientItems] = useState([]);
+  // ingredientItems shape: [{ foodItemId, itemName, servingSizeG, quantityG, calories, protein, carb, fat }]
+  // macros are pre-scaled to quantityG via scaleFoodMacros()
+
   // Meal context
   const [mealSource, setMealSource] = useState('HOME_COOKED');
   const [restaurantName, setRestaurantName] = useState('');
@@ -128,14 +128,60 @@ export default function DietTrackerPage() {
   };
 
   const selectFoodFromDb = (food) => {
-    setManualFood(food.nameVi);
-    setManualCalories(String(food.calories || ''));
-    setManualProtein(String(food.protein || ''));
-    setManualCarb(String(food.carb || ''));
-    setManualFat(String(food.fat || ''));
-    setFoodSearchResults([]);
-    setFoodSearchQuery('');
+    addIngredientFromSearch(food);
   };
+
+  // Scale macros for a food item by quantity in grams (mirrors backend MacroUtils / macrosForFood logic).
+  const scaleFoodMacros = (food, qtyG) => {
+    const serving = Number(food.servingSizeG) > 0 ? Number(food.servingSizeG) : 100;
+    const ratio = (Number(qtyG) || 0) / serving;
+    return {
+      calories: (Number(food.calories) || 0) * ratio,
+      protein:  (Number(food.protein)  || 0) * ratio,
+      carb:     (Number(food.carb)     || 0) * ratio,
+      fat:      (Number(food.fat)      || 0) * ratio,
+    };
+  };
+
+  const addIngredientFromSearch = (food) => {
+    const defaultQty = Number(food.servingSizeG) || 100;
+    setIngredientItems((prev) => [
+      ...prev,
+      {
+        foodItemId: food.id,
+        itemName: food.nameVi,
+        servingSizeG: food.servingSizeG,
+        quantityG: defaultQty,
+        ...scaleFoodMacros(food, defaultQty),
+      },
+    ]);
+    setFoodSearchQuery('');
+    setFoodSearchResults([]);
+  };
+
+  const updateIngredientQty = (idx, qty) => {
+    setIngredientItems((prev) =>
+      prev.map((it, i) => {
+        if (i !== idx) return it;
+        const qtyG = Number(qty) || 0;
+        return { ...it, quantityG: qtyG, ...scaleFoodMacros(it, qtyG) };
+      })
+    );
+  };
+
+  const removeIngredient = (idx) => {
+    setIngredientItems((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const ingredientTotals = ingredientItems.reduce(
+    (acc, it) => ({
+      calories: acc.calories + (Number(it.calories) || 0),
+      protein:  acc.protein  + (Number(it.protein)  || 0),
+      carb:     acc.carb     + (Number(it.carb)     || 0),
+      fat:      acc.fat      + (Number(it.fat)      || 0),
+    }),
+    { calories: 0, protein: 0, carb: 0, fat: 0 }
+  );
 
   const handleFileSelect = (e) => {
     const file = (e.target.files || e.dataTransfer?.files)?.[0];
@@ -192,27 +238,26 @@ export default function DietTrackerPage() {
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
-    if (!manualFood) {
-      toast.error('Please enter a food name');
+    if (ingredientItems.length === 0) {
+      toast.error('Vui lòng chọn ít nhất 1 nguyên liệu');
       return;
     }
     try {
       setUploading(true);
       await dietService.createLog({
         mealType: manualMealType,
-        foodDescription: manualFood,
-        calories: parseFloat(manualCalories) || 0,
-        protein: parseFloat(manualProtein) || 0,
-        carb: parseFloat(manualCarb) || 0,
-        fat: parseFloat(manualFat) || 0,
         mealSource,
         restaurantName: mealSource === 'RESTAURANT' ? restaurantName : undefined,
+        items: ingredientItems.map((it) => ({
+          foodItemId: it.foodItemId,
+          quantityG: it.quantityG,
+        })),
       });
-      toast.success('Meal logged successfully!');
-      setManualFood(''); setManualCalories(''); setManualProtein(''); setManualCarb(''); setManualFat('');
+      toast.success('Đã lưu bữa ăn!');
+      setIngredientItems([]);
       fetchData();
     } catch (err) {
-      toast.error('Failed to log meal');
+      toast.error(err.response?.data?.message || 'Lưu thất bại');
     } finally {
       setUploading(false);
     }
@@ -517,38 +562,98 @@ export default function DietTrackerPage() {
                 </div>
               ) : (
                 <form onSubmit={handleManualSubmit} className="space-y-5 animate-fade-in bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
-                  <div className="grid sm:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Meal Type</label>
-                      <select value={manualMealType} onChange={(e) => setManualMealType(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all">
-                        <option value="BREAKFAST">Breakfast</option>
-                        <option value="LUNCH">Lunch</option>
-                        <option value="DINNER">Dinner</option>
-                        <option value="SNACK">Snack</option>
-                      </select>
-                    </div>
-                    <div className="relative">
-                      <label className="block text-sm font-bold text-slate-700 mb-1.5">Food Name</label>
-                      <input type="text" value={foodSearchQuery || manualFood} onChange={(e) => { setManualFood(e.target.value); searchFoods(e.target.value); }} placeholder="e.g. Phở bò" required className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all" />
-                      {foodSearchResults.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-auto">
-                          {foodSearchResults.map(food => (
-                            <button key={food.id} type="button" onClick={() => selectFoodFromDb(food)} className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 text-slate-700">
-                              {food.nameVi} <span className="text-slate-400">({food.calories} kcal)</span>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Meal Type</label>
+                    <select value={manualMealType} onChange={(e) => setManualMealType(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all">
+                      <option value="BREAKFAST">Breakfast</option>
+                      <option value="LUNCH">Lunch</option>
+                      <option value="DINNER">Dinner</option>
+                      <option value="SNACK">Snack</option>
+                    </select>
+                  </div>
+
+                  <div className="relative">
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Tìm thực phẩm</label>
+                    <input
+                      type="text"
+                      value={foodSearchQuery}
+                      onChange={(e) => searchFoods(e.target.value)}
+                      placeholder="Gạo, thịt bò, trứng, rau muống... (≥ 2 ký tự)"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    />
+                    {foodSearchResults.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-auto">
+                        {foodSearchResults.map((food) => (
+                          <button
+                            key={food.id}
+                            type="button"
+                            onClick={() => addIngredientFromSearch(food)}
+                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 text-slate-700 flex items-center justify-between gap-3"
+                          >
+                            <span className="font-semibold">{food.nameVi}</span>
+                            <span className="text-slate-400 text-xs">
+                              {food.calories} kcal / {food.servingSizeG}g
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {ingredientItems.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-bold text-slate-700">Nguyên liệu đã chọn</label>
+                      <div className="space-y-2">
+                        {ingredientItems.map((it, idx) => (
+                          <div key={`${it.foodItemId}-${idx}`} className="flex items-center gap-2 bg-white p-3 rounded-xl border border-slate-200">
+                            <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{it.itemName}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={it.quantityG}
+                              onChange={(e) => updateIngredientQty(idx, e.target.value)}
+                              className="w-20 px-2 py-1.5 rounded-lg border border-slate-200 text-right text-sm font-semibold focus:border-blue-500 outline-none"
+                            />
+                            <span className="text-xs text-slate-400 w-3">g</span>
+                            <span className="text-xs text-slate-500 w-16 text-right font-semibold">{Math.round(it.calories)} kcal</span>
+                            <button
+                              type="button"
+                              onClick={() => removeIngredient(idx)}
+                              className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg p-1.5 transition-colors"
+                              title="Xóa"
+                            >
+                              <X className="w-4 h-4" />
                             </button>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Calories</label><input type="number" value={manualCalories} onChange={(e) => setManualCalories(e.target.value)} placeholder="kcal" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none" /></div>
-                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Protein</label><input type="number" value={manualProtein} onChange={(e) => setManualProtein(e.target.value)} placeholder="g" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none" /></div>
-                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Carbs</label><input type="number" value={manualCarb} onChange={(e) => setManualCarb(e.target.value)} placeholder="g" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none" /></div>
-                    <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Fat</label><input type="number" value={manualFat} onChange={(e) => setManualFat(e.target.value)} placeholder="g" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none" /></div>
-                  </div>
-                  <Button type="submit" disabled={uploading} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md px-8 h-12">
-                    {uploading ? 'Saving...' : 'Save Meal Entry'}
+                  )}
+
+                  {ingredientItems.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 p-4 bg-gradient-to-br from-blue-50 to-emerald-50/60 rounded-2xl border border-blue-100">
+                      <div className="text-center">
+                        <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Calo</div>
+                        <div className="text-lg font-black text-slate-800">{Math.round(ingredientTotals.calories)}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[10px] font-extrabold text-blue-500 uppercase tracking-wider">Pro</div>
+                        <div className="text-lg font-black text-slate-800">{Math.round(ingredientTotals.protein)}g</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[10px] font-extrabold text-amber-500 uppercase tracking-wider">Carb</div>
+                        <div className="text-lg font-black text-slate-800">{Math.round(ingredientTotals.carb)}g</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[10px] font-extrabold text-red-500 uppercase tracking-wider">Fat</div>
+                        <div className="text-lg font-black text-slate-800">{Math.round(ingredientTotals.fat)}g</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button type="submit" disabled={uploading || ingredientItems.length === 0} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md px-8 h-12">
+                    {uploading ? 'Đang lưu...' : 'Lưu bữa ăn'}
                   </Button>
                 </form>
               )}
