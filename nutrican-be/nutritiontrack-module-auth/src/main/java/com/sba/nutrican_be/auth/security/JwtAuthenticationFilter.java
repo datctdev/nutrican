@@ -38,9 +38,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String jwt = extractJwtFromRequest(request);
 
+            // #region agent log
+            java.nio.file.Files.write(
+                java.nio.file.Paths.get("debug-cb5cfc.log"),
+                ("{\"sessionId\":\"cb5cfc\",\"id\":\"log_" + System.currentTimeMillis() + "_jwt_extract\",\"timestamp\":" + System.currentTimeMillis() + ",\"location\":\"JwtAuthenticationFilter.java:36\",\"message\":\"extractJwtFromRequest\",\"data\":{\"uri\":\"" + request.getRequestURI() + "\",\"hasJwt\":" + org.springframework.util.StringUtils.hasText(jwt) + ",\"hasAuthHeader\":" + org.springframework.util.StringUtils.hasText(request.getHeader("Authorization")) + ",\"hasAccessTokenParam\":" + org.springframework.util.StringUtils.hasText(request.getParameter("accessToken")) + "},\"runId\":\"pre-fix\"}\n").getBytes(),
+                java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.APPEND
+            );
+            // #endregion
+
             if (StringUtils.hasText(jwt) && jwtUtil.validateToken(jwt) && !jwtUtil.isRefreshToken(jwt)
                     && !tokenRevocationService.isRevoked(jwt)) {
-                String email = jwtUtil.getEmailFromToken(jwt);
                 UUID userId = jwtUtil.getUserIdFromToken(jwt);
                 String role = jwtUtil.getRoleFromToken(jwt);
 
@@ -69,6 +77,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
         }
+
+        String accessToken = request.getParameter("accessToken");
+        if (StringUtils.hasText(accessToken)) {
+            return accessToken;
+        }
+
         return null;
     }
 }

@@ -2,13 +2,29 @@ import { useNotificationStore } from '../stores/notificationStore';
 
 const SSE_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
 
-export function createSseConnection(userId) {
-  const eventSource = new EventSource(`${SSE_BASE_URL}/workspace/stream`, {
+const sseConnections = new Map();
+
+export function createSseConnection(userId, accessToken) {
+  const connectionKey = `${userId}`;
+  const existing = sseConnections.get(connectionKey);
+  if (existing && existing.readyState === EventSource.OPEN) {
+    return existing;
+  }
+
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+  const url = accessToken
+    ? `${baseUrl}/workspace/stream?accessToken=${encodeURIComponent(accessToken)}`
+    : `${baseUrl}/workspace/stream`;
+
+  const eventSource = new EventSource(url, {
     withCredentials: true,
   });
 
+  let reconnectAttempts = 0;
+  const maxReconnectDelay = 30000;
+
   eventSource.onopen = () => {
-    console.log('SSE connected');
+    reconnectAttempts = 0;
   };
 
   eventSource.addEventListener('NEW_DIET_LOG', (event) => {
@@ -40,10 +56,21 @@ export function createSseConnection(userId) {
   });
 
   eventSource.onerror = () => {
-    console.error('SSE error, reconnecting...');
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+    reconnectAttempts += 1;
     eventSource.close();
-    setTimeout(() => createSseConnection(userId), 5000);
+    setTimeout(() => createSseConnection(userId, accessToken), delay);
   };
 
+  sseConnections.set(connectionKey, eventSource);
   return eventSource;
+}
+
+export function closeSseConnection(userId) {
+  const connectionKey = `${userId}`;
+  const existing = sseConnections.get(connectionKey);
+  if (existing) {
+    existing.close();
+    sseConnections.delete(connectionKey);
+  }
 }

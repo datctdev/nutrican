@@ -1,5 +1,5 @@
 // src/pages/customer/KycPage.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { useAuthStore } from '../../stores/authStore';
@@ -7,66 +7,154 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
-import { Shield, CheckCircle2, Clock, XCircle, AlertTriangle, UploadCloud, FileText, UserSquare, Calendar, MapPin, ArrowRight } from 'lucide-react';
+import {
+  Shield,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  AlertTriangle,
+  UploadCloud,
+  FileText,
+  UserSquare,
+  Camera,
+  ArrowRight,
+  RotateCcw,
+  ChevronRight,
+  Loader2,
+  Image as ImageIcon,
+} from 'lucide-react';
 
 export default function KycPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [kycStatus, setKycStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
 
-  const [formData, setFormData] = useState({
-    idCardNumber: '', fullNameOnCard: '', dateOfBirthOnCard: '',
-    addressOnCard: '', idCardFrontUrl: '', idCardBackUrl: '',
-  });
+  // Session state
+  const [sessionId, setSessionId] = useState(null);
+  const [currentStep, setCurrentStep] = useState(0); // 0=idle, 1=front, 2=back, 3=selfie, 4=compare, 5=done
+  const [uploading, setUploading] = useState(false);
 
-  useEffect(() => { fetchKycStatus(); }, []);
+  // Uploaded file previews
+  const [frontPreview, setFrontPreview] = useState(null);
+  const [backPreview, setBackPreview] = useState(null);
+  const [selfiePreview, setSelfiePreview] = useState(null);
 
-  const fetchKycStatus = async () => {
+  // Compare result
+  const [compareResult, setCompareResult] = useState(null);
+  const [comparing, setComparing] = useState(false);
+
+  // Session metadata
+  const [sessionInfo, setSessionInfo] = useState(null);
+
+  const frontInputRef = useRef(null);
+  const backInputRef = useRef(null);
+  const selfieInputRef = useRef(null);
+
+  // Steps configuration
+  const steps = [
+    { key: 'front', label: 'Mặt trước CCCD', icon: FileText, ref: frontInputRef },
+    { key: 'back', label: 'Mặt sau CCCD', icon: FileText, ref: backInputRef },
+    { key: 'selfie', label: 'Ảnh gương mặt', icon: Camera, ref: selfieInputRef },
+  ];
+
+  const startSession = async () => {
     try {
-      setLoading(true);
-      const response = await authService.getKycStatus();
-      setKycStatus(response.data.data);
+      setUploading(true);
+      const res = await authService.startKycSession();
+      const sid = res.data.data.sessionId;
+      setSessionId(sid);
+      setCurrentStep(1);
+      toast.success('Đã tạo phiên KYC, bắt đầu với mặt trước CCCD');
     } catch (err) {
-      if (err.response?.status !== 401) console.error(err);
-    } finally { setLoading(false); }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.idCardNumber || !formData.fullNameOnCard) {
-      return toast.error('ID card number and full name are required');
+      toast.error(err.response?.data?.message || 'Không thể tạo phiên KYC');
+    } finally {
+      setUploading(false);
     }
-    try {
-      setSubmitting(true);
-      await authService.submitKyc(formData);
-      toast.success('KYC submitted successfully!', { description: 'Awaiting admin review.' });
-      fetchKycStatus();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed to submit KYC'); } 
-    finally { setSubmitting(false); }
   };
 
-  const StatusBanner = () => {
-    if (!kycStatus) return null;
-    const status = kycStatus.verificationStatus;
+  const handleFileSelect = (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File quá lớn. Tối đa 5MB');
+      return;
+    }
+    const preview = URL.createObjectURL(file);
+    return { file, preview };
+  };
 
-    const banners = {
-      'NOT_SUBMITTED': { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', title: 'KYC Required', desc: 'Submit your ID card to unlock PT registration and advanced features.' },
-      'PENDING_APPROVAL': { icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', title: 'Under Review', desc: 'Your documents are being reviewed. This usually takes 1-2 business days.' },
-      'ACTIVE': { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', title: 'Verified', desc: 'Your identity has been verified successfully.' },
-      'SUSPENDED': { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', title: 'Rejected', desc: kycStatus.rejectionReason ? `Reason: ${kycStatus.rejectionReason}` : 'Application rejected. Please resubmit.' }
+  const uploadImage = async (file, title, setPreview, nextStep) => {
+    try {
+      setUploading(true);
+      const { preview } = handleFileSelect(file) || {};
+      if (preview) setPreview(preview);
+
+      await authService.uploadKycImage(sessionId, file, title);
+      toast.success('Tải ảnh thành công');
+      setCurrentStep(nextStep);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.response?.data?.reason || 'Tải ảnh thất bại');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCompare = async () => {
+    try {
+      setComparing(true);
+      const res = await authService.compareKyc(sessionId);
+      setCompareResult(res.data.data);
+      setCurrentStep(5);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.reason || 'Xác thực thất bại';
+      toast.error(msg);
+      setCompareResult({ status: 'ERROR', error: msg });
+      setCurrentStep(5);
+    } finally {
+      setComparing(false);
+    }
+  };
+
+  const resetKyc = () => {
+    setSessionId(null);
+    setCurrentStep(0);
+    setFrontPreview(null);
+    setBackPreview(null);
+    setSelfiePreview(null);
+    setCompareResult(null);
+    setSessionInfo(null);
+  };
+
+  // Auto-trigger compare when selfie is uploaded (currentStep becomes 4)
+  useEffect(() => {
+    if (currentStep === 4 && !comparing && !compareResult) {
+      handleCompare();
+    }
+  }, [currentStep]);
+
+  // Poll session info when in progress
+  useEffect(() => {
+    if (!sessionId || currentStep < 1 || currentStep >= 5) return;
+    const timer = setInterval(async () => {
+      try {
+        const res = await authService.getKycSession(sessionId);
+        setSessionInfo(res.data.data?.session);
+      } catch {
+        // ignore poll errors
+      }
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [sessionId, currentStep]);
+
+  const StatusBanner = ({ status }) => {
+    if (!status) return null;
+    const cfg = {
+      DRAFT:          { icon: Clock,        color: 'text-slate-600',   bg: 'bg-slate-50',   border: 'border-slate-200', title: 'Đang tạo phiên',   desc: 'Bấm bắt đầu để tiến hành KYC.' },
+      IN_PROGRESS:    { icon: UploadCloud,  color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200',  title: 'Đang xử lý',     desc: 'Đang tương tác với VNPT eKYC...' },
+      VERIFIED:       { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', title: 'Xác thực thành công', desc: 'KYC đã hoàn tất.' },
+      REJECTED:       { icon: XCircle,      color: 'text-red-600',     bg: 'bg-red-50',     border: 'border-red-200',   title: 'Xác thực thất bại', desc: 'Ảnh không khớp hoặc chất lượng không đạt.', },
+      ERROR:          { icon: AlertTriangle,color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200', title: 'Có lỗi',         desc: compareResult?.error || 'Vui lòng thử lại.' },
     };
-
-    const config = banners[status];
-    if (!config) return null;
+    const config = cfg[status] || cfg.DRAFT;
     const Icon = config.icon;
-
     return (
       <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl border ${config.bg} ${config.border} mb-8 shadow-sm`}>
         <div className="flex items-start sm:items-center gap-4">
@@ -76,30 +164,131 @@ export default function KycPage() {
             <p className="text-sm text-slate-600 font-medium mt-0.5">{config.desc}</p>
           </div>
         </div>
-        {status === 'ACTIVE' && user?.role === 'CUSTOMER' && (
-          <Button onClick={() => navigate('/register/pt')} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm shrink-0">
-            <FileText className="w-4 h-4 mr-2" /> Apply as PT
+        {(status === 'REJECTED' || status === 'ERROR') && (
+          <Button onClick={resetKyc} variant="outline" className="shrink-0 rounded-xl border-slate-200">
+            <RotateCcw className="w-4 h-4 mr-2" /> Thử lại
           </Button>
         )}
       </div>
     );
   };
 
-  if (loading) return (
-    <div className="max-w-3xl mx-auto space-y-6 pb-12"><Skeleton className="h-32 w-full rounded-3xl" /><Skeleton className="h-96 w-full rounded-3xl" /></div>
+  const UploadStepCard = ({ stepKey, label, icon: Icon, preview, inputRef, onUpload, isUploaded, isActive, uploadingThis }) => (
+    <Card className={`border-2 transition-all ${isActive ? 'border-blue-400 shadow-md bg-blue-50/30' : 'border-slate-200 bg-white'} ${isUploaded ? 'border-emerald-300 bg-emerald-50/30' : ''}`}>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isUploaded ? 'bg-emerald-100 text-emerald-700' : isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400'}`}>
+            {isUploaded ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+          </div>
+          <div>
+            <h4 className="font-bold text-slate-800">{label}</h4>
+            <p className="text-xs text-slate-500 font-medium">{isUploaded ? 'Đã tải lên' : isActive ? 'Vui lòng tải ảnh' : 'Chờ tải'}</p>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={!isActive || isUploaded}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUpload(file);
+            }}
+          />
+          <Button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={!isActive || isUploaded}
+            className={`flex-1 rounded-xl h-12 font-bold ${isUploaded ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+          >
+            {uploadingThis ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Đang tải...</> : isUploaded ? 'Đã tải xong' : 'Chọn ảnh'}
+          </Button>
+        </div>
+
+        {preview && (
+          <div className="mt-4 relative group">
+            <img src={preview} alt={stepKey} className="w-full h-48 object-cover rounded-xl border border-slate-200" />
+            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 
-  const isEditable = !kycStatus || ['NOT_SUBMITTED', 'SUSPENDED'].includes(kycStatus.verificationStatus);
+  const renderCompareResult = () => {
+    if (!compareResult) return null;
+    const status = compareResult.status;
+    const passed = status === 'VERIFIED';
+    return (
+      <Card className={`border-2 ${passed ? 'border-emerald-300 bg-emerald-50/30' : 'border-red-300 bg-red-50/30'}`}>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-4 mb-4">
+            {passed ? (
+              <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+            ) : (
+              <XCircle className="w-12 h-12 text-red-600" />
+            )}
+            <div>
+              <h3 className="text-xl font-black text-slate-900">{passed ? 'KYC đã xác thực' : 'Xác thực thất bại'}</h3>
+              <p className="text-sm text-slate-600 font-medium">
+                Điểm khớp: <span className="font-bold">{compareResult.matchScore?.toFixed(1)}%</span>
+                {compareResult.verifiedAt && (
+                  <span className="ml-3 text-xs text-slate-400">Lúc {new Date(compareResult.verifiedAt).toLocaleString('vi-VN')}</span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-white p-3 rounded-xl border border-slate-200 text-center">
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Mặt trước</p>
+              <div className="mt-2 w-full h-20 bg-slate-100 rounded-lg overflow-hidden">{frontPreview && <img src={frontPreview} className="w-full h-full object-cover" />}</div>
+            </div>
+            <div className="bg-white p-3 rounded-xl border border-slate-200 text-center">
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Mặt sau</p>
+              <div className="mt-2 w-full h-20 bg-slate-100 rounded-lg overflow-hidden">{backPreview && <img src={backPreview} className="w-full h-full object-cover" />}</div>
+            </div>
+            <div className="bg-white p-3 rounded-xl border border-slate-200 text-center">
+              <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Selfie</p>
+              <div className="mt-2 w-full h-20 bg-slate-100 rounded-lg overflow-hidden">{selfiePreview && <img src={selfiePreview} className="w-full h-full object-cover" />}</div>
+            </div>
+          </div>
+          <div className="mt-6 flex gap-3">
+            {passed ? (
+              <Button onClick={() => navigate('/diet')} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 font-bold">
+                Vào Dashboard <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : (
+              <Button onClick={resetKyc} variant="outline" className="flex-1 rounded-xl h-12 font-bold border-red-200 text-red-700 hover:bg-red-50">
+                <RotateCcw className="w-4 h-4 mr-2" /> Thử lại toàn bộ
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
-  const InputField = ({ icon: Icon, label, type="text", required=false, ...props }) => (
-    <div className="space-y-1.5">
-      <label className="text-sm font-bold text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>
-      <div className="relative flex items-center">
-        <Icon className="absolute left-3.5 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
-        <input type={type} required={required} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all" {...props} />
+  // Loading skeleton
+  if (!sessionId && currentStep === 0) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-6 pb-12">
+        <Skeleton className="h-32 w-full rounded-3xl" />
+        <Skeleton className="h-96 w-full rounded-3xl" />
       </div>
-    </div>
-  );
+    );
+  }
+
+  const getSessionStatus = () => {
+    if (comparing) return 'IN_PROGRESS';
+    if (compareResult?.status === 'VERIFIED') return 'VERIFIED';
+    if (compareResult?.status === 'REJECTED') return 'REJECTED';
+    if (compareResult?.status === 'ERROR') return 'ERROR';
+    if (sessionId) return 'IN_PROGRESS';
+    return 'DRAFT';
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-12 animate-fade-in">
@@ -108,77 +297,101 @@ export default function KycPage() {
           <Shield className="w-8 h-8 text-white" />
         </div>
         <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Identity Verification</h1>
-        <p className="text-slate-500 font-medium">Complete KYC to ensure a safe community for everyone.</p>
+        <p className="text-slate-500 font-medium">Xác thực danh tính qua CCCD bằng VNPT eKYC</p>
       </div>
 
-      <StatusBanner />
+      <StatusBanner status={getSessionStatus()} />
 
-      {isEditable ? (
-        <Card className="bg-white border-slate-200 shadow-xl rounded-3xl overflow-hidden relative">
-          <div className="h-2 bg-gradient-to-r from-blue-500 to-indigo-500 w-full absolute top-0 left-0" />
-          <CardContent className="p-8 pt-10">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <InputField icon={UserSquare} label="ID Card Number" name="idCardNumber" value={formData.idCardNumber} onChange={handleChange} placeholder="e.g. 012345678901" required />
-                <InputField icon={UserSquare} label="Full Name on Card" name="fullNameOnCard" value={formData.fullNameOnCard} onChange={handleChange} placeholder="As printed on your ID" required />
-                <InputField icon={Calendar} label="Date of Birth" type="date" name="dateOfBirthOnCard" value={formData.dateOfBirthOnCard} onChange={handleChange} />
-                <div className="space-y-1.5 md:col-span-2">
-                  <label className="text-sm font-bold text-slate-700">Address on Card</label>
-                  <div className="relative flex">
-                    <MapPin className="absolute left-3.5 top-3.5 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
-                    <textarea name="addressOnCard" value={formData.addressOnCard} onChange={handleChange} rows="2" placeholder="Full residential address" className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none" />
+      {currentStep < 5 && currentStep > 0 && (
+        <div className="flex items-center justify-between mb-8">
+          {steps.map((s, i) => {
+            const stepNum = i + 1;
+            const isComplete = currentStep > stepNum;
+            const isActive = currentStep === stepNum;
+            const StepIcon = s.icon;
+            return (
+              <div key={s.key} className="flex items-center flex-1">
+                <div className="flex flex-col items-center gap-2">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${isComplete ? 'bg-emerald-500 border-emerald-500 text-white' : isActive ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}>
+                    {isComplete ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
                   </div>
+                  <span className={`text-xs font-bold ${isActive ? 'text-blue-700' : isComplete ? 'text-emerald-700' : 'text-slate-400'}`}>{s.label}</span>
                 </div>
+                {i < steps.length - 1 && (
+                  <div className={`flex-1 h-1 mx-3 rounded-full transition-all ${currentStep > stepNum ? 'bg-emerald-400' : 'bg-slate-200'}`} />
+                )}
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              <div className="border-t border-slate-100 pt-6">
-                <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center"><FileText className="w-4 h-4 mr-2 text-blue-500" /> Document Links</h4>
-                <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 mb-5 flex items-center gap-3">
-                  <UploadCloud className="w-5 h-5 text-blue-500 shrink-0" />
-                  <p className="text-sm text-blue-800 font-medium">Please upload your ID images to MinIO and paste the direct URLs below.</p>
-                </div>
-                <div className="space-y-4">
-                  <InputField icon={FileText} label="ID Card Front URL" type="url" name="idCardFrontUrl" value={formData.idCardFrontUrl} onChange={handleChange} placeholder="https://..." />
-                  <InputField icon={FileText} label="ID Card Back URL" type="url" name="idCardBackUrl" value={formData.idCardBackUrl} onChange={handleChange} placeholder="https://..." />
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100">
-                <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-14 text-lg font-bold shadow-md transition-all hover:-translate-y-0.5" disabled={submitting}>
-                  {submitting ? 'Submitting...' : <>Submit for Verification <ArrowRight className="w-5 h-5 ml-2" /></>}
-                </Button>
-              </div>
-            </form>
+      {currentStep === 0 && (
+        <Card className="bg-white border-slate-200 shadow-xl rounded-3xl overflow-hidden">
+          <CardContent className="p-8 text-center">
+            <div className="w-20 h-20 mx-auto bg-blue-50 rounded-full flex items-center justify-center mb-6">
+              <Shield className="w-10 h-10 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">Bắt đầu xác thực danh tính</h3>
+            <p className="text-sm text-slate-500 font-medium mb-8 max-w-md mx-auto">
+              Bạn sẽ cần cung cấp ảnh mặt trước CCCD, mặt sau CCCD và một ảnh selfie. Toàn bộ quá trình được xử lý bởi VNPT eKYC.
+            </p>
+            <Button onClick={startSession} disabled={uploading} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md px-10 h-12 text-lg font-bold">
+              {uploading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Đang tạo phiên...</> : 'Bắt đầu KYC'}
+            </Button>
           </CardContent>
         </Card>
-      ) : (
-        kycsStatus?.verificationStatus !== 'NOT_SUBMITTED' && (
-          <Card className="bg-slate-50 border-slate-200 shadow-sm rounded-3xl overflow-hidden">
-            <CardContent className="p-8">
-              <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center"><FileText className="w-5 h-5 mr-2 text-blue-500" /> Submitted Details</h3>
-              <div className="grid sm:grid-cols-2 gap-y-6 gap-x-8">
-                <div>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">ID Number</p>
-                  <p className="font-semibold text-slate-900">{kycStatus.idCardNumber || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Name on Card</p>
-                  <p className="font-semibold text-slate-900">{kycStatus.fullNameOnCard || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Date of Birth</p>
-                  <p className="font-semibold text-slate-900">{kycStatus.dateOfBirthOnCard || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status</p>
-                  <p className="font-bold text-blue-600 capitalize">{kycStatus.verificationStatus?.replace('_', ' ').toLowerCase()}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )
       )}
+
+      {currentStep >= 1 && currentStep <= 3 && (
+        <div className="grid gap-6">
+          <UploadStepCard
+            stepKey="front"
+            label="Mặt trước CCCD"
+            icon={FileText}
+            preview={frontPreview}
+            inputRef={frontInputRef}
+            isActive={currentStep >= 1}
+            isUploaded={currentStep > 1}
+            uploadingThis={uploading && currentStep === 1}
+            onUpload={(file) => uploadImage(file, 'FRONT', setFrontPreview, 2)}
+          />
+          <UploadStepCard
+            stepKey="back"
+            label="Mặt sau CCCD"
+            icon={FileText}
+            preview={backPreview}
+            inputRef={backInputRef}
+            isActive={currentStep >= 2}
+            isUploaded={currentStep > 2}
+            uploadingThis={uploading && currentStep === 2}
+            onUpload={(file) => uploadImage(file, 'BACK', setBackPreview, 3)}
+          />
+          <UploadStepCard
+            stepKey="selfie"
+            label="Ảnh gương mặt"
+            icon={Camera}
+            preview={selfiePreview}
+            inputRef={selfieInputRef}
+            isActive={currentStep >= 3}
+            isUploaded={currentStep > 3}
+            uploadingThis={uploading && currentStep === 3}
+            onUpload={(file) => uploadImage(file, 'SELFIE', setSelfiePreview, 4)}
+          />
+        </div>
+      )}
+
+      {currentStep === 4 && !compareResult && (
+        <Card className="bg-blue-50 border-blue-200 rounded-3xl">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-800 mb-1">Đang xác thực khuôn mặt...</h3>
+            <p className="text-sm text-slate-500 font-medium">VNPT đang so sánh ảnh selfie với ảnh trên CCCD</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {currentStep === 5 && renderCompareResult()}
     </div>
   );
 }

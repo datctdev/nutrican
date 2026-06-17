@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import MainLayout from './components/layouts/MainLayout';
 import AuthLayout from './components/layouts/AuthLayout';
+import PtProtectedRoute from './components/common/PtProtectedRoute';
 
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -53,18 +54,6 @@ function App() {
           element: <ProtectedRoute><KycPage /></ProtectedRoute>,
         },
         {
-          path: '/pt',
-          element: <ProtectedRoute allowedRoles={['PT_CERTIFIED', 'PT_FREELANCE']}><PtDashboardPage /></ProtectedRoute>,
-        },
-        {
-          path: '/pt/clients',
-          element: <ProtectedRoute allowedRoles={['PT_CERTIFIED', 'PT_FREELANCE']}><ClientListPage /></ProtectedRoute>,
-        },
-        {
-          path: '/pt/reviews',
-          element: <ProtectedRoute allowedRoles={['PT_CERTIFIED', 'PT_FREELANCE']}><ReviewDietLogPage /></ProtectedRoute>,
-        },
-        {
           path: '/admin',
           element: <ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboardPage /></ProtectedRoute>,
         },
@@ -84,6 +73,14 @@ function App() {
           path: '/admin/sos',
           element: <ProtectedRoute allowedRoles={['ADMIN']}><SosTicketsPage /></ProtectedRoute>,
         },
+      ],
+    },
+    {
+      element: <PtProtectedRoute><MainLayout /></PtProtectedRoute>,
+      children: [
+        { path: '/pt', element: <PtDashboardPage /> },
+        { path: '/pt/clients', element: <ClientListPage /> },
+        { path: '/pt/reviews', element: <ReviewDietLogPage /> },
       ],
     },
   ]);

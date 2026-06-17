@@ -1,5 +1,6 @@
 package com.sba.nutrican_be.workspace.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -12,14 +13,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SseEmitterService {
+
+    private static final long SSE_TIMEOUT = 60_000L;
 
     private final Map<UUID, CopyOnWriteArrayList<SseEmitter>> userEmitters = new ConcurrentHashMap<>();
 
     public SseEmitter createEmitter(UUID userId) {
-        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT);
 
-        userEmitters.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        CopyOnWriteArrayList<SseEmitter> emitters = userEmitters
+                .computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>());
+        emitters.add(emitter);
 
         emitter.onCompletion(() -> removeEmitter(userId, emitter));
         emitter.onTimeout(() -> removeEmitter(userId, emitter));
@@ -68,8 +74,8 @@ public class SseEmitterService {
 
     public void notifyPtOfNewDietLog(UUID ptId, UUID clientId, String clientName, UUID logId, String mealType) {
         String data = String.format(
-            "{\"client_id\":\"%s\",\"client_name\":\"%s\",\"log_id\":\"%s\",\"message\":\"%s logged %s\",\"status_color\":\"RED\"}",
-            clientId, clientName, logId, clientName, mealType != null ? mealType.toLowerCase() : "meal"
+                "{\"client_id\":\"%s\",\"client_name\":\"%s\",\"log_id\":\"%s\",\"message\":\"%s logged %s\",\"status_color\":\"RED\"}",
+                clientId, clientName, logId, clientName, mealType != null ? mealType.toLowerCase() : "meal"
         );
         sendToUser(ptId, "NEW_DIET_LOG", data);
         log.info("SSE notification sent to PT: {} for client: {} new log", ptId, clientId);
@@ -88,8 +94,8 @@ public class SseEmitterService {
 
     public void broadcastSos(UUID ptId, UUID clientId, String clientName, String priority) {
         String data = String.format(
-            "{\"client_id\":\"%s\",\"client_name\":\"%s\",\"priority\":\"%s\",\"type\":\"SOS\"}",
-            clientId, clientName, priority
+                "{\"client_id\":\"%s\",\"client_name\":\"%s\",\"priority\":\"%s\",\"type\":\"SOS\"}",
+                clientId, clientName, priority
         );
         sendToUser(ptId, "SOS_TICKET", data);
     }

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
-import { createSseConnection } from '../services/sseService';
+import { createSseConnection, closeSseConnection } from '../services/sseService';
 
 export function useSSE() {
   const user = useAuthStore((state) => state.user);
@@ -8,9 +8,10 @@ export function useSSE() {
   useEffect(() => {
     if (!user) return;
 
-    const sse = createSseConnection(user.id);
+    createSseConnection(user.id, user.accessToken);
+
     return () => {
-      sse.close();
+      closeSseConnection(user.id);
     };
-  }, [user?.id]);
+  }, [user?.id, user?.accessToken]);
 }
