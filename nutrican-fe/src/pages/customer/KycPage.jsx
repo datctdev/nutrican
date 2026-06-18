@@ -5,7 +5,6 @@ import { authService } from '../../services/authService';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import {
   Shield,
@@ -15,13 +14,10 @@ import {
   AlertTriangle,
   UploadCloud,
   FileText,
-  UserSquare,
   Camera,
   ArrowRight,
   RotateCcw,
-  ChevronRight,
   Loader2,
-  Image as ImageIcon,
 } from 'lucide-react';
 
 export default function KycPage() {
@@ -60,12 +56,18 @@ export default function KycPage() {
     try {
       setUploading(true);
       const res = await authService.startKycSession();
-      const sid = res.data.data.sessionId;
+      console.log('KYC start response:', res.data);
+      const session = res.data?.data?.session ?? res.data?.session ?? res.data;
+      const sid = session?.sessionId ?? session?.id;
+      if (!sid) {
+        throw new Error('Không nhận được sessionId từ server');
+      }
       setSessionId(sid);
       setCurrentStep(1);
       toast.success('Đã tạo phiên KYC, bắt đầu với mặt trước CCCD');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Không thể tạo phiên KYC');
+      console.error('KYC start error:', err);
+      toast.error(err.response?.data?.message || err.response?.data?.reason || err.message || 'Không thể tạo phiên KYC');
     } finally {
       setUploading(false);
     }
@@ -150,7 +152,7 @@ export default function KycPage() {
       DRAFT:          { icon: Clock,        color: 'text-slate-600',   bg: 'bg-slate-50',   border: 'border-slate-200', title: 'Đang tạo phiên',   desc: 'Bấm bắt đầu để tiến hành KYC.' },
       IN_PROGRESS:    { icon: UploadCloud,  color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200',  title: 'Đang xử lý',     desc: 'Đang tương tác với VNPT eKYC...' },
       VERIFIED:       { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', title: 'Xác thực thành công', desc: 'KYC đã hoàn tất.' },
-      REJECTED:       { icon: XCircle,      color: 'text-red-600',     bg: 'bg-red-50',     border: 'border-red-200',   title: 'Xác thực thất bại', desc: 'Ảnh không khớp hoặc chất lượng không đạt.', },
+      REJECTED:       { icon: XCircle,      color: 'text-red-600',     bg: 'bg-red-50',     border: 'border-red-300',   title: 'Xác thực thất bại', desc: 'Ảnh không khớp hoặc chất lượng không đạt.', },
       ERROR:          { icon: AlertTriangle,color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200', title: 'Có lỗi',         desc: compareResult?.error || 'Vui lòng thử lại.' },
     };
     const config = cfg[status] || cfg.DRAFT;
@@ -271,16 +273,6 @@ export default function KycPage() {
     );
   };
 
-  // Loading skeleton
-  if (!sessionId && currentStep === 0) {
-    return (
-      <div className="max-w-3xl mx-auto space-y-6 pb-12">
-        <Skeleton className="h-32 w-full rounded-3xl" />
-        <Skeleton className="h-96 w-full rounded-3xl" />
-      </div>
-    );
-  }
-
   const getSessionStatus = () => {
     if (comparing) return 'IN_PROGRESS';
     if (compareResult?.status === 'VERIFIED') return 'VERIFIED';
@@ -302,31 +294,7 @@ export default function KycPage() {
 
       <StatusBanner status={getSessionStatus()} />
 
-      {currentStep < 5 && currentStep > 0 && (
-        <div className="flex items-center justify-between mb-8">
-          {steps.map((s, i) => {
-            const stepNum = i + 1;
-            const isComplete = currentStep > stepNum;
-            const isActive = currentStep === stepNum;
-            const StepIcon = s.icon;
-            return (
-              <div key={s.key} className="flex items-center flex-1">
-                <div className="flex flex-col items-center gap-2">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${isComplete ? 'bg-emerald-500 border-emerald-500 text-white' : isActive ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-400'}`}>
-                    {isComplete ? <CheckCircle2 className="w-5 h-5" /> : <StepIcon className="w-5 h-5" />}
-                  </div>
-                  <span className={`text-xs font-bold ${isActive ? 'text-blue-700' : isComplete ? 'text-emerald-700' : 'text-slate-400'}`}>{s.label}</span>
-                </div>
-                {i < steps.length - 1 && (
-                  <div className={`flex-1 h-1 mx-3 rounded-full transition-all ${currentStep > stepNum ? 'bg-emerald-400' : 'bg-slate-200'}`} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {currentStep === 0 && (
+      {!sessionId && currentStep === 0 ? (
         <Card className="bg-white border-slate-200 shadow-xl rounded-3xl overflow-hidden">
           <CardContent className="p-8 text-center">
             <div className="w-20 h-20 mx-auto bg-blue-50 rounded-full flex items-center justify-center mb-6">
@@ -341,7 +309,7 @@ export default function KycPage() {
             </Button>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {currentStep >= 1 && currentStep <= 3 && (
         <div className="grid gap-6">
