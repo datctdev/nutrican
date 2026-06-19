@@ -4,9 +4,12 @@ import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.userprofile.dto.MacroTargetRequest;
 import com.sba.nutrican_be.userprofile.dto.MacroTargetResponse;
+import com.sba.nutrican_be.userprofile.dto.PtProfileSummary;
+import com.sba.nutrican_be.userprofile.dto.PtRegistrationRequest;
 import com.sba.nutrican_be.userprofile.dto.UpdateProfileRequest;
 import com.sba.nutrican_be.userprofile.dto.UserProfileResponse;
 import com.sba.nutrican_be.userprofile.service.UserProfileService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -60,5 +63,19 @@ public class UserProfileController {
     public ResponseEntity<ApiResponse<UserProfileResponse>> getPublicProfile(
             @PathVariable UUID userId) {
         return ResponseEntity.ok(userProfileService.getProfile(userId));
+    }
+
+    @PostMapping("/pt/register")
+    public ResponseEntity<ApiResponse<PtProfileSummary>> registerAsPt(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody PtRegistrationRequest request) {
+        return ResponseEntity.ok(userProfileService.registerAsPt(user.getId(), request));
+    }
+
+    @PostMapping(value = "/pt/cv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<String>> uploadCv(
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userProfileService.uploadCv(user.getId(), file));
     }
 }

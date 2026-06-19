@@ -205,20 +205,28 @@ export default function KycPage() {
     }));
   };
 
-  const handleCvUpload = (e) => {
+  const handleCvUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
       toast.error('File quá lớn. Tối đa 10MB');
       return;
     }
-    // Simulate upload - in real app, upload to server
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setPtForm(prev => ({ ...prev, cvUrl: ev.target.result, cvFileName: file.name }));
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'application/msword', 
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Chỉ chấp nhận file PDF hoặc Word');
+      return;
+    }
+    try {
+      const response = await userService.uploadCv(file);
+      const cvUrl = response.data?.data;
+      setPtForm(prev => ({ ...prev, cvUrl, cvFileName: file.name }));
       toast.success('CV đã được tải lên!');
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Upload CV thất bại');
+    }
   };
 
   const handleRegisterPt = async () => {
@@ -228,15 +236,22 @@ export default function KycPage() {
 
     setIsSubmittingPt(true);
     try {
-      // Call API to register as PT
-      // In real implementation, call userService.registerAsPt(ptForm)
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+      await userService.registerAsPt({
+        bio: ptForm.bio,
+        trainingPhilosophy: ptForm.trainingPhilosophy,
+        yearsOfExperience: parseInt(ptForm.yearsOfExperience),
+        specializations: ptForm.specializations,
+        certifications: ptForm.certifications,
+        hourlyRate: ptForm.hourlyRate ? parseFloat(ptForm.hourlyRate) : null,
+        cvUrl: ptForm.cvUrl,
+      });
       toast.success('Đăng ký làm PT thành công! Vui lòng chờ duyệt.');
       setHasPtProfile(true);
       setPtProfileStatus('PENDING_APPROVAL');
       await checkAuth();
     } catch (error) {
-      toast.error('Đăng ký thất bại. Vui lòng thử lại.');
+      const message = error?.response?.data?.message || 'Đăng ký thất bại. Vui lòng thử lại.';
+      toast.error(message);
     } finally {
       setIsSubmittingPt(false);
     }

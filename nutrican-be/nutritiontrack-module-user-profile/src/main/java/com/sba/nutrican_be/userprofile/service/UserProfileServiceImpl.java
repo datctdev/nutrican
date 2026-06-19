@@ -2,14 +2,18 @@ package com.sba.nutrican_be.userprofile.service;
 
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.entity.MacroTarget;
+import com.sba.nutrican_be.core.entity.PtProfile;
 import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.core.exception.BadRequestException;
 import com.sba.nutrican_be.core.exception.ResourceNotFoundException;
 import com.sba.nutrican_be.core.repository.MacroTargetRepository;
+import com.sba.nutrican_be.core.repository.PtProfileRepository;
 import com.sba.nutrican_be.core.repository.UserRepository;
 import com.sba.nutrican_be.core.service.MinioService;
 import com.sba.nutrican_be.userprofile.dto.MacroTargetRequest;
 import com.sba.nutrican_be.userprofile.dto.MacroTargetResponse;
+import com.sba.nutrican_be.userprofile.dto.PtProfileSummary;
+import com.sba.nutrican_be.userprofile.dto.PtRegistrationRequest;
 import com.sba.nutrican_be.userprofile.dto.UpdateProfileRequest;
 import com.sba.nutrican_be.userprofile.dto.UserProfileResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +32,7 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     private final UserRepository userRepository;
     private final MacroTargetRepository macroTargetRepository;
+    private final PtProfileRepository ptProfileRepository;
     private final MinioService minioService;
 
     @Override
@@ -36,6 +41,63 @@ public class UserProfileServiceImpl implements UserProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         return ApiResponse.success(toProfileResponse(user));
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<PtProfileSummary> registerAsPt(UUID userId, PtRegistrationRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        // Check if user already has a PT profile
+        if (ptProfileRepository.findByUserId(userId).isPresent()) {
+            throw new BadRequestException("User already has a PT profile");
+        }
+
+        PtProfile ptProfile = PtProfile.builder()
+                .user(user)
+                .bio(request.getBio())
+                .trainingPhilosophy(request.getTrainingPhilosophy())
+                .yearsOfExperience(request.getYearsOfExperience())
+                .specializations(request.getSpecializations())
+                .certifications(request.getCertifications())
+                .hourlyRate(request.getHourlyRate())
+                .cvUrl(request.getCvUrl())
+                .isVerified(false)
+                .build();
+
+        ptProfile = ptProfileRepository.save(ptProfile);
+        log.info("PT profile created for user: {}", userId);
+
+        return ApiResponse.success(toPtProfileSummary(ptProfile), "PT registration submitted successfully");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> uploadCv(UUID userId, MultipartFile file) {
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || (!contentType.equals("application/pdf") && 
+                !contentType.equals("application/msword") &&
+                !contentType.contains("word") &&
+                !contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))) {
+            throw new BadRequestException("Only PDF and Word documents are allowed");
+        }
+
+        // Validate file size (max 10MB)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new BadRequestException("File size must be less than 10MB");
+        }
+
+        try {
+            String objectName = minioService.uploadFile(file, "pt-cvs");
+            String presignedUrl = minioService.getPresignedUrl(objectName);
+
+            log.info("CV uploaded for user: {}", userId);
+            return ApiResponse.success(presignedUrl, "CV uploaded successfully");
+        } catch (Exception e) {
+            throw new BadRequestException("Failed to upload CV: " + e.getMessage());
+        }
     }
 
     @Override
@@ -115,6 +177,12 @@ public class UserProfileServiceImpl implements UserProfileService {
     }
 
     private UserProfileResponse toProfileResponse(User user) {
+        PtProfileSummary ptProfileSummary = null;
+        var ptProfileOpt = ptProfileRepository.findByUserId(user.getId());
+        if (ptProfileOpt.isPresent()) {
+            ptProfileSummary = toPtProfileSummary(ptProfileOpt.get());
+        }
+
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -125,7 +193,26 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .avatarUrl(user.getAvatarUrl())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
+                .isKycVerified(user.getIsKycVerified())
+                .ptProfile(ptProfileSummary)
                 .createdAt(user.getCreatedAt())
+                .build();
+    }
+
+    private PtProfileSummary toPtProfileSummary(PtProfile ptProfile) {
+        return PtProfileSummary.builder()
+                .id(ptProfile.getId())
+                .isVerified(ptProfile.getIsVerified())
+                .bio(ptProfile.getBio())
+                .trainingPhilosophy(ptProfile.getTrainingPhilosophy())
+                .yearsOfExperience(ptProfile.getYearsOfExperience())
+                .specializations(ptProfile.getSpecializations())
+                .rating(ptProfile.getRating())
+                .totalReviews(ptProfile.getTotalReviews())
+                .tier(ptProfile.getTier() != null ? ptProfile.getTier().name() : null)
+                .hourlyRate(ptProfile.getHourlyRate())
+                .ptRequestStatus(ptProfile.getPtRequestStatus() != null ? ptProfile.getPtRequestStatus().name() : null)
+                .verificationStatus(ptProfile.getVerificationStatus() != null ? ptProfile.getVerificationStatus().name() : null)
                 .build();
     }
 

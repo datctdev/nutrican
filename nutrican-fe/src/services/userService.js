@@ -7,4 +7,12 @@ export const userService = {
   getMacroTarget: () => api.get('/profile/macro-target'),
   setMacroTarget: (data) => api.put('/profile/macro-target', data),
   getUserById: (userId) => api.get(`/profile/${userId}`),
+  registerAsPt: (data) => api.post('/profile/pt/register', data),
+  uploadCv: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/profile/pt/cv', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
