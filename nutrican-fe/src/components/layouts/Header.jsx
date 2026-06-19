@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import { useState } from 'react';
-import { Menu, X, ChevronDown, Bell, LogOut, User, Settings, LayoutDashboard, Sparkles } from 'lucide-react';
+import { Menu, X, ChevronDown, Bell, LogOut, User, Settings, LayoutDashboard, Sparkles, Target } from 'lucide-react';
 
 export default function Header() {
   const { user, logout, isAuthenticated } = useAuthStore();
@@ -38,6 +38,7 @@ export default function Header() {
       { label: 'Diet Tracker', href: '/diet' },
       { label: 'Find PT', href: '/marketplace' },
       { label: 'Profile', href: '/profile' },
+      { label: 'Macro Targets', href: '/macro-targets' },
       { label: 'Verification', href: '/kyc' },
     ],
     PT_CERTIFIED: [

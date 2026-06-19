@@ -3,8 +3,10 @@ import { useState, useEffect, useRef } from 'react';
 import { userService } from '../../services/userService';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import Modal from '../../components/common/Modal';
 import { toast } from 'sonner';
-import { Loader2, Upload, User, Mail, Phone, MapPin, Target, Flame, Beef, Wheat, Droplet } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, Camera, User, Mail, Phone, MapPin, Target, ChevronRight, Edit3, Camera as CameraIcon } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
 export default function ProfilePage() {
@@ -12,43 +14,29 @@ export default function ProfilePage() {
   const fileInputRef = useRef(null);
   
   const [profile, setProfile] = useState({ fullName: '', email: '', phoneNumber: '', address: '', avatarUrl: '' });
-  const [macros, setMacros] = useState({ dailyCalories: 2000, protein: 120, carb: 200, fat: 65 });
-  
+  const [editForm, setEditForm] = useState({ fullName: '', phoneNumber: '', address: '' });
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
-  const [isLoadingMacros, setIsLoadingMacros] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [isSavingMacros, setIsSavingMacros] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
-  useEffect(() => { fetchProfile(); fetchMacros(); }, []);
+  useEffect(() => { fetchProfile(); }, []);
 
   const fetchProfile = async () => {
     setIsLoadingProfile(true);
     try {
       const response = await userService.getProfile();
       const data = response.data.data;
-      setProfile({
+      const p = {
         fullName: data.fullName || '', email: data.email || '',
         phoneNumber: data.phoneNumber || '', address: data.address || '',
         avatarUrl: data.avatarUrl || '',
-      });
+      };
+      setProfile(p);
+      setEditForm({ fullName: p.fullName, phoneNumber: p.phoneNumber, address: p.address });
     } catch (error) { toast.error('Failed to load profile'); } 
     finally { setIsLoadingProfile(false); }
-  };
-
-  const fetchMacros = async () => {
-    setIsLoadingMacros(true);
-    try {
-      const response = await userService.getMacroTarget();
-      const data = response.data.data;
-      if(data) {
-        setMacros({
-          dailyCalories: data.dailyCalories || 2000, protein: data.protein || 120,
-          carb: data.carb || data.carbs || 200, fat: data.fat || 65,
-        });
-      }
-    } catch (error) { toast.error('Failed to load macro targets'); } 
-    finally { setIsLoadingMacros(false); }
   };
 
   const handleAvatarChange = async (e) => {
@@ -78,132 +66,185 @@ export default function ProfilePage() {
     setIsSavingProfile(true);
     try {
       const response = await userService.updateProfile({
-        fullName: profile.fullName, phoneNumber: profile.phoneNumber, address: profile.address,
+        fullName: editForm.fullName, phoneNumber: editForm.phoneNumber, address: editForm.address,
       });
       setAuthUser({ ...authUser, ...response.data.data });
+      setProfile(prev => ({ ...prev, ...editForm }));
       toast.success('Profile updated successfully!');
+      setIsEditModalOpen(false);
     } catch (error) { toast.error('Failed to update profile'); } 
     finally { setIsSavingProfile(false); }
   };
 
-  const handleSaveMacros = async () => {
-    setIsSavingMacros(true);
-    try {
-      await userService.setMacroTarget(macros);
-      toast.success('Macro targets updated successfully!');
-    } catch (error) { toast.error('Failed to update macro targets'); } 
-    finally { setIsSavingMacros(false); }
+  const openEditModal = () => {
+    setEditForm({ fullName: profile.fullName, phoneNumber: profile.phoneNumber, address: profile.address });
+    setIsEditModalOpen(true);
   };
 
   const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U';
 
-  if (isLoadingProfile && isLoadingMacros) {
+  if (isLoadingProfile) {
     return <div className="flex items-center justify-center min-h-[400px]"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>;
   }
 
-  const InputField = ({ icon: Icon, label, className = "", ...props }) => (
-    <div className="space-y-1.5 w-full">
-      <label className="text-sm font-bold text-slate-700">{label}</label>
-      <div className="relative flex items-center">
-        {Icon && <Icon className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />}
-        <input 
-          className={`w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all disabled:bg-slate-50 disabled:text-slate-500 ${Icon ? 'pl-9 pr-3' : 'px-4'} ${className}`} 
-          {...props} 
-        />
-      </div>
-    </div>
-  );
-
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Account Settings</h1>
-        <p className="text-slate-500 mt-1 font-medium">Manage your personal information and nutrition targets.</p>
+    <div className="max-w-3xl mx-auto pb-12 animate-fade-in">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Profile</h1>
+        <p className="text-slate-500 mt-1 font-medium">View and manage your personal information.</p>
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-7 space-y-6">
-          <Card className="bg-white border-slate-200 shadow-sm">
-            <CardContent className="p-8">
-              <h3 className="text-xl font-bold text-slate-800 mb-6 border-b border-slate-100 pb-4">Personal Details</h3>
-              
-              <div className="flex items-center gap-6 mb-8">
-                <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                  <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-blue-500 to-indigo-500">
-                    {profile.avatarUrl ? (
-                      <img src={profile.avatarUrl} alt={profile.fullName} className="w-full h-full rounded-full object-cover border-2 border-white" />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-blue-600 font-bold text-2xl border-2 border-white">
-                        {getInitials(profile.fullName)}
-                      </div>
-                    )}
+      {/* Profile Card */}
+      <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
+        {/* Cover gradient */}
+        <div className="h-32 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+        
+        <CardContent className="px-8 pb-8">
+          {/* Avatar */}
+          <div className="flex items-end justify-between -mt-16 mb-6">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-full p-1.5 bg-white shadow-lg">
+                {profile.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={profile.fullName} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-blue-600 font-bold text-4xl">
+                    {getInitials(profile.fullName)}
                   </div>
-                  <div className={`absolute inset-0 rounded-full flex items-center justify-center transition-all ${isUploadingAvatar ? 'bg-black/40' : 'bg-black/40 opacity-0 group-hover:opacity-100'}`}>
-                    {isUploadingAvatar ? <Loader2 className="w-6 h-6 text-white animate-spin" /> : <Upload className="w-6 h-6 text-white" />}
-                  </div>
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                )}
+              </div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition-colors disabled:opacity-50"
+              >
+                {isUploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+            </div>
+          </div>
+
+          {/* Name & email */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-slate-900">{profile.fullName || 'Member'}</h2>
+            <p className="text-slate-500 mt-1">{profile.email}</p>
+          </div>
+
+          {/* Info rows */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between py-4 border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                  <User className="w-5 h-5 text-slate-600" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-bold text-slate-800">{profile.fullName || 'Member'}</h4>
-                  <p className="text-sm text-slate-500 font-medium mb-2">Update your profile picture</p>
-                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploadingAvatar} className="rounded-lg border-slate-200 h-8">
-                    {isUploadingAvatar ? 'Uploading...' : 'Choose image'}
-                  </Button>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Full Name</p>
+                  <p className="text-slate-900 font-medium mt-0.5">{profile.fullName || '—'}</p>
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-5">
-                <InputField icon={User} label="Full Name" value={profile.fullName} onChange={(e) => setProfile(p => ({...p, fullName: e.target.value}))} placeholder="Enter your full name" />
-                <InputField icon={Mail} label="Email Address" type="email" value={profile.email} disabled />
-                <InputField icon={Phone} label="Phone Number" value={profile.phoneNumber} onChange={(e) => setProfile(p => ({...p, phoneNumber: e.target.value}))} placeholder="e.g. +84 123 456 789" />
-                <InputField icon={MapPin} label="Address" value={profile.address} onChange={(e) => setProfile(p => ({...p, address: e.target.value}))} placeholder="Enter your physical address" />
-                
-                <div className="pt-4 flex justify-end">
-                  <Button onClick={handleSaveProfile} disabled={isSavingProfile} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 shadow-sm">
-                    {isSavingProfile ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Changes'}
-                  </Button>
+            <div className="flex items-center justify-between py-4 border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</p>
+                  <p className="text-slate-900 font-medium mt-0.5">{profile.email || '—'}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+
+            <div className="flex items-center justify-between py-4 border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phone Number</p>
+                  <p className="text-slate-900 font-medium mt-0.5">{profile.phoneNumber || 'Not set'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-4">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address</p>
+                  <p className="text-slate-900 font-medium mt-0.5">{profile.address || 'Not set'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-6">
+            <Button onClick={openEditModal} className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-semibold flex items-center justify-center gap-2">
+              <Edit3 className="w-4 h-4" />
+              Edit Profile
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit Profile Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Profile">
+        <div className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold text-slate-700">Full Name</label>
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={editForm.fullName}
+                onChange={(e) => setEditForm(f => ({...f, fullName: e.target.value}))}
+                placeholder="Enter your full name"
+                className="w-full py-2.5 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold text-slate-700">Phone Number</label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={editForm.phoneNumber}
+                onChange={(e) => setEditForm(f => ({...f, phoneNumber: e.target.value}))}
+                placeholder="e.g. +84 123 456 789"
+                className="w-full py-2.5 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold text-slate-700">Address</label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+              <textarea
+                value={editForm.address}
+                onChange={(e) => setEditForm(f => ({...f, address: e.target.value}))}
+                placeholder="Enter your address"
+                rows={3}
+                className="w-full py-2.5 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)} className="flex-1 rounded-xl py-5">
+              Cancel
+            </Button>
+            <Button onClick={handleSaveProfile} disabled={isSavingProfile} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-5">
+              {isSavingProfile ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Changes'}
+            </Button>
+          </div>
         </div>
-
-        <div className="lg:col-span-5 space-y-6">
-          <Card className="bg-gradient-to-br from-slate-900 to-slate-800 border-slate-800 text-white shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl" />
-            <CardContent className="p-8 relative z-10">
-              <div className="flex items-center gap-3 mb-8 border-b border-white/10 pb-4">
-                <Target className="w-6 h-6 text-blue-400" />
-                <h3 className="text-xl font-bold text-white">Daily Macro Targets</h3>
-              </div>
-
-              <div className="space-y-6">
-                <InputField 
-                  icon={Flame} 
-                  label={<span className="text-slate-300">Calories (kcal)</span>} 
-                  type="number" 
-                  value={macros.dailyCalories} 
-                  onChange={(e) => setMacros(m => ({...m, dailyCalories: Number(e.target.value)}))} 
-                  className="bg-white/10 border-white/10 text-white placeholder-white/40 focus:ring-blue-500/40 focus:border-blue-400" 
-                />
-                
-                <div className="grid grid-cols-3 gap-3">
-                  <InputField icon={Beef} label={<span className="text-slate-300 text-xs">Protein (g)</span>} type="number" value={macros.protein} onChange={(e) => setMacros(m => ({...m, protein: Number(e.target.value)}))} className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" />
-                  <InputField icon={Wheat} label={<span className="text-slate-300 text-xs">Carbs (g)</span>} type="number" value={macros.carb} onChange={(e) => setMacros(m => ({...m, carb: Number(e.target.value)}))} className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" />
-                  <InputField icon={Droplet} label={<span className="text-slate-300 text-xs">Fat (g)</span>} type="number" value={macros.fat} onChange={(e) => setMacros(m => ({...m, fat: Number(e.target.value)}))} className="bg-white/10 border-white/10 text-white focus:border-blue-400 text-sm" />
-                </div>
-                
-                <div className="pt-6">
-                  <Button onClick={handleSaveMacros} disabled={isSavingMacros} className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl shadow-md border-0 py-6 text-base">
-                    {isSavingMacros ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Updating...</> : 'Update Targets'}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-      </div>
+      </Modal>
     </div>
   );
 }
