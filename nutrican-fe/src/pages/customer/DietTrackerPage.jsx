@@ -77,8 +77,10 @@ export default function DietTrackerPage() {
     try {
       setLoading(true);
       const today = todayStr();
+      console.log('[DietTracker] Fetching logs for date:', today);
       const [logsRes, summaryRes, sosRes] = await Promise.all([
-        dietService.getLogs({ page: 0, size: 10, startDate: today, endDate: today }),
+        dietService.getLogs({ page: 0, size: 10 }),
+        dietService.getSummary({ date: today }),
         dietService.getSummary({ date: today }),
         dietService.getSosTickets().catch(() => ({ data: { data: [] } })),
       ]);
