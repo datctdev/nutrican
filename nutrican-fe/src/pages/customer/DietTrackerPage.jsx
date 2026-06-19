@@ -58,7 +58,13 @@ export default function DietTrackerPage() {
     loadHotpotData();
   }, []);
 
-  const todayStr = () => new Date().toISOString().split('T')[0];
+  const todayStr = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   const loadHotpotData = async () => {
     try {
@@ -77,22 +83,27 @@ export default function DietTrackerPage() {
     try {
       setLoading(true);
       const today = todayStr();
-      console.log('[DietTracker] Fetching logs for date:', today);
       const [logsRes, summaryRes, sosRes] = await Promise.all([
-        dietService.getLogs({ page: 0, size: 10 }),
+        dietService.getLogs({ page: 0, size: 10, startDate: today, endDate: today }),
         dietService.getSummary({ date: today }),
         dietService.getSummary({ date: today }),
         dietService.getSosTickets().catch(() => ({ data: { data: [] } })),
       ]);
       setLogs(logsRes.data.data.content || []);
-      const summaryData = summaryRes.data.data || {};
-      setSummary({
-        ...summaryData,
-        targetCalories: summaryData.targetCalories || 2000,
-        targetProtein: summaryData.targetProtein || 120,
-        targetCarbs: summaryData.targetCarb || summaryData.targetCarbs || 200,
-        targetFat: summaryData.targetFat || 65,
-      });
+      const rawData = summaryRes.data.data || {};
+      // Ensure all numeric values are properly converted (BigDecimal from Java)
+      const summaryData = {
+        date: rawData.date,
+        totalCalories: Number(rawData.totalCalories) || 0,
+        totalProtein: Number(rawData.totalProtein) || 0,
+        totalCarbs: Number(rawData.totalCarbs || rawData.totalCarb) || 0,
+        totalFat: Number(rawData.totalFat) || 0,
+        targetCalories: Number(rawData.targetCalories) || 2000,
+        targetProtein: Number(rawData.targetProtein) || 120,
+        targetCarbs: Number(rawData.targetCarbs || rawData.targetCarb) || 200,
+        targetFat: Number(rawData.targetFat) || 65,
+      };
+      setSummary(summaryData);
       setSosTickets(sosRes.data.data || []);
     } catch (err) {
       console.error('Error fetching diet data:', err);
