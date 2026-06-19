@@ -8,10 +8,11 @@ export const authService = {
 
   // VNPT-based KYC flow
   startKycSession: () => api.post('/kyc/sessions:start'),
-  uploadKycImage: (sessionId, file, title) => {
+  uploadKycImage: (sessionId, file, title, type) => {
     const form = new FormData();
     form.append('file', file);
     if (title) form.append('title', title);
+    if (type) form.append('type', type);
     return api.post(`/kyc/sessions/${sessionId}/fullFlow-upload`, form);
   },
   compareKyc: (sessionId) => api.post(`/kyc/sessions/${sessionId}/compare`),

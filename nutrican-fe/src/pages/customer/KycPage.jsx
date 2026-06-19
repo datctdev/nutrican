@@ -83,13 +83,13 @@ export default function KycPage() {
     return { file, preview };
   };
 
-  const uploadImage = async (file, title, setPreview, nextStep) => {
+  const uploadImage = async (file, title, type, setPreview, nextStep) => {
     try {
       setUploading(true);
       const { preview } = handleFileSelect(file) || {};
       if (preview) setPreview(preview);
 
-      await authService.uploadKycImage(sessionId, file, title);
+      await authService.uploadKycImage(sessionId, file, title, type);
       toast.success('Tải ảnh thành công');
       setCurrentStep(nextStep);
     } catch (err) {
@@ -123,14 +123,17 @@ export default function KycPage() {
     setSelfiePreview(null);
     setCompareResult(null);
     setSessionInfo(null);
+    compareRan.current = false;
   };
 
   // Auto-trigger compare when selfie is uploaded (currentStep becomes 4)
+  const compareRan = useRef(false);
   useEffect(() => {
-    if (currentStep === 4 && !comparing && !compareResult) {
+    if (currentStep === 4 && !comparing && !compareResult && !compareRan.current) {
+      compareRan.current = true;
       handleCompare();
     }
-  }, [currentStep]);
+  }, [currentStep, comparing, compareResult]);
 
   // Poll session info when in progress
   useEffect(() => {
@@ -144,7 +147,7 @@ export default function KycPage() {
       }
     }, 3000);
     return () => clearInterval(timer);
-  }, [sessionId, currentStep]);
+  }, [sessionId, currentStep, authService]);
 
   const StatusBanner = ({ status }) => {
     if (!status) return null;
@@ -322,7 +325,7 @@ export default function KycPage() {
             isActive={currentStep >= 1}
             isUploaded={currentStep > 1}
             uploadingThis={uploading && currentStep === 1}
-            onUpload={(file) => uploadImage(file, 'FRONT', setFrontPreview, 2)}
+            onUpload={(file) => uploadImage(file, 'FRONT', 'FRONT', setFrontPreview, 2)}
           />
           <UploadStepCard
             stepKey="back"
@@ -333,7 +336,7 @@ export default function KycPage() {
             isActive={currentStep >= 2}
             isUploaded={currentStep > 2}
             uploadingThis={uploading && currentStep === 2}
-            onUpload={(file) => uploadImage(file, 'BACK', setBackPreview, 3)}
+            onUpload={(file) => uploadImage(file, 'BACK', 'BACK', setBackPreview, 3)}
           />
           <UploadStepCard
             stepKey="selfie"
@@ -344,7 +347,7 @@ export default function KycPage() {
             isActive={currentStep >= 3}
             isUploaded={currentStep > 3}
             uploadingThis={uploading && currentStep === 3}
-            onUpload={(file) => uploadImage(file, 'SELFIE', setSelfiePreview, 4)}
+            onUpload={(file) => uploadImage(file, 'SELFIE', 'SELFIE', setSelfiePreview, 4)}
           />
         </div>
       )}

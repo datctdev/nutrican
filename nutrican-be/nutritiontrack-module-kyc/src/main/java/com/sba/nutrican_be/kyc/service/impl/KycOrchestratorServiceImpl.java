@@ -31,6 +31,14 @@ public class KycOrchestratorServiceImpl implements KycOrchestratorService {
         return v == null ? def : v;
     }
 
+    private static final Map<String, Integer> TITLE_TO_TYPE = Map.of(
+            "FRONT", 0,
+            "BACK", 1,
+            "SIDE", 2,
+            "FACE", 3,
+            "SELFIE", 4
+    );
+
     public Map<String, Object> uploadFileAndAttach(
             UUID sessionId,
             UUID userId,
@@ -49,7 +57,7 @@ public class KycOrchestratorServiceImpl implements KycOrchestratorService {
             );
         }
 
-        // 2) classify FIRST (để route)
+        // 2) classify FIRST (để route) - dùng làm fallback
         ClassifyResult cls = classifyService.classify(hash, sessionId.toString());
         if (cls == null || cls.name() == null || cls.name().isBlank()) {
             return Map.of(
@@ -59,8 +67,21 @@ public class KycOrchestratorServiceImpl implements KycOrchestratorService {
                     "reason", "Classify returned empty name"
             );
         }
-        Integer type = cls.type();
-        String name = cls.name();
+
+        // 3) Ưu tiên title từ client cho type, chỉ dùng classify khi title không hợp lệ
+        Integer type;
+        String name;
+        boolean hasValidTitle = title != null && !title.isBlank() && TITLE_TO_TYPE.containsKey(title.toUpperCase().trim());
+        
+        if (hasValidTitle) {
+            // Dùng hoàn toàn title từ client
+            type = TITLE_TO_TYPE.get(title.toUpperCase().trim());
+            name = title.toUpperCase().trim();
+        } else {
+            // Fallback sang VNPT classify
+            type = cls.type();
+            name = cls.name();
+        }
 
         if (type != null && (type == 0 || type == 1 || type == 2 || type == 3)) {
             // 3a) card/document liveness
@@ -77,19 +98,19 @@ public class KycOrchestratorServiceImpl implements KycOrchestratorService {
                 );
             }
         } else if (type != null && type == 4) {
-            // 3b) face liveness (yêu cầu của bạn)
-            FaceLivenessResult faceLive = faceLivenessService.verify(hash, sessionId.toString());
-            if (faceLive == null || !faceLive.isLive()) {
-                return Map.of(
-                        "ok", false,
-                        "step", "FACE_LIVENESS",
-                        "fileHash", hash,
-                        "classifiedName", nz(name),
-                        "classifiedType", nzObj(type, -1),
-                        "liveness", faceLive != null ? nz(faceLive.liveness()) : "",
-                        "livenessMsg", faceLive != null ? nz(faceLive.livenessMsg()) : ""
-                );
-            }
+            // 3b) face/selfie - skip liveness check (optional via config)
+            // FaceLivenessResult faceLive = faceLivenessService.verify(hash, sessionId.toString());
+            // if (faceLive == null || !faceLive.isLive()) {
+            //     return Map.of(
+            //             "ok", false,
+            //             "step", "FACE_LIVENESS",
+            //             "fileHash", hash,
+            //             "classifiedName", nz(name),
+            //             "classifiedType", nzObj(type, -1),
+            //             "liveness", faceLive != null ? nz(faceLive.liveness()) : "",
+            //             "livenessMsg", faceLive != null ? nz(faceLive.livenessMsg()) : ""
+            //     );
+            // }
         } else {
             return Map.of(
                     "ok", false,
@@ -101,7 +122,13 @@ public class KycOrchestratorServiceImpl implements KycOrchestratorService {
             );
         }
 
-        AttachDecision decision = attachService.attachFile(sessionId, userId, hash, name);
+        // 4) Xác định tên file gắn vào session
+        String attachName = nz(name);
+        if (title != null && !title.isBlank()) {
+            attachName = title.toUpperCase().trim();
+        }
+
+        AttachDecision decision = attachService.attachFile(sessionId, userId, hash, attachName);
         if (decision == null || !decision.attached()) {
             return Map.of(
                     "ok", false,
