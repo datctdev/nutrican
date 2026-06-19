@@ -1034,4 +1034,4 @@ print('MAE kcal:', (labeled['ai_cal'] - labeled['pt_cal']).abs().mean())
 ---
 
 *Document Version: 2.1.0*
-*Last Updated: 2026-06-12*
+*Last Updated: 2026-06-20*

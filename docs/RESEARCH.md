@@ -266,4 +266,4 @@ Chi tiet UI: [FRONTEND.md §12](./FRONTEND.md#12-research--rbl-ui).
 ---
 
 *Document Version: 1.0.0*
-*Last Updated: 2026-06-12*
+*Last Updated: 2026-06-20*
