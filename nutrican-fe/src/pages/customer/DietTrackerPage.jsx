@@ -131,28 +131,30 @@ export default function DietTrackerPage() {
     addIngredientFromSearch(food);
   };
 
-  // Scale macros for a food item by quantity in grams (mirrors backend MacroUtils / macrosForFood logic).
-  const scaleFoodMacros = (food, qtyG) => {
-    const serving = Number(food.servingSizeG) > 0 ? Number(food.servingSizeG) : 100;
-    const ratio = (Number(qtyG) || 0) / serving;
-    return {
-      calories: (Number(food.calories) || 0) * ratio,
-      protein:  (Number(food.protein)  || 0) * ratio,
-      carb:     (Number(food.carb)     || 0) * ratio,
-      fat:      (Number(food.fat)      || 0) * ratio,
-    };
-  };
-
   const addIngredientFromSearch = (food) => {
-    const defaultQty = Number(food.servingSizeG) || 100;
+    const defaultQty = parseFloat(food.servingSizeG) || 100;
+    const baseCalories = parseFloat(food.calories) || 0;
+    const baseProtein = parseFloat(food.protein) || 0;
+    const baseCarb = parseFloat(food.carb) || 0;
+    const baseFat = parseFloat(food.fat) || 0;
+    const ratio = defaultQty / 100;
     setIngredientItems((prev) => [
       ...prev,
       {
         foodItemId: food.id,
         itemName: food.nameVi,
-        servingSizeG: food.servingSizeG,
+        servingSizeG: defaultQty,
         quantityG: defaultQty,
-        ...scaleFoodMacros(food, defaultQty),
+        // Store per-100g values for recalculation
+        _caloriesPer100g: baseCalories,
+        _proteinPer100g: baseProtein,
+        _carbPer100g: baseCarb,
+        _fatPer100g: baseFat,
+        // Pre-scaled values for display
+        calories: baseCalories * ratio,
+        protein: baseProtein * ratio,
+        carb: baseCarb * ratio,
+        fat: baseFat * ratio,
       },
     ]);
     setFoodSearchQuery('');
@@ -164,7 +166,20 @@ export default function DietTrackerPage() {
       prev.map((it, i) => {
         if (i !== idx) return it;
         const qtyG = Number(qty) || 0;
-        return { ...it, quantityG: qtyG, ...scaleFoodMacros(it, qtyG) };
+        // Use stored per-100g values for accurate recalculation
+        const calPer100 = parseFloat(it._caloriesPer100g) || 0;
+        const proPer100 = parseFloat(it._proteinPer100g) || 0;
+        const carbPer100 = parseFloat(it._carbPer100g) || 0;
+        const fatPer100 = parseFloat(it._fatPer100g) || 0;
+        const ratio = qtyG / 100;
+        return { 
+          ...it, 
+          quantityG: qtyG, 
+          calories: calPer100 * ratio,
+          protein: proPer100 * ratio,
+          carb: carbPer100 * ratio,
+          fat: fatPer100 * ratio,
+        };
       })
     );
   };
@@ -592,7 +607,7 @@ export default function DietTrackerPage() {
                           >
                             <span className="font-semibold">{food.nameVi}</span>
                             <span className="text-slate-400 text-xs">
-                              {food.calories} kcal / {food.servingSizeG}g
+                              {parseFloat(food.calories || 0).toFixed(0)} kcal / {parseFloat(food.servingSizeG || 100).toFixed(0)}g
                             </span>
                           </button>
                         ))}
