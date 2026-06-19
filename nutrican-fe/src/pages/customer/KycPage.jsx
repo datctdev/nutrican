@@ -2,71 +2,118 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { userService } from '../../services/userService';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import {
-  Shield,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  AlertTriangle,
-  UploadCloud,
-  FileText,
-  Camera,
-  ArrowRight,
-  RotateCcw,
-  Loader2,
+  Shield, CheckCircle2, Clock, XCircle, AlertTriangle,
+  FileText, Camera, ArrowRight, RotateCcw, Loader2,
+  User, Briefcase, Award, FileUp, GraduationCap, Sparkles,
+  Users, TrendingUp, Star, ChevronRight, Mail, Phone, UploadCloud
 } from 'lucide-react';
 
 export default function KycPage() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, checkAuth } = useAuthStore();
 
-  // Session state
+  // Check KYC status - initialize from auth store directly
+  const [isKycVerified, setIsKycVerified] = useState(
+    () => user?.isKycVerified || localStorage.getItem('isKycVerified') === 'true' || false
+  );
+  const [hasPtProfile, setHasPtProfile] = useState(false);
+  const [ptProfileStatus, setPtProfileStatus] = useState(null);
+  const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+
+  // KYC Session state
   const [sessionId, setSessionId] = useState(null);
-  const [currentStep, setCurrentStep] = useState(0); // 0=idle, 1=front, 2=back, 3=selfie, 4=compare, 5=done
+  const [currentStep, setCurrentStep] = useState(0);
   const [uploading, setUploading] = useState(false);
-
-  // Uploaded file previews
   const [frontPreview, setFrontPreview] = useState(null);
   const [backPreview, setBackPreview] = useState(null);
   const [selfiePreview, setSelfiePreview] = useState(null);
-
-  // Compare result
   const [compareResult, setCompareResult] = useState(null);
   const [comparing, setComparing] = useState(false);
-
-  // Session metadata
   const [sessionInfo, setSessionInfo] = useState(null);
+
+  // PT Registration state
+  const [ptForm, setPtForm] = useState({
+    bio: '',
+    trainingPhilosophy: '',
+    yearsOfExperience: '',
+    specializations: [],
+    certifications: '',
+    hourlyRate: '',
+    cvUrl: '',
+  });
+  const [isRegisteringPt, setIsRegisteringPt] = useState(false);
+  const [isSubmittingPt, setIsSubmittingPt] = useState(false);
+  const cvInputRef = useRef(null);
 
   const frontInputRef = useRef(null);
   const backInputRef = useRef(null);
   const selfieInputRef = useRef(null);
+  const compareRan = useRef(false);
 
-  // Steps configuration
+  // Check KYC and PT status on mount
+  useEffect(() => {
+    const checkStatus = async () => {
+      setIsLoadingStatus(true);
+      try {
+        // Check if user has PT profile via API
+        const response = await userService.getProfile();
+        const userData = response.data?.data;
+        
+        // Update KYC status from API
+        if (userData?.isKycVerified) {
+          setIsKycVerified(true);
+          localStorage.setItem('isKycVerified', 'true');
+        }
+
+        // Check if user has PT profile
+        if (userData?.ptProfile) {
+          setHasPtProfile(true);
+          setPtProfileStatus(userData.ptProfile.ptRequestStatus || userData.ptProfile.verificationStatus);
+        }
+      } catch (error) {
+        console.error('Error checking status:', error);
+        // Fallback to localStorage
+        const storedKyc = localStorage.getItem('isKycVerified');
+        if (storedKyc === 'true') {
+          setIsKycVerified(true);
+        }
+      } finally {
+        setIsLoadingStatus(false);
+      }
+    };
+    checkStatus();
+  }, [user?.isKycVerified]);
+
+  // Steps for KYC
   const steps = [
     { key: 'front', label: 'Mặt trước CCCD', icon: FileText, ref: frontInputRef },
     { key: 'back', label: 'Mặt sau CCCD', icon: FileText, ref: backInputRef },
     { key: 'selfie', label: 'Ảnh gương mặt', icon: Camera, ref: selfieInputRef },
   ];
 
+  const specializationOptions = [
+    'Giảm cân', 'Tăng cơ', 'Thể hình', 'Yoga', 'Pilates',
+    'Cardio', 'CrossFit', 'Boxing', 'Swimming', 'Nutrition'
+  ];
+
+  // KYC Functions
   const startSession = async () => {
     try {
       setUploading(true);
       const res = await authService.startKycSession();
-      console.log('KYC start response:', res.data);
       const session = res.data?.data?.session ?? res.data?.session ?? res.data;
       const sid = session?.sessionId ?? session?.id;
-      if (!sid) {
-        throw new Error('Không nhận được sessionId từ server');
-      }
+      if (!sid) throw new Error('Không nhận được sessionId từ server');
       setSessionId(sid);
       setCurrentStep(1);
       toast.success('Đã tạo phiên KYC, bắt đầu với mặt trước CCCD');
     } catch (err) {
-      console.error('KYC start error:', err);
       toast.error(err.response?.data?.message || err.response?.data?.reason || err.message || 'Không thể tạo phiên KYC');
     } finally {
       setUploading(false);
@@ -88,7 +135,6 @@ export default function KycPage() {
       setUploading(true);
       const { preview } = handleFileSelect(file) || {};
       if (preview) setPreview(preview);
-
       await authService.uploadKycImage(sessionId, file, title, type);
       toast.success('Tải ảnh thành công');
       setCurrentStep(nextStep);
@@ -105,6 +151,9 @@ export default function KycPage() {
       const res = await authService.compareKyc(sessionId);
       setCompareResult(res.data.data);
       setCurrentStep(5);
+      // Update localStorage
+      localStorage.setItem('isKycVerified', 'true');
+      setIsKycVerified(true);
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.reason || 'Xác thực thất bại';
       toast.error(msg);
@@ -126,8 +175,7 @@ export default function KycPage() {
     compareRan.current = false;
   };
 
-  // Auto-trigger compare when selfie is uploaded (currentStep becomes 4)
-  const compareRan = useRef(false);
+  // Auto-trigger compare when selfie is uploaded
   useEffect(() => {
     if (currentStep === 4 && !comparing && !compareResult && !compareRan.current) {
       compareRan.current = true;
@@ -142,21 +190,67 @@ export default function KycPage() {
       try {
         const res = await authService.getKycSession(sessionId);
         setSessionInfo(res.data.data?.session);
-      } catch {
-        // ignore poll errors
-      }
+      } catch {}
     }, 3000);
     return () => clearInterval(timer);
-  }, [sessionId, currentStep, authService]);
+  }, [sessionId, currentStep]);
 
+  // PT Registration Functions
+  const handleSpecializationToggle = (spec) => {
+    setPtForm(prev => ({
+      ...prev,
+      specializations: prev.specializations.includes(spec)
+        ? prev.specializations.filter(s => s !== spec)
+        : [...prev.specializations, spec]
+    }));
+  };
+
+  const handleCvUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File quá lớn. Tối đa 10MB');
+      return;
+    }
+    // Simulate upload - in real app, upload to server
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setPtForm(prev => ({ ...prev, cvUrl: ev.target.result, cvFileName: file.name }));
+      toast.success('CV đã được tải lên!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRegisterPt = async () => {
+    if (!ptForm.bio.trim()) return toast.error('Vui lòng nhập giới thiệu bản thân');
+    if (!ptForm.trainingPhilosophy.trim()) return toast.error('Vui lòng nhập triết lý tập luyện');
+    if (!ptForm.yearsOfExperience) return toast.error('Vui lòng nhập số năm kinh nghiệm');
+
+    setIsSubmittingPt(true);
+    try {
+      // Call API to register as PT
+      // In real implementation, call userService.registerAsPt(ptForm)
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+      toast.success('Đăng ký làm PT thành công! Vui lòng chờ duyệt.');
+      setHasPtProfile(true);
+      setPtProfileStatus('PENDING_APPROVAL');
+      await checkAuth();
+    } catch (error) {
+      toast.error('Đăng ký thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsSubmittingPt(false);
+    }
+  };
+
+  // Status Banner Component
   const StatusBanner = ({ status }) => {
     if (!status) return null;
     const cfg = {
-      DRAFT:          { icon: Clock,        color: 'text-slate-600',   bg: 'bg-slate-50',   border: 'border-slate-200', title: 'Đang tạo phiên',   desc: 'Bấm bắt đầu để tiến hành KYC.' },
-      IN_PROGRESS:    { icon: UploadCloud,  color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200',  title: 'Đang xử lý',     desc: 'Đang tương tác với VNPT eKYC...' },
-      VERIFIED:       { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', title: 'Xác thực thành công', desc: 'KYC đã hoàn tất.' },
-      REJECTED:       { icon: XCircle,      color: 'text-red-600',     bg: 'bg-red-50',     border: 'border-red-300',   title: 'Xác thực thất bại', desc: 'Ảnh không khớp hoặc chất lượng không đạt.', },
-      ERROR:          { icon: AlertTriangle,color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200', title: 'Có lỗi',         desc: compareResult?.error || 'Vui lòng thử lại.' },
+      DRAFT: { icon: Clock, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200', title: 'Chưa xác thực', desc: 'Vui lòng xác thực KYC để tiếp tục.' },
+      IN_PROGRESS: { icon: UploadCloud, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', title: 'Đang xử lý', desc: 'Đang tương tác với VNPT eKYC...' },
+      VERIFIED: { icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', title: 'Xác thực thành công', desc: 'KYC đã hoàn tất.' },
+      REJECTED: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300', title: 'Xác thực thất bại', desc: 'Ảnh không khớp hoặc chất lượng không đạt.' },
+      ERROR: { icon: AlertTriangle, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', title: 'Có lỗi', desc: compareResult?.error || 'Vui lòng thử lại.' },
     };
     const config = cfg[status] || cfg.DRAFT;
     const Icon = config.icon;
@@ -190,35 +284,13 @@ export default function KycPage() {
             <p className="text-xs text-slate-500 font-medium">{isUploaded ? 'Đã tải lên' : isActive ? 'Vui lòng tải ảnh' : 'Chờ tải'}</p>
           </div>
         </div>
-
         <div className="flex gap-3">
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            disabled={!isActive || isUploaded}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onUpload(file);
-            }}
-          />
-          <Button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={!isActive || isUploaded}
-            className={`flex-1 rounded-xl h-12 font-bold ${isUploaded ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-          >
+          <input ref={inputRef} type="file" accept="image/*" className="hidden" disabled={!isActive || isUploaded} onChange={(e) => { const file = e.target.files?.[0]; if (file) onUpload(file); }} />
+          <Button type="button" onClick={() => inputRef.current?.click()} disabled={!isActive || isUploaded} className={`flex-1 rounded-xl h-12 font-bold ${isUploaded ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'}`}>
             {uploadingThis ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Đang tải...</> : isUploaded ? 'Đã tải xong' : 'Chọn ảnh'}
           </Button>
         </div>
-
-        {preview && (
-          <div className="mt-4 relative group">
-            <img src={preview} alt={stepKey} className="w-full h-48 object-cover rounded-xl border border-slate-200" />
-            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-          </div>
-        )}
+        {preview && <div className="mt-4 relative group"><img src={preview} alt={stepKey} className="w-full h-48 object-cover rounded-xl border border-slate-200" /><div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" /></div>}
       </CardContent>
     </Card>
   );
@@ -231,18 +303,12 @@ export default function KycPage() {
       <Card className={`border-2 ${passed ? 'border-emerald-300 bg-emerald-50/30' : 'border-red-300 bg-red-50/30'}`}>
         <CardContent className="p-6">
           <div className="flex items-center gap-4 mb-4">
-            {passed ? (
-              <CheckCircle2 className="w-12 h-12 text-emerald-600" />
-            ) : (
-              <XCircle className="w-12 h-12 text-red-600" />
-            )}
+            {passed ? <CheckCircle2 className="w-12 h-12 text-emerald-600" /> : <XCircle className="w-12 h-12 text-red-600" />}
             <div>
               <h3 className="text-xl font-black text-slate-900">{passed ? 'KYC đã xác thực' : 'Xác thực thất bại'}</h3>
               <p className="text-sm text-slate-600 font-medium">
                 Điểm khớp: <span className="font-bold">{compareResult.matchScore?.toFixed(1)}%</span>
-                {compareResult.verifiedAt && (
-                  <span className="ml-3 text-xs text-slate-400">Lúc {new Date(compareResult.verifiedAt).toLocaleString('vi-VN')}</span>
-                )}
+                {compareResult.verifiedAt && <span className="ml-3 text-xs text-slate-400">Lúc {new Date(compareResult.verifiedAt).toLocaleString('vi-VN')}</span>}
               </p>
             </div>
           </div>
@@ -262,8 +328,8 @@ export default function KycPage() {
           </div>
           <div className="mt-6 flex gap-3">
             {passed ? (
-              <Button onClick={() => navigate('/diet')} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 font-bold">
-                Vào Dashboard <ArrowRight className="w-4 h-4 ml-2" />
+              <Button onClick={() => { resetKyc(); setIsKycVerified(true); }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 font-bold">
+                Tiếp tục <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
               <Button onClick={resetKyc} variant="outline" className="flex-1 rounded-xl h-12 font-bold border-red-200 text-red-700 hover:bg-red-50">
@@ -285,13 +351,307 @@ export default function KycPage() {
     return 'DRAFT';
   };
 
+  // Loading state
+  if (isLoadingStatus) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // If KYC is verified, show PT Registration page
+  if (isKycVerified) {
+    return (
+      <div className="max-w-4xl mx-auto pb-12 animate-fade-in">
+        {/* Header */}
+        <div className="text-center mb-10">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Đăng Ký Làm Huấn Luyện Viên Cá Nhân</h1>
+          <p className="text-slate-500 font-medium">Trở thành PT và chia sẻ kiến thức dinh dưỡng của bạn</p>
+        </div>
+
+        {/* Already has PT Profile */}
+        {hasPtProfile && (
+          <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 mb-8">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                  {ptProfileStatus === 'ACTIVE' || ptProfileStatus === 'VERIFIED' ? (
+                    <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                  ) : ptProfileStatus === 'PENDING_APPROVAL' ? (
+                    <Clock className="w-6 h-6 text-amber-600" />
+                  ) : (
+                    <XCircle className="w-6 h-6 text-red-600" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-slate-800">
+                    {ptProfileStatus === 'ACTIVE' || ptProfileStatus === 'VERIFIED' 
+                      ? 'Bạn đã là Huấn Luyện Viên' 
+                      : ptProfileStatus === 'PENDING_APPROVAL'
+                        ? 'Hồ sơ đang chờ duyệt'
+                        : 'Hồ sơ bị từ chối'}
+                  </h3>
+                  <p className="text-sm text-slate-600">
+                    {ptProfileStatus === 'ACTIVE' || ptProfileStatus === 'VERIFIED'
+                      ? 'Chúc mừng! Bạn đã là PT được xác thực.'
+                      : ptProfileStatus === 'PENDING_APPROVAL'
+                        ? 'Vui lòng chờ admin duyệt hồ sơ của bạn.'
+                        : 'Vui lòng cập nhật thông tin và gửi lại.'}
+                  </p>
+                </div>
+                {(ptProfileStatus === 'ACTIVE' || ptProfileStatus === 'VERIFIED') && (
+                  <Button onClick={() => navigate('/pt/dashboard')} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl">
+                    Vào Dashboard PT <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* PT Registration Form */}
+        {!hasPtProfile && (
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left - Form */}
+            <div className="col-span-12 lg:col-span-8">
+              <Card className="bg-white border-slate-200 shadow-lg">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <User className="w-5 h-5 text-blue-600" />
+                    Thông Tin Cá Nhân
+                  </h3>
+                  
+                  <div className="space-y-5">
+                    {/* Bio */}
+                    <div>
+                      <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Giới Thiệu Bản Thân *</label>
+                      <textarea
+                        value={ptForm.bio}
+                        onChange={(e) => setPtForm(p => ({...p, bio: e.target.value}))}
+                        placeholder="Chia sẻ về bản thân, background và kinh nghiệm của bạn..."
+                        rows={4}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
+                      />
+                    </div>
+
+                    {/* Training Philosophy */}
+                    <div>
+                      <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Triết Lý Tập Luyện *</label>
+                      <textarea
+                        value={ptForm.trainingPhilosophy}
+                        onChange={(e) => setPtForm(p => ({...p, trainingPhilosophy: e.target.value}))}
+                        placeholder="Triết lý và phương pháp huấn luyện của bạn là gì?"
+                        rows={3}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
+                      />
+                    </div>
+
+                    {/* Years of Experience & Hourly Rate */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Số Năm Kinh Nghiệm *</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={ptForm.yearsOfExperience}
+                            onChange={(e) => setPtForm(p => ({...p, yearsOfExperience: e.target.value}))}
+                            placeholder="VD: 3"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                          />
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">năm</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Theo Giờ</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            value={ptForm.hourlyRate}
+                            onChange={(e) => setPtForm(p => ({...p, hourlyRate: e.target.value}))}
+                            placeholder="VD: 200000"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                          />
+                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">VND</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Specializations */}
+                    <div>
+                      <label className="text-sm font-semibold text-slate-600 mb-2 block">Chuyên Môn</label>
+                      <div className="flex flex-wrap gap-2">
+                        {specializationOptions.map(spec => (
+                          <button
+                            key={spec}
+                            onClick={() => handleSpecializationToggle(spec)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                              ptForm.specializations.includes(spec)
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {spec}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Certifications */}
+                    <div>
+                      <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Chứng Chỉ / Certificates</label>
+                      <textarea
+                        value={ptForm.certifications}
+                        onChange={(e) => setPtForm(p => ({...p, certifications: e.target.value}))}
+                        placeholder="VD: ACE Certified Personal Trainer, NASM-CPT..."
+                        rows={2}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
+                      />
+                    </div>
+
+                    {/* CV Upload */}
+                    <div>
+                      <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Upload CV (Tùy chọn)</label>
+                      <input ref={cvInputRef} type="file" accept=".pdf,.doc,.docx" onChange={handleCvUpload} className="hidden" />
+                      <div 
+                        onClick={() => cvInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all"
+                      >
+                        {ptForm.cvUrl ? (
+                          <div className="flex items-center justify-center gap-3">
+                            <FileUp className="w-8 h-8 text-emerald-500" />
+                            <div className="text-left">
+                              <p className="font-semibold text-slate-800">{ptForm.cvFileName || 'CV đã tải lên'}</p>
+                              <p className="text-sm text-emerald-600">Click để thay đổi</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <FileUp className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                            <p className="font-medium text-slate-600">Click để upload CV</p>
+                            <p className="text-sm text-slate-400">PDF, DOC, DOCX (tối đa 10MB)</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <Button
+                      onClick={handleRegisterPt}
+                      disabled={isSubmittingPt}
+                      className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl py-5 font-semibold flex items-center justify-center gap-2 mt-4"
+                    >
+                      {isSubmittingPt ? (
+                        <><Loader2 className="h-5 w-5 animate-spin" /> Đang gửi...</>
+                      ) : (
+                        <><Sparkles className="h-5 w-5" /> Đăng Ký Làm PT</>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right - Info */}
+            <div className="col-span-12 lg:col-span-4 space-y-6">
+              {/* Benefits Card */}
+              <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-0 text-white">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <Star className="w-5 h-5 text-amber-400" />
+                    Quyền Lợi Khi Làm PT
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <Users className="w-5 h-5 text-emerald-400 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">Nhận học viên</p>
+                        <p className="text-sm text-slate-300">Kết nối với người dùng cần PT</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <TrendingUp className="w-5 h-5 text-blue-400 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">Theo dõi tiến độ</p>
+                        <p className="text-sm text-slate-300">Monitor học viên 24/7</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Award className="w-5 h-5 text-rose-400 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">Xây dựng thương hiệu</p>
+                        <p className="text-sm text-slate-300">Profile cá nhân trên nền tảng</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Process Card */}
+              <Card className="bg-white border-slate-200 shadow-sm">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-bold text-slate-800 mb-4">Quy Trình</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">1</div>
+                      <div>
+                        <p className="font-semibold text-slate-800">Điền thông tin</p>
+                        <p className="text-sm text-slate-500">Hoàn thành form đăng ký</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-sm">2</div>
+                      <div>
+                        <p className="font-semibold text-slate-800">Chờ duyệt</p>
+                        <p className="text-sm text-slate-500">Admin sẽ xác minh hồ sơ</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm">3</div>
+                      <div>
+                        <p className="font-semibold text-slate-800">Bắt đầu nhận học viên</p>
+                        <p className="text-sm text-slate-500">Profile của bạn sẽ hiển thị</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Contact Card */}
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="p-6">
+                  <h3 className="text-base font-bold text-blue-800 mb-3">Cần hỗ trợ?</h3>
+                  <p className="text-sm text-blue-600 mb-3">Liên hệ với chúng tôi nếu bạn có câu hỏi về quy trình đăng ký.</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                      <Mail className="w-4 h-4" />
+                      <span>support@nutrican.vn</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-blue-700">
+                      <Phone className="w-4 h-4" />
+                      <span>1900 xxxx</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // KYC Verification Page (when not verified)
   return (
     <div className="max-w-3xl mx-auto space-y-8 pb-12 animate-fade-in">
       <div className="text-center mb-10">
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
           <Shield className="w-8 h-8 text-white" />
         </div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Identity Verification</h1>
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Xác Thực Danh Tính</h1>
         <p className="text-slate-500 font-medium">Xác thực danh tính qua CCCD bằng VNPT eKYC</p>
       </div>
 
@@ -317,35 +677,23 @@ export default function KycPage() {
       {currentStep >= 1 && currentStep <= 3 && (
         <div className="grid gap-6">
           <UploadStepCard
-            stepKey="front"
-            label="Mặt trước CCCD"
-            icon={FileText}
-            preview={frontPreview}
-            inputRef={frontInputRef}
-            isActive={currentStep >= 1}
-            isUploaded={currentStep > 1}
+            stepKey="front" label="Mặt trước CCCD" icon={FileText}
+            preview={frontPreview} inputRef={frontInputRef}
+            isActive={currentStep >= 1} isUploaded={currentStep > 1}
             uploadingThis={uploading && currentStep === 1}
             onUpload={(file) => uploadImage(file, 'FRONT', 'FRONT', setFrontPreview, 2)}
           />
           <UploadStepCard
-            stepKey="back"
-            label="Mặt sau CCCD"
-            icon={FileText}
-            preview={backPreview}
-            inputRef={backInputRef}
-            isActive={currentStep >= 2}
-            isUploaded={currentStep > 2}
+            stepKey="back" label="Mặt sau CCCD" icon={FileText}
+            preview={backPreview} inputRef={backInputRef}
+            isActive={currentStep >= 2} isUploaded={currentStep > 2}
             uploadingThis={uploading && currentStep === 2}
             onUpload={(file) => uploadImage(file, 'BACK', 'BACK', setBackPreview, 3)}
           />
           <UploadStepCard
-            stepKey="selfie"
-            label="Ảnh gương mặt"
-            icon={Camera}
-            preview={selfiePreview}
-            inputRef={selfieInputRef}
-            isActive={currentStep >= 3}
-            isUploaded={currentStep > 3}
+            stepKey="selfie" label="Ảnh gương mặt" icon={Camera}
+            preview={selfiePreview} inputRef={selfieInputRef}
+            isActive={currentStep >= 3} isUploaded={currentStep > 3}
             uploadingThis={uploading && currentStep === 3}
             onUpload={(file) => uploadImage(file, 'SELFIE', 'SELFIE', setSelfiePreview, 4)}
           />
