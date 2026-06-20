@@ -46,7 +46,9 @@ public class VNPTClientImpl implements VNPTClient {
 
             form.add("file", filePart);
             if (title != null && !title.isBlank()) form.add("title", title);
-            if (description != null && !description.isBlank()) form.add("description", description);
+            // description is required by VNPT - use title or default value
+            String desc = (description != null && !description.isBlank()) ? description : "kyc-upload";
+            form.add("description", desc);
 
             UploadResponse res = vnptRestClient.post()
                     .uri("/file-service/v1/addFile")

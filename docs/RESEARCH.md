@@ -145,4 +145,27 @@ python research/scripts/rbl_analyze.py research/output/rbl_export.csv
 
 ---
 
-*Document Version: 2.0.0 (ResNet50) | Last Updated: 2026-06-17*
+## 9. Related Work (tham khảo)
+
+| Hướng | Ví dụ | Khác biệt với NutriCan |
+|-------|-------|------------------------|
+| App calorie tracking | MyFitnessPal, FatSecret | Nhập tay, không CV |
+| CV food recognition | Foodvisor, Bohlol ResNet50 2025 | NutriCan có RBL + PT ground truth |
+| VLM nutrition | GPT-4V, Qwen-VL | NutriCan dùng CNN 10-class cho `analyzeMeal` |
+| Dataset | Nutrition5k, Food-101 | NutriCan: Vietnamese_Food_Dataset + RBL |
+
+---
+
+## 10. UI liên quan nghiên cứu
+
+| Route | Vai trò | Chức năng RBL |
+|-------|---------|---------------|
+| `/diet` | Customer | Upload ảnh + meal context |
+| `/pt/reviews` | PT | Review, blind mode, RBL stats |
+| `/admin` | Admin | RBL dashboard, export CSV/report |
+
+Chi tiết UI: [FRONTEND.md §12](./FRONTEND.md#12-research--rbl-ui).
+
+---
+
+*Document Version: 2.0.0 (ResNet50) | Last Updated: 2026-06-20*

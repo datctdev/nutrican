@@ -1577,6 +1577,32 @@ All endpoints require `ADMIN` role. Admin endpoints are organized into: User Man
 
 ---
 
+### 6.7.1 RBL Log Snapshot
+
+**Endpoint:** `GET /api/v1/admin/rbl/logs/{logId}`
+
+Get a single diet log snapshot with RBL fields (aiPredictedMacros, dbMatchedMacros, ptAdjustedMacros, etc.) for review.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "...",
+    "foodName": "...",
+    "aiPredictedMacros": { "calories": 485, "protein": 42, ... },
+    "dbMatchedMacros": { "calories": 450, "protein": 38, ... },
+    "ptAdjustedMacros": { "calories": 470, "protein": 40, ... },
+    "macrosJson": { ... },
+    "ptBlindMacros": null,
+    "experimentCohort": "RESTAURANT_HYBRID",
+    ...
+  }
+}
+```
+
+---
+
 ### 6.8 RBL Export Preview
 
 **Endpoint:** `GET /api/v1/admin/rbl/export/preview`
@@ -1603,7 +1629,7 @@ Returns row count and sample rows for labeled CV dataset.
 
 ---
 
-### 6.10 RBL Stats
+### 6.11 RBL Stats
 
 **Endpoint:** `GET /api/v1/admin/rbl/stats`
 
@@ -1632,7 +1658,7 @@ MAE baseline is always `ai_predicted_macros` vs `pt_adjusted_macros` (APPROVE + 
 
 ---
 
-### 6.11 RBL Markdown Report
+### 6.12 RBL Markdown Report
 
 **Endpoint:** `GET /api/v1/admin/rbl/report`
 
@@ -1929,5 +1955,5 @@ FREELANCE
 
 ---
 
-*Document Version: 2.1.0*
-*Last Updated: 2026-06-11*
+*Document Version: 2.2.0*
+*Last Updated: 2026-06-20*

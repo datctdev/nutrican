@@ -3,6 +3,8 @@ package com.sba.nutrican_be.userprofile.service;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.userprofile.dto.MacroTargetRequest;
 import com.sba.nutrican_be.userprofile.dto.MacroTargetResponse;
+import com.sba.nutrican_be.userprofile.dto.PtProfileSummary;
+import com.sba.nutrican_be.userprofile.dto.PtRegistrationRequest;
 import com.sba.nutrican_be.userprofile.dto.UpdateProfileRequest;
 import com.sba.nutrican_be.userprofile.dto.UserProfileResponse;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,4 +21,8 @@ public interface UserProfileService {
     ApiResponse<MacroTargetResponse> getMacroTarget(UUID userId);
 
     ApiResponse<MacroTargetResponse> setMacroTarget(UUID userId, MacroTargetRequest request);
+
+    ApiResponse<PtProfileSummary> registerAsPt(UUID userId, PtRegistrationRequest request);
+
+    ApiResponse<String> uploadCv(UUID userId, MultipartFile file);
 }

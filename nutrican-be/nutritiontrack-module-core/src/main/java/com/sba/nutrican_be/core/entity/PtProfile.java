@@ -64,7 +64,7 @@ public class PtProfile extends BaseEntity {
     @Column(name = "certifications", columnDefinition = "TEXT")
     private String certifications;
 
-    @Column(name = "cv_url", length = 500)
+    @Column(name = "cv_url", columnDefinition = "TEXT")
     private String cvUrl;
 
     @Column(name = "document_urls", columnDefinition = "TEXT")

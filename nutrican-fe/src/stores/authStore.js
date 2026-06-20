@@ -80,6 +80,19 @@ export const useAuthStore = create(
       setUser: (userData) => set({ user: userData }),
 
       setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
+
+      checkAuth: async () => {
+        const { accessToken } = get();
+        if (!accessToken) return;
+        try {
+          const response = await authService.me();
+          if (response.data?.data) {
+            set({ user: response.data.data });
+          }
+        } catch (error) {
+          console.error('checkAuth failed:', error);
+        }
+      },
     }),
     {
       name: 'nutrican-auth',

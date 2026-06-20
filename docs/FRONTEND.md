@@ -690,4 +690,4 @@ Section **RBL Research (CV + PT Ground Truth)**:
 ---
 
 *Document Version: 2.2.0*
-*Last Updated: 2026-06-12*
+*Last Updated: 2026-06-20*
