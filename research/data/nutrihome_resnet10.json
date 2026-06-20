@@ -1,0 +1,212 @@
+{
+  "source": "bang-luong-calo-trong-thuc-pham.pdf (NutriHome)",
+  "extractedAt": "2026-06-20T10:10:53.355975+00:00",
+  "note": "ResNet50 10-class + LLaVA variants — macros per standard serving from NutriHome PDF",
+  "resnet10": {
+    "banh_chung": {
+      "foodCode": "banh_chung",
+      "nameVi": "Bánh chưng",
+      "unit": "1 cái",
+      "servingG": 200,
+      "calories": 407.9,
+      "protein": 14.9,
+      "fat": 5.5,
+      "carb": 74.7,
+      "category": "Bánh, kẹo, đồ ngọt",
+      "nutrihomeStt": 16,
+      "source": "NUTRIHOME_PDF"
+    },
+    "banh_khot": {
+      "foodCode": "banh_khot",
+      "nameVi": "Bánh khọt",
+      "unit": "1 đĩa 5 cái",
+      "servingG": 150,
+      "calories": 154.12,
+      "protein": 5.8,
+      "fat": 7.08,
+      "carb": 16.8,
+      "category": "Bánh, kẹo, đồ ngọt",
+      "nutrihomeStt": 32,
+      "source": "NUTRIHOME_PDF"
+    },
+    "banh_mi": {
+      "foodCode": "banh_mi",
+      "nameVi": "Bánh mì ổ",
+      "unit": "1 ổ trung",
+      "servingG": 250,
+      "calories": 239.6,
+      "protein": 7.6,
+      "fat": 0.8,
+      "carb": 50.5,
+      "category": "Bánh, kẹo, đồ ngọt",
+      "nutrihomeStt": 44,
+      "source": "NUTRIHOME_PDF"
+    },
+    "banh_trang_nuong": {
+      "foodCode": "banh_trang_nuong",
+      "nameVi": "Bánh tráng trộn",
+      "unit": "100g",
+      "servingG": 200,
+      "calories": 300.0,
+      "protein": 5.0,
+      "fat": 16.3,
+      "carb": 32.5,
+      "category": "Đồ ăn vặt",
+      "nutrihomeStt": 133,
+      "source": "NUTRIHOME_PDF"
+    },
+    "banh_xeo": {
+      "foodCode": "banh_xeo",
+      "nameVi": "Bánh xèo",
+      "unit": "1 cái",
+      "servingG": 180,
+      "calories": 517.3,
+      "protein": 15.0,
+      "fat": 19.3,
+      "carb": 70.9,
+      "category": "Bánh, kẹo, đồ ngọt",
+      "nutrihomeStt": 66,
+      "source": "NUTRIHOME_PDF"
+    },
+    "bun_dau_mam_tom": {
+      "foodCode": "bun_dau_mam_tom",
+      "nameVi": "Bún đậu mắm tôm",
+      "unit": "1 suất",
+      "servingG": 400,
+      "calories": 760.0,
+      "protein": 58.3,
+      "fat": 44.5,
+      "carb": 48.9,
+      "category": "Món sợi",
+      "nutrihomeStt": 243,
+      "source": "NUTRIHOME_PDF"
+    },
+    "ca_kho_to": {
+      "foodCode": "ca_kho_to",
+      "nameVi": "Cá lóc kho",
+      "unit": "1 tộ (~3 lát + nước kho)",
+      "servingG": 350,
+      "calories": 329.5,
+      "protein": 39.2,
+      "fat": 9.5,
+      "carb": 21.8,
+      "category": "Món mặn",
+      "nutrihomeStt": 176,
+      "source": "NUTRIHOME_PDF",
+      "compositeNote": "Scaled from NutriHome 'Cá lóc kho' 1 lát cá"
+    },
+    "com_tam": {
+      "foodCode": "com_tam",
+      "nameVi": "Cơm tấm sườn",
+      "unit": "1 phần",
+      "servingG": 350,
+      "calories": 528.9,
+      "protein": 20.7,
+      "fat": 13.3,
+      "carb": 81.6,
+      "category": "Cơm phần",
+      "nutrihomeStt": 129,
+      "source": "NUTRIHOME_PDF"
+    },
+    "goi_cuon": {
+      "foodCode": "goi_cuon",
+      "nameVi": "Gỏi bì cuốn",
+      "unit": "3 cuốn",
+      "servingG": 120,
+      "calories": 116.0,
+      "protein": 10.3,
+      "fat": 3.6,
+      "carb": 10.6,
+      "category": "Món mặn",
+      "nutrihomeStt": 200,
+      "source": "NUTRIHOME_PDF"
+    },
+    "pho": {
+      "foodCode": "pho",
+      "nameVi": "Phở bò tái",
+      "unit": "1 tô",
+      "servingG": 500,
+      "calories": 414.1,
+      "protein": 17.9,
+      "fat": 11.7,
+      "carb": 59.3,
+      "category": "Món sợi",
+      "nutrihomeStt": 271,
+      "source": "NUTRIHOME_PDF"
+    }
+  },
+  "variants": {
+    "com_tam_bi": {
+      "foodCode": "com_tam_bi",
+      "nameVi": "Cơm tấm bì",
+      "unit": "1 phần",
+      "servingG": 350,
+      "calories": 628.1,
+      "protein": 26.0,
+      "fat": 19.3,
+      "carb": 87.6,
+      "category": "Cơm phần",
+      "nutrihomeStt": 127,
+      "source": "NUTRIHOME_PDF"
+    },
+    "com_tam_cha": {
+      "foodCode": "com_tam_cha",
+      "nameVi": "Cơm tấm chả",
+      "unit": "1 phần",
+      "servingG": 350,
+      "calories": 593.7,
+      "protein": 17.0,
+      "fat": 18.1,
+      "carb": 90.7,
+      "category": "Cơm phần",
+      "nutrihomeStt": 128,
+      "source": "NUTRIHOME_PDF"
+    },
+    "pho_ga": {
+      "foodCode": "pho_ga",
+      "nameVi": "Phở gà",
+      "unit": "1 tô",
+      "servingG": 500,
+      "calories": 483.5,
+      "protein": 21.3,
+      "fat": 17.9,
+      "carb": 59.3,
+      "category": "Món sợi",
+      "nutrihomeStt": 273,
+      "source": "NUTRIHOME_PDF"
+    },
+    "pho_bo_chin": {
+      "foodCode": "pho_bo_chin",
+      "nameVi": "Phở bò chín",
+      "unit": "1 tô",
+      "servingG": 500,
+      "calories": 430.6,
+      "protein": 20.9,
+      "fat": 12.2,
+      "carb": 59.3,
+      "category": "Món sợi",
+      "nutrihomeStt": 270,
+      "source": "NUTRIHOME_PDF"
+    },
+    "pho_bo_vien": {
+      "foodCode": "pho_bo_vien",
+      "nameVi": "Phở bò viên",
+      "unit": "1 tô",
+      "servingG": 500,
+      "calories": 430.5,
+      "protein": 16.3,
+      "fat": 14.1,
+      "carb": 59.6,
+      "category": "Món sợi",
+      "nutrihomeStt": 272,
+      "source": "NUTRIHOME_PDF"
+    },
+    "com_tam_suon": {
+      "aliasOf": "com_tam"
+    },
+    "pho_bo": {
+      "aliasOf": "pho"
+    }
+  },
+  "missingMappings": []
+}

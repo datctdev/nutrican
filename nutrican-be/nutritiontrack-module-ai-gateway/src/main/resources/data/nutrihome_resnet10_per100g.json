@@ -1,0 +1,65 @@
+{
+  "per100g": {
+    "banh_chung": {
+      "calories": 203.9,
+      "protein": 7.5,
+      "fat": 2.8,
+      "carb": 37.4
+    },
+    "banh_khot": {
+      "calories": 102.7,
+      "protein": 3.9,
+      "fat": 4.7,
+      "carb": 11.2
+    },
+    "banh_mi": {
+      "calories": 95.8,
+      "protein": 3.0,
+      "fat": 0.3,
+      "carb": 20.2
+    },
+    "banh_trang_nuong": {
+      "calories": 150.0,
+      "protein": 2.5,
+      "fat": 8.2,
+      "carb": 16.2
+    },
+    "banh_xeo": {
+      "calories": 287.4,
+      "protein": 8.3,
+      "fat": 10.7,
+      "carb": 39.4
+    },
+    "bun_dau_mam_tom": {
+      "calories": 190.0,
+      "protein": 14.6,
+      "fat": 11.1,
+      "carb": 12.2
+    },
+    "ca_kho_to": {
+      "calories": 94.1,
+      "protein": 11.2,
+      "fat": 2.7,
+      "carb": 6.2
+    },
+    "com_tam": {
+      "calories": 151.1,
+      "protein": 5.9,
+      "fat": 3.8,
+      "carb": 23.3
+    },
+    "goi_cuon": {
+      "calories": 96.7,
+      "protein": 8.6,
+      "fat": 3.0,
+      "carb": 8.8
+    },
+    "pho": {
+      "calories": 82.8,
+      "protein": 3.6,
+      "fat": 2.3,
+      "carb": 11.9
+    }
+  },
+  "extractedAt": "2026-06-20T10:10:53.355975+00:00"
+}

@@ -1,5 +1,7 @@
 package com.sba.nutrican_be.diet.service;
 
+import com.sba.nutrican_be.ai.ResNetFoodCodeMapping;
+import com.sba.nutrican_be.ai.ResNetFoodDefaults;
 import com.sba.nutrican_be.core.entity.FoodItem;
 import com.sba.nutrican_be.core.exception.ResourceNotFoundException;
 import com.sba.nutrican_be.core.repository.FoodItemRepository;
@@ -75,6 +77,62 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
             return Optional.empty();
         }
         return findMatches(foodName, 1).stream().findFirst();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<FoodItemResponse> findByResNetFoodCode(String foodCode) {
+        if (foodCode == null || foodCode.isBlank()) {
+            return Optional.empty();
+        }
+        String code = foodCode.trim().toLowerCase(Locale.ROOT);
+
+        Optional<FoodItemResponse> bySource = foodItemRepository.findAll().stream()
+                .filter(f -> ResNetFoodDefaults.SOURCE.equals(f.getSource())
+                        || "RESNET_VTN_10".equals(f.getSource()))
+                .filter(f -> f.getAliases() != null && f.getAliases().stream()
+                        .anyMatch(alias -> code.equals(alias.toLowerCase(Locale.ROOT))))
+                .findFirst()
+                .map(this::toResponse);
+        if (bySource.isPresent()) {
+            return bySource;
+        }
+
+        return ResNetFoodCodeMapping.catalogNameVi(code)
+                .flatMap(nameVi -> foodItemRepository.findAll().stream()
+                        .filter(f -> nameVi.equalsIgnoreCase(f.getNameVi())
+                                || (f.getAliases() != null && f.getAliases().stream()
+                                .anyMatch(a -> code.equals(a.toLowerCase(Locale.ROOT)))))
+                        .findFirst()
+                        .map(this::toResponse));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FoodItemResponse> getResNetDishes() {
+        List<FoodItemResponse> fromDb = foodItemRepository.findAll().stream()
+                .filter(f -> ResNetFoodDefaults.SOURCE.equals(f.getSource()))
+                .sorted(Comparator.comparing(FoodItem::getNameVi))
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+        if (!fromDb.isEmpty()) {
+            return fromDb;
+        }
+        return ResNetFoodCodeMapping.classOrder().stream()
+                .map(code -> {
+                    var macros = ResNetFoodDefaults.scaledMacros(code, java.math.BigDecimal.ONE);
+                    return FoodItemResponse.builder()
+                            .nameVi(ResNetFoodCodeMapping.catalogNameViOrDisplay(code, code))
+                            .nameEn(code.replace('_', ' '))
+                            .category("Món ResNet50")
+                            .servingSizeG(ResNetFoodDefaults.defaultServingG(code))
+                            .calories(macros.get("calories"))
+                            .protein(macros.get("protein"))
+                            .carb(macros.get("carbs"))
+                            .fat(macros.get("fat"))
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     @Override

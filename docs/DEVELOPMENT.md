@@ -71,14 +71,43 @@ EOF
 ```bash
 cd nutrican-be
 
-# Start infrastructure
+# Start infrastructure (Postgres + MinIO)
 docker-compose up -d
 
 # Verify services
 docker ps
 ```
 
-### 1.5 Run Backend
+### 1.5 Start AI Service (ResNet50 — bắt buộc cho Analyze ảnh)
+
+Chụp ảnh món trên `/diet` cần **FastAPI** chạy song song với Spring Boot.
+
+**Lần đầu:**
+
+```powershell
+cd research\ai-service
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+> Nếu lỗi `No runtime installed that matches 3.12`: chạy `py install 3.12` trước. **Không dùng Python 3.14** — TensorFlow chưa hỗ trợ.
+
+**Mỗi lần dev (terminal riêng, giữ chạy):**
+
+```powershell
+cd d:\FPT\SU26\SBA\project_team\nutrican
+$env:MODEL_PATH = "d:\FPT\SU26\SBA\project_team\research\best_resnet50_model.h5"
+.\research\scripts\start_ai_service.ps1
+```
+
+Kiểm tra: `curl http://localhost:8000/health` → `model_loaded: true`
+
+> **Lưu ý:** Cần Python **3.10–3.12** + TensorFlow. Nếu AI service tắt, backend vẫn chạy nhưng Analyze ảnh sẽ **fallback** (macro mặc định, confidence = 0). Ollama/llava **không** thay thế — chỉ dùng cho chatbot nếu bật.
+
+Chi tiết: [research/ai-service/README.md](../research/ai-service/README.md)
+
+### 1.6 Run Backend
 
 ```bash
 cd nutrican-be
@@ -87,7 +116,7 @@ cd nutrican-be
 
 Backend runs at `http://localhost:8080`
 
-### 1.6 Run Frontend
+### 1.7 Run Frontend
 
 ```bash
 cd nutican-fe
@@ -95,6 +124,17 @@ npm run dev
 ```
 
 Frontend runs at `http://localhost:5173`
+
+### 1.8 Thứ tự chạy nhanh (tóm tắt)
+
+| # | Terminal | Lệnh |
+|---|----------|------|
+| 1 | Docker | `cd nutrican-be && docker-compose up -d` |
+| 2 | AI | `.\research\scripts\start_ai_service.ps1` |
+| 3 | BE | `cd nutrican-be && ./mvnw spring-boot:run` |
+| 4 | FE | `cd nutrican-fe && npm run dev` |
+
+Mở `http://localhost:5173` → đăng nhập → `/diet` → upload ảnh phở/bánh mì (1 trong 10 món) → Analyze.
 
 ---
 

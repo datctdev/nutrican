@@ -1,6 +1,9 @@
 package com.sba.nutrican_be.diet.service;
 
 import com.sba.nutrican_be.ai.MealRecognitionResult;
+import com.sba.nutrican_be.ai.dto.FoodPredictionDto;
+import com.sba.nutrican_be.ai.ResNetFoodDefaults;
+import com.sba.nutrican_be.ai.ResNetFoodCodeMapping;
 import com.sba.nutrican_be.ai.service.MealRecognitionService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
@@ -41,6 +44,7 @@ import com.sba.nutrican_be.core.util.MacroUtils;
 import com.sba.nutrican_be.diet.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -67,7 +71,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DietLogServiceImpl implements DietLogService {
 
-    private static final BigDecimal CONFIDENCE_THRESHOLD = new BigDecimal("0.6");
+    @Value("${ai.recognition.confidence-threshold:0.25}")
+    private BigDecimal confidenceThreshold;
+
     private static final Set<DietLogStatus> SUMMARY_STATUSES = Set.of(
             DietLogStatus.APPROVED, DietLogStatus.LOGGED, DietLogStatus.PT_REVIEWING);
 
@@ -157,56 +163,116 @@ public class DietLogServiceImpl implements DietLogService {
                     .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
             MealType mealType = parseMealType(ctx.getMealType());
-            List<FoodItemResponse> suggestedMatches = foodCatalogService.findMatches(aiResult.getFoodName(), 5);
-            Optional<FoodItemResponse> bestMatch = suggestedMatches.stream().findFirst();
+            BigDecimal portionRatio = aiResult.getPortionRatio() != null
+                    ? aiResult.getPortionRatio() : BigDecimal.ONE;
 
-            Map<String, Object> aiPredictedMacros = MacroUtils.fromValues(
-                    aiResult.getCalories(), aiResult.getProtein(), aiResult.getCarbs(), aiResult.getFat());
+            Optional<FoodItemResponse> resnetFoodMatch =
+                    foodCatalogService.findByResNetFoodCode(aiResult.getFoodCode());
+            String catalogLookupName = ResNetFoodCodeMapping.catalogNameVi(aiResult.getFoodCode())
+                    .orElse(aiResult.getFoodName());
+            List<FoodItemResponse> suggestedMatches = foodCatalogService.findMatches(catalogLookupName, 5);
+            Optional<FoodItemResponse> bestMatch = resnetFoodMatch.isPresent()
+                    ? resnetFoodMatch
+                    : suggestedMatches.stream().findFirst();
 
             RecognitionSource recognitionSource = RecognitionSource.AI_ONLY;
-            Map<String, Object> macros = MacroUtils.copyMacroMap(aiPredictedMacros);
+            Map<String, Object> macros = MacroUtils.newMacroMap();
+            Map<String, Object> aiPredictedMacros = MacroUtils.newMacroMap();
             Map<String, Object> dbMatchedMacros = null;
             Integer dbMatchScore = null;
             String matchedFoodName = null;
             boolean dbApplied = false;
+            BigDecimal portionG = aiResult.getEstimatedTotalGrams() != null
+                    ? aiResult.getEstimatedTotalGrams()
+                    : (aiResult.getPortionSize() != null ? aiResult.getPortionSize() : null);
 
             if (mealComplexity == MealComplexity.HOTPOT && ctx.getHotpotItemIds() != null && !ctx.getHotpotItemIds().isEmpty()) {
                 dbMatchedMacros = buildHotpotMacros(ctx);
                 macros = MacroUtils.copyMacroMap(dbMatchedMacros);
+                aiPredictedMacros = MacroUtils.copyMacroMap(dbMatchedMacros);
                 recognitionSource = RecognitionSource.HYBRID;
                 dbApplied = true;
             } else if (mealComplexity == MealComplexity.COMPOSITE && ctx.getCompositeItemIds() != null && !ctx.getCompositeItemIds().isEmpty()) {
                 dbMatchedMacros = buildCompositeMacros(ctx);
                 macros = MacroUtils.copyMacroMap(dbMatchedMacros);
+                aiPredictedMacros = MacroUtils.copyMacroMap(dbMatchedMacros);
                 recognitionSource = RecognitionSource.HYBRID;
                 dbApplied = true;
-            } else if (bestMatch.isPresent()) {
-                FoodItem food = foodItemRepository.findById(bestMatch.get().getId()).orElseThrow();
-                dbMatchScore = foodCatalogService.getMatchScore(aiResult.getFoodName(), food.getId());
-                matchedFoodName = food.getNameVi();
-                BigDecimal portion = aiResult.getPortionSize() != null ? aiResult.getPortionSize() : food.getServingSizeG();
-                dbMatchedMacros = macrosForFood(food, portion);
-                if (isHighConfidence(aiResult)) {
-                    macros = MacroUtils.copyMacroMap(dbMatchedMacros);
+            } else if (aiResult.getCalories() != null) {
+                aiPredictedMacros = MacroUtils.fromValues(
+                        aiResult.getCalories(), aiResult.getProtein(), aiResult.getCarbs(), aiResult.getFat());
+                macros = MacroUtils.copyMacroMap(aiPredictedMacros);
+                if (portionG == null && bestMatch.isPresent()) {
+                    FoodItem food = foodItemRepository.findById(bestMatch.get().getId()).orElseThrow();
+                    BigDecimal serving = food.getServingSizeG() != null && food.getServingSizeG().compareTo(BigDecimal.ZERO) > 0
+                            ? food.getServingSizeG() : BigDecimal.valueOf(100);
+                    portionG = serving.multiply(portionRatio).setScale(2, RoundingMode.HALF_UP);
+                }
+                if (bestMatch.isPresent()) {
+                    FoodItem food = foodItemRepository.findById(bestMatch.get().getId()).orElseThrow();
+                    dbMatchScore = foodCatalogService.getMatchScore(catalogLookupName, food.getId());
+                    matchedFoodName = food.getNameVi();
+                    BigDecimal dbPortion = portionG != null ? portionG
+                            : food.getServingSizeG().multiply(portionRatio);
+                    dbMatchedMacros = macrosForFood(food, dbPortion);
                     recognitionSource = RecognitionSource.HYBRID;
                     dbApplied = true;
+                } else {
+                    recognitionSource = Boolean.TRUE.equals(aiResult.getLlavaUsed())
+                            ? RecognitionSource.HYBRID : RecognitionSource.AI_ONLY;
                 }
+            } else if (bestMatch.isPresent()) {
+                FoodItem food = foodItemRepository.findById(bestMatch.get().getId()).orElseThrow();
+                dbMatchScore = foodCatalogService.getMatchScore(catalogLookupName, food.getId());
+                matchedFoodName = food.getNameVi();
+                BigDecimal serving = food.getServingSizeG() != null && food.getServingSizeG().compareTo(BigDecimal.ZERO) > 0
+                        ? food.getServingSizeG() : BigDecimal.valueOf(100);
+                portionG = serving.multiply(portionRatio).setScale(2, RoundingMode.HALF_UP);
+                dbMatchedMacros = macrosForFood(food, portionG);
+                aiPredictedMacros = MacroUtils.copyMacroMap(dbMatchedMacros);
+                macros = MacroUtils.copyMacroMap(dbMatchedMacros);
+                recognitionSource = RecognitionSource.HYBRID;
+                dbApplied = true;
+            } else {
+                aiPredictedMacros = MacroUtils.fromValues(
+                        BigDecimal.valueOf(300), BigDecimal.valueOf(15),
+                        BigDecimal.valueOf(35), BigDecimal.valueOf(10));
+                macros = MacroUtils.copyMacroMap(aiPredictedMacros);
             }
 
+            List<FoodPredictionResponse> topPredictions = mapTopPredictions(aiResult.getTopPredictions(), portionRatio);
+            if (topPredictions.isEmpty() && aiResult.getFoodCode() != null) {
+                topPredictions = List.of(buildPredictionPreview(
+                        aiResult.getFoodCode(),
+                        aiResult.getFoodName(),
+                        aiResult.getConfidenceScore(),
+                        portionRatio));
+            }
             ExperimentCohort cohort = RblCohortUtil.resolve(mealSource, mealComplexity, recognitionSource);
             DietLogStatus status = resolveStatus(aiResult);
             boolean suggestSos = shouldSuggestSos(mealSource, aiResult, bestMatch.isPresent());
 
             Map<String, Object> aiRaw = new HashMap<>();
             aiRaw.put("foodName", aiResult.getFoodName());
+            aiRaw.put("foodCode", aiResult.getFoodCode());
             aiRaw.put("confidenceScore", aiResult.getConfidenceScore());
+            aiRaw.put("confidenceMargin", aiResult.getConfidenceMargin());
             aiRaw.put("fallback", aiResult.isFallback());
             aiRaw.put("message", aiResult.getMessage());
-            aiRaw.put("portionSize", aiResult.getPortionSize());
-            aiRaw.put("calories", aiResult.getCalories());
-            aiRaw.put("protein", aiResult.getProtein());
-            aiRaw.put("carbs", aiResult.getCarbs());
-            aiRaw.put("fat", aiResult.getFat());
+            aiRaw.put("portionRatio", portionRatio);
+            aiRaw.put("foodAreaRatio", aiResult.getFoodAreaRatio());
+            aiRaw.put("portionSize", portionG);
+            aiRaw.put("calories", MacroUtils.toBd(aiPredictedMacros.get("calories")));
+            aiRaw.put("protein", MacroUtils.toBd(aiPredictedMacros.get("protein")));
+            aiRaw.put("carbs", MacroUtils.toBd(aiPredictedMacros.get("carbs")));
+            aiRaw.put("fat", MacroUtils.toBd(aiPredictedMacros.get("fat")));
+            aiRaw.put("topPredictions", topPredictions);
+            aiRaw.put("needsConfirmation", aiResult.getNeedsConfirmation());
+            aiRaw.put("llavaUsed", aiResult.getLlavaUsed());
+            aiRaw.put("llavaFoodName", aiResult.getLlavaFoodName());
+            aiRaw.put("macroSource", aiResult.getMacroSource());
+            aiRaw.put("fusionNote", aiResult.getFusionNote());
+            aiRaw.put("estimatedTotalGrams", portionG);
             aiRaw.put("detectedItems", aiResult.getDetectedItems() != null ? aiResult.getDetectedItems() : List.of());
             aiRaw.put("uncertaintyReasons", aiResult.getUncertaintyReasons() != null ? aiResult.getUncertaintyReasons() : List.of());
             aiRaw.put("mealComplexityFromAi", aiResult.getMealComplexityFromAi());
@@ -253,18 +319,26 @@ public class DietLogServiceImpl implements DietLogService {
             AnalyzeMealResponse response = AnalyzeMealResponse.builder()
                     .logId(dietLog.getId())
                     .foodName(aiResult.getFoodName())
-                    .portionSize(aiResult.getPortionSize())
-                    .portionUnit(aiResult.getPortionUnit())
+                    .foodCode(aiResult.getFoodCode())
+                    .portionSize(portionG)
+                    .portionRatio(portionRatio)
+                    .portionUnit("grams")
                     .calories(MacroUtils.toBd(macros.get("calories")))
                     .protein(MacroUtils.toBd(macros.get("protein")))
                     .carb(MacroUtils.toBd(macros.get("carbs")))
                     .fat(MacroUtils.toBd(macros.get("fat")))
                     .confidenceScore(aiResult.getConfidenceScore())
                     .fallback(aiResult.isFallback())
+                    .needsConfirmation(aiResult.getNeedsConfirmation())
                     .message(aiResult.getMessage())
                     .mealType(mealType)
                     .suggestSos(suggestSos)
                     .suggestedFoodMatches(suggestedMatches)
+                    .topPredictions(topPredictions)
+                    .llavaUsed(aiResult.getLlavaUsed())
+                    .macroSource(aiResult.getMacroSource())
+                    .llavaFoodName(aiResult.getLlavaFoodName())
+                    .estimatedTotalGrams(portionG)
                     .build();
 
             return ApiResponse.success(response,
@@ -453,6 +527,75 @@ public class DietLogServiceImpl implements DietLogService {
 
     @Override
     @Transactional
+    public ApiResponse<DietLogResponse> confirmRecognition(UUID logId, UUID customerId, ConfirmRecognitionRequest request) {
+        if (request == null || request.getFoodCode() == null || request.getFoodCode().isBlank()) {
+            throw new BadRequestException("foodCode is required");
+        }
+        DietLog dietLog = dietLogRepository.findById(logId)
+                .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
+        if (!dietLog.getCustomer().getId().equals(customerId)) {
+            throw new BadRequestException("You can only confirm your own diet logs");
+        }
+
+        String foodCode = request.getFoodCode().trim().toLowerCase();
+        FoodItem food = foodCatalogService.findByResNetFoodCode(foodCode)
+                .flatMap(f -> foodItemRepository.findById(f.getId()))
+                .orElseThrow(() -> new BadRequestException("Unknown food code: " + foodCode));
+
+        BigDecimal serving = food.getServingSizeG() != null && food.getServingSizeG().compareTo(BigDecimal.ZERO) > 0
+                ? food.getServingSizeG() : BigDecimal.valueOf(100);
+
+        BigDecimal portionG;
+        BigDecimal portionRatio;
+        if (request.getPortionGrams() != null && request.getPortionGrams().compareTo(BigDecimal.ZERO) > 0) {
+            portionG = request.getPortionGrams().setScale(2, RoundingMode.HALF_UP);
+            portionRatio = portionG.divide(serving, 3, RoundingMode.HALF_UP);
+        } else {
+            portionRatio = BigDecimal.ONE;
+            if (dietLog.getAiRawJson() != null && dietLog.getAiRawJson().get("portionRatio") != null) {
+                portionRatio = MacroUtils.toBd(dietLog.getAiRawJson().get("portionRatio"));
+                if (portionRatio == null || portionRatio.compareTo(BigDecimal.ZERO) <= 0) {
+                    portionRatio = BigDecimal.ONE;
+                }
+            }
+            portionG = serving.multiply(portionRatio).setScale(2, RoundingMode.HALF_UP);
+        }
+        Map<String, Object> macros = macrosForFood(food, portionG);
+
+        String foodName = ResNetFoodCodeMapping.catalogNameVi(foodCode).orElse(food.getNameVi());
+        dietLog.setFoodDescription(foodName);
+        dietLog.setMatchedFoodName(food.getNameVi());
+        dietLog.setFoodItemId(food.getId());
+        dietLog.setMacrosJson(macros);
+        dietLog.setAiPredictedMacros(MacroUtils.copyMacroMap(macros));
+        dietLog.setDbMatchedMacros(MacroUtils.copyMacroMap(macros));
+        dietLog.setRecognitionSource(RecognitionSource.HYBRID);
+
+        Map<String, Object> aiRaw = dietLog.getAiRawJson() != null
+                ? new HashMap<>(dietLog.getAiRawJson()) : new HashMap<>();
+        aiRaw.put("foodCode", foodCode);
+        aiRaw.put("foodName", foodName);
+        aiRaw.put("userConfirmed", true);
+        aiRaw.put("userAdjustedGrams", portionG);
+        aiRaw.put("portionRatio", portionRatio);
+        aiRaw.put("portionSize", portionG);
+        aiRaw.put("calories", MacroUtils.toBd(macros.get("calories")));
+        aiRaw.put("protein", MacroUtils.toBd(macros.get("protein")));
+        aiRaw.put("carbs", MacroUtils.toBd(macros.get("carbs")));
+        aiRaw.put("fat", MacroUtils.toBd(macros.get("fat")));
+        aiRaw.put("needsConfirmation", false);
+        dietLog.setAiRawJson(aiRaw);
+
+        if (dietLog.getStatus() == DietLogStatus.DRAFT) {
+            dietLog.setStatus(DietLogStatus.LOGGED);
+        }
+
+        dietLog = dietLogRepository.save(dietLog);
+        return ApiResponse.success(toResponse(dietLog), "Recognition confirmed");
+    }
+
+    @Override
+    @Transactional
     public ApiResponse<DietLogResponse> submitForReview(UUID logId, UUID customerId) {
         DietLog dietLog = dietLogRepository.findById(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
@@ -535,7 +678,7 @@ public class DietLogServiceImpl implements DietLogService {
             return SosReasonCode.HOTPOT_HELP;
         }
         if (dietLog.getAiConfidenceScore() != null
-                && dietLog.getAiConfidenceScore().compareTo(CONFIDENCE_THRESHOLD) < 0) {
+                && dietLog.getAiConfidenceScore().compareTo(confidenceThreshold) < 0) {
             return SosReasonCode.LOW_CONFIDENCE;
         }
         if (dietLog.getFoodItemId() == null) {
@@ -632,6 +775,74 @@ public class DietLogServiceImpl implements DietLogService {
                 .build();
     }
 
+    private List<FoodPredictionResponse> mapTopPredictions(List<FoodPredictionDto> predictions, BigDecimal portionRatio) {
+        if (predictions == null || predictions.isEmpty()) {
+            return List.of();
+        }
+        BigDecimal ratio = portionRatio != null ? portionRatio : BigDecimal.ONE;
+        return predictions.stream()
+                .map(p -> {
+                    FoodPredictionResponse.FoodPredictionResponseBuilder builder = FoodPredictionResponse.builder()
+                            .foodCode(p.getFoodCode())
+                            .foodName(ResNetFoodCodeMapping.catalogNameViOrDisplay(p.getFoodCode(), p.getFoodName()))
+                            .confidence(BigDecimal.valueOf(p.getConfidence())
+                                    .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
+                    var foodOpt = foodCatalogService.findByResNetFoodCode(p.getFoodCode());
+                    if (foodOpt.isPresent() && foodOpt.get().getId() != null) {
+                        FoodItem food = foodItemRepository.findById(foodOpt.get().getId()).orElse(null);
+                        if (food != null) {
+                            applyMacroPreview(builder, food, ratio);
+                        } else {
+                            applyDefaultMacroPreview(builder, p.getFoodCode(), ratio);
+                        }
+                    } else {
+                        applyDefaultMacroPreview(builder, p.getFoodCode(), ratio);
+                    }
+                    return builder.build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    private void applyMacroPreview(
+            FoodPredictionResponse.FoodPredictionResponseBuilder builder, FoodItem food, BigDecimal ratio) {
+        BigDecimal serving = food.getServingSizeG() != null
+                && food.getServingSizeG().compareTo(BigDecimal.ZERO) > 0
+                ? food.getServingSizeG() : BigDecimal.valueOf(100);
+        Map<String, Object> macros = macrosForFood(food, serving.multiply(ratio));
+        builder.calories(MacroUtils.toBd(macros.get("calories")))
+                .protein(MacroUtils.toBd(macros.get("protein")))
+                .carb(MacroUtils.toBd(macros.get("carbs")))
+                .fat(MacroUtils.toBd(macros.get("fat")));
+    }
+
+    private void applyDefaultMacroPreview(
+            FoodPredictionResponse.FoodPredictionResponseBuilder builder, String foodCode, BigDecimal ratio) {
+        Map<String, BigDecimal> macros = ResNetFoodDefaults.scaledMacros(foodCode, ratio);
+        if (macros.isEmpty()) {
+            return;
+        }
+        builder.calories(macros.get("calories"))
+                .protein(macros.get("protein"))
+                .carb(macros.get("carbs"))
+                .fat(macros.get("fat"));
+    }
+
+    private FoodPredictionResponse buildPredictionPreview(
+            String foodCode, String foodName, BigDecimal confidence, BigDecimal portionRatio) {
+        FoodPredictionResponse.FoodPredictionResponseBuilder builder = FoodPredictionResponse.builder()
+                .foodCode(foodCode)
+                .foodName(ResNetFoodCodeMapping.catalogNameViOrDisplay(foodCode, foodName))
+                .confidence(confidence);
+        applyDefaultMacroPreview(builder, foodCode, portionRatio);
+        foodCatalogService.findByResNetFoodCode(foodCode).ifPresent(foodResp -> {
+            if (foodResp.getId() != null) {
+                foodItemRepository.findById(foodResp.getId()).ifPresent(food ->
+                        applyMacroPreview(builder, food, portionRatio));
+            }
+        });
+        return builder.build();
+    }
+
     private Map<String, Object> macrosForFood(FoodItem food, BigDecimal quantityG) {
         BigDecimal serving = food.getServingSizeG() != null && food.getServingSizeG().compareTo(BigDecimal.ZERO) > 0
                 ? food.getServingSizeG() : BigDecimal.valueOf(100);
@@ -652,14 +863,14 @@ public class DietLogServiceImpl implements DietLogService {
     private DietLogStatus resolveStatus(MealRecognitionResult aiResult) {
         if (aiResult.isFallback()) return DietLogStatus.DRAFT;
         if (aiResult.getConfidenceScore() == null) return DietLogStatus.DRAFT;
-        return aiResult.getConfidenceScore().compareTo(CONFIDENCE_THRESHOLD) >= 0
+        return aiResult.getConfidenceScore().compareTo(confidenceThreshold) >= 0
                 ? DietLogStatus.PT_REVIEWING : DietLogStatus.DRAFT;
     }
 
     private boolean isHighConfidence(MealRecognitionResult aiResult) {
         return !aiResult.isFallback()
                 && aiResult.getConfidenceScore() != null
-                && aiResult.getConfidenceScore().compareTo(CONFIDENCE_THRESHOLD) >= 0;
+                && aiResult.getConfidenceScore().compareTo(confidenceThreshold) >= 0;
     }
 
     private boolean shouldSuggestSos(MealSource mealSource, MealRecognitionResult aiResult, boolean hasDbMatch) {
@@ -757,6 +968,11 @@ public class DietLogServiceImpl implements DietLogService {
             suggestedMatches = foodCatalogService.findMatches(dietLog.getFoodDescription(), 3);
         }
 
+        String aiFoodCode = null;
+        if (dietLog.getAiRawJson() != null && dietLog.getAiRawJson().get("foodCode") != null) {
+            aiFoodCode = String.valueOf(dietLog.getAiRawJson().get("foodCode"));
+        }
+
         return DietLogResponse.builder()
                 .id(dietLog.getId())
                 .customerId(dietLog.getCustomer().getId())
@@ -767,6 +983,8 @@ public class DietLogServiceImpl implements DietLogService {
                 .mealType(dietLog.getMealType())
                 .status(dietLog.getStatus())
                 .foodDescription(dietLog.getFoodDescription())
+                .matchedFoodName(dietLog.getMatchedFoodName())
+                .aiFoodCode(aiFoodCode)
                 .sosTicketFlag(dietLog.getSosTicketFlag())
                 .ptReviewerId(dietLog.getPtReviewer() != null ? dietLog.getPtReviewer().getId() : null)
                 .ptNote(dietLog.getPtNote())

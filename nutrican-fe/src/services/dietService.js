@@ -12,7 +12,12 @@ export const dietService = {
   getSummary: (params) => api.get('/diet/summary', { params }),
   createSos: (data) => api.post('/diet/sos', data),
   getSosTickets: () => api.get('/diet/sos'),
+  confirmRecognition: (logId, foodCode, portionGrams) => api.put(`/diet/logs/${logId}/confirm-recognition`, {
+    foodCode,
+    portionGrams: portionGrams != null ? Number(portionGrams) : undefined,
+  }),
   submitForReview: (id) => api.put(`/diet/logs/${id}/submit-for-review`),
+  getResNetDishes: () => api.get('/foods/resnet-dishes'),
   searchFoods: (q, params = {}) => api.get('/foods/search', { params: { q, ...params } }),
   getHotpotBroths: () => api.get('/foods/hotpot/broths'),
   getHotpotItems: () => api.get('/foods/hotpot/items'),

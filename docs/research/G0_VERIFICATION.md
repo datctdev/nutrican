@@ -1,12 +1,23 @@
-# G0 — Xác minh kỹ thuật RBL
+# G0 — Xác minh kỹ thuật RBL (ResNet50 AI Module)
 
-Checklist trước khi thu data hàng loạt (LO_TRINH §G0). Mục tiêu: đảm bảo **ΔA** không sai từ gốc.
+Checklist trước khi thu data hàng loạt. Mục tiêu: đảm bảo pipeline **ResNet50 → FastAPI → Spring Boot → RBL** hoạt động đúng trước khi PT label cohort ≥30 mẫu.
 
-**Ngày kiểm:** 2026-06-14
-**Người kiểm:** g0_smoke_test.py (automated)
-**Commit / version:** 53520e0
-**Backend:** `http://localhost:8082/api/v1` (bản có fix upload + fallback parser)  
-**Model:** `llava` (Ollama)
+**Script:** `research/scripts/resnet50_smoke_test.py` (thay `g0_smoke_test.py` llava/Ollama)  
+**Model kỳ vọng:** `resnet50-vtn-10class`  
+**FastAPI:** `http://localhost:8000`  
+**Spring Boot:** `http://localhost:8080/api/v1`
+
+> **Yêu cầu môi trường:** Python **3.10–3.12** + TensorFlow để load `best_resnet50_model.h5`. Python 3.14 chưa có wheel TF.
+
+---
+
+## 0.0 — Khởi động dịch vụ
+
+| Bước | Lệnh | Pass? |
+|------|------|-------|
+| 1 | `research/scripts/start_ai_service.ps1` (env `MODEL_PATH`) | ☐ |
+| 2 | Spring Boot + postgres + minio | ☐ |
+| 3 | `python research/scripts/resnet50_smoke_test.py` | ☐ |
 
 ---
 
@@ -14,18 +25,17 @@ Checklist trước khi thu data hàng loạt (LO_TRINH §G0). Mục tiêu: đả
 
 | Bước | Hành động | Kết quả mong đợi | Pass? |
 |------|-----------|------------------|-------|
-| 1 | Customer upload 1 ảnh qua `/diet` → Analyze | Status `PT_REVIEWING` hoặc `DRAFT` | ☑ |
-| 2 | Kiểm DB `diet_logs` hoặc API `GET /admin/rbl/logs/{id}` | Có `aiPredictedMacros` | ☑ |
-| 3 | Cùng log | Có `dbMatchedMacros` (khi có match) hoặc null (không match) | ☑ |
-| 4 | Cùng log | Có `modelVersion`, `promptVersion`, `experimentCohort` | ☑ |
-
-**Smoke log (HOME):** `2ded21ff-177d-4f6b-8530-2e75226f1f2b` — cohort `HOME_HYBRID_DB`, recognition `HYBRID`.
+| 1 | `GET /health` FastAPI | `model_loaded: true` | ☐ |
+| 2 | Customer upload ảnh qua `/diet` → Analyze | Status `PT_REVIEWING` hoặc `DRAFT` | ☐ |
+| 3 | Kiểm DB hoặc `GET /admin/rbl/logs/{id}` | Có `aiPredictedMacros` | ☐ |
+| 4 | Cùng log | Có `dbMatchedMacros` khi `food_code` map được Food DB | ☐ |
+| 5 | Cùng log | `modelVersion=resnet50-vtn-10class` | ☐ |
 
 ---
 
 ## 0.2 — `db_matched_macros` scale theo portion
 
-**Code reference:** `DietLogServiceImpl.macrosForFood()`:
+ResNet50 mặc định `portionSize=100g` (CNN không estimate portion — limitation).
 
 ```
 ratio = portionG / serving_size_g
@@ -34,18 +44,9 @@ db_cal = food.calories × ratio
 
 | Bước | Hành động | Kết quả mong đợi | Pass? |
 |------|-----------|------------------|-------|
-| 1 | Upload món **có trong** `food_items` (vd: phở, cơm tấm) | `db_food_name` khớp catalog | ☑ |
-| 2 | Ghi `ai_portion_g` từ export CSV (cột mới) | > 0 | ☑ |
-| 3 | So sánh `db_cal` ≈ `food.calories × (ai_portion_g / serving_size_g)` | Sai lệch < 5 kcal hoặc do làm tròn | ☑ |
-
-**Kết luận G0.2 (smoke test số thật):** Scaling **OK** — không cần scale lại trong Python ở G4.
-
-| G0.2 | Ghi chú |
-|------|---------|
-| ☑ scaling OK | Dùng `db_cal` trực tiếp từ CSV |
-| ☐ cần xử lý Python | — |
-
-**Số kiểm:** Phở bò — base 450 kcal / serving 500 g, portion 500 g → expected 450 kcal, actual 450 kcal, diff 0.
+| 1 | Upload ảnh **pho** / **com_tam** (trong 10 class) | `recognition_source=HYBRID` | ☐ |
+| 2 | `ai_portion_g` từ export | = 100 (default) | ☐ |
+| 3 | So `db_cal` ≈ macro DB × ratio | Sai lệch do làm tròn OK | ☐ |
 
 ---
 
@@ -55,42 +56,32 @@ Export: `GET /admin/rbl/export?cvOnly=true`
 
 | Cột bắt buộc | Có? |
 |--------------|-----|
-| `delta_ai_cal`, `delta_db_cal` | ☑ |
-| `db_match_score`, `recognition_source`, `experiment_cohort` | ☑ |
-| `ai_portion_g`, `db_applied` | ☑ |
-| `blind_cal/pro/carb/fat` | ☑ |
-| `diet_log_items_json` | ☑ |
-| Header `# food_db_version=v2-60` | ☑ |
-
-Schema đầy đủ: [RBL_METHODOLOGY.md §6](../RBL_METHODOLOGY.md#6-csv-export-schema)
+| `delta_ai_cal`, `delta_db_cal` | ☐ |
+| `model_version` (= resnet50-vtn-10class) | ☐ |
+| `recognition_source`, `experiment_cohort` | ☐ |
+| `ai_portion_g`, `db_applied` | ☐ |
 
 ---
 
-## 0.4 — Hybrid kích hoạt được
+## 0.4 — Hybrid + fallback
 
 | Bước | Hành động | Kết quả | Pass? |
 |------|-----------|---------|-------|
-| 1 | Upload món trong `food_items`, confidence ≥ 0.6 | `recognition_source = HYBRID` | ☑ |
-| 2 | Upload món không có trong DB | `recognition_source = AI_ONLY` | ☑ |
-| 3 | HOTPOT + chọn items từ DB | `recognition_source = HYBRID`, cohort `HOTPOT_HYBRID` | ☐ (chưa test G0) |
+| 1 | Ảnh trong 10 class, confidence ≥ 0.25 | `HYBRID`, cohort `HOME_HYBRID_DB` | ☐ |
+| 2 | Ảnh ngoài 10 class (pizza, burger) | `fallback=true`, `AI_ONLY` hoặc `DRAFT` | ☐ |
+| 3 | Confidence < 0.25 | Status `DRAFT`, SOS `LOW_CONFIDENCE` | ☐ |
 
-**Smoke:**
-- HOME (`smoke_pho.png`): Beef Pho, conf=0.85 → **HYBRID**, cohort `HOME_HYBRID_DB`
-- REST (`smoke_pizza.png`): Cheese Pizza, conf=0.9 → **AI_ONLY**, cohort `RESTAURANT_AI_ONLY`
+**Confidence threshold:** 0.25 (theo Biên bản §3 — MVP 25–40%).
 
 ---
 
-## G0 run log (2026-06-14)
+## 0.5 — Offline eval (RQ1)
 
-- AI health: available=True model=llava
-- HOME image: smoke_pho.png
-- HOME analyze logId=a6ffc1be-1c73-4992-8256-9f108d35ccff food=Beef Pho conf=0.85 portion=500.0
-- 0.1 snapshots: ai=True db_macros=True model=True cohort=HOME_HYBRID_DB recognition=HYBRID
-- REST image: smoke_pizza.png
-- REST analyze logId=6c02110f-8a63-4231-9f14-430558c09690 food=Cheese Pizza conf=0.9
-- 0.3 csv: missing_cols=none version_header=True
-- 0.2 scaling PASS: food=Phở bò base_cal=450.0 serving_g=500.0 portion_g=500.0 ratio=1.0000 expected_db_cal=450.00 actual_db_cal=450.00 diff=0.00 tol=9.00
-- 0.4 HOME=HYBRID (expect HYBRID, conf=0.85) | REST=AI_ONLY (expect AI_ONLY)
+```bash
+python research/scripts/eval_resnet50.py
+```
+
+Output: `research/output/resnet50_eval.json` + `.md` (Top-1, confusion matrix, per-class F1).
 
 ---
 
@@ -98,13 +89,14 @@ Schema đầy đủ: [RBL_METHODOLOGY.md §6](../RBL_METHODOLOGY.md#6-csv-export
 
 | Mục | Trạng thái |
 |-----|------------|
-| 0.1 RBL snapshots | ☑ Pass / ☐ Fail |
-| 0.2 Portion scaling | ☑ Pass / ☐ Fail |
-| 0.3 CSV columns | ☑ Pass / ☐ Fail |
-| 0.4 Hybrid pipeline | ☑ Pass / ☐ Fail |
+| 0.1 RBL snapshots | ☐ |
+| 0.2 Portion scaling | ☐ |
+| 0.3 CSV columns | ☐ |
+| 0.4 Hybrid / fallback | ☐ |
+| 0.5 Offline eval | ☐ |
 
-**Sẵn sàng thu data G2:** ☑ Có — chỉ khi cả 4 mục Pass
+**Sẵn sàng thu data G2:** chỉ khi cả 5 mục Pass
 
 ---
 
-*Document Version: 1.1.0 | Last Updated: 2026-06-14*
+*Document Version: 2.0.0 (ResNet50) | Last Updated: 2026-06-17*

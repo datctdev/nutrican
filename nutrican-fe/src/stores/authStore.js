@@ -82,7 +82,7 @@ export const useAuthStore = create(
 
       setUser: (userData) => set({ user: userData }),
 
-      setAccessToken: (accessToken) => set({ accessToken }),
+      setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
 
       checkAuth: async () => {
         const { accessToken } = get();

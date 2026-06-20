@@ -18,6 +18,10 @@ public interface FoodCatalogService {
 
     Optional<FoodItemResponse> findBestMatch(String foodName);
 
+    Optional<FoodItemResponse> findByResNetFoodCode(String foodCode);
+
+    List<FoodItemResponse> getResNetDishes();
+
     List<FoodItemResponse> findMatches(String foodName, int limit);
 
     int getMatchScore(String foodName, UUID foodItemId);
