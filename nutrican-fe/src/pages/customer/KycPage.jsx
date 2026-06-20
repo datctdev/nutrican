@@ -14,26 +14,9 @@ import {
   Users, TrendingUp, Star, ChevronRight, Mail, Phone, UploadCloud
 } from 'lucide-react';
 
-const KYC_COOKIE = 'nutrican-kyc';
-const COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
-
-function readKycCookie() {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp('(^| )' + KYC_COOKIE + '=([^;]+)'));
-  return match ? match[2] : null;
-}
-
-function writeKycCookie(value) {
-  document.cookie = `${KYC_COOKIE}=${value}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
-}
-
 export default function KycPage() {
   const navigate = useNavigate();
   const { user, checkAuth } = useAuthStore();
-
-  const [isKycVerified, setIsKycVerified] = useState(
-    () => user?.isKycVerified || readKycCookie() === '1' || false
-  );
   const [hasPtProfile, setHasPtProfile] = useState(false);
   const [ptProfileStatus, setPtProfileStatus] = useState(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
@@ -73,33 +56,21 @@ export default function KycPage() {
     const checkStatus = async () => {
       setIsLoadingStatus(true);
       try {
-        // Check if user has PT profile via API
         const response = await userService.getProfile();
         const userData = response.data?.data;
-        
-        // Update KYC cookie
-        if (userData?.isKycVerified) {
-          setIsKycVerified(true);
-          writeKycCookie('1');
-        }
 
-        // Check if user has PT profile
         if (userData?.ptProfile) {
           setHasPtProfile(true);
           setPtProfileStatus(userData.ptProfile.ptRequestStatus || userData.ptProfile.verificationStatus);
         }
       } catch (error) {
         console.error('Error checking status:', error);
-        // Fallback to cookie
-        if (readKycCookie() === '1') {
-          setIsKycVerified(true);
-        }
       } finally {
         setIsLoadingStatus(false);
       }
     };
     checkStatus();
-  }, [user?.isKycVerified]);
+  }, []);
 
   // Steps for KYC
   const steps = [
@@ -164,8 +135,6 @@ export default function KycPage() {
       setCompareResult(result);
       setCurrentStep(5);
       if (result?.status === 'VERIFIED') {
-        writeKycCookie('1');
-        setIsKycVerified(true);
         await checkAuth();
       }
     } catch (err) {
@@ -357,7 +326,7 @@ export default function KycPage() {
           </div>
           <div className="mt-6 flex gap-3">
             {passed ? (
-              <Button onClick={() => { resetKyc(); setIsKycVerified(true); }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 font-bold">
+              <Button onClick={() => { resetKyc(); }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 font-bold">
                 Tiếp tục <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
@@ -390,7 +359,7 @@ export default function KycPage() {
   }
 
   // If KYC is verified, show PT Registration page
-  if (isKycVerified) {
+  if (user?.isKycVerified) {
     return (
       <div className="max-w-4xl mx-auto pb-12 animate-fade-in">
         {/* Header */}
