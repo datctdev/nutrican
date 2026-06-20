@@ -110,7 +110,7 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (request.getPhoneNumber() != null) user.setPhoneNumber(request.getPhoneNumber());
         if (request.getAddress() != null) user.setAddress(request.getAddress());
         if (request.getDateOfBirth() != null) {
-            user.setDateOfBirth(java.time.LocalDateTime.parse(request.getDateOfBirth()));
+            user.setDateOfBirth(java.time.LocalDate.parse(request.getDateOfBirth()));
         }
 
         user = userRepository.save(user);

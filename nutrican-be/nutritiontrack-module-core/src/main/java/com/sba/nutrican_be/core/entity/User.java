@@ -4,7 +4,7 @@ import com.sba.nutrican_be.core.enums.UserRole;
 import com.sba.nutrican_be.core.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "users")
@@ -44,7 +44,7 @@ public class User extends BaseEntity {
     private String address;
 
     @Column(name = "date_of_birth")
-    private LocalDateTime dateOfBirth;
+    private LocalDate dateOfBirth;
 
     @Column(name = "google_id", unique = true)
     private String googleId;

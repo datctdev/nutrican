@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
+import { toast } from 'sonner';
 
 export default function PtRegistrationPage() {
   const { registerPt, isLoading, error, clearError } = useAuthStore();
@@ -12,11 +13,14 @@ export default function PtRegistrationPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    clearError();
     try {
-      clearError();
       await registerPt({ ...formData, yearsOfExperience: parseInt(formData.yearsOfExperience) || 0 });
+      toast.success('Registration submitted!', { description: 'Your PT application will be reviewed by admin.' });
       navigate('/login');
-    } catch {}
+    } catch (err) {
+      toast.error('Registration failed', { description: err.response?.data?.message || 'Something went wrong' });
+    }
   };
 
   return (

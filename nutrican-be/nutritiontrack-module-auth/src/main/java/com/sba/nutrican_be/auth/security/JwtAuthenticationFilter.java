@@ -72,11 +72,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
 
-        String accessToken = request.getParameter("accessToken");
-        if (StringUtils.hasText(accessToken)) {
-            return accessToken;
-        }
-
         String refreshToken = extractRefreshTokenFromCookie(request);
         if (StringUtils.hasText(refreshToken)) {
             return refreshToken;

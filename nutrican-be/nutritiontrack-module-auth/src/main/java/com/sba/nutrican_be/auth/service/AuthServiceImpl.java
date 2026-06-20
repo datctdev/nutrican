@@ -16,16 +16,25 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.UUID;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
+
+    private static final Logger auditLog = LoggerFactory.getLogger("SECURITY_AUDIT");
+
+    private static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
+    private static final String COOKIE_PATH = "/";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -34,9 +43,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${app.security.jwt.expiration}")
     private Long jwtExpirationMs;
-
-    private static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
-    private static final String COOKIE_PATH = "/api/v1/auth";
 
     @Override
     @Transactional
@@ -64,21 +70,32 @@ public class AuthServiceImpl implements AuthService {
     @Transactional(readOnly = true)
     public ApiResponse<AuthResponse> login(LoginRequest request, HttpServletResponse response) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new UnauthorizedException("Invalid email or password"));
+                .orElseThrow(() -> {
+                    auditLog.warn("AUTH_FAILED: email={}, reason=USER_NOT_FOUND", request.getEmail());
+                    return new UnauthorizedException("Invalid email or password");
+                });
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            auditLog.warn("AUTH_FAILED: email={}, userId={}, reason=INVALID_PASSWORD",
+                    request.getEmail(), user.getId());
             throw new UnauthorizedException("Invalid email or password");
         }
 
         if (user.getStatus() == UserStatus.SUSPENDED) {
+            auditLog.warn("AUTH_FAILED: email={}, userId={}, reason=ACCOUNT_SUSPENDED",
+                    request.getEmail(), user.getId());
             throw new BadRequestException("Account is suspended");
         }
 
         if (user.getStatus() == UserStatus.PENDING_APPROVAL
                 || user.getStatus() == UserStatus.PENDING_VERIFICATION) {
+            auditLog.warn("AUTH_FAILED: email={}, userId={}, reason=ACCOUNT_PENDING",
+                    request.getEmail(), user.getId());
             throw new BadRequestException("Account is pending approval");
         }
 
+        auditLog.info("AUTH_SUCCESS: email={}, userId={}, role={}",
+                user.getEmail(), user.getId(), user.getRole());
         return ApiResponse.success(buildAuthResponse(user, null, response), "Login successful");
     }
 
@@ -104,32 +121,52 @@ public class AuthServiceImpl implements AuthService {
 
         tokenRevocationService.revoke(rawRefreshToken);
 
-        String email = jwtUtil.getEmailFromToken(rawRefreshToken);
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UnauthorizedException("User not found"));
+        UUID userId = jwtUtil.getUserIdFromRefreshToken(rawRefreshToken);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    auditLog.warn("TOKEN_REFRESH_FAILED: reason=USER_NOT_FOUND, tokenId={}",
+                            jwtUtil.getTokenId(rawRefreshToken));
+                    return new UnauthorizedException("User not found");
+                });
 
+        auditLog.info("TOKEN_REFRESHED: userId={}", user.getId());
         return ApiResponse.success(buildAuthResponse(user, rawRefreshToken, response), "Token refreshed");
+    }
+
+    private void clearRefreshTokenCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, "");
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath(COOKIE_PATH);
+        cookie.setMaxAge(0);
+        cookie.setAttribute("SameSite", "Strict");
+        response.addCookie(cookie);
     }
 
     @Override
     @Transactional
-    public ApiResponse<Void> logout(String accessToken, HttpServletRequest request) {
-        if (StringUtils.hasText(accessToken)) {
-            tokenRevocationService.revoke(accessToken);
-        }
+    public ApiResponse<Void> logout(String accessToken, HttpServletRequest request, HttpServletResponse response) {
+        boolean revoked = StringUtils.hasText(accessToken)
+                && tokenRevocationService.revoke(accessToken);
 
         String rawRefreshToken = extractRefreshTokenFromCookie(request);
-        if (StringUtils.hasText(rawRefreshToken)) {
-            tokenRevocationService.revoke(rawRefreshToken);
-        }
+        boolean refreshRevoked = StringUtils.hasText(rawRefreshToken)
+                && tokenRevocationService.revoke(rawRefreshToken);
 
-        log.info("User logged out, tokens revoked");
+        clearRefreshTokenCookie(response);
+
+        if (!revoked && !refreshRevoked) {
+            log.warn("Logout called but no tokens were found to revoke for this session");
+        } else {
+            log.info("User logged out, tokens revoked: accessToken={}, refreshToken={}",
+                    revoked, refreshRevoked);
+        }
         return ApiResponse.success(null, "Logout successful");
     }
 
     private AuthResponse buildAuthResponse(User user, String oldRefreshToken, HttpServletResponse response) {
         String accessToken = jwtUtil.generateToken(user.getEmail(), user.getId(), user.getRole().name());
-        String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail());
+        String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getId());
 
         if (response != null) {
             setRefreshTokenCookie(response, newRefreshToken);
