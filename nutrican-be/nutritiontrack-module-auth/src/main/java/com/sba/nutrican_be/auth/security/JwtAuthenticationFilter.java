@@ -6,6 +6,7 @@ import com.sba.nutrican_be.core.repository.UserRepository;
 import com.sba.nutrican_be.core.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -32,20 +33,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserRepository userRepository;
     private final TokenRevocationService tokenRevocationService;
 
+    private static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = extractJwtFromRequest(request);
-
-            // #region agent log
-            java.nio.file.Files.write(
-                java.nio.file.Paths.get("debug-cb5cfc.log"),
-                ("{\"sessionId\":\"cb5cfc\",\"id\":\"log_" + System.currentTimeMillis() + "_jwt_extract\",\"timestamp\":" + System.currentTimeMillis() + ",\"location\":\"JwtAuthenticationFilter.java:36\",\"message\":\"extractJwtFromRequest\",\"data\":{\"uri\":\"" + request.getRequestURI() + "\",\"hasJwt\":" + org.springframework.util.StringUtils.hasText(jwt) + ",\"hasAuthHeader\":" + org.springframework.util.StringUtils.hasText(request.getHeader("Authorization")) + ",\"hasAccessTokenParam\":" + org.springframework.util.StringUtils.hasText(request.getParameter("accessToken")) + "},\"runId\":\"pre-fix\"}\n").getBytes(),
-                java.nio.file.StandardOpenOption.CREATE,
-                java.nio.file.StandardOpenOption.APPEND
-            );
-            // #endregion
 
             if (StringUtils.hasText(jwt) && jwtUtil.validateToken(jwt) && !jwtUtil.isRefreshToken(jwt)
                     && !tokenRevocationService.isRevoked(jwt)) {
@@ -83,6 +77,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return accessToken;
         }
 
+        String refreshToken = extractRefreshTokenFromCookie(request);
+        if (StringUtils.hasText(refreshToken)) {
+            return refreshToken;
+        }
+
+        return null;
+    }
+
+    private String extractRefreshTokenFromCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (REFRESH_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
         return null;
     }
 }

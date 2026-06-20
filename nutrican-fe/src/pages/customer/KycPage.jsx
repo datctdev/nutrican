@@ -14,13 +14,25 @@ import {
   Users, TrendingUp, Star, ChevronRight, Mail, Phone, UploadCloud
 } from 'lucide-react';
 
+const KYC_COOKIE = 'nutrican-kyc';
+const COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
+
+function readKycCookie() {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^| )' + KYC_COOKIE + '=([^;]+)'));
+  return match ? match[2] : null;
+}
+
+function writeKycCookie(value) {
+  document.cookie = `${KYC_COOKIE}=${value}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
 export default function KycPage() {
   const navigate = useNavigate();
   const { user, checkAuth } = useAuthStore();
 
-  // Check KYC status - initialize from auth store directly
   const [isKycVerified, setIsKycVerified] = useState(
-    () => user?.isKycVerified || localStorage.getItem('isKycVerified') === 'true' || false
+    () => user?.isKycVerified || readKycCookie() === '1' || false
   );
   const [hasPtProfile, setHasPtProfile] = useState(false);
   const [ptProfileStatus, setPtProfileStatus] = useState(null);
@@ -65,10 +77,10 @@ export default function KycPage() {
         const response = await userService.getProfile();
         const userData = response.data?.data;
         
-        // Update KYC status from API
+        // Update KYC cookie
         if (userData?.isKycVerified) {
           setIsKycVerified(true);
-          localStorage.setItem('isKycVerified', 'true');
+          writeKycCookie('1');
         }
 
         // Check if user has PT profile
@@ -78,9 +90,8 @@ export default function KycPage() {
         }
       } catch (error) {
         console.error('Error checking status:', error);
-        // Fallback to localStorage
-        const storedKyc = localStorage.getItem('isKycVerified');
-        if (storedKyc === 'true') {
+        // Fallback to cookie
+        if (readKycCookie() === '1') {
           setIsKycVerified(true);
         }
       } finally {
@@ -151,8 +162,8 @@ export default function KycPage() {
       const res = await authService.compareKyc(sessionId);
       setCompareResult(res.data.data);
       setCurrentStep(5);
-      // Update localStorage
-      localStorage.setItem('isKycVerified', 'true');
+      // Update KYC cookie
+      writeKycCookie('1');
       setIsKycVerified(true);
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.reason || 'Xác thực thất bại';

@@ -3,8 +3,9 @@ import api from './api';
 export const authService = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
-  refreshToken: (refreshToken) => api.post('/auth/refresh', { refreshToken }),
+  refreshToken: () => api.post('/auth/refresh', {}),
   logout: () => api.post('/auth/logout'),
+  me: () => api.get('/users/me'),
 
   // VNPT-based KYC flow
   startKycSession: () => api.post('/kyc/sessions:start'),

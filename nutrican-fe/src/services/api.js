@@ -1,5 +1,5 @@
-// src/services/api.js
 import axios from 'axios';
+import { useAuthStore } from '../stores/authStore';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1',
@@ -7,30 +7,15 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
-
-// Get auth state from Zustand persisted storage
-const getAuthState = () => {
-  try {
-    const stored = localStorage.getItem('nutrican-auth');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Zustand persist stores as: { state: {...}, version: number }
-      return parsed.state || parsed;
-    }
-  } catch (e) {
-    console.error('Error reading auth state:', e);
-  }
-  return {};
-};
 
 api.interceptors.request.use(
   (config) => {
-    const { accessToken } = getAuthState();
+    const accessToken = useAuthStore.getState().accessToken;
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
-    // Let the browser set multipart boundary automatically
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
@@ -46,26 +31,19 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const { refreshToken } = getAuthState();
-        if (refreshToken) {
-          const { data } = await axios.post(
-            `${api.defaults.baseURL}/auth/refresh`,
-            { refreshToken }
-          );
-          // Update localStorage with new tokens
-          const currentState = getAuthState();
-          const newState = {
-            ...currentState,
-            accessToken: data.data.accessToken,
-            refreshToken: data.data.refreshToken,
-          };
-          localStorage.setItem('nutrican-auth', JSON.stringify({ state: newState }));
-          originalRequest.headers.Authorization = `Bearer ${data.data.accessToken}`;
-          return api(originalRequest);
+        const refreshResponse = await axios.post(
+          `${api.defaults.baseURL}/auth/refresh`,
+          {},
+          { withCredentials: true }
+        );
+        const newAccessToken = refreshResponse.data?.data?.accessToken;
+        if (newAccessToken) {
+          useAuthStore.getState().setAccessToken(newAccessToken);
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         }
+        return api(originalRequest);
       } catch (refreshError) {
-        // Clear auth on refresh failure
-        localStorage.removeItem('nutrican-auth');
+        useAuthStore.getState().logout();
         window.location.href = '/login';
       }
     }
