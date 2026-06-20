@@ -82,16 +82,26 @@ export const useAuthStore = create(
 
       setUser: (userData) => set({ user: userData }),
 
-      setTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
+      setAccessToken: (accessToken) => set({ accessToken }),
 
       checkAuth: async () => {
-        const { accessToken } = get();
+        const { accessToken, user } = get();
         if (!accessToken) return;
         try {
           const response = await authService.me();
-          if (response.data?.data) {
-            set({ user: response.data.data });
-          }
+          const profile = response.data?.data;
+          if (!profile) return;
+          set({
+            user: {
+              ...user,
+              id: profile.id,
+              email: profile.email,
+              fullName: profile.fullName,
+              role: profile.role,
+              avatarUrl: profile.avatarUrl,
+              isKycVerified: profile.isKycVerified,
+            },
+          });
         } catch (error) {
           console.error('checkAuth failed:', error);
         }
