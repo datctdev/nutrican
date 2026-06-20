@@ -1,6 +1,7 @@
 package com.sba.nutrican_be.diet.config;
 
 import com.sba.nutrican_be.ai.ResNetFoodCodeMapping;
+import com.sba.nutrican_be.ai.ResNetFoodDefaults;
 import com.sba.nutrican_be.core.entity.FoodItem;
 import com.sba.nutrican_be.core.repository.FoodItemRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,11 +12,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
- * Seeds 10 ResNet50 dish entries for A1.1 hybrid Food DB matching (BienBan §3).
+ * Seeds / updates 10 ResNet50 dish entries for A1.1 hybrid Food DB matching.
  */
 @Slf4j
 @Component
@@ -24,57 +31,80 @@ import java.util.Map;
 public class ResNetFoodCatalogInitializer implements CommandLineRunner {
 
     private static final String CATEGORY = "Món ResNet50";
-    private static final String SOURCE = "RESNET_VTN_10";
-
-    private static final Map<String, int[]> MACROS = Map.ofEntries(
-            Map.entry("banh_chung", new int[]{600, 15, 65, 20}),
-            Map.entry("banh_khot", new int[]{350, 12, 45, 15}),
-            Map.entry("banh_mi", new int[]{400, 15, 45, 18}),
-            Map.entry("banh_trang_nuong", new int[]{250, 8, 30, 10}),
-            Map.entry("banh_xeo", new int[]{450, 16, 40, 22}),
-            Map.entry("bun_dau_mam_tom", new int[]{550, 25, 60, 22}),
-            Map.entry("ca_kho_to", new int[]{300, 20, 10, 18}),
-            Map.entry("com_tam", new int[]{650, 30, 80, 25}),
-            Map.entry("goi_cuon", new int[]{150, 8, 25, 2}),
-            Map.entry("pho", new int[]{400, 20, 55, 12})
-    );
 
     private final FoodItemRepository foodItemRepository;
 
     @Override
     @Transactional
     public void run(String... args) {
-        int added = 0;
+        int upserted = 0;
         for (Map.Entry<String, String> entry : ResNetFoodCodeMapping.allMappings().entrySet()) {
             String code = entry.getKey();
             String nameVi = entry.getValue();
-            boolean exists = foodItemRepository.findAll().stream()
-                    .anyMatch(f -> nameVi.equalsIgnoreCase(f.getNameVi())
-                            || (SOURCE.equals(f.getSource())
-                            && f.getAliases() != null
-                            && f.getAliases().contains(code)));
-            if (exists) {
+            Optional<ResNetFoodDefaults.MacroServing> defaults = ResNetFoodDefaults.forCode(code);
+            if (defaults.isEmpty()) {
                 continue;
             }
-            int[] m = MACROS.get(code);
-            FoodItem item = FoodItem.builder()
-                    .nameVi(nameVi)
-                    .nameEn(code.replace('_', ' '))
-                    .category(CATEGORY)
-                    .aliases(List.of(code, code.replace('_', ' ')))
-                    .servingSizeG(BigDecimal.valueOf(100))
-                    .calories(BigDecimal.valueOf(m[0]))
-                    .protein(BigDecimal.valueOf(m[1]))
-                    .carb(BigDecimal.valueOf(m[2]))
-                    .fat(BigDecimal.valueOf(m[3]))
-                    .isComposite(false)
-                    .source(SOURCE)
-                    .build();
-            foodItemRepository.save(item);
-            added++;
+            ResNetFoodDefaults.MacroServing m = defaults.get();
+            List<String> aliases = buildAliases(code);
+
+            Optional<FoodItem> existing = findExisting(code, nameVi);
+            if (existing.isPresent()) {
+                FoodItem item = existing.get();
+                item.setNameVi(nameVi);
+                item.setCategory(CATEGORY);
+                item.setSource(ResNetFoodDefaults.SOURCE);
+                item.setAliases(aliases);
+                item.setServingSizeG(BigDecimal.valueOf(m.servingG()));
+                item.setCalories(BigDecimal.valueOf(m.calories()));
+                item.setProtein(BigDecimal.valueOf(m.protein()));
+                item.setCarb(BigDecimal.valueOf(m.carb()));
+                item.setFat(BigDecimal.valueOf(m.fat()));
+                foodItemRepository.save(item);
+            } else {
+                FoodItem item = FoodItem.builder()
+                        .nameVi(nameVi)
+                        .nameEn(code.replace('_', ' '))
+                        .category(CATEGORY)
+                        .aliases(aliases)
+                        .servingSizeG(BigDecimal.valueOf(m.servingG()))
+                        .calories(BigDecimal.valueOf(m.calories()))
+                        .protein(BigDecimal.valueOf(m.protein()))
+                        .carb(BigDecimal.valueOf(m.carb()))
+                        .fat(BigDecimal.valueOf(m.fat()))
+                        .isComposite(false)
+                        .source(ResNetFoodDefaults.SOURCE)
+                        .build();
+                foodItemRepository.save(item);
+            }
+            upserted++;
         }
-        if (added > 0) {
-            log.info("Seeded {} ResNet50 dish catalog entries", added);
+        if (upserted > 0) {
+            log.info("Upserted {} ResNet50 dish catalog entries", upserted);
         }
+    }
+
+    private List<String> buildAliases(String code) {
+        Set<String> aliases = new LinkedHashSet<>();
+        aliases.add(code);
+        aliases.add(code.replace('_', ' '));
+        Arrays.stream(ResNetFoodDefaults.aliasesCsv(code).split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .forEach(aliases::add);
+        return new ArrayList<>(aliases);
+    }
+
+    private Optional<FoodItem> findExisting(String code, String nameVi) {
+        return foodItemRepository.findAll().stream()
+                .filter(f -> ResNetFoodDefaults.SOURCE.equals(f.getSource())
+                        || "RESNET_VTN_10".equals(f.getSource())
+                        || (f.getAliases() != null && f.getAliases().stream()
+                        .anyMatch(a -> code.equalsIgnoreCase(a.trim()))))
+                .filter(f -> ResNetFoodDefaults.SOURCE.equals(f.getSource())
+                        || "RESNET_VTN_10".equals(f.getSource())
+                        || nameVi.equalsIgnoreCase(f.getNameVi())
+                        || (f.getAliases() != null && f.getAliases().contains(code)))
+                .findFirst();
     }
 }

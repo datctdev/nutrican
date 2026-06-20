@@ -30,6 +30,8 @@ public class DietLogResponse {
     private MealType mealType;
     private DietLogStatus status;
     private String foodDescription;
+    private String matchedFoodName;
+    private String aiFoodCode;
     private Boolean sosTicketFlag;
     private UUID ptReviewerId;
     private String ptNote;

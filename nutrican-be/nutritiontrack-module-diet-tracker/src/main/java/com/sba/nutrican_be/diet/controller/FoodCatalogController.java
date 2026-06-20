@@ -24,6 +24,11 @@ public class FoodCatalogController {
         return ResponseEntity.ok(ApiResponse.success(foodCatalogService.search(q, category)));
     }
 
+    @GetMapping("/resnet-dishes")
+    public ResponseEntity<ApiResponse<List<FoodItemResponse>>> getResNetDishes() {
+        return ResponseEntity.ok(ApiResponse.success(foodCatalogService.getResNetDishes()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<FoodItemResponse>> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(foodCatalogService.getById(id)));

@@ -9,6 +9,143 @@ import { Upload, Camera, FileText, AlertTriangle, RefreshCw, Trash2, CheckCircle
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
+const FOOD_CODE_LABELS = {
+  banh_chung: 'Bánh Chưng',
+  banh_khot: 'Bánh Khọt',
+  banh_mi: 'Bánh Mì',
+  banh_trang_nuong: 'Bánh Tráng Nướng',
+  banh_xeo: 'Bánh Xèo',
+  bun_dau_mam_tom: 'Bún Đậu Mắm Tôm',
+  ca_kho_to: 'Cá Kho Tộ',
+  com_tam: 'Cơm Tấm (Cơm sườn)',
+  goi_cuon: 'Gỏi Cuốn',
+  pho: 'Phở',
+};
+
+function getLogFoodTitle(log) {
+  if (log.foodDescription?.trim()) return log.foodDescription.trim();
+  if (log.matchedFoodName?.trim()) return log.matchedFoodName.trim();
+  if (log.aiFoodCode && FOOD_CODE_LABELS[log.aiFoodCode]) return FOOD_CODE_LABELS[log.aiFoodCode];
+  if (log.aiFoodCode) return log.aiFoodCode.replace(/_/g, ' ');
+  return 'Chưa nhận diện tên món';
+}
+
+function formatAiConfidence(score) {
+  if (score == null || Number.isNaN(Number(score))) return null;
+  return `${Math.round(Number(score) * 100)}%`;
+}
+
+function formatPredictionConfidence(score) {
+  if (score == null || Number.isNaN(Number(score))) return null;
+  const pct = Number(score) <= 1 ? Math.round(Number(score) * 100) : Math.round(Number(score));
+  return `${pct}%`;
+}
+
+function formatPortionRatio(ratio) {
+  if (ratio == null || Number.isNaN(Number(ratio))) return null;
+  const value = Number(ratio);
+  if (value >= 0.95 && value <= 1.05) return '1 suất chuẩn';
+  if (value < 1) return `${Math.round(value * 100)}% suất`;
+  return `${value.toFixed(1)}× suất`;
+}
+
+const RESNET_FOOD_CODES = Object.keys(FOOD_CODE_LABELS);
+
+const RESNET_MACRO_ESTIMATES = {
+  banh_chung: { calories: 408, protein: 15, carb: 75, fat: 6, servingG: 200 },
+  banh_khot: { calories: 154, protein: 6, carb: 17, fat: 7, servingG: 150 },
+  banh_mi: { calories: 240, protein: 8, carb: 51, fat: 1, servingG: 250 },
+  banh_trang_nuong: { calories: 300, protein: 5, carb: 33, fat: 16, servingG: 200 },
+  banh_xeo: { calories: 517, protein: 15, carb: 71, fat: 19, servingG: 180 },
+  bun_dau_mam_tom: { calories: 760, protein: 58, carb: 49, fat: 45, servingG: 400 },
+  ca_kho_to: { calories: 330, protein: 39, carb: 22, fat: 10, servingG: 350 },
+  com_tam: { calories: 529, protein: 21, carb: 82, fat: 13, servingG: 350 },
+  goi_cuon: { calories: 116, protein: 10, carb: 11, fat: 4, servingG: 120 },
+  pho: { calories: 414, protein: 18, carb: 59, fat: 12, servingG: 500 },
+};
+
+function resolveResnetFoodCode(dish) {
+  if (!dish) return null;
+  const alias = dish.aliases?.find((a) => RESNET_FOOD_CODES.includes(a));
+  if (alias) return alias;
+  if (dish.nameEn) return dish.nameEn.replace(/ /g, '_');
+  return null;
+}
+
+function getManualDishOptions(resnetDishes) {
+  if (resnetDishes?.length > 0) return resnetDishes;
+  return RESNET_FOOD_CODES.map((code) => ({
+    nameVi: FOOD_CODE_LABELS[code],
+    aliases: [code],
+    ...RESNET_MACRO_ESTIMATES[code],
+  }));
+}
+
+function getServingGForCode(foodCode, resnetDishes) {
+  if (!foodCode) return 350;
+  const dish = getManualDishOptions(resnetDishes).find((d) => resolveResnetFoodCode(d) === foodCode);
+  return Math.round(
+    Number(dish?.servingSizeG || dish?.servingG || RESNET_MACRO_ESTIMATES[foodCode]?.servingG || 350)
+  );
+}
+
+function scaleMacrosByGrams(dish, grams, servingG) {
+  if (!dish) return null;
+  const base = Number(servingG) || Number(dish.servingSizeG || dish.servingG) || 100;
+  const g = Number(grams) || base;
+  const ratio = g / base;
+  return {
+    calories: Math.round(Number(dish.calories || 0) * ratio),
+    protein: Math.round(Number(dish.protein || 0) * ratio),
+    carb: Math.round(Number(dish.carb || 0) * ratio),
+    fat: Math.round(Number(dish.fat || 0) * ratio),
+  };
+}
+
+function scaleDishMacros(dish, portionRatio = 1) {
+  if (!dish) return null;
+  const servingG = Number(dish.servingSizeG || dish.servingG || 100);
+  return scaleMacrosByGrams(dish, servingG * (Number(portionRatio) || 1), servingG);
+}
+
+function getPreviewForSelection(selectedFoodCode, topPredictions, resnetDishes, adjustedGrams) {
+  if (!selectedFoodCode) return null;
+  const servingG = getServingGForCode(selectedFoodCode, resnetDishes);
+  const grams = Math.round(Number(adjustedGrams) || servingG);
+  const dish = getManualDishOptions(resnetDishes).find((d) => resolveResnetFoodCode(d) === selectedFoodCode);
+  if (dish) {
+    const scaled = scaleMacrosByGrams(dish, grams, servingG);
+    return {
+      foodCode: selectedFoodCode,
+      foodName: dish.nameVi,
+      servingG,
+      ...scaled,
+    };
+  }
+  const est = RESNET_MACRO_ESTIMATES[selectedFoodCode];
+  if (est) {
+    const scaled = scaleMacrosByGrams(est, grams, servingG);
+    return {
+      foodCode: selectedFoodCode,
+      foodName: FOOD_CODE_LABELS[selectedFoodCode],
+      servingG,
+      ...scaled,
+    };
+  }
+  const fromTop = topPredictions?.find((p) => p.foodCode === selectedFoodCode);
+  return fromTop ? { ...fromTop, servingG } : null;
+}
+
+function initialAdjustedGrams(analyzed, foodCode, resnetDishes) {
+  const servingG = getServingGForCode(foodCode, resnetDishes);
+  const fromAi = analyzed?.estimatedTotalGrams ?? analyzed?.portionSize;
+  if (fromAi != null && Number(fromAi) > 0) {
+    return Math.round(Number(fromAi));
+  }
+  const ratio = Number(analyzed?.portionRatio) || 1;
+  return Math.round(servingG * ratio);
+}
+
 export default function DietTrackerPage() {
   const [logs, setLogs] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -53,10 +190,24 @@ export default function DietTrackerPage() {
   const [sosTickets, setSosTickets] = useState([]);
   const [sosDietLogId, setSosDietLogId] = useState(null);
 
+  const [confirmModal, setConfirmModal] = useState(null);
+  const [confirmingFood, setConfirmingFood] = useState(false);
+  const [resnetDishes, setResnetDishes] = useState([]);
+
   useEffect(() => {
     fetchData();
     loadHotpotData();
+    loadResNetDishes();
   }, []);
+
+  const loadResNetDishes = async () => {
+    try {
+      const res = await dietService.getResNetDishes();
+      setResnetDishes(res.data.data || []);
+    } catch (err) {
+      console.error('Failed to load ResNet dishes', err);
+    }
+  };
 
   const todayStr = () => {
     const now = new Date();
@@ -248,15 +399,45 @@ export default function DietTrackerPage() {
       }
 
       const res = await dietService.analyzeMeal(formData);
-      if (res.data.data?.suggestSos) {
+      const analyzed = res.data.data;
+      if (analyzed?.suggestSos) {
         toast.warning('Low confidence — consider sending an SOS to your PT');
       }
-      toast.success('Meal analyzed successfully!');
-      fetchData();
+
+      const topPredictions = analyzed?.topPredictions?.length
+        ? analyzed.topPredictions
+        : [{
+            foodCode: analyzed?.foodCode,
+            foodName: analyzed?.foodName,
+            confidence: analyzed?.confidenceScore,
+          }].filter((p) => p.foodCode);
+
+      const selectedCode = analyzed?.foodCode || topPredictions[0]?.foodCode;
+      setConfirmModal({
+        logId: analyzed.logId,
+        confirmed: false,
+        topPredictions,
+        selectedFoodCode: selectedCode,
+        portionRatio: analyzed?.portionRatio ?? 1,
+        portionSize: analyzed?.portionSize,
+        adjustedGrams: initialAdjustedGrams(analyzed, selectedCode, resnetDishes),
+        calories: analyzed?.calories,
+        protein: analyzed?.protein,
+        carb: analyzed?.carb,
+        fat: analyzed?.fat,
+        needsConfirmation: analyzed?.needsConfirmation ?? true,
+        foodName: analyzed?.foodName,
+        llavaUsed: analyzed?.llavaUsed,
+        llavaFoodName: analyzed?.llavaFoodName,
+        macroSource: analyzed?.macroSource,
+        estimatedTotalGrams: analyzed?.estimatedTotalGrams,
+      });
+
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      // Chưa fetchData — log tạm chỉ hiện sau khi user xác nhận
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to analyze meal');
     } finally {
@@ -300,6 +481,67 @@ export default function DietTrackerPage() {
       toast.error('Failed to delete log');
     }
   };
+
+  const handleCancelConfirmation = async () => {
+    const logId = confirmModal?.logId;
+    const wasConfirmed = confirmModal?.confirmed;
+    setConfirmModal(null);
+    if (logId && !wasConfirmed) {
+      try {
+        await dietService.deleteLog(logId);
+        toast.info('Đã hủy — bữa ăn không được lưu');
+      } catch {
+        toast.error('Không thể hủy bữa ăn tạm');
+      }
+    }
+    fetchData();
+  };
+
+  const handleConfirmRecognition = async () => {
+    if (!confirmModal?.logId || !confirmModal?.selectedFoodCode) return;
+    try {
+      setConfirmingFood(true);
+      await dietService.confirmRecognition(
+        confirmModal.logId,
+        confirmModal.selectedFoodCode,
+        confirmModal.adjustedGrams
+      );
+      const selected = getPreviewForSelection(
+        confirmModal.selectedFoodCode,
+        confirmModal.topPredictions,
+        resnetDishes,
+        confirmModal.adjustedGrams
+      );
+      toast.success(`Đã lưu: ${selected?.foodName || FOOD_CODE_LABELS[confirmModal.selectedFoodCode] || confirmModal.selectedFoodCode}`);
+      setConfirmModal(null);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể xác nhận món ăn');
+    } finally {
+      setConfirmingFood(false);
+    }
+  };
+
+  const selectedPrediction = getPreviewForSelection(
+    confirmModal?.selectedFoodCode,
+    confirmModal?.topPredictions,
+    resnetDishes,
+    confirmModal?.adjustedGrams
+  );
+
+  const selectFoodCode = (code) => {
+    setConfirmModal((prev) => {
+      if (!prev) return prev;
+      const servingG = getServingGForCode(code, resnetDishes);
+      return {
+        ...prev,
+        selectedFoodCode: code,
+        adjustedGrams: Math.round(servingG * (Number(prev.portionRatio) || 1)),
+      };
+    });
+  };
+
+  const manualDishOptions = getManualDishOptions(resnetDishes);
 
   const handleUploadAdditionalImages = async (logId) => {
     const input = document.createElement('input');
@@ -735,12 +977,34 @@ export default function DietTrackerPage() {
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Cần SOS?</span>
                             )}
                           </div>
-                          <p className="text-lg font-bold text-slate-800 capitalize">
-                            {log.foodDescription || 'Processing AI Data...'}
+                          <p className="text-lg font-bold text-slate-800">
+                            {getLogFoodTitle(log)}
                           </p>
-                          <div className="flex items-center gap-4 mt-2.5 text-sm font-semibold text-slate-600">
+                          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                            {log.aiFoodCode && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200">
+                                ResNet · {FOOD_CODE_LABELS[log.aiFoodCode] || log.aiFoodCode}
+                              </span>
+                            )}
+                            {formatAiConfidence(log.aiConfidenceScore) && (
+                              <span className="text-[10px] font-semibold text-slate-500">
+                                AI {formatAiConfidence(log.aiConfidenceScore)} tin cậy
+                              </span>
+                            )}
+                            {log.matchedFoodName && log.recognitionSource === 'HYBRID' && (
+                              <span className="text-[10px] font-semibold text-emerald-700">
+                                DB: {log.matchedFoodName}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 mt-2.5 text-sm font-semibold text-slate-600 flex-wrap">
                             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />{macros.calories || 0} kcal</span>
+                            <span className="text-[10px] font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-100">
+                              từ ảnh · DB × khẩu phần
+                            </span>
                             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" />{macros.protein || 0}g Pro</span>
+                            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" />{macros.carbs || macros.carb || 0}g Carb</span>
+                            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" />{macros.fat || 0}g Fat</span>
                           </div>
                           {log.status === 'DRAFT' && (
                             <Button size="sm" onClick={async () => { await dietService.submitForReview(log.id); toast.success('Submitted for PT review'); fetchData(); }} className="mt-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs h-8">
@@ -865,6 +1129,198 @@ export default function DietTrackerPage() {
           
         </div>
       </div>
+
+      {confirmModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="w-full sm:max-w-lg max-h-[92vh] sm:max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-slide-in">
+            {/* Header — luôn hiện */}
+            <div className="flex-shrink-0 px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-blue-50">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-violet-600 flex-shrink-0" />
+                    Xác nhận món ăn
+                  </h3>
+                  <p className="text-xs text-slate-600 mt-1">
+                    ResNet Phase 2 + NutriHome · kéo gram → xác nhận để lưu
+                  </p>
+                  {confirmModal.llavaUsed && confirmModal.llavaFoodName && (
+                    <p className="text-xs text-emerald-700 mt-1.5 font-medium truncate">
+                      LLaVA: {confirmModal.llavaFoodName}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCancelConfirmation}
+                  disabled={confirmingFood}
+                  aria-label="Đóng"
+                  className="p-2 rounded-full hover:bg-white/90 text-slate-500 disabled:opacity-50 flex-shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {confirmModal.needsConfirmation && (
+                <p className="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                  Độ tin cậy thấp — chọn đúng món và chỉnh gram trước khi lưu.
+                </p>
+              )}
+            </div>
+
+            {/* Body — cuộn được */}
+            <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4">
+              <section>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Top 3 nhận diện</p>
+                <div className="space-y-2">
+                  {confirmModal.topPredictions.map((pred, idx) => {
+                    const isSelected = pred.foodCode === confirmModal.selectedFoodCode;
+                    return (
+                      <button
+                        key={pred.foodCode}
+                        type="button"
+                        onClick={() => selectFoodCode(pred.foodCode)}
+                        className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                          isSelected
+                            ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-200'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="text-[10px] font-bold text-slate-400">#{idx + 1}</span>
+                            <p className="font-semibold text-slate-800 text-sm truncate">
+                              {pred.foodName || FOOD_CODE_LABELS[pred.foodCode]}
+                            </p>
+                          </div>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                            isSelected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {formatPredictionConfidence(pred.confidence)}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {manualDishOptions.length > 0 && (
+                <section className="pt-1 border-t border-slate-100">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Chọn món đúng (10 món)
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-0.5">
+                    {manualDishOptions.map((dish) => {
+                      const code = resolveResnetFoodCode(dish);
+                      if (!code) return null;
+                      const isSelected = code === confirmModal.selectedFoodCode;
+                      const servingG = getServingGForCode(code, resnetDishes);
+                      const scaled = scaleMacrosByGrams(dish, confirmModal.adjustedGrams ?? servingG, servingG);
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => selectFoodCode(code)}
+                          className={`text-left p-2.5 rounded-xl border-2 text-xs transition-all ${
+                            isSelected
+                              ? 'border-emerald-500 bg-emerald-50'
+                              : code === 'com_tam'
+                                ? 'border-amber-200 bg-amber-50/40 hover:border-amber-300'
+                                : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <p className="font-bold text-slate-800 leading-tight line-clamp-2">
+                            {dish.nameVi || FOOD_CODE_LABELS[code]}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            ~{scaled?.calories ?? '—'} kcal
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {confirmModal.selectedFoodCode && (() => {
+                const servingG = selectedPrediction?.servingG
+                  || getServingGForCode(confirmModal.selectedFoodCode, resnetDishes);
+                const minG = Math.max(50, Math.round(servingG * 0.4));
+                const maxG = Math.min(900, Math.round(servingG * 2.2));
+                const grams = confirmModal.adjustedGrams ?? servingG;
+                return (
+                  <section className="rounded-2xl border border-violet-100 bg-gradient-to-b from-violet-50/50 to-white p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-800">Khẩu phần</p>
+                      <span className="text-xl font-bold text-violet-700 tabular-nums">{grams}g</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={minG}
+                      max={maxG}
+                      step={5}
+                      value={grams}
+                      onChange={(e) => setConfirmModal((prev) => ({
+                        ...prev,
+                        adjustedGrams: Number(e.target.value),
+                      }))}
+                      className="w-full h-2.5 accent-violet-600 cursor-pointer rounded-full"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-500">
+                      <span>{minG}g</span>
+                      <span className="font-medium text-violet-600">Chuẩn {servingG}g</span>
+                      <span>{maxG}g</span>
+                    </div>
+                    {selectedPrediction && (
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { label: 'Kcal', value: selectedPrediction.calories, accent: 'text-emerald-700' },
+                          { label: 'Protein', value: `${selectedPrediction.protein ?? '—'}g`, accent: 'text-slate-800' },
+                          { label: 'Carb', value: `${selectedPrediction.carb ?? '—'}g`, accent: 'text-slate-800' },
+                          { label: 'Fat', value: `${selectedPrediction.fat ?? '—'}g`, accent: 'text-slate-800' },
+                        ].map(({ label, value, accent }) => (
+                          <div key={label} className="rounded-xl bg-white border border-slate-100 py-2 text-center shadow-sm">
+                            <p className="text-[10px] text-slate-500">{label}</p>
+                            <p className={`text-sm font-bold ${accent}`}>{value ?? '—'}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })()}
+            </div>
+
+            {/* Footer — luôn hiện, nút thao tác */}
+            <div className="flex-shrink-0 px-5 py-4 border-t border-slate-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)] safe-area-pb">
+              {selectedPrediction && (
+                <p className="text-center text-sm font-semibold text-emerald-700 mb-3">
+                  Tổng: {selectedPrediction.calories ?? '—'} kcal · {confirmModal.adjustedGrams ?? '—'}g
+                </p>
+              )}
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 h-12 rounded-xl border-slate-300 text-slate-700 font-semibold"
+                  disabled={confirmingFood}
+                  onClick={handleCancelConfirmation}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1 h-12 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-semibold shadow-md shadow-violet-200"
+                  disabled={confirmingFood || !confirmModal.selectedFoodCode}
+                  onClick={handleConfirmRecognition}
+                >
+                  {confirmingFood ? 'Đang lưu...' : 'Xác nhận & lưu'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
 import com.sba.nutrican_be.diet.dto.AnalyzeMealContext;
 import com.sba.nutrican_be.diet.dto.AnalyzeMealResponse;
+import com.sba.nutrican_be.diet.dto.ConfirmRecognitionRequest;
 import com.sba.nutrican_be.diet.dto.CreateDietLogRequest;
 import com.sba.nutrican_be.diet.dto.CreateSosRequest;
 import com.sba.nutrican_be.diet.dto.DietLogResponse;
@@ -37,4 +38,6 @@ public interface DietLogService {
     ApiResponse<List<SosTicketResponse>> getSosTickets(UUID customerId);
 
     ApiResponse<DietLogResponse> submitForReview(UUID logId, UUID customerId);
+
+    ApiResponse<DietLogResponse> confirmRecognition(UUID logId, UUID customerId, ConfirmRecognitionRequest request);
 }

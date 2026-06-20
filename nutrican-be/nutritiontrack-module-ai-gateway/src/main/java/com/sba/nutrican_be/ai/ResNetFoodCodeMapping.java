@@ -21,7 +21,7 @@ public final class ResNetFoodCodeMapping {
             Map.entry("banh_xeo", "Bánh Xèo"),
             Map.entry("bun_dau_mam_tom", "Bún Đậu Mắm Tôm"),
             Map.entry("ca_kho_to", "Cá Kho Tộ"),
-            Map.entry("com_tam", "Cơm Tấm"),
+            Map.entry("com_tam", "Cơm Tấm (Cơm sườn)"),
             Map.entry("goi_cuon", "Gỏi Cuốn"),
             Map.entry("pho", "Phở")
     );

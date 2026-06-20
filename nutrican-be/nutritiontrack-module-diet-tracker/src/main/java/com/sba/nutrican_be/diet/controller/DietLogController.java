@@ -208,6 +208,22 @@ public class DietLogController {
 
 
 
+    @PutMapping("/logs/{id}/confirm-recognition")
+
+    public ResponseEntity<ApiResponse<DietLogResponse>> confirmRecognition(
+
+            @PathVariable UUID id,
+
+            @AuthenticationPrincipal User user,
+
+            @Valid @RequestBody ConfirmRecognitionRequest request) {
+
+        return ResponseEntity.ok(dietLogService.confirmRecognition(id, user.getId(), request));
+
+    }
+
+
+
     @DeleteMapping("/logs/{id}")
 
     public ResponseEntity<ApiResponse<Void>> deleteLog(

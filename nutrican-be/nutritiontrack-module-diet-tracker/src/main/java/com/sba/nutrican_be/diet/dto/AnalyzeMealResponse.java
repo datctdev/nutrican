@@ -16,7 +16,9 @@ import java.util.UUID;
 public class AnalyzeMealResponse {
     private UUID logId;
     private String foodName;
+    private String foodCode;
     private BigDecimal portionSize;
+    private BigDecimal portionRatio;
     private String portionUnit;
     private BigDecimal calories;
     private BigDecimal protein;
@@ -24,8 +26,14 @@ public class AnalyzeMealResponse {
     private BigDecimal fat;
     private BigDecimal confidenceScore;
     private boolean fallback;
+    private Boolean needsConfirmation;
     private String message;
     private MealType mealType;
     private Boolean suggestSos;
     private List<FoodItemResponse> suggestedFoodMatches;
+    private List<FoodPredictionResponse> topPredictions;
+    private Boolean llavaUsed;
+    private String macroSource;
+    private String llavaFoodName;
+    private BigDecimal estimatedTotalGrams;
 }
