@@ -84,8 +84,6 @@ export const useAuthStore = create(
 
       setAccessToken: (accessToken) => set({ accessToken }),
 
-      setAccessToken: (accessToken) => set({ accessToken }),
-
       checkAuth: async () => {
         const { accessToken, user } = get();
         if (!accessToken) return;

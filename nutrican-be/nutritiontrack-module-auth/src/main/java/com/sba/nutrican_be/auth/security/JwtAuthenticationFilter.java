@@ -2,6 +2,7 @@ package com.sba.nutrican_be.auth.security;
 
 import com.sba.nutrican_be.auth.service.TokenRevocationService;
 import com.sba.nutrican_be.core.entity.User;
+import com.sba.nutrican_be.core.enums.UserStatus;
 import com.sba.nutrican_be.core.repository.UserRepository;
 import com.sba.nutrican_be.core.util.JwtUtil;
 import jakarta.servlet.FilterChain;
@@ -50,6 +51,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (userOpt.isPresent()) {
                     User user = userOpt.get();
+
+                    if (user.getStatus() == UserStatus.SUSPENDED
+                            || user.getStatus() == UserStatus.PENDING_APPROVAL
+                            || user.getStatus() == UserStatus.PENDING_VERIFICATION) {
+                        log.warn("Blocked authentication attempt for userId={}, status={}",
+                                user.getId(), user.getStatus());
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
                                     user,
