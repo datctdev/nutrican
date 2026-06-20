@@ -160,11 +160,14 @@ export default function KycPage() {
     try {
       setComparing(true);
       const res = await authService.compareKyc(sessionId);
-      setCompareResult(res.data.data);
+      const result = res.data?.data ?? res.data;
+      setCompareResult(result);
       setCurrentStep(5);
-      // Update KYC cookie
-      writeKycCookie('1');
-      setIsKycVerified(true);
+      if (result?.status === 'VERIFIED') {
+        writeKycCookie('1');
+        setIsKycVerified(true);
+        await checkAuth();
+      }
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.reason || 'Xác thực thất bại';
       toast.error(msg);
@@ -200,7 +203,7 @@ export default function KycPage() {
     const timer = setInterval(async () => {
       try {
         const res = await authService.getKycSession(sessionId);
-        setSessionInfo(res.data.data?.session);
+        setSessionInfo(res.data?.session ?? res.data?.data?.session);
       } catch {}
     }, 3000);
     return () => clearInterval(timer);
