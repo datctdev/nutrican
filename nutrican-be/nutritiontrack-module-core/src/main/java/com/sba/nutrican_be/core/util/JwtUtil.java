@@ -44,7 +44,7 @@ public class JwtUtil {
                 .compact();
     }
 
-    public String generateRefreshToken(String email) {
+    public String generateRefreshToken(String email, UUID userId) {
         Date now = new Date();
         long refreshExpiration = expirationMs * 7;
         Date expiryDate = new Date(now.getTime() + refreshExpiration);
@@ -53,6 +53,7 @@ public class JwtUtil {
                 .id(UUID.randomUUID().toString())
                 .subject(email)
                 .claim("type", "refresh")
+                .claim("userId", userId.toString())
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
@@ -64,6 +65,10 @@ public class JwtUtil {
     }
 
     public UUID getUserIdFromToken(String token) {
+        return UUID.fromString(parseClaims(token).get("userId", String.class));
+    }
+
+    public UUID getUserIdFromRefreshToken(String token) {
         return UUID.fromString(parseClaims(token).get("userId", String.class));
     }
 

@@ -25,8 +25,8 @@ The application uses JSON Web Tokens (JWT) for stateless authentication.
 
 | Token | Purpose | Expiration | Storage |
 |-------|---------|------------|---------|
-| Access Token | API authorization | 1 hour (configurable) | Memory / localStorage |
-| Refresh Token | Obtain new access token | 7 days | localStorage |
+| Access Token | API authorization | 1 hour (configurable) | Zustand store (serialized to non-HttpOnly cookie for hydration) |
+| Refresh Token | Obtain new access token | 7 days | HttpOnly, Secure cookie (path=/, SameSite=Strict) |
 
 #### Token Structure
 
@@ -94,7 +94,8 @@ The application uses JSON Web Tokens (JWT) for stateless authentication.
 | Aspect | Implementation |
 |--------|----------------|
 | Hashing | BCrypt with cost factor 10 |
-| Minimum Length | 6 characters |
+| Minimum Length | 8 characters |
+| Required Characters | At least one uppercase, one lowercase, one digit |
 | Storage | Never stored in plain text |
 
 #### BCrypt Configuration
@@ -211,40 +212,23 @@ public ResponseEntity<ApiResponse<DietLogResponse>> updateLog(
 
 ### 4.1 CORS Configuration
 
+CORS is configured via `SecurityConfig.java` (primary) and reads allowed origins from the environment variable `${app.cors.allowed-origins}`. Both `allowedHeaders` and `exposedHeaders` are set via `SecurityConfig`. The `WebConfig.java` duplicate CORS mapping has been removed to avoid conflicts.
+
 ```java
-@Configuration
-public class CorsConfig {
-    
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        
-        // Allowed origins - restrict in production
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:5173",  // Development
-            "http://localhost:3000"   // Development
-            // Add production URLs
-        ));
-        
-        configuration.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
-        ));
-        
-        configuration.setAllowedHeaders(Arrays.asList(
-            "Authorization",
-            "Content-Type",
-            "X-Requested-With"
-        ));
-        
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
-        
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(allowedOrigins); // from app.cors.allowed-origins
+    configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+    configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+    configuration.setAllowCredentials(true);
+    configuration.setMaxAge(3600L);
+    configuration.setExposedHeaders(List.of("Authorization", "Access-Token", "Refresh-Token"));
+    // ...
 }
 ```
+
+> **Note:** In development, set `app.cors.allowed-origins=http://localhost:5173,http://localhost:3000,http://localhost:5174`. In production, replace with your actual domain(s).
 
 ### 4.2 Rate Limiting
 
@@ -253,9 +237,30 @@ Current implementation relies on:
 - Database connection pooling (HikariCP)
 - Frontend rate limiting (debounce on inputs)
 
-For production, consider adding:
-- Spring Cloud Gateway
-- Redis-based rate limiting
+For production, a dedicated rate limiting filter should be added. Example with Bucket4j:
+
+```java
+@Component
+public class RateLimitingFilter extends OncePerRequestFilter {
+    private final Bucket loginBucket = Bucket.builder()
+        .addLimit(Bandwidth.classic(5, Refill.intervally(1, Duration.ofMinutes(1))))
+        .build();
+
+    @Override
+    protected void doFilterInternal(...) {
+        if (request.getRequestURI().contains("/auth/login")) {
+            if (!loginBucket.tryConsume()) {
+                response.setStatus(429);
+                return;
+            }
+        }
+        filterChain.doFilter(request, response);
+    }
+}
+```
+
+Alternatively, consider using:
+- Spring Cloud Gateway with Redis-based rate limiting
 - Third-party services (Cloudflare, etc.)
 
 ### 4.3 Input Validation

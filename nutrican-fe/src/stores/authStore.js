@@ -67,9 +67,9 @@ export const useAuthStore = create(
       logout: async () => {
         try {
           await authService.logout();
-        } catch (e) {
-          // Logout API failure is non-critical; clear local state anyway
-        }
+  } catch {
+    // Logout API failure is non-critical; clear local state anyway
+  }
         set({
           user: null,
           accessToken: null,
@@ -81,6 +81,8 @@ export const useAuthStore = create(
       clearError: () => set({ error: null }),
 
       setUser: (userData) => set({ user: userData }),
+
+      setAccessToken: (accessToken) => set({ accessToken }),
 
       setAccessToken: (accessToken) => set({ accessToken }),
 
@@ -103,7 +105,14 @@ export const useAuthStore = create(
             },
           });
         } catch (error) {
-          console.error('checkAuth failed:', error);
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            set({
+              user: null,
+              accessToken: null,
+              isAuthenticated: false,
+              error: null,
+            });
+          }
         }
       },
     }),

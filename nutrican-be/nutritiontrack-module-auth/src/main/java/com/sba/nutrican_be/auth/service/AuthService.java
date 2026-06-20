@@ -11,5 +11,5 @@ public interface AuthService {
     ApiResponse<AuthResponse> registerCustomer(RegisterRequest request);
     ApiResponse<AuthResponse> login(LoginRequest request, HttpServletResponse response);
     ApiResponse<AuthResponse> refreshToken(HttpServletRequest request, HttpServletResponse response);
-    ApiResponse<Void> logout(String accessToken, HttpServletRequest request);
+    ApiResponse<Void> logout(String accessToken, HttpServletRequest request, HttpServletResponse response);
 }

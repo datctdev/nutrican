@@ -31,18 +31,14 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
-        const refreshResponse = await axios.post(
-          `${api.defaults.baseURL}/auth/refresh`,
-          {},
-          { withCredentials: true }
-        );
+        const refreshResponse = await api.post('/auth/refresh', {});
         const newAccessToken = refreshResponse.data?.data?.accessToken;
         if (newAccessToken) {
           useAuthStore.getState().setAccessToken(newAccessToken);
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         }
         return api(originalRequest);
-      } catch (refreshError) {
+      } catch {
         useAuthStore.getState().logout();
         window.location.href = '/login';
       }

@@ -6,10 +6,10 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { Loader2, Mail, Lock, User, Phone, ArrowRight, UserCircle, Sparkles, Eye, EyeOff, Check, X } from 'lucide-react';
+import { Loader2, Mail, Lock, User, Sparkles, Eye } from 'lucide-react';
 
 const PASSWORD_RULES = [
-  { key: 'length', label: 'At least 6 characters', test: (p) => p.length >= 6 },
+  { key: 'length', label: 'At least 8 characters', test: (p) => p.length >= 8 },
   { key: 'upper', label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
   { key: 'lower', label: 'One lowercase letter', test: (p) => /[a-z]/.test(p) },
   { key: 'number', label: 'One number', test: (p) => /\d/.test(p) },
@@ -30,7 +30,6 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({ email: '', password: '', confirmPassword: '', fullName: '', phoneNumber: '' });
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const strength = getPasswordStrength(formData.password);
 
   const validate = () => {
@@ -39,7 +38,10 @@ export default function RegisterPage() {
     if (!formData.email) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Invalid email format';
     if (!formData.password) newErrors.password = 'Password is required';
-    else if (formData.password.length < 6) newErrors.password = 'Min 6 characters';
+    else if (formData.password.length < 8) newErrors.password = 'Min 8 characters';
+    else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      newErrors.password = 'Must contain uppercase, lowercase, and number';
+    }
     if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -49,7 +51,7 @@ export default function RegisterPage() {
     e.preventDefault();
     if (!validate()) return;
     try {
-      const { confirmPassword, ...payload } = formData;
+      const payload = { email: formData.email, password: formData.password, fullName: formData.fullName, phoneNumber: formData.phoneNumber };
       await register(payload);
       toast.success('Account created!', { description: 'Welcome to Nutrican PT' });
       navigate('/login');
@@ -109,7 +111,7 @@ export default function RegisterPage() {
                 <label className="text-sm font-bold text-slate-700">Confirm Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                  <Input type={showConfirm ? 'text' : 'password'} placeholder="Re-enter password" className="pl-10 pr-10 py-5 rounded-xl bg-slate-50" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} />
+                  <Input type={showPassword ? 'text' : 'password'} placeholder="Re-enter password" className="pl-10 pr-10 py-5 rounded-xl bg-slate-50" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} />
                 </div>
                 {errors.confirmPassword && <p className="text-xs text-red-500 font-bold">{errors.confirmPassword}</p>}
               </div>

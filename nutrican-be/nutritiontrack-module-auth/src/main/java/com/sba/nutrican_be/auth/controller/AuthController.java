@@ -47,9 +47,10 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            HttpServletResponse response) {
         String accessToken = extractBearerToken(authorization);
-        return ResponseEntity.ok(authService.logout(accessToken, request));
+        return ResponseEntity.ok(authService.logout(accessToken, request, response));
     }
 
     private String extractBearerToken(String authorization) {
