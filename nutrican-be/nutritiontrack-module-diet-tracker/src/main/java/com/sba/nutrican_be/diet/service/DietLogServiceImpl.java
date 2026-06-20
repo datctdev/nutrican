@@ -1,6 +1,7 @@
 package com.sba.nutrican_be.diet.service;
 
 import com.sba.nutrican_be.ai.MealRecognitionResult;
+import com.sba.nutrican_be.ai.ResNetFoodCodeMapping;
 import com.sba.nutrican_be.ai.service.MealRecognitionService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.dto.PageResponse;
@@ -41,6 +42,7 @@ import com.sba.nutrican_be.core.util.MacroUtils;
 import com.sba.nutrican_be.diet.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -67,7 +69,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DietLogServiceImpl implements DietLogService {
 
-    private static final BigDecimal CONFIDENCE_THRESHOLD = new BigDecimal("0.6");
+    @Value("${ai.recognition.confidence-threshold:0.25}")
+    private BigDecimal confidenceThreshold;
+
     private static final Set<DietLogStatus> SUMMARY_STATUSES = Set.of(
             DietLogStatus.APPROVED, DietLogStatus.LOGGED, DietLogStatus.PT_REVIEWING);
 
@@ -157,7 +161,9 @@ public class DietLogServiceImpl implements DietLogService {
                     .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
             MealType mealType = parseMealType(ctx.getMealType());
-            List<FoodItemResponse> suggestedMatches = foodCatalogService.findMatches(aiResult.getFoodName(), 5);
+            String catalogLookupName = ResNetFoodCodeMapping.catalogNameVi(aiResult.getFoodCode())
+                    .orElse(aiResult.getFoodName());
+            List<FoodItemResponse> suggestedMatches = foodCatalogService.findMatches(catalogLookupName, 5);
             Optional<FoodItemResponse> bestMatch = suggestedMatches.stream().findFirst();
 
             Map<String, Object> aiPredictedMacros = MacroUtils.fromValues(
@@ -182,7 +188,7 @@ public class DietLogServiceImpl implements DietLogService {
                 dbApplied = true;
             } else if (bestMatch.isPresent()) {
                 FoodItem food = foodItemRepository.findById(bestMatch.get().getId()).orElseThrow();
-                dbMatchScore = foodCatalogService.getMatchScore(aiResult.getFoodName(), food.getId());
+                dbMatchScore = foodCatalogService.getMatchScore(catalogLookupName, food.getId());
                 matchedFoodName = food.getNameVi();
                 BigDecimal portion = aiResult.getPortionSize() != null ? aiResult.getPortionSize() : food.getServingSizeG();
                 dbMatchedMacros = macrosForFood(food, portion);
@@ -199,6 +205,7 @@ public class DietLogServiceImpl implements DietLogService {
 
             Map<String, Object> aiRaw = new HashMap<>();
             aiRaw.put("foodName", aiResult.getFoodName());
+            aiRaw.put("foodCode", aiResult.getFoodCode());
             aiRaw.put("confidenceScore", aiResult.getConfidenceScore());
             aiRaw.put("fallback", aiResult.isFallback());
             aiRaw.put("message", aiResult.getMessage());
@@ -535,7 +542,7 @@ public class DietLogServiceImpl implements DietLogService {
             return SosReasonCode.HOTPOT_HELP;
         }
         if (dietLog.getAiConfidenceScore() != null
-                && dietLog.getAiConfidenceScore().compareTo(CONFIDENCE_THRESHOLD) < 0) {
+                && dietLog.getAiConfidenceScore().compareTo(confidenceThreshold) < 0) {
             return SosReasonCode.LOW_CONFIDENCE;
         }
         if (dietLog.getFoodItemId() == null) {
@@ -652,14 +659,14 @@ public class DietLogServiceImpl implements DietLogService {
     private DietLogStatus resolveStatus(MealRecognitionResult aiResult) {
         if (aiResult.isFallback()) return DietLogStatus.DRAFT;
         if (aiResult.getConfidenceScore() == null) return DietLogStatus.DRAFT;
-        return aiResult.getConfidenceScore().compareTo(CONFIDENCE_THRESHOLD) >= 0
+        return aiResult.getConfidenceScore().compareTo(confidenceThreshold) >= 0
                 ? DietLogStatus.PT_REVIEWING : DietLogStatus.DRAFT;
     }
 
     private boolean isHighConfidence(MealRecognitionResult aiResult) {
         return !aiResult.isFallback()
                 && aiResult.getConfidenceScore() != null
-                && aiResult.getConfidenceScore().compareTo(CONFIDENCE_THRESHOLD) >= 0;
+                && aiResult.getConfidenceScore().compareTo(confidenceThreshold) >= 0;
     }
 
     private boolean shouldSuggestSos(MealSource mealSource, MealRecognitionResult aiResult, boolean hasDbMatch) {

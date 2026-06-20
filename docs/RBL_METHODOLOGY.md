@@ -9,7 +9,7 @@ This document describes the Research Baseline Layer (RBL) pipeline for collectin
 ```mermaid
 sequenceDiagram
     participant C as Customer
-    participant CV as VLM_analyze
+    participant CV as ResNet50_analyze
     participant DB as FoodDB
     participant Q as PT_queue
     participant PT as PT_reviewLog
@@ -49,7 +49,7 @@ MAE_calories = mean(|ai_predicted_macros.calories - pt_adjusted_macros.calories|
 
 ## 4. Hybrid CV → Food DB Matching
 
-After VLM returns `foodName`, `FoodCatalogServiceImpl` matches against the `food_items` catalog.
+After ResNet50 returns `food_code` / `foodName`, `FoodCatalogServiceImpl` matches against the `food_items` catalog (via `ResNetFoodCodeMapping` for the 10 trained dishes).
 
 ### 4.1 Normalization
 
@@ -62,7 +62,7 @@ Example: `"Phở Bò"` → `"pho bo"`
 
 ### 4.2 Match scoring
 
-For each `food_items` row, score against normalized VLM `foodName`:
+For each `food_items` row, score against normalized query name (`foodName` or mapped `food_code` display name):
 
 | Match target | Score if `contains(query)` |
 |--------------|--------------------------|
@@ -130,7 +130,7 @@ First line is a metadata comment:
 | `experiment_cohort` | enum | See §5 |
 | `ai_confidence` | decimal | VLM confidence (0–1) |
 | `db_match_score` | int | Food DB match score (§4.2) |
-| `model_version` | string | Ollama model name |
+| `model_version` | string | e.g. `resnet50-vtn-10class` |
 | `prompt_version` | string | SHA hash of system prompt |
 | `ai_food_name` | string | VLM-detected food name |
 | `db_food_name` | string | Matched `food_items.name_vi` |

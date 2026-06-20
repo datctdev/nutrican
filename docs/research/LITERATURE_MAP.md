@@ -4,13 +4,15 @@ Khung Related Work theo Paper 1 (Jelodar & Sun, arXiv 2112.09839). Nguồn gốc
 
 ---
 
-## A. Dish Classification (VLM nhận diện `foodName`)
+## A. Dish Classification (ResNet50 — 10 món Việt)
 
 | Paper | Năm/Venue | Đóng góp chính | Liên hệ NutriCan |
 |-------|-----------|----------------|------------------|
-| Jelodar & Sun (2021) — **Paper 1** | arXiv 2112.09839 | 2-stage pipeline meal kit + calorie | Baseline Improve |
-| Ng et al. [5] | IWAMDM 2019 | CNN food image recognition | Bước classify trước nutrition |
-| Horiguchi et al. [6] | IEEE TMM 2018 | Personalized food classifier | Personalized vs zero-shot VLM |
+| **Bohlol et al.** | 2025 | ResNet50 refined FC, transfer learning, 97.25% / 16 class | Kiến trúc + justification module AI |
+| Jelodar & Sun (2021) — **Paper 1** | arXiv 2112.09839 | 2-stage pipeline meal kit + calorie | Baseline Improve (macro) |
+| Ng et al. [5] | IWAMDM 2019 | CNN food image recognition | CNN baseline lineage |
+
+**NutriCan:** `best_resnet50_model.h5`, Vietnamese_Food_Dataset (10 class, ~8.705 ảnh), FastAPI `:8000`.
 
 ---
 
@@ -31,7 +33,7 @@ Khung Related Work theo Paper 1 (Jelodar & Sun, arXiv 2112.09839). Nguồn gốc
 | Paper 1 Table III | 2021 | 6 unit types (cup, tsp, …) MAE portion | NutriCan: rule `portion/serving_size_g` |
 | Wu & Yang [10] | ICPR 2009 | Fast food video calorie | Video vs single image |
 
-**NutriCan:** VLM `portionSize` (g) → scale Food DB macros ([RBL_METHODOLOGY.md](../RBL_METHODOLOGY.md) §4.4).
+**NutriCan:** ResNet default `portionSize=100g` — CNN không estimate portion ([BIEN_BAN_AI_MODULE.md](./BIEN_BAN_AI_MODULE.md)).
 
 ---
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,24 @@ PDF_PATH = Path(r"d:\FPT\SU26\SBA\project_team\research\VTN_FCT_2007.pdf")
 OUTPUT_DIR = REPO_ROOT / "research" / "output"
 CSV_OUT = OUTPUT_DIR / "vtn_fct_2007_initializer.csv"
 JAVA_OUT = OUTPUT_DIR / "vtn_fct_2007_initializer.java"
+
+# First STT of each group from VTN_FCT_2007 table of contents.
+VTN_GROUPS: list[tuple[int, str]] = [
+    (1, "Ngũ cốc và sản phẩm chế biến"),
+    (24, "Khoai củ và sản phẩm chế biến"),
+    (50, "Hạt, quả giàu đạm, béo và sản phẩm chế biến"),
+    (83, "Rau, quả, củ dùng làm rau"),
+    (209, "Quả chín"),
+    (265, "Dầu, mỡ, bơ"),
+    (279, "Thịt và sản phẩm chế biến"),
+    (361, "Thủy sản và sản phẩm chế biến"),
+    (420, "Trứng và sản phẩm chế biến"),
+    (431, "Sữa và sản phẩm chế biến"),
+    (440, "Đồ hộp"),
+    (461, "Đồ ngọt (đường, bánh, mứt, kẹo)"),
+    (488, "Gia vị, nước chấm"),
+    (511, "Nước giải khát, bia, rượu"),
+]
 
 # PDF embeds Vietnamese food names in TCVN3 (ABC); map to Unicode.
 _TCVN3TAB = (
@@ -36,7 +55,11 @@ def tcvn3_to_unicode(text: str) -> str:
 @dataclass
 class FoodRow:
     stt: int
+    food_code: str
     name_vi: str
+    name_en: str
+    category: str
+    aliases: str
     energy_cal: int
     protein_g: float
     lipid_g: float
@@ -44,11 +67,36 @@ class FoodRow:
     page: int
 
 
+def category_for_stt(stt: int) -> str:
+    category = VTN_GROUPS[0][1]
+    for start_stt, name in VTN_GROUPS:
+        if stt >= start_stt:
+            category = name
+    return category
+
+
 def _to_float(raw: str) -> float:
     s = (raw or "").strip().replace(",", ".")
     if not s or s == "-":
         return 0.0
     return float(s)
+
+
+def _strip_accents(text: str) -> str:
+    normalized = unicodedata.normalize("NFD", text)
+    return "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+
+
+def _build_aliases(name_vi: str, name_en: str) -> list[str]:
+    aliases: list[str] = []
+    vi_plain = _strip_accents(name_vi).lower()
+    if vi_plain:
+        aliases.append(vi_plain)
+    if name_en:
+        en_plain = name_en.strip().lower()
+        if en_plain and en_plain not in aliases:
+            aliases.append(en_plain)
+    return aliases
 
 
 def _is_invalid_food_name(name: str) -> bool:
@@ -59,6 +107,24 @@ def _is_invalid_food_name(name: str) -> bool:
         or lowered.startswith("tên tiếng")
         or lowered.startswith("tên thực phẩm")
     )
+
+
+def _is_valid_english_name(name: str) -> bool:
+    if not name or len(name) < 2 or name.isdigit():
+        return False
+    lowered = name.casefold()
+    invalid_markers = (
+        "english",
+        "thành phần",
+        "100 grams",
+        "magiê",
+        "magnesium",
+        "mã số",
+        "m· sè",
+        "stt:",
+        "nutrients",
+    )
+    return not any(marker in lowered for marker in invalid_markers)
 
 
 def _extract_name_vi(text: str) -> str | None:
@@ -84,6 +150,30 @@ def _extract_name_vi(text: str) -> str | None:
     return None
 
 
+def _extract_name_en(text: str, stt: int) -> str:
+    m_bottom = re.search(r"English\):\s*\n(.+?)\n", text)
+    if m_bottom:
+        bottom = m_bottom.group(1).strip()
+        if _is_valid_english_name(bottom):
+            return bottom
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for idx, line in enumerate(lines):
+        if line != "STT:" or idx + 1 >= len(lines) or lines[idx + 1] != str(stt):
+            continue
+        if idx + 2 < len(lines):
+            candidate = lines[idx + 2]
+            if _is_valid_english_name(candidate):
+                return candidate
+        break
+    return ""
+
+
+def _extract_food_code(text: str) -> str:
+    match = re.search(r"(?:M· sè|Mã số):\s*\n?(\d+)", text)
+    return match.group(1) if match else ""
+
+
 def parse_pdf() -> list[FoodRow]:
     rows: list[FoodRow] = []
     seen: set[int] = set()
@@ -103,6 +193,7 @@ def parse_pdf() -> list[FoodRow]:
 
             m_stt = pattern_stt.search(text)
             name_vi = _extract_name_vi(text)
+            name_en = _extract_name_en(text, int(m_stt.group(1))) if m_stt else ""
             m_energy = pattern_energy.search(text)
             m_protein = pattern_protein.search(text)
             m_lipid = pattern_lipid.search(text)
@@ -115,11 +206,16 @@ def parse_pdf() -> list[FoodRow]:
                 continue
             seen.add(stt)
 
+            aliases = _build_aliases(name_vi, name_en)
             kcal = _to_float(m_energy.group(1))
             rows.append(
                 FoodRow(
                     stt=stt,
+                    food_code=_extract_food_code(text),
                     name_vi=name_vi,
+                    name_en=name_en,
+                    category=category_for_stt(stt),
+                    aliases="|".join(aliases),
                     energy_cal=int(round(kcal * 1000)),
                     protein_g=_to_float(m_protein.group(1)),
                     lipid_g=_to_float(m_lipid.group(1)),
@@ -138,9 +234,37 @@ def write_csv(rows: list[FoodRow]) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     with CSV_OUT.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["stt", "name_vi", "energy_cal", "protein_g", "lipid_g", "glucid_g", "source_page"])
+        writer.writerow(
+            [
+                "stt",
+                "food_code",
+                "name_vi",
+                "name_en",
+                "category",
+                "aliases",
+                "energy_cal",
+                "protein_g",
+                "lipid_g",
+                "glucid_g",
+                "source_page",
+            ]
+        )
         for r in rows:
-            writer.writerow([r.stt, r.name_vi, r.energy_cal, r.protein_g, r.lipid_g, r.glucid_g, r.page])
+            writer.writerow(
+                [
+                    r.stt,
+                    r.food_code,
+                    r.name_vi,
+                    r.name_en,
+                    r.category,
+                    r.aliases,
+                    r.energy_cal,
+                    r.protein_g,
+                    r.lipid_g,
+                    r.glucid_g,
+                    r.page,
+                ]
+            )
 
 
 def write_java(rows: list[FoodRow]) -> None:
@@ -150,7 +274,7 @@ def write_java(rows: list[FoodRow]) -> None:
     lines.append("List<RawFoodInit> foods = List.of(")
     for i, r in enumerate(rows):
         suffix = "," if i < len(rows) - 1 else ""
-        escaped = r.name_vi.replace("\\", "\\\\").replace("\"", "\\\"")
+        escaped = r.name_vi.replace("\\", "\\\\").replace('"', '\\"')
         lines.append(
             f'    new RawFoodInit({r.stt}, "{escaped}", {r.energy_cal}, {r.protein_g:.3f}, {r.lipid_g:.3f}, {r.glucid_g:.3f}){suffix}'
         )
@@ -167,10 +291,12 @@ def main() -> int:
     write_csv(rows)
     write_java(rows)
 
+    missing_en = sum(1 for r in rows if not r.name_en)
     print(f"Parsed rows: {len(rows)}")
     if rows:
         print(f"STT range: {rows[0].stt}..{rows[-1].stt}")
         print(f"Sample: {rows[0]}")
+        print(f"Missing English names: {missing_en}")
     print(f"CSV: {CSV_OUT}")
     print(f"JAVA: {JAVA_OUT}")
     return 0

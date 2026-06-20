@@ -14,6 +14,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class MealRecognitionResult {
     private String foodName;
+    private String foodCode;
     private BigDecimal portionSize;
     private String portionUnit;
     private BigDecimal calories;

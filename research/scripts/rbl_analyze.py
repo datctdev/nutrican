@@ -83,7 +83,7 @@ def analyze(df: pd.DataFrame) -> str:
     lines.append("| Model | MAE (kcal) | MAE% | RMSE (kcal) |")
     lines.append("|-------|------------|------|-------------|")
     lines.append(
-        f"| A1.0 (VLM) | {mae_ai:.1f} | {mae_pct:.1f}% | "
+        f"| A1.0 (ResNet50 + mock macros) | {mae_ai:.1f} | {mae_pct:.1f}% | "
         f"{rmse_series(lab['ai_cal'], lab['pt_cal']):.1f} |"
     )
     db_rmse = rmse_series(lab["db_cal"], lab["pt_cal"]) if lab["db_cal"].notna().any() else float("nan")
@@ -122,6 +122,11 @@ def analyze(df: pd.DataFrame) -> str:
             include_groups=False,
         )
         lines.append(cohort_delta.to_markdown())
+
+    if "model_version" in lab.columns:
+        models = lab["model_version"].dropna().unique().tolist()
+        lines.append(f"\n## Model versions in export\n")
+        lines.append(f"- {', '.join(str(m) for m in models)}\n")
 
     if "meal_source" in lab.columns:
         lines.append("\n## H4 — A1.0 MAE by meal_source\n")

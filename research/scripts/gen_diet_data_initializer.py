@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate diet-tracker DataInitializer.java from VTN_FCT_2007 CSV."""
+"""Generate diet-tracker FoodCatalogDataInitializer.java from VTN_FCT_2007 CSV."""
 from __future__ import annotations
 
 import csv
@@ -19,7 +19,7 @@ OUT_PATH = (
     / "nutrican_be"
     / "diet"
     / "config"
-    / "DataInitializer.java"
+    / "FoodCatalogDataInitializer.java"
 )
 
 HEADER = """package com.sba.nutrican_be.diet.config;
@@ -39,9 +39,8 @@ import java.util.List;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class DataInitializer implements CommandLineRunner {
+public class FoodCatalogDataInitializer implements CommandLineRunner {
 
-    private static final String CATEGORY = "VTN_FCT_2007";
     private static final String SOURCE = "VTN_FCT_2007";
 
     private final FoodItemRepository foodItemRepository;
@@ -65,16 +64,25 @@ FOOTER = """
         return items;
     }
 
-    private static FoodItem food(String nameVi, int caloriesKcal, double protein, double carb, double fat) {
+    private static FoodItem food(
+            String nameVi,
+            String nameEn,
+            String category,
+            List<String> aliases,
+            int caloriesKcal,
+            double protein,
+            double carb,
+            double fat) {
         return FoodItem.builder()
                 .nameVi(nameVi)
-                .category(CATEGORY)
+                .nameEn(nameEn)
+                .category(category)
+                .aliases(aliases)
                 .servingSizeG(BigDecimal.valueOf(100))
                 .calories(BigDecimal.valueOf(caloriesKcal))
                 .protein(BigDecimal.valueOf(protein))
                 .carb(BigDecimal.valueOf(carb))
                 .fat(BigDecimal.valueOf(fat))
-                .aliases(List.of())
                 .isComposite(false)
                 .source(SOURCE)
                 .build();
@@ -83,16 +91,38 @@ FOOTER = """
 """
 
 
+def _java_string(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _java_string_or_null(value: str) -> str:
+    value = (value or "").strip()
+    return "null" if not value else _java_string(value)
+
+
+def _java_aliases(raw: str) -> str:
+    aliases = [part.strip() for part in (raw or "").split("|") if part.strip()]
+    if not aliases:
+        return "List.of()"
+    parts = ", ".join(_java_string(alias) for alias in aliases)
+    return f"List.of({parts})"
+
+
 def main() -> None:
     seed_lines: list[str] = []
     with CSV_PATH.open(encoding="utf-8") as f:
         for row in csv.DictReader(f):
-            name = row["name_vi"].replace("\\", "\\\\").replace('"', '\\"')
+            name_vi = _java_string(row["name_vi"])
+            name_en = _java_string_or_null(row["name_en"])
+            category = _java_string(row["category"])
+            aliases = _java_aliases(row["aliases"])
             cal = int(row["energy_cal"]) // 1000
             pro = float(row["protein_g"])
             fat = float(row["lipid_g"])
             carb = float(row["glucid_g"])
-            seed_lines.append(f'        items.add(food("{name}", {cal}, {pro}, {carb}, {fat}));')
+            seed_lines.append(
+                f"        items.add(food({name_vi}, {name_en}, {category}, {aliases}, {cal}, {pro}, {carb}, {fat}));"
+            )
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text(HEADER + "\n".join(seed_lines) + FOOTER, encoding="utf-8")
