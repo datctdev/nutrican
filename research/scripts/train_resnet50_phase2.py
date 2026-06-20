@@ -21,21 +21,16 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[2]  # d:\nutrican-pt-workspace
 AI_SERVICE = REPO_ROOT / "research" / "ai-service"
 sys.path.insert(0, str(AI_SERVICE))
 
 from main import CLASS_NAMES, safe_preprocess  # noqa: E402
 
-DEFAULT_DATASET = Path(
-    r"d:\FPT\SU26\SBA\project_team\research\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset"
-)
-DEFAULT_BASE_MODEL = Path(
-    r"d:\FPT\SU26\SBA\project_team\research\best_resnet50_model.h5"
-)
-OUTPUT_MODEL = Path(
-    r"d:\FPT\SU26\SBA\project_team\research\best_resnet50_model_phase2.h5"
-)
+# Resolve from workspace root (one level up from scripts/)
+DEFAULT_DATASET = REPO_ROOT / "Vietnamese_Food_Dataset" / "Vietnamese_Food_Dataset"
+DEFAULT_BASE_MODEL = REPO_ROOT / "research" / "best_resnet50_model.h5"
+OUTPUT_MODEL = REPO_ROOT / "research" / "best_resnet50_model_phase2.h5"
 OUTPUT_DIR = REPO_ROOT / "research" / "output"
 FOCUS_CLASSES = ("com_tam", "pho")
 

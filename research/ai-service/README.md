@@ -12,23 +12,17 @@ FastAPI microservice — nhận diện 10 món Việt từ ảnh (theo Biên b�
 
 ## Phase 2 — Fine-tune (com_tam / pho focus)
 
-Dataset: `d:\FPT\SU26\SBA\project_team\research\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset`
-(com_tam ~936 ảnh, pho ~801 ảnh)
+Dataset: `Vietnamese_Food_Dataset/Vietnamese_Food_Dataset/` (com_tam ~936 ảnh, pho ~801 ảnh)
 
 ```cmd
 cd research
-scripts\train_resnet50_phase2.cmd
-scripts\train_resnet50_phase2.cmd --quick
+run-train-phase2.bat           :: Full train (3+12 epochs, ~30-90 min)
+run-train-phase2.bat --quick  :: Smoke test (2+3 epochs)
 ```
 
 Output: `research/best_resnet50_model_phase2.h5` + `research/output/resnet50_phase2_report.json`
 
-Dùng model mới:
-
-```cmd
-set MODEL_PATH=d:\FPT\SU26\SBA\project_team\research\best_resnet50_model_phase2.h5
-research\scripts\start_ai_service.cmd
-```
+Script tu dong uu tien phase2 > phase1 khi chay service.
 
 ## LLaVA (Ollama local)
 
@@ -42,41 +36,58 @@ ollama serve
 Cấu hình: `ai.ollama.meal-analysis.model=llava` trong `application.properties`.
 
 
-## Cài đặt (lần đầu)
+## Chay nhanh (click chay — khong can cua so Terminal)
+
+Dat o `research/`, click chay file `.bat`:
+
+| File | Tac vu |
+|------|--------|
+| `run-ai.bat` | Menu chinh — chon tac vu (1-5) |
+| `run-setup.bat` | Cai dat venv + dependencies (lan dau) |
+| `run-ai-service.bat` | Chay AI service (FastAPI localhost:8000) |
+| `run-train-phase2.bat` | Train ResNet50 Phase 2 |
+
+Hoac mo PowerShell / CMD, cd vao `research` roi goi truc tiep:
 
 ```powershell
-cd research\ai-service
+research\run-ai.bat
+```
+
+## Chay tu dong (CMD / PowerShell)
+
+**Cach 1 — menu (khuyen nghi nhat):**
+
+```powershell
+cd d:\nutrican-pt-workspace
+research\run-ai.bat
+```
+
+**Cach 2 — chay truc tiep:**
+
+```powershell
+cd d:\nutrican-pt-workspace
+research\run-ai-service.bat
+research\run-train-phase2.bat
+research\run-train-phase2.bat --quick        # smoke test (2+3 epochs)
+research\run-train-phase2.bat "D:\path\to\dataset"   # dataset tuy chinh
+```
+
+## Cai dat (lan dau)
+
+```powershell
+cd d:\nutrican-pt-workspace
+research\run-setup.bat
+```
+
+Hoac thu cong:
+
+```powershell
+cd d:\nutrican-pt-workspace\research\ai-service
 py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+.\.venv\Scripts\pip install -r requirements.txt
 ```
 
-> Máy chỉ có Python 3.14 sẽ **lỗi TensorFlow**. Cài 3.12: `py install 3.12` rồi dùng `py -3.12` như trên.
-
-## Chạy service
-
-**Cách 1 — file .cmd (khuyến nghị, không bị chặn PowerShell):**
-
-```powershell
-cd d:\FPT\SU26\SBA\project_team\nutrican
-research\scripts\start_ai_service.cmd
-```
-
-**Cách 2 — script PowerShell** (nếu bị lỗi `running scripts is disabled`):
-
-```powershell
-cd d:\FPT\SU26\SBA\project_team\nutrican
-$env:MODEL_PATH = "d:\FPT\SU26\SBA\project_team\research\best_resnet50_model.h5"
-powershell -ExecutionPolicy Bypass -File .\research\scripts\start_ai_service.ps1
-```
-
-**Cách 3 — thủ công (luôn chạy được):**
-
-```powershell
-cd research\ai-service
-$env:MODEL_PATH = "d:\FPT\SU26\SBA\project_team\research\best_resnet50_model.h5"
-.\.venv\Scripts\python.exe main.py
-```
+> May chi co Python 3.14 se **loi TensorFlow**. Cai 3.12: `py install 3.12`.
 
 Server: **http://localhost:8000**
 

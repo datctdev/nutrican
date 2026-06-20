@@ -9,11 +9,13 @@ if not exist "%VENV%" (
 )
 
 echo === Phase 2 ResNet50 fine-tune (com_tam + pho focus) ===
-echo Dataset: d:\FPT\SU26\SBA\project_team\research\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset
-echo Output:  research\best_resnet50_model_phase2.h5
+echo Workspace: %CD%
+echo Dataset:   ..\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset
+echo Output:    research\best_resnet50_model_phase2.h5
 echo.
 echo Quick smoke: add --quick
 echo Full train:  default 3+12 epochs (~30-90 min GPU / longer on CPU)
+echo Dataset tuy chinh: run-train-phase2.bat "D:\path\to\dataset"
 echo.
 
 "%VENV%" scripts\train_resnet50_phase2.py %*
@@ -21,6 +23,5 @@ echo.
 if %ERRORLEVEL% equ 0 (
     echo.
     echo To use the new model:
-    echo   set MODEL_PATH=d:\FPT\SU26\SBA\project_team\research\best_resnet50_model_phase2.h5
-    echo   research\scripts\start_ai_service.cmd
+    echo   research\run-ai-service.bat
 )
