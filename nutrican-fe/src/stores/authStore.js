@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authService } from '../services/authService';
+import { cookieStorage } from '../utils/cookieStorage';
 
 export const useAuthStore = create(
   persist(
     (set, get) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
@@ -16,11 +16,10 @@ export const useAuthStore = create(
         set({ isLoading: true, error: null });
         try {
           const response = await authService.login(credentials);
-          const { accessToken, refreshToken, user } = response.data.data;
+          const { accessToken, user } = response.data.data;
           set({
             user,
             accessToken,
-            refreshToken,
             isAuthenticated: true,
             isLoading: false,
             error: null,
@@ -65,11 +64,15 @@ export const useAuthStore = create(
         }
       },
 
-      logout: () => {
+      logout: async () => {
+        try {
+          await authService.logout();
+        } catch (e) {
+          // Logout API failure is non-critical; clear local state anyway
+        }
         set({
           user: null,
           accessToken: null,
-          refreshToken: null,
           isAuthenticated: false,
           error: null,
         });
@@ -96,12 +99,7 @@ export const useAuthStore = create(
     }),
     {
       name: 'nutrican-auth',
-      partialize: (state) => ({
-        user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
-      }),
+      storage: cookieStorage,
     }
   )
 );

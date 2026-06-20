@@ -2,11 +2,11 @@ package com.sba.nutrican_be.auth.controller;
 
 import com.sba.nutrican_be.auth.dto.AuthResponse;
 import com.sba.nutrican_be.auth.dto.LoginRequest;
-import com.sba.nutrican_be.auth.dto.LogoutRequest;
-import com.sba.nutrican_be.auth.dto.RefreshTokenRequest;
 import com.sba.nutrican_be.auth.dto.RegisterRequest;
 import com.sba.nutrican_be.auth.service.AuthService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -32,23 +32,24 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
-            @Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse response) {
+        return ResponseEntity.ok(authService.login(request, response));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<AuthResponse>> refresh(
-            @Valid @RequestBody RefreshTokenRequest request) {
-        return ResponseEntity.ok(authService.refreshToken(request));
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        return ResponseEntity.ok(authService.refreshToken(request, response));
     }
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
             @RequestHeader(value = "Authorization", required = false) String authorization,
-            @RequestBody(required = false) LogoutRequest request) {
+            HttpServletRequest request) {
         String accessToken = extractBearerToken(authorization);
-        String refreshToken = request != null ? request.getRefreshToken() : null;
-        return ResponseEntity.ok(authService.logout(accessToken, refreshToken));
+        return ResponseEntity.ok(authService.logout(accessToken, request));
     }
 
     private String extractBearerToken(String authorization) {

@@ -1,10 +1,8 @@
 import { useNotificationStore } from '../stores/notificationStore';
 
-const SSE_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
-
 const sseConnections = new Map();
 
-export function createSseConnection(userId, accessToken) {
+export function createSseConnection(userId) {
   const connectionKey = `${userId}`;
   const existing = sseConnections.get(connectionKey);
   if (existing && existing.readyState === EventSource.OPEN) {
@@ -12,9 +10,7 @@ export function createSseConnection(userId, accessToken) {
   }
 
   const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
-  const url = accessToken
-    ? `${baseUrl}/workspace/stream?accessToken=${encodeURIComponent(accessToken)}`
-    : `${baseUrl}/workspace/stream`;
+  const url = `${baseUrl}/workspace/stream`;
 
   const eventSource = new EventSource(url, {
     withCredentials: true,
@@ -59,7 +55,7 @@ export function createSseConnection(userId, accessToken) {
     const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
     reconnectAttempts += 1;
     eventSource.close();
-    setTimeout(() => createSseConnection(userId, accessToken), delay);
+    setTimeout(() => createSseConnection(userId), delay);
   };
 
   sseConnections.set(connectionKey, eventSource);

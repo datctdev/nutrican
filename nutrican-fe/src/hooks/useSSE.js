@@ -6,12 +6,12 @@ export function useSSE() {
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
-    createSseConnection(user.id, user.accessToken);
+    createSseConnection(user.id);
 
     return () => {
       closeSseConnection(user.id);
     };
-  }, [user?.id, user?.accessToken]);
+  }, [user?.id]);
 }
