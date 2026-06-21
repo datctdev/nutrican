@@ -16,6 +16,7 @@ public class AuthResponse {
     private String tokenType;
     private Long expiresIn;
     private UserInfo user;
+    private boolean requiresPasswordSetup;
 
     @Data
     @Builder

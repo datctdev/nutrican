@@ -60,6 +60,23 @@ public class JwtUtil {
                 .compact();
     }
 
+    public String generateLimitedToken(String email, UUID userId, String role) {
+        Date now = new Date();
+        long limitedExpiration = expirationMs;
+        Date expiryDate = new Date(now.getTime() + limitedExpiration);
+
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(email)
+                .claim("userId", userId.toString())
+                .claim("role", role)
+                .claim("limited", true)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(key)
+                .compact();
+    }
+
     public String getEmailFromToken(String token) {
         return parseClaims(token).getSubject();
     }

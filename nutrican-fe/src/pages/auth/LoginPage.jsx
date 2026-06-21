@@ -5,6 +5,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { Card, CardContent } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
+import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
 import { toast } from 'sonner';
 import { Loader2, Mail, Lock, ArrowRight, Eye, EyeOff, Sparkles } from 'lucide-react';
 
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const validate = () => {
     const newErrors = {};
@@ -62,6 +64,19 @@ export default function LoginPage() {
 
         <Card className="bg-white/80 backdrop-blur-xl border-slate-200/60 shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden">
           <CardContent className="p-8">
+            <div className="mb-5">
+              <GoogleLoginButton
+                isLoading={isGoogleLoading}
+                onLoadingChange={setIsGoogleLoading}
+              />
+            </div>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex-1 h-px bg-slate-200" />
+              <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">or</span>
+              <div className="flex-1 h-px bg-slate-200" />
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">Email Address</label>

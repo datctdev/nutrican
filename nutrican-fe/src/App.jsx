@@ -6,6 +6,7 @@ import AuthLayout from './components/layouts/AuthLayout';
 import PtProtectedRoute from './components/common/PtProtectedRoute';
 
 import LoginPage from './pages/auth/LoginPage';
+import SetPasswordPage from './pages/auth/SetPasswordPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import PtRegistrationPage from './pages/auth/PtRegistrationPage';
 import LandingPage from './pages/LandingPage';
@@ -34,6 +35,10 @@ function App() {
         { path: '/login', element: <LoginPage /> },
         { path: '/register', element: <RegisterPage /> },
         { path: '/register/pt', element: <PtRegistrationPage /> },
+        {
+          path: '/set-password',
+          element: <SetPasswordPage />,
+        },
         {
           path: '/marketplace',
           element: <ProtectedRoute allowedRoles={['CUSTOMER']}><MarketplacePage /></ProtectedRoute>,

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authService } from '../services/authService';
 import { cookieStorage } from '../utils/cookieStorage';
+import { signInWithGoogle, isFirebaseConfigured } from '../firebase/config';
 
 export const useAuthStore = create(
   persist(
@@ -29,6 +30,73 @@ export const useAuthStore = create(
           set({
             isLoading: false,
             error: error.response?.data?.message || 'Login failed',
+          });
+          throw error;
+        }
+      },
+
+      googleLogin: async () => {
+        if (!isFirebaseConfigured) {
+          throw new Error('Firebase is not configured. Please set Firebase environment variables.');
+        }
+        set({ isLoading: true, error: null });
+        try {
+          const { idToken } = await signInWithGoogle();
+          const response = await authService.googleAuth(idToken);
+          const { accessToken, user, requiresPasswordSetup } = response.data.data;
+
+          if (requiresPasswordSetup) {
+            set({
+              user,
+              accessToken,
+              isAuthenticated: true,
+              isLoading: false,
+              error: null,
+            });
+            window.location.href = '/set-password';
+            return response;
+          }
+
+          set({
+            user,
+            accessToken,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+          });
+
+          const role = user?.role;
+          let redirectPath = '/diet';
+          if (role === 'ADMIN') redirectPath = '/admin';
+          else if (role === 'PT_CERTIFIED' || role === 'PT_FREELANCE') redirectPath = '/pt';
+          window.location.href = redirectPath;
+          return response;
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error.response?.data?.message || 'Google login failed',
+          });
+          throw error;
+        }
+      },
+
+      setPassword: async (password) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await authService.setPassword(password);
+          const { accessToken, user } = response.data.data;
+          set({
+            user,
+            accessToken,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+          });
+          return response;
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error.response?.data?.message || 'Failed to set password',
           });
           throw error;
         }

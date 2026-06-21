@@ -49,6 +49,13 @@ public class User extends BaseEntity {
     @Column(name = "google_id", unique = true)
     private String googleId;
 
+    @Column(name = "password_set_required")
+    @Builder.Default
+    private Boolean passwordSetRequired = false;
+
+    @Column(name = "google_picture_url", length = 500)
+    private String googlePictureUrl;
+
     @Column(name = "is_kyc_verified")
     @Builder.Default
     private Boolean isKycVerified = false;
@@ -58,4 +65,29 @@ public class User extends BaseEntity {
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private MacroTarget macroTarget;
+
+    public static User createGoogleUser(String email, String googleId, String name, String picture) {
+        return User.builder()
+                .email(email)
+                .googleId(googleId)
+                .fullName(name)
+                .avatarUrl(picture)
+                .googlePictureUrl(picture)
+                .role(UserRole.CUSTOMER)
+                .status(UserStatus.PENDING_PASSWORD)
+                .passwordSetRequired(true)
+                .build();
+    }
+
+    public static User createWithPassword(String email, String passwordHash, String fullName, String phoneNumber) {
+        return User.builder()
+                .email(email)
+                .passwordHash(passwordHash)
+                .fullName(fullName)
+                .phoneNumber(phoneNumber)
+                .role(UserRole.CUSTOMER)
+                .status(UserStatus.ACTIVE)
+                .passwordSetRequired(false)
+                .build();
+    }
 }

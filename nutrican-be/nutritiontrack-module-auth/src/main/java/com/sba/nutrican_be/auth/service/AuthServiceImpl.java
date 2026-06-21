@@ -1,8 +1,10 @@
 package com.sba.nutrican_be.auth.service;
 
 import com.sba.nutrican_be.auth.dto.AuthResponse;
+import com.sba.nutrican_be.auth.dto.GoogleAuthRequest;
 import com.sba.nutrican_be.auth.dto.LoginRequest;
 import com.sba.nutrican_be.auth.dto.RegisterRequest;
+import com.sba.nutrican_be.auth.dto.SetPasswordRequest;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.core.enums.UserRole;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -40,6 +43,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     final JwtUtil jwtUtil;
     private final TokenRevocationService tokenRevocationService;
+    private final com.sba.nutrican_be.auth.service.GoogleIdTokenService googleIdTokenService;
 
     @Value("${app.security.jwt.expiration}")
     private Long jwtExpirationMs;
@@ -58,6 +62,7 @@ public class AuthServiceImpl implements AuthService {
                 .phoneNumber(request.getPhoneNumber())
                 .role(UserRole.CUSTOMER)
                 .status(UserStatus.ACTIVE)
+                .passwordSetRequired(false)
                 .build();
 
         user = userRepository.save(user);
@@ -85,6 +90,12 @@ public class AuthServiceImpl implements AuthService {
             auditLog.warn("AUTH_FAILED: email={}, userId={}, reason=ACCOUNT_SUSPENDED",
                     request.getEmail(), user.getId());
             throw new BadRequestException("Account is suspended");
+        }
+
+        if (user.getPasswordSetRequired() != null && user.getPasswordSetRequired()) {
+            auditLog.warn("AUTH_FAILED: email={}, userId={}, reason=PASSWORD_NOT_SET",
+                    request.getEmail(), user.getId());
+            throw new BadRequestException("Please set a password before logging in. Use 'Login with Google' to complete account setup.");
         }
 
         if (user.getStatus() == UserStatus.PENDING_APPROVAL
@@ -164,6 +175,87 @@ public class AuthServiceImpl implements AuthService {
         return ApiResponse.success(null, "Logout successful");
     }
 
+    @Override
+    @Transactional
+    public ApiResponse<AuthResponse> googleAuth(GoogleAuthRequest request) {
+        GoogleIdTokenService.GoogleTokenPayload payload = googleIdTokenService.verify(request.googleIdToken());
+
+        String email = payload.email();
+        String googleId = payload.googleId();
+        String name = payload.name();
+        String picture = payload.picture();
+
+        Optional<User> byGoogleId = userRepository.findByGoogleId(googleId);
+
+        User user;
+        if (byGoogleId.isPresent()) {
+            user = byGoogleId.get();
+        } else {
+            Optional<User> byEmail = userRepository.findByEmail(email);
+            if (byEmail.isPresent()) {
+                User existing = byEmail.get();
+                existing.setGoogleId(googleId);
+                existing.setGooglePictureUrl(picture);
+                existing.setPasswordSetRequired(true);
+                existing.setStatus(UserStatus.PENDING_PASSWORD);
+                user = userRepository.save(existing);
+            } else {
+                user = userRepository.save(User.createGoogleUser(email, googleId, name, picture));
+            }
+        }
+
+        auditLog.info("GOOGLE_AUTH: email={}, userId={}, passwordRequired={}",
+                user.getEmail(), user.getId(), user.getPasswordSetRequired());
+
+        if (user.getPasswordSetRequired() != null && user.getPasswordSetRequired()) {
+            String limitedToken = jwtUtil.generateLimitedToken(user.getEmail(), user.getId(), user.getRole().name());
+            AuthResponse.UserInfo userInfo = buildUserInfo(user);
+            return ApiResponse.success(AuthResponse.builder()
+                    .accessToken(limitedToken)
+                    .tokenType("Bearer")
+                    .expiresIn(jwtExpirationMs / 1000)
+                    .user(userInfo)
+                    .requiresPasswordSetup(true)
+                    .build(), "Google authentication successful");
+        }
+
+        return ApiResponse.success(buildAuthResponse(user, null, null), "Google authentication successful");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<AuthResponse> setPassword(UUID userId, SetPasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    auditLog.warn("SET_PASSWORD_FAILED: userId={}, reason=USER_NOT_FOUND", userId);
+                    return new UnauthorizedException("User not found");
+                });
+
+        if (user.getPasswordSetRequired() == null || !user.getPasswordSetRequired()) {
+            auditLog.warn("SET_PASSWORD_FAILED: userId={}, reason=PASSWORD_ALREADY_SET", userId);
+            throw new BadRequestException("Password has already been set for this account");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setPasswordSetRequired(false);
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
+
+        auditLog.info("PASSWORD_SET: userId={}, email={}", userId, user.getEmail());
+        return ApiResponse.success(buildAuthResponse(user, null, null), "Password set successfully");
+    }
+
+    private AuthResponse.UserInfo buildUserInfo(User user) {
+        return AuthResponse.UserInfo.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .role(user.getRole().name())
+                .avatarUrl(user.getAvatarUrl())
+                .isKycVerified(user.getIsKycVerified())
+                .build();
+    }
+
     private AuthResponse buildAuthResponse(User user, String oldRefreshToken, HttpServletResponse response) {
         String accessToken = jwtUtil.generateToken(user.getEmail(), user.getId(), user.getRole().name());
         String newRefreshToken = jwtUtil.generateRefreshToken(user.getEmail(), user.getId());
@@ -191,6 +283,7 @@ public class AuthServiceImpl implements AuthService {
                 .tokenType("Bearer")
                 .expiresIn(jwtExpirationMs / 1000)
                 .user(userInfo)
+                .requiresPasswordSetup(false)
                 .build();
     }
 

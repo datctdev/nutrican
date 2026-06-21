@@ -3,6 +3,8 @@ import api from './api';
 export const authService = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
+  googleAuth: (googleIdToken) => api.post('/auth/google', { googleIdToken }),
+  setPassword: (password) => api.post('/auth/set-password', { password }),
   refreshToken: () => api.post('/auth/refresh', {}),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/profile/me'),

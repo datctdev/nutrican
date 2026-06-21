@@ -1,15 +1,19 @@
 package com.sba.nutrican_be.auth.controller;
 
 import com.sba.nutrican_be.auth.dto.AuthResponse;
+import com.sba.nutrican_be.auth.dto.GoogleAuthRequest;
 import com.sba.nutrican_be.auth.dto.LoginRequest;
 import com.sba.nutrican_be.auth.dto.RegisterRequest;
+import com.sba.nutrican_be.auth.dto.SetPasswordRequest;
 import com.sba.nutrican_be.auth.service.AuthService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
+import com.sba.nutrican_be.core.entity.User;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -51,6 +55,19 @@ public class AuthController {
             HttpServletResponse response) {
         String accessToken = extractBearerToken(authorization);
         return ResponseEntity.ok(authService.logout(accessToken, request, response));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<AuthResponse>> googleAuth(
+            @Valid @RequestBody GoogleAuthRequest request) {
+        return ResponseEntity.ok(authService.googleAuth(request));
+    }
+
+    @PostMapping("/set-password")
+    public ResponseEntity<ApiResponse<AuthResponse>> setPassword(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody SetPasswordRequest request) {
+        return ResponseEntity.ok(authService.setPassword(user.getId(), request));
     }
 
     private String extractBearerToken(String authorization) {
