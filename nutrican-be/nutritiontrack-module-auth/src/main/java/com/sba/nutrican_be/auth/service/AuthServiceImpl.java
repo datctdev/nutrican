@@ -6,12 +6,16 @@ import com.sba.nutrican_be.auth.dto.LoginRequest;
 import com.sba.nutrican_be.auth.dto.RegisterRequest;
 import com.sba.nutrican_be.auth.dto.SetPasswordRequest;
 import com.sba.nutrican_be.core.dto.ApiResponse;
+import com.sba.nutrican_be.core.entity.PasswordResetToken;
 import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.core.enums.UserRole;
 import com.sba.nutrican_be.core.enums.UserStatus;
 import com.sba.nutrican_be.core.exception.BadRequestException;
+import com.sba.nutrican_be.core.exception.TooManyRequestsException;
 import com.sba.nutrican_be.core.exception.UnauthorizedException;
+import com.sba.nutrican_be.core.repository.PasswordResetTokenRepository;
 import com.sba.nutrican_be.core.repository.UserRepository;
+import com.sba.nutrican_be.core.service.EmailService;
 import com.sba.nutrican_be.core.util.JwtUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,8 +30,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -35,6 +42,9 @@ import java.util.UUID;
 public class AuthServiceImpl implements AuthService {
 
     private static final Logger auditLog = LoggerFactory.getLogger("SECURITY_AUDIT");
+    private static final long RATE_LIMIT_SECONDS = 60;
+
+    private final Map<String, Instant> passwordResetRateLimit = new ConcurrentHashMap<>();
 
     private static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
     private static final String COOKIE_PATH = "/";
@@ -44,6 +54,8 @@ public class AuthServiceImpl implements AuthService {
     final JwtUtil jwtUtil;
     private final TokenRevocationService tokenRevocationService;
     private final com.sba.nutrican_be.auth.service.GoogleIdTokenService googleIdTokenService;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailService emailService;
 
     @Value("${app.security.jwt.expiration}")
     private Long jwtExpirationMs;
@@ -243,6 +255,68 @@ public class AuthServiceImpl implements AuthService {
 
         auditLog.info("PASSWORD_SET: userId={}, email={}", userId, user.getEmail());
         return ApiResponse.success(buildAuthResponse(user, null, null), "Password set successfully");
+    }
+
+    @Override
+    @Transactional
+    public void sendPasswordResetEmail(String email) {
+        Instant lastSent = passwordResetRateLimit.get(email);
+        if (lastSent != null && lastSent.plusSeconds(RATE_LIMIT_SECONDS).isAfter(Instant.now())) {
+            throw new TooManyRequestsException("Please wait before requesting another reset email");
+        }
+
+        userRepository.findByEmail(email).ifPresent(user -> {
+            passwordResetTokenRepository.deleteByUserId(user.getId());
+
+            String token = UUID.randomUUID().toString();
+            Instant expiresAt = Instant.now().plusSeconds(15 * 60);
+
+            PasswordResetToken resetToken = PasswordResetToken.builder()
+                    .user(user)
+                    .token(token)
+                    .expiresAt(expiresAt)
+                    .used(false)
+                    .build();
+            passwordResetTokenRepository.save(resetToken);
+
+            emailService.sendPasswordResetEmail(user.getEmail(), token);
+            passwordResetRateLimit.put(email, Instant.now());
+            auditLog.info("PASSWORD_RESET_INITIATED: email={}, userId={}", email, user.getId());
+        });
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> {
+                    auditLog.warn("PASSWORD_RESET_FAILED: reason=TOKEN_NOT_FOUND");
+                    return new BadRequestException("Invalid or expired reset token");
+                });
+
+        if (resetToken.getUsed()) {
+            auditLog.warn("PASSWORD_RESET_FAILED: reason=TOKEN_ALREADY_USED");
+            throw new BadRequestException("This reset link has already been used");
+        }
+
+        if (resetToken.isExpired()) {
+            auditLog.warn("PASSWORD_RESET_FAILED: reason=TOKEN_EXPIRED");
+            throw new BadRequestException("This reset link has expired");
+        }
+
+        User user = resetToken.getUser();
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+
+        if (user.getStatus() == UserStatus.PENDING_PASSWORD) {
+            user.setStatus(UserStatus.ACTIVE);
+            user.setPasswordSetRequired(false);
+        }
+
+        userRepository.save(user);
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+
+        auditLog.info("PASSWORD_RESET_COMPLETED: userId={}, email={}", user.getId(), user.getEmail());
     }
 
     private AuthResponse.UserInfo buildUserInfo(User user) {

@@ -23,4 +23,8 @@ export const authService = {
 
   // PT Request
   requestPt: (data) => api.post('/auth/pt/request', data),
+
+  // Password reset
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token, newPassword) => api.post('/auth/reset-password', { token, newPassword }),
 };

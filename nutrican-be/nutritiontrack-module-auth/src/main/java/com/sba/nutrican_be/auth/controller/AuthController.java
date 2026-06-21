@@ -1,9 +1,11 @@
 package com.sba.nutrican_be.auth.controller;
 
 import com.sba.nutrican_be.auth.dto.AuthResponse;
+import com.sba.nutrican_be.auth.dto.ForgotPasswordRequest;
 import com.sba.nutrican_be.auth.dto.GoogleAuthRequest;
 import com.sba.nutrican_be.auth.dto.LoginRequest;
 import com.sba.nutrican_be.auth.dto.RegisterRequest;
+import com.sba.nutrican_be.auth.dto.ResetPasswordRequest;
 import com.sba.nutrican_be.auth.dto.SetPasswordRequest;
 import com.sba.nutrican_be.auth.service.AuthService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
@@ -68,6 +70,18 @@ public class AuthController {
             @AuthenticationPrincipal User user,
             @Valid @RequestBody SetPasswordRequest request) {
         return ResponseEntity.ok(authService.setPassword(user.getId(), request));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.sendPasswordResetEmail(request.email());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully"));
     }
 
     private String extractBearerToken(String authorization) {

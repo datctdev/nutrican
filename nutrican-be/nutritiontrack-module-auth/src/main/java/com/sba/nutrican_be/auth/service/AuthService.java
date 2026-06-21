@@ -18,4 +18,6 @@ public interface AuthService {
     ApiResponse<Void> logout(String accessToken, HttpServletRequest request, HttpServletResponse response);
     ApiResponse<AuthResponse> googleAuth(GoogleAuthRequest request);
     ApiResponse<AuthResponse> setPassword(UUID userId, SetPasswordRequest request);
+    void sendPasswordResetEmail(String email);
+    void resetPassword(String token, String newPassword);
 }

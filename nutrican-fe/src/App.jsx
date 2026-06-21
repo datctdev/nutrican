@@ -6,6 +6,8 @@ import AuthLayout from './components/layouts/AuthLayout';
 import PtProtectedRoute from './components/common/PtProtectedRoute';
 
 import LoginPage from './pages/auth/LoginPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import SetPasswordPage from './pages/auth/SetPasswordPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import PtRegistrationPage from './pages/auth/PtRegistrationPage';
@@ -35,6 +37,8 @@ function App() {
         { path: '/login', element: <LoginPage /> },
         { path: '/register', element: <RegisterPage /> },
         { path: '/register/pt', element: <PtRegistrationPage /> },
+        { path: '/forgot-password', element: <ForgotPasswordPage /> },
+        { path: '/reset-password', element: <ResetPasswordPage /> },
         {
           path: '/set-password',
           element: <SetPasswordPage />,

@@ -49,6 +49,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/pt/**").permitAll()
                 // Authenticated auth endpoints
                 .requestMatchers("/api/v1/auth/kyc/**").authenticated()
+                // Password reset endpoints — public
+                .requestMatchers("/api/v1/auth/forgot-password").permitAll()
+                .requestMatchers("/api/v1/auth/reset-password").permitAll()
                 // SSE endpoint - authenticated via cookie or header (handled by JwtAuthenticationFilter)
                 .requestMatchers("/api/v1/workspace/stream").authenticated()
                 // Swagger & health
