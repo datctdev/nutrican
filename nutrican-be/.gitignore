@@ -40,7 +40,6 @@ application-secret.properties
 *.pem
 *.p12
 *.jks
-firebase-service-account.json
 
 # Thư mục lưu trữ của Docker / MinIO (Tránh đẩy volume lên Git)
 postgres_data/
@@ -50,3 +49,4 @@ ollama_data/
 # Các file hệ điều hành sinh ra
 .DS_Store
 Thumbs.db
+/nutritiontrack-module-application/src/main/resources/firebase-service-account.json
