@@ -2,8 +2,8 @@ package com.sba.nutrican_be.ai.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sba.nutrican_be.ai.LlavaMealPromptBuilder;
-import com.sba.nutrican_be.ai.ResNetFoodCodeMapping;
+import com.sba.nutrican_be.ai.util.LlavaMealPromptBuilder;
+import com.sba.nutrican_be.ai.catalog.ResNetFoodCodeMapping;
 import com.sba.nutrican_be.ai.dto.LlavaMealAnalysisResult;
 import com.sba.nutrican_be.ai.service.LlavaMealAnalysisService;
 import com.sba.nutrican_be.ai.service.OllamaService;
@@ -154,3 +154,4 @@ public class LlavaMealAnalysisServiceImpl implements LlavaMealAnalysisService {
         }
     }
 }
+

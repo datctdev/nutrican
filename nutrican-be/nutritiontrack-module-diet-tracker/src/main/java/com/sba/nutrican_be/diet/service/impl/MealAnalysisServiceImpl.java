@@ -1,9 +1,9 @@
 package com.sba.nutrican_be.diet.service.impl;
 
-import com.sba.nutrican_be.ai.MealRecognitionResult;
-import com.sba.nutrican_be.ai.ResNetFoodCodeMapping;
-import com.sba.nutrican_be.ai.ResNetFoodDefaults;
+import com.sba.nutrican_be.ai.catalog.ResNetFoodCodeMapping;
+import com.sba.nutrican_be.ai.catalog.ResNetFoodDefaults;
 import com.sba.nutrican_be.ai.dto.FoodPredictionDto;
+import com.sba.nutrican_be.ai.dto.MealRecognitionResult;
 import com.sba.nutrican_be.ai.service.MealRecognitionService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
 import com.sba.nutrican_be.core.entity.DietLog;

@@ -1,5 +1,6 @@
-package com.sba.nutrican_be.ai;
+package com.sba.nutrican_be.ai.util;
 
+import com.sba.nutrican_be.ai.catalog.NutriHomeCatalog;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -161,3 +162,4 @@ public final class LlavaMealPromptBuilder {
         }
     }
 }
+

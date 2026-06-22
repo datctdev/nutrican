@@ -1,4 +1,4 @@
-package com.sba.nutrican_be.ai;
+package com.sba.nutrican_be.ai.catalog;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -307,3 +307,4 @@ public final class NutriHomeCatalog {
         return o instanceof List<?> l ? (List<Map<String, Object>>) l : List.of();
     }
 }
+

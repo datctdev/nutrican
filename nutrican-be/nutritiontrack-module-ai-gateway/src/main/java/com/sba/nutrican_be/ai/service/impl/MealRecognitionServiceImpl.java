@@ -1,8 +1,8 @@
 package com.sba.nutrican_be.ai.service.impl;
 
-import com.sba.nutrican_be.ai.MealAnalysisFusion;
-import com.sba.nutrican_be.ai.MealRecognitionResult;
-import com.sba.nutrican_be.ai.ResNetFoodCodeMapping;
+import com.sba.nutrican_be.ai.util.MealAnalysisFusion;
+import com.sba.nutrican_be.ai.dto.MealRecognitionResult;
+import com.sba.nutrican_be.ai.catalog.ResNetFoodCodeMapping;
 import com.sba.nutrican_be.ai.dto.FoodPredictionDto;
 import com.sba.nutrican_be.ai.dto.LlavaMealAnalysisResult;
 import com.sba.nutrican_be.ai.dto.ResNetAnalyzeResponse;
@@ -164,3 +164,4 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
                 .build();
     }
 }
+

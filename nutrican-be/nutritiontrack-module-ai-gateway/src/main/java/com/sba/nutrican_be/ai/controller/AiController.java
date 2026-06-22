@@ -1,6 +1,6 @@
-package com.sba.nutrican_be.ai;
+package com.sba.nutrican_be.ai.controller;
 
-import com.sba.nutrican_be.ai.MealRecognitionResult;
+import com.sba.nutrican_be.ai.dto.MealRecognitionResult;
 import com.sba.nutrican_be.ai.service.MealRecognitionService;
 import com.sba.nutrican_be.ai.service.NutritionChatbotService;
 import com.sba.nutrican_be.core.dto.ApiResponse;
@@ -73,3 +73,5 @@ public class AiController {
         )));
     }
 }
+
+

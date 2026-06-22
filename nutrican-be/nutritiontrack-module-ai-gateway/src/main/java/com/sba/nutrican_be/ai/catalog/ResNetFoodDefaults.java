@@ -1,4 +1,4 @@
-package com.sba.nutrican_be.ai;
+package com.sba.nutrican_be.ai.catalog;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -89,3 +89,4 @@ public final class ResNetFoodDefaults {
         return ALIASES.getOrDefault(foodCode, foodCode);
     }
 }
+

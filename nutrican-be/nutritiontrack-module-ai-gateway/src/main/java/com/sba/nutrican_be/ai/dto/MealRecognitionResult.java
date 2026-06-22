@@ -1,4 +1,4 @@
-package com.sba.nutrican_be.ai;
+package com.sba.nutrican_be.ai.dto;
 
 import com.sba.nutrican_be.ai.dto.FoodPredictionDto;
 import lombok.AllArgsConstructor;
@@ -39,3 +39,4 @@ public class MealRecognitionResult {
     private List<Map<String, Object>> detectedItems;
     private List<String> uncertaintyReasons;
 }
+

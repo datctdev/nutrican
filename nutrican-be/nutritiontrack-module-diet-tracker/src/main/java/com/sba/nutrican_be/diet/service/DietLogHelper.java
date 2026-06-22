@@ -1,6 +1,6 @@
 package com.sba.nutrican_be.diet.service;
 
-import com.sba.nutrican_be.ai.MealRecognitionResult;
+import com.sba.nutrican_be.ai.dto.MealRecognitionResult;
 import com.sba.nutrican_be.core.entity.DietLog;
 import com.sba.nutrican_be.core.entity.DietLogItem;
 import com.sba.nutrican_be.core.entity.FoodItem;
@@ -242,3 +242,4 @@ public class DietLogHelper {
                 .build();
     }
 }
+

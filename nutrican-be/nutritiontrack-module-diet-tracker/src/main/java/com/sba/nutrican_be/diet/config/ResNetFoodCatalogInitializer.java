@@ -1,7 +1,7 @@
 package com.sba.nutrican_be.diet.config;
 
-import com.sba.nutrican_be.ai.ResNetFoodCodeMapping;
-import com.sba.nutrican_be.ai.ResNetFoodDefaults;
+import com.sba.nutrican_be.ai.catalog.ResNetFoodCodeMapping;
+import com.sba.nutrican_be.ai.catalog.ResNetFoodDefaults;
 import com.sba.nutrican_be.core.entity.FoodItem;
 import com.sba.nutrican_be.core.repository.FoodItemRepository;
 import lombok.RequiredArgsConstructor;
@@ -108,3 +108,4 @@ public class ResNetFoodCatalogInitializer implements CommandLineRunner {
                 .findFirst();
     }
 }
+

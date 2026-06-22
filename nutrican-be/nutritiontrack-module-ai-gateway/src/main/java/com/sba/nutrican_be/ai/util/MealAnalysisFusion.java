@@ -1,6 +1,8 @@
-package com.sba.nutrican_be.ai;
+package com.sba.nutrican_be.ai.util;
 
 import com.sba.nutrican_be.ai.dto.LlavaMealAnalysisResult;
+import com.sba.nutrican_be.ai.catalog.ResNetFoodDefaults;
+import com.sba.nutrican_be.ai.catalog.ResNetFoodCodeMapping;
 import lombok.Builder;
 import lombok.Data;
 
@@ -249,3 +251,4 @@ public final class MealAnalysisFusion {
         return temp.replaceAll("\\p{M}", "").trim();
     }
 }
+

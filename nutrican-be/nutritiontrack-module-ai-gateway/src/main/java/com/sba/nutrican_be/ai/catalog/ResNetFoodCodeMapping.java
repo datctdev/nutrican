@@ -1,4 +1,4 @@
-package com.sba.nutrican_be.ai;
+package com.sba.nutrican_be.ai.catalog;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -53,3 +53,4 @@ public final class ResNetFoodCodeMapping {
         return Collections.unmodifiableMap(new LinkedHashMap<>(CODE_TO_NAME_VI));
     }
 }
+

@@ -1,6 +1,6 @@
 package com.sba.nutrican_be.ai.service;
 
-import com.sba.nutrican_be.ai.MealRecognitionResult;
+import com.sba.nutrican_be.ai.dto.MealRecognitionResult;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface MealRecognitionService {
@@ -17,3 +17,4 @@ public interface MealRecognitionService {
 
     String getPromptVersionHash();
 }
+
