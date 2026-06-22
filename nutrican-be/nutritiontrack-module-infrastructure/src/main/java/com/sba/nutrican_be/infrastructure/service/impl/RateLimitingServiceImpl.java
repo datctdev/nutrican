@@ -1,5 +1,6 @@
-package com.sba.nutrican_be.infrastructure.redis;
+package com.sba.nutrican_be.infrastructure.service.impl;
 
+import com.sba.nutrican_be.infrastructure.service.RateLimitingService;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
@@ -10,20 +11,22 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 
 @Service
-public class RateLimitingService {
+public class RateLimitingServiceImpl implements RateLimitingService {
 
     private final LettuceBasedProxyManager<byte[]> proxyManager;
 
-    public RateLimitingService(RedisClient redisClient) {
+    public RateLimitingServiceImpl(RedisClient redisClient) {
         this.proxyManager = LettuceBasedProxyManager.builderFor(redisClient).build();
     }
 
+    @Override
     public Bucket resolveBucket(String key, int tokens, Duration period) {
         return proxyManager.builder().build(key.getBytes(), () -> BucketConfiguration.builder()
                 .addLimit(Bandwidth.builder().capacity(tokens).refillIntervally(tokens, period).build())
                 .build());
     }
 
+    @Override
     public boolean tryConsume(String key, int tokens, Duration period) {
         Bucket bucket = resolveBucket(key, tokens, period);
         return bucket.tryConsume(1);

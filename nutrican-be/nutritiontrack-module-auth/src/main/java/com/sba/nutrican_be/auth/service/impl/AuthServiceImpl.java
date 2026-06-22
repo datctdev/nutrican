@@ -37,7 +37,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.Duration;
-import com.sba.nutrican_be.infrastructure.redis.RateLimitingService;
+import com.sba.nutrican_be.infrastructure.service.RateLimitingService;
 
 @Slf4j
 @Service
@@ -382,3 +382,4 @@ public class AuthServiceImpl implements AuthService {
         return null;
     }
 }
+

@@ -1,7 +1,7 @@
 package com.sba.nutrican_be.application.filter;
 
 import com.sba.nutrican_be.core.dto.ApiResponse;
-import com.sba.nutrican_be.infrastructure.redis.RateLimitingService;
+import com.sba.nutrican_be.infrastructure.service.RateLimitingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -53,3 +53,4 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return xfHeader.split(",")[0];
     }
 }
+
