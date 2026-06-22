@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 import java.util.UUID;
 
 @Data
@@ -24,11 +25,11 @@ public class RblExportRowDto {
     private String promptVersion;
     private String aiFoodName;
     private String dbFoodName;
-    private Map<String, Object> aiPredictedMacros;
-    private Map<String, Object> dbMatchedMacros;
-    private Map<String, Object> macrosAtReview;
-    private Map<String, Object> ptAdjustedMacros;
-    private Map<String, Object> ptBlindMacros;
+    private MacroNutrients aiPredictedMacros;
+    private MacroNutrients dbMatchedMacros;
+    private MacroNutrients macrosAtReview;
+    private MacroNutrients ptAdjustedMacros;
+    private MacroNutrients ptBlindMacros;
     private BigDecimal deltaAiCalories;
     private BigDecimal deltaDbCalories;
     private String ptAction;

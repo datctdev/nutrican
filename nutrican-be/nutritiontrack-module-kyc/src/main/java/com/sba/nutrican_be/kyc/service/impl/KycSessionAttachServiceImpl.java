@@ -1,12 +1,12 @@
 package com.sba.nutrican_be.kyc.service.impl;
-import com.sba.nutrican_be.kyc.entity.EKycDocument;
-import com.sba.nutrican_be.kyc.entity.EKycSession;
+import com.sba.nutrican_be.core.entity.EKycDocument;
+import com.sba.nutrican_be.core.entity.EKycSession;
+import com.sba.nutrican_be.core.enums.KycDocumentType;
+import com.sba.nutrican_be.core.enums.KycStatus;
 import com.sba.nutrican_be.kyc.repository.KycDocumentRepository;
 import com.sba.nutrican_be.kyc.repository.KycSessionRepository;
 import com.sba.nutrican_be.kyc.service.KycSessionAttachService;
 import com.sba.nutrican_be.kyc.valueObjects.AttachDecision;
-import com.sba.nutrican_be.kyc.valueObjects.KycDocumentType;
-import com.sba.nutrican_be.kyc.valueObjects.KycStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

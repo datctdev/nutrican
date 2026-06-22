@@ -19,6 +19,8 @@ import com.sba.nutrican_be.diet.dto.*;
 import com.sba.nutrican_be.diet.service.DietLogImageService;
 
 import com.sba.nutrican_be.diet.service.DietLogService;
+import com.sba.nutrican_be.diet.service.MealAnalysisService;
+import com.sba.nutrican_be.diet.service.SosService;
 
 import jakarta.validation.Valid;
 
@@ -63,8 +65,9 @@ public class DietLogController {
 
 
     private final DietLogService dietLogService;
-
     private final DietLogImageService dietLogImageService;
+    private final MealAnalysisService mealAnalysisService;
+    private final SosService sosService;
 
 
 
@@ -136,7 +139,7 @@ public class DietLogController {
 
                 .build();
 
-        return ResponseEntity.ok(dietLogService.analyzeMeal(user.getId(), upload, context));
+        return ResponseEntity.ok(mealAnalysisService.analyzeMeal(user.getId(), upload, context));
 
     }
 
@@ -218,7 +221,7 @@ public class DietLogController {
 
             @Valid @RequestBody ConfirmRecognitionRequest request) {
 
-        return ResponseEntity.ok(dietLogService.confirmRecognition(id, user.getId(), request));
+        return ResponseEntity.ok(mealAnalysisService.confirmRecognition(id, user.getId(), request));
 
     }
 
@@ -322,7 +325,7 @@ public class DietLogController {
 
             @Valid @RequestBody CreateSosRequest request) {
 
-        return ResponseEntity.ok(dietLogService.createSosTicket(user.getId(), request));
+        return ResponseEntity.ok(sosService.createSosTicket(user.getId(), request));
 
     }
 
@@ -332,7 +335,7 @@ public class DietLogController {
 
     public ResponseEntity<ApiResponse<List<SosTicketResponse>>> getSosTickets(@AuthenticationPrincipal User user) {
 
-        return ResponseEntity.ok(dietLogService.getSosTickets(user.getId()));
+        return ResponseEntity.ok(sosService.getSosTickets(user.getId()));
 
     }
 

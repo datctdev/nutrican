@@ -23,6 +23,7 @@
 	</developers>
     <modules>
         <module>nutritiontrack-module-core</module>
+	    <module>nutritiontrack-module-infrastructure</module>
 	    <module>nutritiontrack-module-auth</module>
 	    <module>nutritiontrack-module-user-profile</module>
 	    <module>nutritiontrack-module-diet-tracker</module>

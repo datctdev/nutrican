@@ -1,7 +1,7 @@
 package com.sba.nutrican_be.kyc.repository;
 
-import com.sba.nutrican_be.kyc.entity.EKycDocument;
-import com.sba.nutrican_be.kyc.valueObjects.KycDocumentType;
+import com.sba.nutrican_be.core.entity.EKycDocument;
+import com.sba.nutrican_be.core.enums.KycDocumentType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

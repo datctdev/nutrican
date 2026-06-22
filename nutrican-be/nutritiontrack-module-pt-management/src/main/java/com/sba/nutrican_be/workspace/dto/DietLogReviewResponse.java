@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 import java.util.UUID;
 
 @Data
@@ -32,7 +33,7 @@ public class DietLogReviewResponse {
     private MealType mealType;
     private String foodDescription;
     private BigDecimal aiConfidenceScore;
-    private Map<String, Object> macrosJson;
+    private MacroNutrients macrosJson;
     private DietLogStatus status;
     private Boolean sosTicketFlag;
     private LocalDate logDate;
@@ -44,11 +45,11 @@ public class DietLogReviewResponse {
     private String restaurantName;
     private RecognitionSource recognitionSource;
     private Map<String, Object> aiRawJson;
-    private Map<String, Object> aiPredictedMacros;
-    private Map<String, Object> dbMatchedMacros;
-    private Map<String, Object> macrosAtReview;
-    private Map<String, Object> ptAdjustedMacros;
-    private Map<String, Object> ptBlindMacros;
+    private MacroNutrients aiPredictedMacros;
+    private MacroNutrients dbMatchedMacros;
+    private MacroNutrients macrosAtReview;
+    private MacroNutrients ptAdjustedMacros;
+    private MacroNutrients ptBlindMacros;
     private Integer dbMatchScore;
     private String modelVersion;
     private String matchedFoodName;

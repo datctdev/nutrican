@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 
 @Entity
 @Table(name = "diet_logs")
@@ -41,7 +42,7 @@ public class DietLog extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "macros_json", columnDefinition = "jsonb")
-    private Map<String, Object> macrosJson;
+    private MacroNutrients macrosJson;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "meal_type", length = 20)
@@ -101,15 +102,15 @@ public class DietLog extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "pt_adjusted_macros", columnDefinition = "jsonb")
-    private Map<String, Object> ptAdjustedMacros;
+    private MacroNutrients ptAdjustedMacros;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "ai_predicted_macros", columnDefinition = "jsonb")
-    private Map<String, Object> aiPredictedMacros;
+    private MacroNutrients aiPredictedMacros;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "db_matched_macros", columnDefinition = "jsonb")
-    private Map<String, Object> dbMatchedMacros;
+    private MacroNutrients dbMatchedMacros;
 
     @Column(name = "db_match_score")
     private Integer dbMatchScore;
@@ -137,14 +138,14 @@ public class DietLog extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "macros_at_review", columnDefinition = "jsonb")
-    private Map<String, Object> macrosAtReview;
+    private MacroNutrients macrosAtReview;
 
     @Column(name = "matched_food_name", length = 200)
     private String matchedFoodName;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "pt_blind_macros", columnDefinition = "jsonb")
-    private Map<String, Object> ptBlindMacros;
+    private MacroNutrients ptBlindMacros;
 
     @OneToMany(mappedBy = "dietLog", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

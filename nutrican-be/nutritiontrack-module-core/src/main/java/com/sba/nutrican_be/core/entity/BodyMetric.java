@@ -36,8 +36,4 @@ public class BodyMetric extends BaseEntity {
 
     @Column(precision = 5, scale = 2)
     private BigDecimal muscleMass;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
 }

@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 import java.util.stream.Collectors;
 
 @Service
@@ -404,7 +405,7 @@ public class RblAdminServiceImpl implements RblAdminService {
         BigDecimal sum = BigDecimal.ZERO;
         int n = 0;
         for (DietLog log : logs) {
-            Map<String, Object> other = "ai".equals(target) ? log.getAiPredictedMacros() : log.getPtAdjustedMacros();
+            MacroNutrients other = "ai".equals(target) ? log.getAiPredictedMacros() : log.getPtAdjustedMacros();
             BigDecimal d = RblMetricsUtil.delta(log.getPtBlindMacros(), other, "calories");
             if (d != null) { sum = sum.add(d); n++; }
         }
@@ -416,9 +417,9 @@ public class RblAdminServiceImpl implements RblAdminService {
         return v.replace(",", " ");
     }
 
-    private String macro(Map<String, Object> m, String key) {
+    private String macro(MacroNutrients m, String key) {
         if (m == null) return "";
-        return MacroUtils.toBd(m.get(key)).toPlainString();
+        return MacroUtils.getMacro(m, key).toPlainString();
     }
 
     private String csvJson(Object value) {

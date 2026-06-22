@@ -8,6 +8,15 @@ volumes:
   minio_data:
 
 services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: nutrican-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+    restart: unless-stopped
   postgres:
     image: postgres:17-alpine
     container_name: nutrican-postgres

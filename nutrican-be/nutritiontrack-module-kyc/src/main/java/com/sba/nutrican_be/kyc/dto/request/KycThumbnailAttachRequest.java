@@ -1,6 +1,6 @@
 package com.sba.nutrican_be.kyc.dto.request;
 
-import com.sba.nutrican_be.kyc.valueObjects.KycDocumentType;
+import com.sba.nutrican_be.core.enums.KycDocumentType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import org.jetbrains.annotations.NotNull;

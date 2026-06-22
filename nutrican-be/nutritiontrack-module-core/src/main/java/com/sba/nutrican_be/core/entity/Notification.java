@@ -2,7 +2,6 @@ package com.sba.nutrican_be.core.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -32,8 +31,4 @@ public class Notification extends BaseEntity {
 
     @Column(name = "reference_id")
     private String referenceId;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
 }

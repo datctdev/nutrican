@@ -10,7 +10,7 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
-import java.util.Map;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 import java.util.UUID;
 
 public final class RblMetricsUtil {
@@ -22,10 +22,10 @@ public final class RblMetricsUtil {
         BigDecimal sum = BigDecimal.ZERO;
         int count = 0;
         for (DietLog log : logs) {
-            Map<String, Object> ai = aiKey.equals("ai") ? log.getAiPredictedMacros() : log.getDbMatchedMacros();
-            Map<String, Object> pt = log.getPtAdjustedMacros();
+            MacroNutrients ai = aiKey.equals("ai") ? log.getAiPredictedMacros() : log.getDbMatchedMacros();
+            MacroNutrients pt = log.getPtAdjustedMacros();
             if (ai == null || pt == null) continue;
-            BigDecimal diff = MacroUtils.toBd(ai.get("calories")).subtract(MacroUtils.toBd(pt.get("calories"))).abs();
+            BigDecimal diff = ai.calories().subtract(pt.calories()).abs();
             sum = sum.add(diff);
             count++;
         }
@@ -59,9 +59,9 @@ public final class RblMetricsUtil {
         }
     }
 
-    public static BigDecimal delta(Map<String, Object> a, Map<String, Object> b, String key) {
+    public static BigDecimal delta(MacroNutrients a, MacroNutrients b, String key) {
         if (a == null || b == null) return null;
-        return MacroUtils.toBd(a.get(key)).subtract(MacroUtils.toBd(b.get(key))).abs();
+        return MacroUtils.getMacro(a, key).subtract(MacroUtils.getMacro(b, key)).abs();
     }
 
     public static boolean isCvLog(DietLog log) {

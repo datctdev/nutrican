@@ -1,6 +1,7 @@
 package com.sba.nutrican_be.core.exception;
 
 import com.sba.nutrican_be.core.dto.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -13,7 +14,9 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -81,9 +84,15 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    /**
+     * Catch-all: log đầy đủ server-side với correlation ID, KHÔNG expose chi tiết nội bộ ra client.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex) {
+        String correlationId = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        log.error("[ERR-{}] Unhandled exception: {}", correlationId, ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Internal server error: " + ex.getMessage()));
+                .body(ApiResponse.error(
+                        "An unexpected error occurred. Reference ID: " + correlationId));
     }
 }

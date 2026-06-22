@@ -7,6 +7,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 
 @Entity
 @Table(name = "diet_log_images")
@@ -47,5 +48,5 @@ public class DietLogImage extends BaseEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "macros_json", columnDefinition = "jsonb")
-    private Map<String, Object> macrosJson;
+    private MacroNutrients macrosJson;
 }

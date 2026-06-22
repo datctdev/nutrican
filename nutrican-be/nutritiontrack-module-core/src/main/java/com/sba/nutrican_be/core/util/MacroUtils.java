@@ -1,12 +1,10 @@
 package com.sba.nutrican_be.core.util;
 
-import com.sba.nutrican_be.core.entity.DietLog;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Component
 public class MacroUtils {
@@ -17,32 +15,26 @@ public class MacroUtils {
     public static final BigDecimal DEFAULT_CARB = BigDecimal.valueOf(200);
     public static final BigDecimal DEFAULT_FAT = BigDecimal.valueOf(65);
 
-    public static Map<String, Object> newMacroMap() {
-        Map<String, Object> macros = new HashMap<>();
-        macros.put("calories", ZERO);
-        macros.put("protein", ZERO);
-        macros.put("carbs", ZERO);
-        macros.put("fat", ZERO);
-        return macros;
+    public static MacroNutrients newMacroMap() {
+        return MacroNutrients.ZERO;
     }
 
-    public static Map<String, Object> buildAdjustedMacroMap(BigDecimal calories, BigDecimal protein,
-                                                           BigDecimal carb, BigDecimal fat) {
-        Map<String, Object> macros = new HashMap<>();
-        macros.put("calories", calories != null ? calories : ZERO);
-        macros.put("protein", protein != null ? protein : ZERO);
-        macros.put("carbs", carb != null ? carb : ZERO);
-        macros.put("fat", fat != null ? fat : ZERO);
-        macros.put("adjusted", true);
-        return macros;
+    public static MacroNutrients buildAdjustedMacroMap(BigDecimal calories, BigDecimal protein,
+                                                       BigDecimal carb, BigDecimal fat) {
+        return MacroNutrients.of(calories, protein, carb, fat);
     }
 
-    public static BigDecimal getMacro(DietLog dietLog, String key) {
-        if (dietLog.getMacrosJson() == null || !dietLog.getMacrosJson().containsKey(key)) {
+    public static BigDecimal getMacro(MacroNutrients macros, String key) {
+        if (macros == null) {
             return ZERO;
         }
-        Object val = dietLog.getMacrosJson().get(key);
-        return toBd(val);
+        return switch (key) {
+            case "calories" -> macros.calories();
+            case "protein" -> macros.protein();
+            case "carbs" -> macros.carbs();
+            case "fat" -> macros.fat();
+            default -> ZERO;
+        };
     }
 
     public static BigDecimal toBd(Object val) {
@@ -65,35 +57,32 @@ public class MacroUtils {
         return value != null ? value : defaultValue;
     }
 
-    public static Map<String, Object> copyMacroMap(Map<String, Object> source) {
-        if (source == null) {
-            return null;
-        }
-        return new HashMap<>(source);
+    public static MacroNutrients copyMacroMap(MacroNutrients source) {
+        return source;
     }
 
-    public static Map<String, Object> fromValues(BigDecimal calories, BigDecimal protein,
-                                                 BigDecimal carbs, BigDecimal fat) {
-        Map<String, Object> macros = newMacroMap();
-        macros.put("calories", calories != null ? calories : ZERO);
-        macros.put("protein", protein != null ? protein : ZERO);
-        macros.put("carbs", carbs != null ? carbs : ZERO);
-        macros.put("fat", fat != null ? fat : ZERO);
-        return macros;
+    public static MacroNutrients fromValues(BigDecimal calories, BigDecimal protein,
+                                            BigDecimal carbs, BigDecimal fat) {
+        return MacroNutrients.of(calories, protein, carbs, fat);
     }
 
-    public static String fieldsChanged(Map<String, Object> before, Map<String, Object> after) {
+    public static String fieldsChanged(MacroNutrients before, MacroNutrients after) {
         if (before == null || after == null) {
             return "";
         }
         StringBuilder sb = new StringBuilder();
-        for (String key : List.of("calories", "protein", "carbs", "fat")) {
-            BigDecimal b = toBd(before.get(key));
-            BigDecimal a = toBd(after.get(key));
-            if (b.compareTo(a) != 0) {
-                if (!sb.isEmpty()) sb.append(",");
-                sb.append(key);
-            }
+        if (before.calories().compareTo(after.calories()) != 0) sb.append("calories");
+        if (before.protein().compareTo(after.protein()) != 0) {
+            if (!sb.isEmpty()) sb.append(",");
+            sb.append("protein");
+        }
+        if (before.carbs().compareTo(after.carbs()) != 0) {
+            if (!sb.isEmpty()) sb.append(",");
+            sb.append("carbs");
+        }
+        if (before.fat().compareTo(after.fat()) != 0) {
+            if (!sb.isEmpty()) sb.append(",");
+            sb.append("fat");
         }
         return sb.toString();
     }

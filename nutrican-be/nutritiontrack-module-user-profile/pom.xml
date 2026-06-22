@@ -18,6 +18,12 @@
     </properties>
 
     <dependencies>
+        <!-- Infrastructure: storage (MinIO), mail (SMTP) -->
+        <dependency>
+            <groupId>com.sba</groupId>
+            <artifactId>nutritiontrack-module-infrastructure</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -4,11 +4,10 @@ package com.sba.nutrican_be.kyc.controller;
 import com.sba.nutrican_be.core.config.CurrentUser;
 import com.sba.nutrican_be.core.config.CurrentUserInfo;
 import com.sba.nutrican_be.kyc.dto.request.KycThumbnailAttachRequest;
-import com.sba.nutrican_be.kyc.entity.EKycSession;
+import com.sba.nutrican_be.core.entity.EKycSession;
 import com.sba.nutrican_be.kyc.service.CompareKycService;
-import com.sba.nutrican_be.kyc.service.KycOrchestrator;
 import com.sba.nutrican_be.kyc.service.KycOrchestratorService;
-import com.sba.nutrican_be.kyc.valueObjects.KycDocumentType;
+import com.sba.nutrican_be.core.enums.KycDocumentType;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
@@ -23,14 +22,13 @@ import java.util.UUID;
 @RequestMapping(path = "/api/v1/kyc")
 @RequiredArgsConstructor
 public class KycController {
-    private final KycOrchestrator orchestrator;
     private final KycOrchestratorService orchestratorService;
     private final CompareKycService compareKycService;
 
 
     @PostMapping("/sessions:start")
     public ResponseEntity<Map<String, Object>> start(@CurrentUser CurrentUserInfo u) {
-        UUID sessionId = orchestrator.start(u.getUserId());
+        UUID sessionId = orchestratorService.start(u.getUserId());
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "status", "DRAFT"
@@ -47,7 +45,7 @@ public class KycController {
             @RequestParam(value = "description", required = false) String description,
             @CurrentUser CurrentUserInfo u
     ) {
-        String vnptHash = orchestrator.uploadToVnptAndAttach(
+        String vnptHash = orchestratorService.uploadToVnptAndAttach(
                 sessionId,
                 u.getUserId(),
                 type,
@@ -71,8 +69,8 @@ public class KycController {
             @RequestBody @Valid KycThumbnailAttachRequest req,
             @CurrentUser CurrentUserInfo u
     ) {
-        orchestrator.attachFile(sessionId, u.getUserId(), req.getType(), req.getFileHash());
-        var session = orchestrator.get(sessionId, u.getUserId());
+        orchestratorService.attachFile(sessionId, u.getUserId(), req.getType(), req.getFileHash());
+        var session = orchestratorService.get(sessionId, u.getUserId());
 
         return Map.of(
                 "success", true,
@@ -87,7 +85,7 @@ public class KycController {
             @RequestParam(required = false) String fileHash
 
     ) {
-        Map<String, Object> out = orchestrator.classify(sessionId, u.getUserId(), fileHash);
+        Map<String, Object> out = orchestratorService.classify(sessionId, u.getUserId(), fileHash);
         return ResponseEntity.ok(out);
     }
 
@@ -98,7 +96,7 @@ public class KycController {
             @RequestParam(required = false) String fileHash,
             @RequestParam(name = "type", defaultValue = "-1") int type
     ) {
-        Map<String, Object> out = orchestrator.ocrFront(sessionId, u.getUserId(), fileHash, type);
+        Map<String, Object> out = orchestratorService.ocrFront(sessionId, u.getUserId(), fileHash, type);
         return ResponseEntity.ok(out);
     }
 
@@ -109,7 +107,7 @@ public class KycController {
             @RequestParam(required = false) String fileHash,
             @RequestParam(name = "type", defaultValue = "-1") int type
     ) {
-        Map<String, Object> out = orchestrator.ocrBack(sessionId, u.getUserId(), fileHash, type);
+        Map<String, Object> out = orchestratorService.ocrBack(sessionId, u.getUserId(), fileHash, type);
         return ResponseEntity.ok(out);
     }
 
@@ -119,7 +117,7 @@ public class KycController {
             @CurrentUser CurrentUserInfo u,
             @RequestParam(required = false) String fileHash
     ) {
-        Map<String, Object> out = orchestrator.liveness(sessionId, u.getUserId(), fileHash);
+        Map<String, Object> out = orchestratorService.liveness(sessionId, u.getUserId(), fileHash);
         return ResponseEntity.ok(out);
     }
 
@@ -137,7 +135,7 @@ public class KycController {
             @PathVariable UUID sessionId,
             @CurrentUser CurrentUserInfo u
     ) {
-        EKycSession session = orchestrator.get(sessionId, u.getUserId());
+        EKycSession session = orchestratorService.get(sessionId, u.getUserId());
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "session", session

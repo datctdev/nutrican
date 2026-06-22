@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 import java.util.UUID;
 
 @Data
@@ -26,7 +27,7 @@ public class DietLogResponse {
     private String customerName;
     private String imageUrl;
     private BigDecimal aiConfidenceScore;
-    private Map<String, Object> macrosJson;
+    private MacroNutrients macrosJson;
     private MealType mealType;
     private DietLogStatus status;
     private String foodDescription;

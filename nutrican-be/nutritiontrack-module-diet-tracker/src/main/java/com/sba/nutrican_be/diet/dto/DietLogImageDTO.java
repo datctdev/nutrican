@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import com.sba.nutrican_be.core.dto.MacroNutrients;
 import java.util.UUID;
 
 @Data
@@ -23,5 +24,5 @@ public class DietLogImageDTO {
     private Long fileSize;
     private String contentType;
     private BigDecimal aiConfidenceScore;
-    private Map<String, Object> macrosJson;
+    private MacroNutrients macrosJson;
 }

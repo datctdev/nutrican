@@ -4,23 +4,19 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
-import java.util.UUID;
 
-@Entity
-@Table(name = "password_reset_tokens")
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
-public class PasswordResetToken {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
+@NoArgsConstructor
+@Entity
+@Table(name = "password_reset_tokens")
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
+public class PasswordResetToken extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -33,16 +29,7 @@ public class PasswordResetToken {
     private Instant expiresAt;
 
     @Column(name = "used", nullable = false)
-    @Builder.Default
     private Boolean used = false;
-
-    @Column(name = "created_at", updatable = false)
-    private Instant createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = Instant.now();
-    }
 
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);
