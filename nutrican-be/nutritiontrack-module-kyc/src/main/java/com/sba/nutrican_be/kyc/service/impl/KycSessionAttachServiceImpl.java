@@ -3,8 +3,8 @@ import com.sba.nutrican_be.core.entity.EKycDocument;
 import com.sba.nutrican_be.core.entity.EKycSession;
 import com.sba.nutrican_be.core.enums.KycDocumentType;
 import com.sba.nutrican_be.core.enums.KycStatus;
-import com.sba.nutrican_be.kyc.repository.KycDocumentRepository;
-import com.sba.nutrican_be.kyc.repository.KycSessionRepository;
+import com.sba.nutrican_be.core.repository.KycDocumentRepository;
+import com.sba.nutrican_be.core.repository.KycSessionRepository;
 import com.sba.nutrican_be.kyc.service.KycSessionAttachService;
 import com.sba.nutrican_be.kyc.valueObjects.AttachDecision;
 import lombok.RequiredArgsConstructor;
@@ -87,3 +87,4 @@ public class KycSessionAttachServiceImpl implements KycSessionAttachService {
         return KycDocumentType.FRONT;
     }
 }
+

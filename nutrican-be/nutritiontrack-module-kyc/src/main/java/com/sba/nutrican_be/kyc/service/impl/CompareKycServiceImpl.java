@@ -7,7 +7,7 @@ import com.sba.nutrican_be.core.entity.User;
 import com.sba.nutrican_be.core.repository.UserRepository;
 import com.sba.nutrican_be.kyc.dto.response.CompareResponse;
 import com.sba.nutrican_be.core.entity.EKycSession;
-import com.sba.nutrican_be.kyc.repository.KycSessionRepository;
+import com.sba.nutrican_be.core.repository.KycSessionRepository;
 import com.sba.nutrican_be.kyc.service.CompareKycService;
 import com.sba.nutrican_be.kyc.usecase.VNPTClient;
 import com.sba.nutrican_be.core.enums.KycStatus;
@@ -82,3 +82,4 @@ public class CompareKycServiceImpl implements CompareKycService {
         }
     }
 }
+

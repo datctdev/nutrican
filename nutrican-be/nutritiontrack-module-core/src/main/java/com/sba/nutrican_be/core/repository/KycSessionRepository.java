@@ -1,4 +1,4 @@
-package com.sba.nutrican_be.kyc.repository;
+package com.sba.nutrican_be.core.repository;
 
 import com.sba.nutrican_be.core.entity.EKycSession;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,3 +12,4 @@ public interface KycSessionRepository extends JpaRepository<EKycSession, UUID> {
 
     Optional<EKycSession> findByIdAndUserId(UUID id, UUID userId);
 }
+

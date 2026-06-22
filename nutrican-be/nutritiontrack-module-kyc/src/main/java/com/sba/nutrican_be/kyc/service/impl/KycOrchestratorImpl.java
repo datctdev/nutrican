@@ -8,8 +8,8 @@ import com.sba.nutrican_be.core.repository.UserRepository;
 import com.sba.nutrican_be.kyc.dto.response.*;
 import com.sba.nutrican_be.core.entity.EKycDocument;
 import com.sba.nutrican_be.core.entity.EKycSession;
-import com.sba.nutrican_be.kyc.repository.KycDocumentRepository;
-import com.sba.nutrican_be.kyc.repository.KycSessionRepository;
+import com.sba.nutrican_be.core.repository.KycDocumentRepository;
+import com.sba.nutrican_be.core.repository.KycSessionRepository;
 import com.sba.nutrican_be.kyc.service.KycOrchestratorService;
 import com.sba.nutrican_be.kyc.service.UploadFileService;
 import com.sba.nutrican_be.kyc.service.CardLivenessService;
@@ -302,3 +302,4 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
         }
     }
 }
+

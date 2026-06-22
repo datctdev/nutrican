@@ -1,4 +1,4 @@
-package com.sba.nutrican_be.kyc.repository;
+package com.sba.nutrican_be.core.repository;
 
 import com.sba.nutrican_be.core.entity.EKycDocument;
 import com.sba.nutrican_be.core.enums.KycDocumentType;
@@ -15,3 +15,4 @@ public interface KycDocumentRepository extends JpaRepository<EKycDocument, UUID>
             KycDocumentType type
     );
 }
+
