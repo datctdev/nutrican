@@ -232,25 +232,23 @@ public CorsConfigurationSource corsConfigurationSource() {
 
 ### 4.2 Rate Limiting
 
-Current implementation relies on:
-- Spring Boot default connection handling
-- Database connection pooling (HikariCP)
-- Frontend rate limiting (debounce on inputs)
-
-For production, a dedicated rate limiting filter should be added. Example with Bucket4j:
+The application implements rate limiting to protect endpoints from abuse:
+- A `RateLimitingService` interface defines the contract.
+- `RateLimitingServiceImpl` uses Redis (or in-memory fallback) to enforce limits.
+- `RateLimitFilter` intercepts requests and consumes tokens from configured buckets.
 
 ```java
 @Component
-public class RateLimitingFilter extends OncePerRequestFilter {
-    private final Bucket loginBucket = Bucket.builder()
-        .addLimit(Bandwidth.classic(5, Refill.intervally(1, Duration.ofMinutes(1))))
-        .build();
+@RequiredArgsConstructor
+public class RateLimitFilter extends OncePerRequestFilter {
+    private final RateLimitingService rateLimitingService;
 
     @Override
     protected void doFilterInternal(...) {
         if (request.getRequestURI().contains("/auth/login")) {
-            if (!loginBucket.tryConsume()) {
-                response.setStatus(429);
+            Bucket bucket = rateLimitingService.resolveBucket(clientIp);
+            if (!bucket.tryConsume(1)) {
+                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
                 return;
             }
         }

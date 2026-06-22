@@ -123,6 +123,16 @@ nutrican-be/
 │           ├── SecurityConfig.java
 │           └── JwtAuthenticationFilter.java
 
+├── nutritiontrack-module-infrastructure/    # Redis, Rate Limiting, External Configs
+│   ├── pom.xml
+│   └── src/main/java/com/sba/nutrican_be/infrastructure/
+│       ├── config/
+│       │   └── RedisConfig.java
+│       └── service/
+│           ├── RateLimitingService.java
+│           └── impl/
+│               └── RateLimitingServiceImpl.java
+│
 ├── nutritiontrack-module-kyc/               # KYC Verification (VNPT OCR + Face Liveness)
 │   ├── pom.xml
 │   └── src/main/java/com/sba/nutrican_be/kyc/
@@ -192,7 +202,9 @@ nutrican-be/
 │       │   └── AiController.java
 │       ├── service/
 │       │   ├── MealRecognitionService.java
-│       │   ├── MealRecognitionServiceImpl.java  # qwen2.5-vl integration
+│       │   ├── MealRecognitionServiceImpl.java  # ResNet50 + LLaVA integration
+│       │   ├── ResNetFoodRecognitionClient.java
+│       │   ├── LlavaMealAnalysisService.java
 │       │   ├── OllamaService.java
 │       │   ├── OllamaServiceImpl.java           # WebFlux HTTP client
 │       │   ├── NutritionChatbotService.java
@@ -295,7 +307,7 @@ nutritiontrack-module-user-profile          nutritiontrack-module-auth
 | Security | Spring Security + JWT | - |
 | Database | PostgreSQL | 17 |
 | Object Storage | MinIO | 8.5.12 |
-| AI | Ollama + WebFlux | qwen2.5-vl |
+| AI | Ollama + WebFlux | ResNet50 + LLaVA |
 | API Documentation | SpringDoc OpenAPI | 2.5.0 |
 | JWT Library | jjwt | 0.12.6 |
 | Build Tool | Maven | 3.9+ |
@@ -581,7 +593,7 @@ Client (React)  → GET /workspace/stream  →  Backend (SseEmitterService)
 Client (Upload Image)  →  Backend  →  MinIO (store image)
                                     │
                                     ▼
-                          Ollama (qwen2.5-vl)
+                          ResNet50 + Ollama (LLaVA)
                           { vision + prompt }
                                     │
                                     ▼
@@ -594,7 +606,7 @@ Client (Upload Image)  →  Backend  →  MinIO (store image)
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| Model | `qwen2.5-vl` | Vision-language model |
+| Model | ResNet50 + LLaVA | Hybrid vision-language flow |
 | Base URL | `http://localhost:11434` | Ollama endpoint |
 | Temperature (Meal) | 0.1 | Low for consistent nutrition data |
 | Temperature (Chat) | 0.7 | Balanced creativity |
@@ -604,11 +616,12 @@ Client (Upload Image)  →  Backend  →  MinIO (store image)
 
 ### 7.3 Hybrid CV → Food DB Flow
 
-```
-VLM (foodName + macros) → FoodCatalogService.findBestMatch()
-                        → db_matched_macros snapshot (always if match)
-                        → if confidence ≥ 0.6: apply HYBRID to macros_json
-                        → RblCohortUtil.resolve() → experiment_cohort
+```text
+ResNet50 (foodCode, confidence) → if confidence < 0.35 or confusion pair:
+                                → LLaVA (override foodName, macros)
+                                → MealAnalysisFusion.fuse()
+                                → db_matched_macros snapshot
+                                → RblCohortUtil.resolve() → experiment_cohort
 ```
 
 See [RBL_METHODOLOGY.md §4](./RBL_METHODOLOGY.md#4-hybrid-cv--food-db-matching) and [RESEARCH.md](./RESEARCH.md).
@@ -624,7 +637,7 @@ services:
   postgres:
     image: postgres:17-alpine
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: nutrican_db
       POSTGRES_USER: postgres

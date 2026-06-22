@@ -1,4 +1,4 @@
-﻿# NutriCan PT - AI-Powered Nutrition Tracking Platform
+# NutriCan PT - AI-Powered Nutrition Tracking Platform
 
 Ung dung theo doi dinh duong voi tich hop AI, ket noi PT, va theo doi tien tri.
 
@@ -31,7 +31,7 @@ docs/             # Full documentation
 | Language | Java 17 | JavaScript |
 | Database | PostgreSQL | - |
 | Storage | MinIO (S3) | - |
-| AI | Ollama (qwen2.5-vl) | - |
+| AI | Ollama (llava) & ResNet50 | - |
 
 ## Quick Start
 
