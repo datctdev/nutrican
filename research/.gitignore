@@ -1,2 +1,7 @@
 # Trained ResNet weights — too large for git (~100–220 MB); share via Drive/OneDrive
 *.h5
+
+# Python — generated locally when running scripts (not from git)
+__pycache__/
+*.py[cod]
+.venv/
