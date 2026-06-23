@@ -5,6 +5,7 @@ import com.sba.nutrican_be.core.repository.FoodItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +15,7 @@ import java.util.List;
 
 @Slf4j
 @Component
+@Order(10)
 @RequiredArgsConstructor
 public class FoodCatalogDataInitializer implements CommandLineRunner {
 
@@ -24,7 +26,8 @@ public class FoodCatalogDataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (foodItemRepository.count() > 0) {
+        if (foodItemRepository.existsBySource(SOURCE)) {
+            log.debug("Food catalog source {} already present, skipping VTN seed", SOURCE);
             return;
         }
         List<FoodItem> items = buildVtnFct2007Foods();

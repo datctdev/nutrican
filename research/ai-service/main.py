@@ -14,7 +14,7 @@ from PIL import Image
 from portion_estimator import estimate_portion_ratio
 
 APP_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = APP_DIR.parent.parent  # d:\nutrican-pt-workspace
+PROJECT_ROOT = APP_DIR.parent.parent  # nutrican repo root
 DEFAULT_MODEL = PROJECT_ROOT / "research" / "best_resnet50_model.h5"
 MODEL_PATH = Path(os.environ.get("MODEL_PATH", str(DEFAULT_MODEL)))
 MODEL_VERSION = os.environ.get(

@@ -56,8 +56,7 @@ ollama pull llava && ollama serve
 research\scripts\train_resnet50_phase2.cmd
 
 :: 4. Dùng model mới
-set MODEL_PATH=d:\FPT\SU26\SBA\project_team\research\best_resnet50_model_phase2.h5
-research\scripts\start_ai_service.cmd
+research\run-ai-service.bat
 ```
 
 ## Công thức macro cuối cùng

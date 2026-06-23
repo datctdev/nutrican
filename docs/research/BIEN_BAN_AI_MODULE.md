@@ -112,8 +112,7 @@ Response:
 
 ```powershell
 # Terminal 1 — AI service (Python 3.10–3.12)
-$env:MODEL_PATH = "d:\FPT\SU26\SBA\project_team\research\best_resnet50_model.h5"
-.\research\scripts\start_ai_service.ps1
+research\run-ai-service.bat
 
 # Terminal 2 — Smoke test
 python research/scripts/resnet50_smoke_test.py

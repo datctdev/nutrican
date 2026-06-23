@@ -10,16 +10,12 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from repo_paths import DEFAULT_DATASET, OUTPUT_DIR, REPO_ROOT
+
 AI_SERVICE = REPO_ROOT / "research" / "ai-service"
 sys.path.insert(0, str(AI_SERVICE))
 
 from main import CLASS_NAMES, MODEL_PATH, safe_preprocess  # noqa: E402
-
-DEFAULT_DATASET = Path(
-    r"d:\FPT\SU26\SBA\project_team\research\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset"
-)
-OUTPUT_DIR = REPO_ROOT / "research" / "output"
 
 
 def collect_images(dataset_dir: Path) -> list[tuple[Path, str]]:

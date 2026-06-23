@@ -20,9 +20,7 @@ from pathlib import Path
 
 import pdfplumber
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-PDF_PATH = Path(r"d:\FPT\SU26\SBA\project_team\research\bang-luong-calo-trong-thuc-pham.pdf")
-DATA_DIR = REPO_ROOT / "research" / "data"
+from repo_paths import DATA_DIR, DEFAULT_PDF, REPO_ROOT
 
 # ResNet10 food_code → exact NutriHome dish name (PDF row)
 RESNET_NUTRIHOME_MAP: dict[str, str] = {
@@ -112,11 +110,11 @@ def estimate_serving_g(unit: str, name: str) -> int | None:
     return None
 
 
-def extract_tables() -> list[dict]:
+def extract_tables(pdf_path: Path) -> list[dict]:
     rows: list[dict] = []
     seen_stt: set[int] = set()
 
-    with pdfplumber.open(PDF_PATH) as pdf:
+    with pdfplumber.open(pdf_path) as pdf:
         for page_num, page in enumerate(pdf.pages, start=1):
             for table in page.extract_tables() or []:
                 if not table or not table[0] or table[0][0] != "STT":
@@ -259,11 +257,24 @@ def per_100g(row: dict) -> dict | None:
 
 
 def main() -> int:
-    if not PDF_PATH.exists():
-        print(f"PDF not found: {PDF_PATH}", file=sys.stderr)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Extract NutriHome PDF → JSON")
+    parser.add_argument(
+        "--pdf",
+        type=Path,
+        default=DEFAULT_PDF,
+        help=f"Path to bang-luong-calo-trong-thuc-pham.pdf (default: {DEFAULT_PDF})",
+    )
+    args = parser.parse_args()
+    pdf_path = args.pdf.resolve()
+
+    if not pdf_path.exists():
+        print(f"PDF not found: {pdf_path}", file=sys.stderr)
+        print(f"Place the file at: {DEFAULT_PDF}", file=sys.stderr)
         return 1
 
-    all_rows = extract_tables()
+    all_rows = extract_tables(pdf_path)
     if not all_rows:
         print("No rows extracted — check PDF format", file=sys.stderr)
         return 1
@@ -274,7 +285,7 @@ def main() -> int:
     ts = datetime.now(timezone.utc).isoformat()
     foods_payload = {
         "meta": {
-            "source_pdf": str(PDF_PATH),
+            "source_pdf": str(pdf_path),
             "publisher": "NutriHome",
             "title": "Bảng lượng calo trong thực phẩm, thức ăn Việt Nam",
             "extractedAt": ts,

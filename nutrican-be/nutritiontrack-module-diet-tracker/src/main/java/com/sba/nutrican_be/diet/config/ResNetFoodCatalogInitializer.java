@@ -16,13 +16,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
  * Seeds / updates 10 ResNet50 dish entries for A1.1 hybrid Food DB matching.
+ * Source column value: {@link ResNetFoodDefaults#SOURCE} (= {@code NUTRIHOME_PDF}).
  */
 @Slf4j
 @Component
@@ -31,6 +31,7 @@ import java.util.Set;
 public class ResNetFoodCatalogInitializer implements CommandLineRunner {
 
     private static final String CATEGORY = "Món ResNet50";
+    private static final List<String> LEGACY_SOURCES = List.of("RESNET_VTN_10");
 
     private final FoodItemRepository foodItemRepository;
 
@@ -38,20 +39,27 @@ public class ResNetFoodCatalogInitializer implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         int upserted = 0;
-        for (Map.Entry<String, String> entry : ResNetFoodCodeMapping.allMappings().entrySet()) {
+        int skipped = 0;
+        Map<String, String> mappings = ResNetFoodCodeMapping.allMappings();
+        log.info("ResNet50 catalog seed: {} dish codes to upsert (source={})", mappings.size(), ResNetFoodDefaults.SOURCE);
+
+        for (Map.Entry<String, String> entry : mappings.entrySet()) {
             String code = entry.getKey();
             String nameVi = entry.getValue();
             Optional<ResNetFoodDefaults.MacroServing> defaults = ResNetFoodDefaults.forCode(code);
             if (defaults.isEmpty()) {
+                skipped++;
+                log.warn("No macro defaults for ResNet code '{}', skipping", code);
                 continue;
             }
             ResNetFoodDefaults.MacroServing m = defaults.get();
             List<String> aliases = buildAliases(code);
 
-            Optional<FoodItem> existing = findExisting(code, nameVi);
+            Optional<FoodItem> existing = findResNetCatalogItem(code);
             if (existing.isPresent()) {
                 FoodItem item = existing.get();
                 item.setNameVi(nameVi);
+                item.setNameEn(code.replace('_', ' '));
                 item.setCategory(CATEGORY);
                 item.setSource(ResNetFoodDefaults.SOURCE);
                 item.setAliases(aliases);
@@ -79,9 +87,10 @@ public class ResNetFoodCatalogInitializer implements CommandLineRunner {
             }
             upserted++;
         }
-        if (upserted > 0) {
-            log.info("Upserted {} ResNet50 dish catalog entries", upserted);
-        }
+
+        long nutrihomeCount = foodItemRepository.findBySource(ResNetFoodDefaults.SOURCE).size();
+        log.info("ResNet50 catalog seed done: upserted={}, skipped={}, total source={} in DB={}",
+                upserted, skipped, ResNetFoodDefaults.SOURCE, nutrihomeCount);
     }
 
     private List<String> buildAliases(String code) {
@@ -95,17 +104,31 @@ public class ResNetFoodCatalogInitializer implements CommandLineRunner {
         return new ArrayList<>(aliases);
     }
 
-    private Optional<FoodItem> findExisting(String code, String nameVi) {
-        return foodItemRepository.findAll().stream()
-                .filter(f -> ResNetFoodDefaults.SOURCE.equals(f.getSource())
-                        || "RESNET_VTN_10".equals(f.getSource())
-                        || (f.getAliases() != null && f.getAliases().stream()
-                        .anyMatch(a -> code.equalsIgnoreCase(a.trim()))))
-                .filter(f -> ResNetFoodDefaults.SOURCE.equals(f.getSource())
-                        || "RESNET_VTN_10".equals(f.getSource())
-                        || nameVi.equalsIgnoreCase(f.getNameVi())
-                        || (f.getAliases() != null && f.getAliases().contains(code)))
+    /** Only match rows already seeded for ResNet / NutriHome — never VTN_FCT_2007 rows. */
+    private Optional<FoodItem> findResNetCatalogItem(String code) {
+        Optional<FoodItem> current = findBySourceAndCode(ResNetFoodDefaults.SOURCE, code);
+        if (current.isPresent()) {
+            return current;
+        }
+        for (String legacySource : LEGACY_SOURCES) {
+            Optional<FoodItem> legacy = findBySourceAndCode(legacySource, code);
+            if (legacy.isPresent()) {
+                return legacy;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<FoodItem> findBySourceAndCode(String source, String code) {
+        return foodItemRepository.findBySource(source).stream()
+                .filter(item -> hasAlias(item, code))
                 .findFirst();
     }
-}
 
+    private static boolean hasAlias(FoodItem item, String code) {
+        if (item.getAliases() == null) {
+            return false;
+        }
+        return item.getAliases().stream().anyMatch(alias -> code.equalsIgnoreCase(alias.trim()));
+    }
+}

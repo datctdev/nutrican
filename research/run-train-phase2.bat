@@ -29,16 +29,16 @@ if not exist "%BASE_MODEL%" (
     set "BASE_MODEL_ARG=--base-model %BASE_MODEL%"
 )
 
-:: --- Dataset: cho phep truyen vao hoac dung default tuong doi ---
-:: Default dataset: ..\Vietnamese_Food_Dataset (neu co)
-set "DATASET_DEFAULT=..\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset"
+:: --- Dataset: relative to repo root ---
+set "DATASET_DEFAULT=research\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset"
+if not exist "%DATASET_DEFAULT%" set "DATASET_DEFAULT=research\Vietnamese_Food_Dataset"
 if "%~1"=="" (
     if not exist "%DATASET_DEFAULT%" (
         echo [LOI] Khong tim thay dataset.
         echo   Can: %CD%\%DATASET_DEFAULT%
         echo.
         echo Dung: run-train-phase2.bat "D:\duong\dan\dataset"
-        echo Hoac copy dataset vao Vietnamese_Food_Dataset
+        echo Hoac copy dataset vao research\Vietnamese_Food_Dataset\
         pause
         exit /b 1
     )

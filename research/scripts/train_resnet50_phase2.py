@@ -21,18 +21,29 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]  # d:\nutrican-pt-workspace
+from repo_paths import (
+    DEFAULT_DATASET,
+    DEFAULT_MODEL_PHASE1,
+    DEFAULT_MODEL_PHASE2,
+    OUTPUT_DIR,
+    REPO_ROOT,
+)
+
 AI_SERVICE = REPO_ROOT / "research" / "ai-service"
 sys.path.insert(0, str(AI_SERVICE))
 
 from main import CLASS_NAMES, safe_preprocess  # noqa: E402
 
-# Resolve from workspace root (one level up from scripts/)
-DEFAULT_DATASET = REPO_ROOT / "Vietnamese_Food_Dataset" / "Vietnamese_Food_Dataset"
-DEFAULT_BASE_MODEL = REPO_ROOT / "research" / "best_resnet50_model.h5"
-OUTPUT_MODEL = REPO_ROOT / "research" / "best_resnet50_model_phase2.h5"
-OUTPUT_DIR = REPO_ROOT / "research" / "output"
+DEFAULT_BASE_MODEL = DEFAULT_MODEL_PHASE1
+OUTPUT_MODEL = DEFAULT_MODEL_PHASE2
 FOCUS_CLASSES = ("com_tam", "pho")
+
+
+def _repo_relative(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(REPO_ROOT.resolve()))
+    except ValueError:
+        return str(path)
 
 
 def collect_images(dataset_dir: Path) -> list[tuple[Path, int]]:
@@ -299,9 +310,9 @@ def main():
     after_focus = evaluate_focus(model, val_rows, args.batch_size)
     report = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "dataset": str(args.dataset),
-        "base_model": str(args.base_model),
-        "output_model": str(args.output),
+        "dataset": _repo_relative(args.dataset),
+        "base_model": _repo_relative(args.base_model),
+        "output_model": _repo_relative(args.output),
         "train_size": len(train_rows),
         "val_size": len(val_rows),
         "focus_classes": list(FOCUS_CLASSES),

@@ -99,9 +99,8 @@ flowchart LR
 
 ### Chuẩn bị
 ```powershell
-# AI service (Python 3.10–3.12 + TensorFlow)
-$env:MODEL_PATH = "d:\FPT\SU26\SBA\project_team\research\best_resnet50_model.h5"
-.\research\scripts\start_ai_service.ps1
+# AI service (Python 3.10–3.12 + TensorFlow) — từ repo root
+research\run-ai-service.bat
 
 # Backend
 cd nutrican-be && docker-compose up -d

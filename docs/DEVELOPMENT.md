@@ -19,7 +19,7 @@ Before starting development, ensure you have:
 ```bash
 # Clone repository
 git clone <repository-url>
-cd nutrican-pt-workspace
+cd nutrican
 
 # Install frontend dependencies
 cd nutican-fe
@@ -82,28 +82,48 @@ docker ps
 
 Chụp ảnh món trên `/diet` cần **FastAPI** chạy song song với Spring Boot.
 
-**Lần đầu:**
+**Chuẩn bị file model (một lần):** copy `best_resnet50_model_phase2.h5` vào `research/` (không có trong git — lấy từ Drive nhóm).
+
+**Lần đầu — cài Python env:**
 
 ```powershell
-cd research\ai-service
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+cd nutrican
+research\run-setup.bat
 ```
 
-> Nếu lỗi `No runtime installed that matches 3.12`: chạy `py install 3.12` trước. **Không dùng Python 3.14** — TensorFlow chưa hỗ trợ.
+> Cần **Python 3.10–3.12** + TensorFlow. `py install 3.12` nếu máy chưa có. **Không dùng Python 3.14.**
 
 **Mỗi lần dev (terminal riêng, giữ chạy):**
 
 ```powershell
-cd d:\FPT\SU26\SBA\project_team\nutrican
-$env:MODEL_PATH = "d:\FPT\SU26\SBA\project_team\research\best_resnet50_model.h5"
+cd nutrican
+research\run-ai-service.bat
+```
+
+Hoặc PowerShell:
+
+```powershell
+cd nutrican
 .\research\scripts\start_ai_service.ps1
 ```
 
-Kiểm tra: `curl http://localhost:8000/health` → `model_loaded: true`
+Script tự ưu tiên `research/best_resnet50_model_phase2.h5` → `research/best_resnet50_model.h5`. Override:
 
-> **Lưu ý:** Cần Python **3.10–3.12** + TensorFlow. Nếu AI service tắt, backend vẫn chạy nhưng Analyze ảnh sẽ **fallback** (macro mặc định, confidence = 0). Ollama/llava **không** thay thế — chỉ dùng cho chatbot nếu bật.
+```powershell
+$env:MODEL_PATH = "D:\path\to\custom_model.h5"
+.\research\scripts\start_ai_service.ps1
+```
+
+**Ollama (LLaVA — macro fusion):**
+
+```powershell
+ollama pull llava
+ollama serve
+```
+
+Kiểm tra ResNet: `curl http://localhost:8000/health` → `model_loaded: true`
+
+> Nếu AI service tắt, backend vẫn chạy nhưng Analyze ảnh **fallback** (macro mặc định). Ollama tắt → chỉ dùng ResNet + NutriHome JSON, không có LLaVA fusion.
 
 Chi tiết: [research/ai-service/README.md](../research/ai-service/README.md)
 

@@ -7,10 +7,11 @@ import random
 import shutil
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-DATASET = Path(r"d:\FPT\SU26\SBA\project_team\research\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset")
-SEED_DIR = REPO / "research" / "seed" / "resnet10"
-MANIFEST = REPO / "research" / "seed" / "resnet10_manifest.csv"
+from repo_paths import DEFAULT_DATASET, REPO_ROOT
+
+DATASET = DEFAULT_DATASET
+SEED_DIR = REPO_ROOT / "research" / "seed" / "resnet10"
+MANIFEST = REPO_ROOT / "research" / "seed" / "resnet10_manifest.csv"
 
 CLASSES = [
     "banh_chung", "banh_khot", "banh_mi", "banh_trang_nuong", "banh_xeo",
@@ -32,7 +33,7 @@ PT_MACROS = {
 }
 
 SAMPLES_PER_CLASS = 3
-NEGATIVE_DIR = REPO / "research" / "seed" / "test"
+NEGATIVE_DIR = REPO_ROOT / "research" / "seed" / "test"
 
 
 def main() -> None:

@@ -1,42 +1,6 @@
 {
-  "timestamp": "2026-06-20T13:31:51.011672+00:00",
-  "dataset": "d:\\FPT\\SU26\\SBA\\project_team\\research\\Vietnamese_Food_Dataset\\Vietnamese_Food_Dataset",
-  "base_model": "d:\\FPT\\SU26\\SBA\\project_team\\research\\best_resnet50_model.h5",
-  "output_model": "d:\\FPT\\SU26\\SBA\\project_team\\research\\best_resnet50_model_phase2.h5",
-  "train_size": 9744,
-  "val_size": 1741,
-  "focus_classes": [
-    "com_tam",
-    "pho"
-  ],
-  "focus_weight": 2.5,
-  "baseline_focus": {
-    "samples": 347,
-    "accuracy": 0.7003,
-    "per_class": {
-      "com_tam": {
-        "accuracy": 0.4813,
-        "support": 187
-      },
-      "pho": {
-        "accuracy": 0.9563,
-        "support": 160
-      }
-    }
-  },
-  "after_focus": {
-    "samples": 347,
-    "accuracy": 0.9395,
-    "per_class": {
-      "com_tam": {
-        "accuracy": 0.9572,
-        "support": 187
-      },
-      "pho": {
-        "accuracy": 0.9187,
-        "support": 160
-      }
-    }
-  },
-  "final_val_accuracy": 0.9270533919334412
+  "note": "Re-run train to regenerate; paths are now stored relative to repo root.",
+  "dataset": "research/Vietnamese_Food_Dataset/Vietnamese_Food_Dataset",
+  "base_model": "research/best_resnet50_model.h5",
+  "output_model": "research/best_resnet50_model_phase2.h5"
 }

@@ -9,13 +9,13 @@ from pathlib import Path
 import requests
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
 
+from repo_paths import DEFAULT_DATASET, REPO_ROOT  # noqa: E402
 from research_api import ResearchClient, git_commit_short  # noqa: E402
 
 AI_BASE = "http://localhost:8000"
-DATASET = Path(r"d:\FPT\SU26\SBA\project_team\research\Vietnamese_Food_Dataset\Vietnamese_Food_Dataset")
+DATASET = DEFAULT_DATASET
 G0_DOC = REPO_ROOT / "docs" / "research" / "G0_VERIFICATION.md"
 EXPECTED_MODEL = "resnet50-vtn-10class"
 

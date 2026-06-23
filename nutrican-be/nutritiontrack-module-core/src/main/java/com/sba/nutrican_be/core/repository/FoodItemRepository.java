@@ -22,4 +22,8 @@ public interface FoodItemRepository extends JpaRepository<FoodItem, UUID> {
     List<FoodItem> searchByName(@Param("q") String q);
 
     List<FoodItem> findByCategoryOrderByNameViAsc(String category);
+
+    boolean existsBySource(String source);
+
+    List<FoodItem> findBySource(String source);
 }
