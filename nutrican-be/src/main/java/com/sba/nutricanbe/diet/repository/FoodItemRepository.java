@@ -1,0 +1,29 @@
+package com.sba.nutricanbe.diet.repository;
+
+import com.sba.nutricanbe.diet.entity.FoodItem;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public interface FoodItemRepository extends JpaRepository<FoodItem, UUID> {
+
+    List<FoodItem> findByCategory(String category);
+
+    @Query("""
+            SELECT f FROM FoodItem f WHERE
+            LOWER(f.nameVi) LIKE LOWER(CONCAT('%', :q, '%'))
+            OR LOWER(COALESCE(f.nameEn, '')) LIKE LOWER(CONCAT('%', :q, '%'))
+            """)
+    List<FoodItem> searchByName(@Param("q") String q);
+
+    List<FoodItem> findByCategoryOrderByNameViAsc(String category);
+
+    boolean existsBySource(String source);
+
+    List<FoodItem> findBySource(String source);
+}

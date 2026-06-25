@@ -1,52 +1,38 @@
-# ==========================================
-# CẤU HÌNH GITIGNORE CHO BACKEND (SPRING BOOT)
-# ==========================================
-
-# Thư mục Build của Maven (Mỗi module đều có)
+HELP.md
 target/
-pom.xml.tag
-pom.xml.releaseBackup
-pom.xml.versionsBackup
-pom.xml.next
-release.properties
-dependency-reduced-pom.xml
-buildNumber.properties
-.mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 
-# Thư mục Build của Gradle (Nếu sau này chuyển sang Gradle)
-build/
-.gradle/
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
 
-# Môi trường IDE (IntelliJ IDEA, Eclipse, VS Code)
-.idea/
-*.iml
+### IntelliJ IDEA ###
+.idea
 *.iws
-*.classpath
-*.project
-*.settings/
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
 .vscode/
 
-# Thư mục log của Spring Boot
-logs/
-*.log
-
-# CẤU HÌNH NHẠY CẢM VÀ MÔI TRƯỜNG (QUAN TRỌNG!)
+### Environment Variables ###
 .env
-.env.*
-application-dev.yml
-application-prod.yml
-application-secret.properties
-*.pem
-*.p12
-*.jks
 
-# Thư mục lưu trữ của Docker / MinIO (Tránh đẩy volume lên Git)
-postgres_data/
-minio_data/
-ollama_data/
-
-# Các file hệ điều hành sinh ra
-.DS_Store
-Thumbs.db
-/nutritiontrack-module-application/src/main/resources/firebase-service-account.json
+/src/main/resources/firebase-service-account.json
