@@ -206,7 +206,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             aiRaw.put("db_applied", dbApplied);
 
             DietLog dietLog = DietLog.builder()
-                    .customer(customer)
+                    .customerId(customer.getId())
                     .imageUrl(imageUrl)
                     .imageObjectName(objectName)
                     .mealType(mealType)
@@ -285,7 +285,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
         }
         DietLog dietLog = dietLogRepository.findById(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
-        if (!dietLog.getCustomer().getId().equals(customerId)) {
+        if (!dietLog.getCustomerId().equals(customerId)) {
             throw new BadRequestException("You can only confirm your own diet logs");
         }
 

@@ -23,6 +23,7 @@ import com.sba.nutricanbe.diet.dto.DietLogItemResponse;
 import com.sba.nutricanbe.diet.dto.DietLogResponse;
 import com.sba.nutricanbe.diet.dto.FoodItemResponse;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
+import com.sba.nutricanbe.user.service.UserQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -46,6 +47,7 @@ public class DietLogHelperImpl implements DietLogHelper {
     private final PtClientMappingRepository ptClientMappingRepository;
     private final FoodCatalogService foodCatalogService;
     private final ApplicationEventPublisher eventPublisher;
+    private final UserQueryService userQueryService;
 
     @Value("${ai.recognition.confidence-threshold:0.25}")
     private BigDecimal confidenceThreshold;
@@ -126,7 +128,7 @@ public class DietLogHelperImpl implements DietLogHelper {
     @Override
     public void assignPtReviewerIfNeeded(DietLog dietLog, UUID customerId) {
         if (dietLog.getStatus() != DietLogStatus.PT_REVIEWING) return;
-        findActivePt(customerId).ifPresent(mapping -> dietLog.setPtReviewer(mapping.getPt()));
+        findActivePt(customerId).ifPresent(mapping -> dietLog.setPtReviewerId(mapping.getPt().getId()));
     }
 
     @Override
@@ -140,16 +142,19 @@ public class DietLogHelperImpl implements DietLogHelper {
     @Override
     public void notifyPtOfNewLog(DietLog dietLog) {
         if (dietLog.getStatus() != DietLogStatus.PT_REVIEWING) return;
-        UUID ptId = dietLog.getPtReviewer() != null ? dietLog.getPtReviewer().getId() : null;
+        UUID ptId = dietLog.getPtReviewerId();
         if (ptId == null) {
-            ptId = findActivePt(dietLog.getCustomer().getId()).map(m -> m.getPt().getId()).orElse(null);
+            ptId = findActivePt(dietLog.getCustomerId()).map(m -> m.getPt().getId()).orElse(null);
         }
         if (ptId == null) return;
+        String customerName = userQueryService.findUserById(dietLog.getCustomerId())
+                .map(User::getFullName)
+                .orElse("");
         eventPublisher.publishEvent(new DietLogCreatedEvent(
                 this,
                 ptId,
-                dietLog.getCustomer().getId(),
-                dietLog.getCustomer().getFullName(),
+                dietLog.getCustomerId(),
+                customerName,
                 dietLog.getId(),
                 dietLog.getMealType() != null ? dietLog.getMealType().name() : null
         ));
@@ -219,10 +224,14 @@ public class DietLogHelperImpl implements DietLogHelper {
             aiFoodCode = String.valueOf(dietLog.getAiRawJson().get("foodCode"));
         }
 
+        String customerName = userQueryService.findUserById(dietLog.getCustomerId())
+                .map(User::getFullName)
+                .orElse(null);
+
         return DietLogResponse.builder()
                 .id(dietLog.getId())
-                .customerId(dietLog.getCustomer().getId())
-                .customerName(dietLog.getCustomer().getFullName())
+                .customerId(dietLog.getCustomerId())
+                .customerName(customerName)
                 .imageUrl(dietLog.getImageUrl())
                 .aiConfidenceScore(dietLog.getAiConfidenceScore())
                 .macrosJson(dietLog.getMacrosJson())
@@ -232,7 +241,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .matchedFoodName(dietLog.getMatchedFoodName())
                 .aiFoodCode(aiFoodCode)
                 .sosTicketFlag(dietLog.getSosTicketFlag())
-                .ptReviewerId(dietLog.getPtReviewer() != null ? dietLog.getPtReviewer().getId() : null)
+                .ptReviewerId(dietLog.getPtReviewerId())
                 .ptNote(dietLog.getPtNote())
                 .logDate(dietLog.getLogDate())
                 .createdAt(dietLog.getCreatedAt())

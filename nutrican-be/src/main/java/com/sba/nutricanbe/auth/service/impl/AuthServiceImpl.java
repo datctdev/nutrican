@@ -14,6 +14,7 @@ import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
 import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.exception.TooManyRequestsException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
 import com.sba.nutricanbe.auth.repository.PasswordResetTokenRepository;
@@ -272,7 +273,7 @@ public class AuthServiceImpl implements AuthService {
             Instant expiresAt = Instant.now().plusSeconds(15 * 60);
 
             PasswordResetToken resetToken = PasswordResetToken.builder()
-                    .user(user)
+                    .userId(user.getId())
                     .token(token)
                     .expiresAt(expiresAt)
                     .used(false)
@@ -303,7 +304,8 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("This reset link has expired");
         }
 
-        User user = resetToken.getUser();
+        User user = userRepository.findById(resetToken.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", resetToken.getUserId()));
         user.setPasswordHash(passwordEncoder.encode(newPassword));
 
         if (user.getStatus() == UserStatus.PENDING_PASSWORD) {

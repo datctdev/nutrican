@@ -240,7 +240,7 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .sosTicketFlag(log.getSosTicketFlag())
                 .sosReasonCode(sosReason != null ? sosReason.name() : null)
                 .fieldsChanged(fieldsChanged)
-                .customerIdHash(RblMetricsUtil.customerHash(log.getCustomer() != null ? log.getCustomer().getId() : null))
+                .customerIdHash(RblMetricsUtil.customerHash(log.getCustomerId()))
                 .imageObjectName(log.getImageObjectName())
                 .dietLogItemsJson(itemsJson(log.getItems()))
                 .aiPortionG(aiPortionG)

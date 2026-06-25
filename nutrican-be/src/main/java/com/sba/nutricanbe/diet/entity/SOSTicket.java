@@ -2,7 +2,7 @@ package com.sba.nutricanbe.diet.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
 
-import com.sba.nutricanbe.user.entity.User;
+import java.util.UUID;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.enums.SosReasonCode;
@@ -19,20 +19,18 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
-@ToString(exclude = {"dietLog", "pt", "assignedBy"})
+@ToString(exclude = {"dietLog"})
 public class SosTicket extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "diet_log_id")
     private DietLog dietLog;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pt_id")
-    private User pt;
+    @Column(name = "pt_id")
+    private UUID ptId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_by")
-    private User assignedBy;
+    @Column(name = "assigned_by")
+    private UUID assignedById;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 20)

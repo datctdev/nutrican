@@ -57,7 +57,7 @@ public class SosServiceImpl implements SosService {
         if (request.getDietLogId() != null) {
             dietLog = dietLogRepository.findById(request.getDietLogId())
                     .orElseThrow(() -> new ResourceNotFoundException("DietLog", request.getDietLogId()));
-            if (!dietLog.getCustomer().getId().equals(customerId)) {
+            if (!dietLog.getCustomerId().equals(customerId)) {
                 throw new BadRequestException("You can only create SOS for your own diet logs");
             }
             dietLog.setSosTicketFlag(true);
@@ -138,6 +138,19 @@ public class SosServiceImpl implements SosService {
     }
 
     private SosTicketResponse toSosResponse(SosTicket ticket) {
+        String customerName = null;
+        if (ticket.getDietLog() != null && ticket.getDietLog().getCustomerId() != null) {
+            customerName = userQueryService.findUserById(ticket.getDietLog().getCustomerId())
+                    .map(User::getFullName)
+                    .orElse(null);
+        }
+        String ptName = null;
+        if (ticket.getPtId() != null) {
+            ptName = userQueryService.findUserById(ticket.getPtId())
+                    .map(User::getFullName)
+                    .orElse(null);
+        }
+
         return SosTicketResponse.builder()
                 .id(ticket.getId())
                 .dietLogId(ticket.getDietLog() != null ? ticket.getDietLog().getId() : null)
@@ -147,9 +160,8 @@ public class SosServiceImpl implements SosService {
                 .reasonCode(ticket.getReasonCode())
                 .mealSource(ticket.getMealSource())
                 .autoCreated(ticket.getAutoCreated())
-                .customerName(ticket.getDietLog() != null && ticket.getDietLog().getCustomer() != null
-                        ? ticket.getDietLog().getCustomer().getFullName() : null)
-                .ptName(ticket.getPt() != null ? ticket.getPt().getFullName() : null)
+                .customerName(customerName)
+                .ptName(ptName)
                 .createdAt(ticket.getCreatedAt())
                 .build();
     }

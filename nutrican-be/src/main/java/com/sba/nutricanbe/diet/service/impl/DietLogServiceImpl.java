@@ -70,7 +70,7 @@ public class DietLogServiceImpl implements DietLogService {
         MealComplexity mealComplexity = request.getMealComplexity() != null ? request.getMealComplexity() : MealComplexity.SIMPLE;
 
         DietLog dietLog = DietLog.builder()
-                .customer(customer)
+                .customerId(customerId)
                 .mealType(request.getMealType())
                 .foodDescription(request.getFoodDescription())
                 .logDate(request.getLogDate() != null ? request.getLogDate() : LocalDate.now())
@@ -130,7 +130,7 @@ public class DietLogServiceImpl implements DietLogService {
     public ApiResponse<DietLogResponse> getLogById(UUID logId, UUID customerId) {
         DietLog dietLog = dietLogRepository.findByIdWithCustomer(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
-        if (!dietLog.getCustomer().getId().equals(customerId)) {
+        if (!dietLog.getCustomerId().equals(customerId)) {
             throw new BadRequestException("You can only view your own diet logs");
         }
         return ApiResponse.success(dietLogHelper.toResponse(dietLog));
@@ -142,7 +142,7 @@ public class DietLogServiceImpl implements DietLogService {
         DietLog dietLog = dietLogRepository.findById(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
 
-        if (!dietLog.getCustomer().getId().equals(userId)) {
+        if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only edit your own diet logs");
         }
 
@@ -167,7 +167,7 @@ public class DietLogServiceImpl implements DietLogService {
     public ApiResponse<DietLogResponse> submitForReview(UUID logId, UUID customerId) {
         DietLog dietLog = dietLogRepository.findById(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
-        if (!dietLog.getCustomer().getId().equals(customerId)) {
+        if (!dietLog.getCustomerId().equals(customerId)) {
             throw new BadRequestException("You can only submit your own diet logs");
         }
         if (dietLog.getStatus() != DietLogStatus.DRAFT) {
@@ -186,7 +186,7 @@ public class DietLogServiceImpl implements DietLogService {
         DietLog dietLog = dietLogRepository.findById(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
 
-        if (!dietLog.getCustomer().getId().equals(userId)) {
+        if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only delete your own diet logs");
         }
 

@@ -21,6 +21,7 @@ import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
+import com.sba.nutricanbe.user.service.UserQueryService;
 
 // Enums & DTOs
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
@@ -66,6 +67,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final DietLogImageRepository dietLogImageRepository;
     private final SosTicketRepository sosTicketRepository;
     private final SseEmitterService sseEmitterService;
+    private final UserQueryService userQueryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -110,11 +112,11 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         User pt = userRepository.findById(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
 
-        if (!mappingRepository.existsByPt_IdAndClient_Id(ptId, dietLog.getCustomer().getId())) {
+        if (!mappingRepository.existsByPt_IdAndClient_Id(ptId, dietLog.getCustomerId())) {
             throw new BadRequestException("You can only review logs from your assigned clients");
         }
 
-        dietLog.setPtReviewer(pt);
+        dietLog.setPtReviewerId(ptId);
         dietLog.setMacrosAtReview(MacroUtils.copyMacroMap(dietLog.getMacrosJson()));
         PtCorrectionReason reason = request.getCorrectionReason() != null
                 ? request.getCorrectionReason() : PtCorrectionReason.OTHER;
@@ -153,7 +155,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         dietLog = dietLogRepository.save(dietLog);
         log.info("Diet log {} reviewed by PT {}: action={}", logId, ptId, request.getAction());
 
-        notifyClientOfReview(dietLog.getCustomer().getId(), logId, dietLog.getStatus().name());
+        notifyClientOfReview(dietLog.getCustomerId(), logId, dietLog.getStatus().name());
 
         return ApiResponse.success(toReviewResponse(dietLog), "Log reviewed successfully");
     }
@@ -302,7 +304,10 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     }
 
     private DietLogReviewResponse toReviewResponse(DietLog log) {
-        User customer = log.getCustomer();
+        User customer = userQueryService.findUserById(log.getCustomerId()).orElse(null);
+        String customerName = customer != null ? customer.getFullName() : null;
+        String customerAvatar = customer != null ? customer.getAvatarUrl() : null;
+        
         List<DietLogReviewResponse.AdditionalImageInfo> additionalImages = log.getAdditionalImages() == null ? null : log.getAdditionalImages().stream()
                 .map(img -> DietLogReviewResponse.AdditionalImageInfo.builder()
                         .id(img.getId())
@@ -313,9 +318,9 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .toList();
         return DietLogReviewResponse.builder()
                 .id(log.getId())
-                .customerId(customer.getId())
-                .customerName(customer.getFullName())
-                .customerAvatar(customer.getAvatarUrl())
+                .customerId(log.getCustomerId())
+                .customerName(customerName)
+                .customerAvatar(customerAvatar)
                 .imageUrl(log.getImageUrl())
                 .mealType(log.getMealType())
                 .foodDescription(log.getFoodDescription())
@@ -360,7 +365,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     public ApiResponse<DietLogReviewResponse> submitBlindEstimate(UUID logId, UUID ptId, BlindEstimateRequest request) {
         DietLog dietLog = dietLogRepository.findByIdWithCustomer(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
-        if (!mappingRepository.existsByPt_IdAndClient_Id(ptId, dietLog.getCustomer().getId())) {
+        if (!mappingRepository.existsByPt_IdAndClient_Id(ptId, dietLog.getCustomerId())) {
             throw new BadRequestException("You can only estimate logs from your assigned clients");
         }
         MacroNutrients blind = MacroUtils.buildAdjustedMacroMap(
@@ -375,7 +380,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     public ApiResponse<Void> resolveSosTicket(UUID ticketId, UUID ptId, String note) {
         SosTicket ticket = sosTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("SOS Ticket", ticketId));
-        if (ticket.getPt() == null || !ticket.getPt().getId().equals(ptId)) {
+        if (ticket.getPtId() == null || !ticket.getPtId().equals(ptId)) {
             throw new BadRequestException("You can only resolve tickets assigned to you");
         }
         ticket.setStatus(SosTicketStatus.RESOLVED);
@@ -396,9 +401,12 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .reasonCode(ticket.getReasonCode())
                 .mealSource(ticket.getMealSource())
                 .autoCreated(ticket.getAutoCreated())
-                .customerName(ticket.getDietLog() != null && ticket.getDietLog().getCustomer() != null
-                        ? ticket.getDietLog().getCustomer().getFullName() : null)
-                .ptName(ticket.getPt() != null ? ticket.getPt().getFullName() : null)
+                .customerName(ticket.getDietLog() != null
+                        ? userQueryService.findUserById(ticket.getDietLog().getCustomerId()).map(User::getFullName).orElse(null)
+                        : null)
+                .ptName(ticket.getPtId() != null
+                        ? userQueryService.findUserById(ticket.getPtId()).map(User::getFullName).orElse(null)
+                        : null)
                 .createdAt(ticket.getCreatedAt())
                 .build();
     }

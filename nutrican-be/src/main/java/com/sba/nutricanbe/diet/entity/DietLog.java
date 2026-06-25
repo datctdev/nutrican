@@ -1,8 +1,7 @@
 package com.sba.nutricanbe.diet.entity;
 
+import java.util.UUID;
 import com.sba.nutricanbe.common.entity.BaseEntity;
-
-import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
@@ -30,9 +29,8 @@ import com.sba.nutricanbe.common.dto.MacroNutrients;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
 public class DietLog extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private User customer;
+    @Column(name = "customer_id", nullable = false)
+    private UUID customerId;
 
     @Column(name = "image_url", length = 500)
     private String imageUrl;
@@ -63,9 +61,8 @@ public class DietLog extends BaseEntity {
     @Builder.Default
     private Boolean sosTicketFlag = false;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pt_reviewer_id")
-    private User ptReviewer;
+    @Column(name = "pt_reviewer_id")
+    private UUID ptReviewerId;
 
     @Column(name = "pt_note", columnDefinition = "TEXT")
     private String ptNote;
@@ -97,7 +94,7 @@ public class DietLog extends BaseEntity {
     private RecognitionSource recognitionSource;
 
     @Column(name = "food_item_id")
-    private java.util.UUID foodItemId;
+    private UUID foodItemId;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "ai_raw_json", columnDefinition = "jsonb")

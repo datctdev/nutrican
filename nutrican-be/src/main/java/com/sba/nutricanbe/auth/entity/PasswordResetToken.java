@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.auth.entity;
 
+import java.util.UUID;
 import com.sba.nutricanbe.common.entity.BaseEntity;
-import com.sba.nutricanbe.user.entity.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,9 +20,8 @@ import java.time.Instant;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
 public class PasswordResetToken extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     @Column(name = "token", unique = true, nullable = false, length = 64)
     private String token;

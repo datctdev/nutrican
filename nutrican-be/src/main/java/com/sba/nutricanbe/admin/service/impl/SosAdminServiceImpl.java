@@ -12,6 +12,7 @@ import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.user.service.UserQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,6 +32,7 @@ public class SosAdminServiceImpl implements SosAdminService {
 
     private final SosTicketRepository sosTicketRepository;
     private final UserRepository userRepository;
+    private final UserQueryService userQueryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -65,8 +67,8 @@ public class SosAdminServiceImpl implements SosAdminService {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new ResourceNotFoundException("Admin", adminId));
 
-        ticket.setPt(pt);
-        ticket.setAssignedBy(admin);
+        ticket.setPtId(ptId);
+        ticket.setAssignedById(adminId);
         ticket.setStatus(SosTicketStatus.ASSIGNED);
         sosTicketRepository.save(ticket);
 
@@ -85,15 +87,27 @@ public class SosAdminServiceImpl implements SosAdminService {
     }
 
     private SosTicketAdminResponse toResponse(SosTicket ticket) {
+        String customerName = null;
+        if (ticket.getDietLog() != null && ticket.getDietLog().getCustomerId() != null) {
+            customerName = userQueryService.findUserById(ticket.getDietLog().getCustomerId())
+                    .map(User::getFullName)
+                    .orElse(null);
+        }
+        String ptName = null;
+        if (ticket.getPtId() != null) {
+            ptName = userQueryService.findUserById(ticket.getPtId())
+                    .map(User::getFullName)
+                    .orElse(null);
+        }
+
         return SosTicketAdminResponse.builder()
                 .id(ticket.getId())
                 .dietLogId(ticket.getDietLog() != null ? ticket.getDietLog().getId() : null)
                 .note(ticket.getNote())
                 .priority(ticket.getPriority())
                 .status(ticket.getStatus())
-                .customerName(ticket.getDietLog() != null && ticket.getDietLog().getCustomer() != null
-                        ? ticket.getDietLog().getCustomer().getFullName() : null)
-                .ptName(ticket.getPt() != null ? ticket.getPt().getFullName() : null)
+                .customerName(customerName)
+                .ptName(ptName)
                 .createdAt(ticket.getCreatedAt())
                 .build();
     }

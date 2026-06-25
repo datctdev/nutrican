@@ -18,13 +18,13 @@ public interface SosTicketRepository extends JpaRepository<SosTicket, UUID> {
 
     Page<SosTicket> findByStatusIn(List<SosTicketStatus> statuses, Pageable pageable);
 
-    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE dl.customer.id = :customerId ORDER BY t.createdAt DESC")
+    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl WHERE dl.customerId = :customerId ORDER BY t.createdAt DESC")
     List<SosTicket> findByCustomerId(@Param("customerId") UUID customerId);
 
-    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE t.pt.id = :ptId ORDER BY t.createdAt DESC")
+    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl WHERE t.ptId = :ptId ORDER BY t.createdAt DESC")
     Page<SosTicket> findByPt_Id(@Param("ptId") UUID ptId, Pageable pageable);
 
-    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE t.pt.id = :ptId AND t.status = :status")
+    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl WHERE t.ptId = :ptId AND t.status = :status")
     Page<SosTicket> findByPt_IdAndStatus(@Param("ptId") UUID ptId, @Param("status") SosTicketStatus status, Pageable pageable);
 
     List<SosTicket> findByDietLog_Id(UUID dietLogId);

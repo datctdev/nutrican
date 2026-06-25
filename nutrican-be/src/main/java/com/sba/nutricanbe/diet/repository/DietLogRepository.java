@@ -25,27 +25,27 @@ public interface DietLogRepository extends JpaRepository<DietLog, UUID> {
 
     Page<DietLog> findByStatus(DietLogStatus status, Pageable pageable);
 
-    @Query("SELECT d FROM DietLog d WHERE d.ptReviewer.id = :ptId AND d.status = :status")
+    @Query("SELECT d FROM DietLog d WHERE d.ptReviewerId = :ptId AND d.status = :status")
     Page<DietLog> findByPtReviewerIdAndStatus(
             @Param("ptId") UUID ptId, @Param("status") DietLogStatus status, Pageable pageable);
 
-    @Query("SELECT d FROM DietLog d WHERE d.customer.id = :customerId AND d.logDate = :date")
+    @Query("SELECT d FROM DietLog d WHERE d.customerId = :customerId AND d.logDate = :date")
     List<DietLog> findByCustomerIdAndLogDate(
             @Param("customerId") UUID customerId, @Param("date") LocalDate date);
 
     @Query("SELECT d FROM DietLog d WHERE d.sosTicketFlag = true AND d.status = :status")
     Page<DietLog> findSosTickets(@Param("status") DietLogStatus status, Pageable pageable);
 
-    @Query("SELECT d FROM DietLog d LEFT JOIN FETCH d.customer WHERE d.id = :id")
+    @Query("SELECT d FROM DietLog d WHERE d.id = :id")
     Optional<DietLog> findByIdWithCustomer(@Param("id") UUID id);
 
-    @Query("SELECT d FROM DietLog d WHERE d.customer.id IN :customerIds AND d.status = :status")
+    @Query("SELECT d FROM DietLog d WHERE d.customerId IN :customerIds AND d.status = :status")
     Page<DietLog> findByCustomerIdInAndStatus(
             @Param("customerIds") List<UUID> customerIds,
             @Param("status") DietLogStatus status,
             Pageable pageable);
 
-    @Query("SELECT d FROM DietLog d WHERE d.customer.id = :customerId AND d.logDate BETWEEN :startDate AND :endDate AND d.status = :status")
+    @Query("SELECT d FROM DietLog d WHERE d.customerId = :customerId AND d.logDate BETWEEN :startDate AND :endDate AND d.status = :status")
     Page<DietLog> findByCustomerIdAndLogDateBetweenAndStatus(
             @Param("customerId") UUID customerId,
             @Param("startDate") LocalDate startDate,
@@ -53,10 +53,10 @@ public interface DietLogRepository extends JpaRepository<DietLog, UUID> {
             @Param("status") DietLogStatus status,
             Pageable pageable);
 
-    @Query("SELECT d FROM DietLog d LEFT JOIN FETCH d.customer WHERE d.ptReviewedAt IS NOT NULL AND d.logDate BETWEEN :from AND :to ORDER BY d.ptReviewedAt DESC")
+    @Query("SELECT d FROM DietLog d WHERE d.ptReviewedAt IS NOT NULL AND d.logDate BETWEEN :from AND :to ORDER BY d.ptReviewedAt DESC")
     List<DietLog> findReviewedBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
-    @Query("SELECT d FROM DietLog d LEFT JOIN FETCH d.customer WHERE d.ptReviewedAt IS NOT NULL AND d.customer.id IN :customerIds AND d.logDate BETWEEN :from AND :to")
+    @Query("SELECT d FROM DietLog d WHERE d.ptReviewedAt IS NOT NULL AND d.customerId IN :customerIds AND d.logDate BETWEEN :from AND :to")
     List<DietLog> findReviewedByCustomersBetween(
             @Param("customerIds") List<UUID> customerIds,
             @Param("from") LocalDate from,

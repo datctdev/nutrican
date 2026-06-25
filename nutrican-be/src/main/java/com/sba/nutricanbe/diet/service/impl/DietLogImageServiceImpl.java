@@ -35,7 +35,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
 
-        if (!dietLog.getCustomer().getId().equals(userId)) {
+        if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only add images to your own diet logs");
         }
 
@@ -48,7 +48,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
 
         for (int i = 0; i < files.length; i++) {
             MultipartFile file = files[i];
-            String objectName = minioService.uploadFile(file, "diet-logs/" + dietLog.getCustomer().getId());
+            String objectName = minioService.uploadFile(file, "diet-logs/" + dietLog.getCustomerId());
             String presignedUrl = minioService.getPresignedUrl(objectName);
 
             DietLogImage dietLogImage = DietLogImage.builder()
@@ -75,7 +75,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
 
-        if (!dietLog.getCustomer().getId().equals(userId)) {
+        if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only view images of your own diet logs");
         }
 
@@ -89,7 +89,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
 
-        if (!dietLog.getCustomer().getId().equals(userId)) {
+        if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only modify your own diet logs");
         }
 
@@ -120,7 +120,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
 
-        if (!dietLog.getCustomer().getId().equals(userId)) {
+        if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only delete images from your own diet logs");
         }
 
@@ -144,7 +144,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
 
-        if (!dietLog.getCustomer().getId().equals(userId)) {
+        if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only delete images from your own diet logs");
         }
 
