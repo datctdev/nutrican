@@ -21,9 +21,6 @@ export const authService = {
   compareKyc: (sessionId) => api.post(`/kyc/sessions/${sessionId}/compare`),
   getKycSession: (sessionId) => api.get(`/kyc/sessions/${sessionId}`),
 
-  // PT Request
-  requestPt: (data) => api.post('/auth/pt/request', data),
-
   // Password reset
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, newPassword) => api.post('/auth/reset-password', { token, newPassword }),

@@ -117,20 +117,6 @@ export const useAuthStore = create(
         }
       },
 
-      registerPt: async (data) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await authService.requestPt(data);
-          set({ isLoading: false });
-          return response;
-        } catch (error) {
-          set({
-            isLoading: false,
-            error: error.response?.data?.message || 'PT Registration failed',
-          });
-          throw error;
-        }
-      },
 
       logout: async () => {
         try {

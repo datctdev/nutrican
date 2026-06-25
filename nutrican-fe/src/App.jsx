@@ -10,7 +10,6 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import SetPasswordPage from './pages/auth/SetPasswordPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import PtRegistrationPage from './pages/auth/PtRegistrationPage';
 import LandingPage from './pages/LandingPage';
 import MarketplacePage from './pages/customer/MarketplacePage';
 import PtDetailPage from './pages/customer/PtDetailPage';
@@ -23,7 +22,6 @@ import ClientListPage from './pages/pt/ClientListPage';
 import ReviewDietLogPage from './pages/pt/ReviewDietLogPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import PtVerificationPage from './pages/admin/PtVerificationPage';
-import KycAdminPage from './pages/admin/KycAdminPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import SosTicketsPage from './pages/admin/SosTicketsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -36,7 +34,6 @@ function App() {
         { path: '/', element: <LandingPage /> },
         { path: '/login', element: <LoginPage /> },
         { path: '/register', element: <RegisterPage /> },
-        { path: '/register/pt', element: <PtRegistrationPage /> },
         { path: '/forgot-password', element: <ForgotPasswordPage /> },
         { path: '/reset-password', element: <ResetPasswordPage /> },
         {
@@ -74,10 +71,6 @@ function App() {
         {
           path: '/admin/pts',
           element: <ProtectedRoute allowedRoles={['ADMIN']}><PtVerificationPage /></ProtectedRoute>,
-        },
-        {
-          path: '/admin/kyc',
-          element: <ProtectedRoute allowedRoles={['ADMIN']}><KycAdminPage /></ProtectedRoute>,
         },
         {
           path: '/admin/users',

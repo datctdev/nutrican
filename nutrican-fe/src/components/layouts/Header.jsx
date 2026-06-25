@@ -54,7 +54,6 @@ export default function Header() {
     ADMIN: [
       { label: 'Dashboard', href: '/admin' },
       { label: 'PT Approvals', href: '/admin/pts' },
-      { label: 'KYC Approvals', href: '/admin/kyc' },
       { label: 'Users', href: '/admin/users' },
       { label: 'SOS Center', href: '/admin/sos' },
     ],

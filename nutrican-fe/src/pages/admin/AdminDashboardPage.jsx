@@ -5,7 +5,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { adminService } from '../../services/adminService';
-import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, UserPlus, Star, Download, BarChart3 } from 'lucide-react';
+import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AdminDashboardPage() {
@@ -176,41 +176,19 @@ export default function AdminDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* KYC */}
+            {/* SOS Tickets */}
             <Card className="bg-white border-slate-200 shadow-sm flex flex-col justify-between">
               <CardContent className="p-6">
-                <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4">
-                  <UserPlus className="w-6 h-6 text-blue-500" />
-                </div>
-                <h4 className="font-bold text-slate-900 mb-1">KYC Verifications</h4>
-                <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
-                  {stats?.pendingKycVerifications > 0 
-                    ? `You have ${stats.pendingKycVerifications} KYC requests to review.`
-                    : 'No pending KYC requests.'}
-                </p>
-                <Link to="/admin/kyc">
-                  <Button className="w-full bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl h-11">
-                    Review KYC <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* SOS Tickets */}
-            <Card className="bg-white border-slate-200 shadow-sm flex flex-col justify-between md:col-span-2">
-              <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
-                <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mb-4">
                   <AlertCircle className="w-6 h-6 text-red-500" />
                 </div>
-                <div className="flex-1 text-center md:text-left">
-                  <h4 className="font-bold text-slate-900 mb-1">Emergency SOS</h4>
-                  <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                    {stats?.activeSosTickets > 0 
-                      ? `There are ${stats.activeSosTickets} unresolved SOS tickets from clients needing immediate assistance.`
-                      : 'No active SOS tickets. Platform is running smoothly.'}
-                  </p>
-                </div>
-                <Link to="/admin/sos" className="w-full md:w-auto">
+                <h4 className="font-bold text-slate-900 mb-1">Emergency SOS</h4>
+                <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
+                  {stats?.activeSosTickets > 0 
+                    ? `There are ${stats.activeSosTickets} unresolved SOS tickets from clients needing immediate assistance.`
+                    : 'No active SOS tickets. Platform is running smoothly.'}
+                </p>
+                <Link to="/admin/sos">
                   <Button variant="outline" className="w-full border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11">
                     Manage Tickets <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
