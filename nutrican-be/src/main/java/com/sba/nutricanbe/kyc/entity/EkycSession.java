@@ -1,6 +1,7 @@
-package com.sba.nutricanbe.common.entity;
+package com.sba.nutricanbe.kyc.entity;
 
 import com.sba.nutricanbe.common.enums.KycStatus;
+import com.sba.nutricanbe.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.Accessors;
@@ -17,7 +18,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
 @Accessors(chain = true)
-public class EKycSession extends BaseEntity {
+public class EkycSession extends BaseEntity {
 
     @Column(nullable = false)
     private UUID userId;

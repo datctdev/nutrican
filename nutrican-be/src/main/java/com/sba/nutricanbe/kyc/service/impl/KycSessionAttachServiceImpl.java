@@ -1,10 +1,10 @@
 package com.sba.nutricanbe.kyc.service.impl;
-import com.sba.nutricanbe.common.entity.EKycDocument;
-import com.sba.nutricanbe.common.entity.EKycSession;
+import com.sba.nutricanbe.kyc.entity.EkycDocument;
+import com.sba.nutricanbe.kyc.entity.EkycSession;
 import com.sba.nutricanbe.common.enums.KycDocumentType;
 import com.sba.nutricanbe.common.enums.KycStatus;
-import com.sba.nutricanbe.common.repository.KycDocumentRepository;
-import com.sba.nutricanbe.common.repository.KycSessionRepository;
+import com.sba.nutricanbe.kyc.repository.KycDocumentRepository;
+import com.sba.nutricanbe.kyc.repository.KycSessionRepository;
 import com.sba.nutricanbe.kyc.service.KycSessionAttachService;
 import com.sba.nutricanbe.kyc.valueobject.AttachDecision;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ public class KycSessionAttachServiceImpl implements KycSessionAttachService {
 
     @Override
     public AttachDecision attachFile(UUID sessionId, UUID userId, String fileHash, String classifyName) {
-        EKycSession s = sessions.findByIdAndUserId(sessionId, userId)
+        EkycSession s = sessions.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new RuntimeException(sessionId.toString() +  userId.toString()));
 
         if (classifyName == null || classifyName.isBlank()) {
@@ -67,7 +67,7 @@ public class KycSessionAttachServiceImpl implements KycSessionAttachService {
         s.setStatus(KycStatus.IN_PROGRESS);
         sessions.save(s);
 
-        EKycDocument doc = new EKycDocument();
+        EkycDocument doc = new EkycDocument();
         doc.setSessionId(s.getId());
         doc.setType(determineDocType(classifyName));
         doc.setFileHash(fileHash);

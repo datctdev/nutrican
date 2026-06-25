@@ -17,8 +17,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import org.springframework.security.access.prepost.PreAuthorize;
+
 @RestController
 @RequestMapping("/api/v1/workspace")
+@PreAuthorize("hasAnyRole('PT_CERTIFIED', 'PT_FREELANCE')")
 @RequiredArgsConstructor
 public class PtWorkspaceController {
 

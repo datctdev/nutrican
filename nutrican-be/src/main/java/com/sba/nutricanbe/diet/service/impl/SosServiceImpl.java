@@ -16,7 +16,7 @@ import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.diet.repository.SosTicketRepository;
-import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.user.service.UserQueryService;
 import com.sba.nutricanbe.diet.dto.CreateSosRequest;
 import com.sba.nutricanbe.diet.service.SosService;
 import lombok.RequiredArgsConstructor;
@@ -43,14 +43,14 @@ public class SosServiceImpl implements SosService {
 
     private final SosTicketRepository sosTicketRepository;
     private final DietLogRepository dietLogRepository;
-    private final UserRepository userRepository;
+    private final UserQueryService userQueryService;
     private final PtClientMappingRepository ptClientMappingRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
     public ApiResponse<Void> createSosTicket(UUID customerId, CreateSosRequest request) {
-        userRepository.findById(customerId)
+        userQueryService.findUserById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
         DietLog dietLog = null;

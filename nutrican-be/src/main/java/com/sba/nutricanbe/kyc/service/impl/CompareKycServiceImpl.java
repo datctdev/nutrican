@@ -6,8 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.kyc.dto.response.CompareResponse;
-import com.sba.nutricanbe.common.entity.EKycSession;
-import com.sba.nutricanbe.common.repository.KycSessionRepository;
+import com.sba.nutricanbe.kyc.entity.EkycSession;
+import com.sba.nutricanbe.kyc.repository.KycSessionRepository;
 import com.sba.nutricanbe.kyc.service.CompareKycService;
 import com.sba.nutricanbe.kyc.client.VnptClient;
 import com.sba.nutricanbe.common.enums.KycStatus;
@@ -30,7 +30,7 @@ public class CompareKycServiceImpl implements CompareKycService {
     private final ObjectMapper om;
 
     public Map<String, Object> compare(UUID sessionId, UUID accountId) {
-        EKycSession s = get(sessionId, accountId);
+        EkycSession s = get(sessionId, accountId);
 
         if (s.getFrontHash() == null || s.getFrontHash().isBlank()) {
             throw new IllegalStateException("Front not uploaded");
@@ -68,7 +68,7 @@ public class CompareKycServiceImpl implements CompareKycService {
         return out;
     }
 
-    public EKycSession get(UUID sessionId, UUID userId) {
+    public EkycSession get(UUID sessionId, UUID userId) {
         return sessions.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new RuntimeException(sessionId.toString() + userId.toString()));
     }

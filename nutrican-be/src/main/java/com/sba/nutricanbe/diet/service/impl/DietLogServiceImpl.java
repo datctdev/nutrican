@@ -18,8 +18,7 @@ import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.DietLogItemRepository;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
-import com.sba.nutricanbe.user.repository.MacroTargetRepository;
-import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.user.service.UserQueryService;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.diet.dto.CreateDietLogRequest;
 import com.sba.nutricanbe.diet.dto.DietLogResponse;
@@ -56,8 +55,7 @@ public class DietLogServiceImpl implements DietLogService {
     private final DietLogRepository dietLogRepository;
     private final DietLogImageRepository dietLogImageRepository;
     private final DietLogItemRepository dietLogItemRepository;
-    private final UserRepository userRepository;
-    private final MacroTargetRepository macroTargetRepository;
+    private final UserQueryService userQueryService;
     private final FoodItemRepository foodItemRepository;
     private final StorageService minioService;
     private final DietLogHelper dietLogHelper;
@@ -65,7 +63,7 @@ public class DietLogServiceImpl implements DietLogService {
     @Override
     @Transactional
     public ApiResponse<DietLogResponse> createLog(UUID customerId, CreateDietLogRequest request) {
-        User customer = userRepository.findById(customerId)
+        User customer = userQueryService.findUserById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
         MealSource mealSource = request.getMealSource() != null ? request.getMealSource() : MealSource.HOME_COOKED;
@@ -230,7 +228,7 @@ public class DietLogServiceImpl implements DietLogService {
             countableLogs.add(dietLogHelper.toResponse(dietLog));
         }
 
-        MacroTarget target = macroTargetRepository.findByUserId(customerId).orElse(null);
+        MacroTarget target = userQueryService.findMacroTargetByUserId(customerId).orElse(null);
 
         DietSummaryResponse summary = DietSummaryResponse.builder()
                 .date(date)

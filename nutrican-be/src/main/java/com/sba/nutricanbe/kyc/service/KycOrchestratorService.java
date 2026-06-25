@@ -1,6 +1,6 @@
 package com.sba.nutricanbe.kyc.service;
 
-import com.sba.nutricanbe.common.entity.EKycSession;
+import com.sba.nutricanbe.kyc.entity.EkycSession;
 import com.sba.nutricanbe.common.enums.KycDocumentType;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,7 +27,7 @@ public interface KycOrchestratorService {
     // ── Session lifecycle ────────────────────────────────────────────────────
     UUID start(UUID accountId);
 
-    EKycSession get(UUID sessionId, UUID accountId);
+    EkycSession get(UUID sessionId, UUID accountId);
 
     // ── Individual step operations (step-by-step workflow) ──────────────────
     String uploadToVnptAndAttach(

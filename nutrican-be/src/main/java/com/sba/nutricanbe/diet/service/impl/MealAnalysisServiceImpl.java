@@ -19,7 +19,7 @@ import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
-import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.user.service.UserQueryService;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.RblCohortUtil;
 import com.sba.nutricanbe.diet.dto.AnalyzeMealContext;
@@ -61,7 +61,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
     private BigDecimal confidenceThreshold;
 
     private final DietLogRepository dietLogRepository;
-    private final UserRepository userRepository;
+    private final UserQueryService userQueryService;
     private final FoodItemRepository foodItemRepository;
     private final MealRecognitionService mealRecognitionService;
     private final StorageService minioService;
@@ -89,7 +89,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             String objectName = minioService.uploadFile(file, "diet-logs/" + customerId);
             String imageUrl = minioService.getPresignedUrl(objectName);
 
-            User customer = userRepository.findById(customerId)
+            User customer = userQueryService.findUserById(customerId)
                     .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
             MealType mealType = dietLogHelper.parseMealType(ctx.getMealType());

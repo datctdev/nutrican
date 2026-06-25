@@ -4,7 +4,7 @@ package com.sba.nutricanbe.kyc.controller;
 import com.sba.nutricanbe.common.config.CurrentUser;
 import com.sba.nutricanbe.common.config.CurrentUserInfo;
 import com.sba.nutricanbe.kyc.dto.request.KycThumbnailAttachRequest;
-import com.sba.nutricanbe.common.entity.EKycSession;
+import com.sba.nutricanbe.kyc.entity.EkycSession;
 import com.sba.nutricanbe.kyc.service.CompareKycService;
 import com.sba.nutricanbe.kyc.service.KycOrchestratorService;
 import com.sba.nutricanbe.common.enums.KycDocumentType;
@@ -135,7 +135,7 @@ public class KycController {
             @PathVariable UUID sessionId,
             @CurrentUser CurrentUserInfo u
     ) {
-        EKycSession session = orchestratorService.get(sessionId, u.getUserId());
+        EkycSession session = orchestratorService.get(sessionId, u.getUserId());
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "session", session

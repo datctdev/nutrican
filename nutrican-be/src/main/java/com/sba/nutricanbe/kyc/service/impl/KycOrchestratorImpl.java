@@ -6,10 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.kyc.dto.response.*;
-import com.sba.nutricanbe.common.entity.EKycDocument;
-import com.sba.nutricanbe.common.entity.EKycSession;
-import com.sba.nutricanbe.common.repository.KycDocumentRepository;
-import com.sba.nutricanbe.common.repository.KycSessionRepository;
+import com.sba.nutricanbe.kyc.entity.EkycDocument;
+import com.sba.nutricanbe.kyc.entity.EkycSession;
+import com.sba.nutricanbe.kyc.repository.KycDocumentRepository;
+import com.sba.nutricanbe.kyc.repository.KycSessionRepository;
 import com.sba.nutricanbe.kyc.service.KycOrchestratorService;
 import com.sba.nutricanbe.kyc.service.UploadFileService;
 import com.sba.nutricanbe.kyc.service.CardLivenessService;
@@ -112,7 +112,7 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
     }
 
     public UUID start(UUID userId) {
-        EKycSession s = new EKycSession();
+        EkycSession s = new EkycSession();
         s.setUserId(userId);
         s.setStatus(KycStatus.DRAFT);
         sessions.save(s);
@@ -124,7 +124,7 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
                            KycDocumentType type,
                            String fileHash) {
 
-        EKycSession s = get(sessionId, accountId);
+        EkycSession s = get(sessionId, accountId);
 
         if (type == KycDocumentType.FRONT) {
             s.setFrontHash(fileHash);
@@ -138,7 +138,7 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
         s.setStatus(KycStatus.IN_PROGRESS);
         sessions.save(s);
 
-        EKycDocument doc = new EKycDocument();
+        EkycDocument doc = new EkycDocument();
         doc.setSessionId(s.getId());
         doc.setType(type);
         doc.setFileHash(fileHash);
@@ -243,7 +243,7 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
      * Compare face: nếu match + score >= 95 -> VERIFIED, else -> REJECTED
      */
     public Map<String, Object> compare(UUID sessionId, UUID accountId) {
-        EKycSession s = get(sessionId, accountId);
+        EkycSession s = get(sessionId, accountId);
 
         if (s.getFrontHash() == null || s.getFrontHash().isBlank()) {
             throw new IllegalStateException("Front not uploaded");
@@ -280,13 +280,13 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
         return out;
     }
 
-    public EKycSession get(UUID sessionId, UUID userId) {
+    public EkycSession get(UUID sessionId, UUID userId) {
         return sessions.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new RuntimeException(sessionId.toString() + userId.toString()));
     }
 
     private String getActiveHash(UUID sessionId, UUID accountId, KycDocumentType type) {
-        EKycSession s = get(sessionId, accountId);
+        EkycSession s = get(sessionId, accountId);
         if (type == KycDocumentType.FRONT) return s.getFrontHash();
         if (type == KycDocumentType.BACK) return s.getBackHash();
         if (type == KycDocumentType.SELFIE) return s.getSelfieHash();
