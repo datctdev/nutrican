@@ -1,13 +1,13 @@
-package com.sba.nutricanbe.userprofile.controller;
+package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.user.entity.User;
-import com.sba.nutricanbe.userprofile.dto.CreateReviewRequest;
-import com.sba.nutricanbe.userprofile.dto.PtProfileResponse;
-import com.sba.nutricanbe.userprofile.dto.PtSearchRequest;
-import com.sba.nutricanbe.userprofile.dto.ReviewResponse;
-import com.sba.nutricanbe.userprofile.service.MarketplaceService;
+import com.sba.nutricanbe.user.dto.CreateReviewRequest;
+import com.sba.nutricanbe.user.dto.PtProfileResponse;
+import com.sba.nutricanbe.user.dto.PtSearchRequest;
+import com.sba.nutricanbe.user.dto.ReviewResponse;
+import com.sba.nutricanbe.user.service.MarketplaceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

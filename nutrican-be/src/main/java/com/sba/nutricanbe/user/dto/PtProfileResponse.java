@@ -1,4 +1,4 @@
-package com.sba.nutricanbe.userprofile.dto;
+package com.sba.nutricanbe.user.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

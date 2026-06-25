@@ -1,4 +1,4 @@
-package com.sba.nutricanbe.userprofile.service.impl;
+package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
@@ -12,11 +12,11 @@ import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.ReviewRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
-import com.sba.nutricanbe.userprofile.dto.CreateReviewRequest;
-import com.sba.nutricanbe.userprofile.dto.PtProfileResponse;
-import com.sba.nutricanbe.userprofile.dto.PtSearchRequest;
-import com.sba.nutricanbe.userprofile.dto.ReviewResponse;
-import com.sba.nutricanbe.userprofile.service.MarketplaceService;
+import com.sba.nutricanbe.user.dto.CreateReviewRequest;
+import com.sba.nutricanbe.user.dto.PtProfileResponse;
+import com.sba.nutricanbe.user.dto.PtSearchRequest;
+import com.sba.nutricanbe.user.dto.ReviewResponse;
+import com.sba.nutricanbe.user.service.MarketplaceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;

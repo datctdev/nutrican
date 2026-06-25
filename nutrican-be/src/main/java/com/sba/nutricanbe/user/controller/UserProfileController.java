@@ -1,14 +1,14 @@
-package com.sba.nutricanbe.userprofile.controller;
+package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.user.entity.User;
-import com.sba.nutricanbe.userprofile.dto.MacroTargetRequest;
-import com.sba.nutricanbe.userprofile.dto.MacroTargetResponse;
-import com.sba.nutricanbe.userprofile.dto.PtProfileSummary;
-import com.sba.nutricanbe.userprofile.dto.PtRegistrationRequest;
-import com.sba.nutricanbe.userprofile.dto.UpdateProfileRequest;
-import com.sba.nutricanbe.userprofile.dto.UserProfileResponse;
-import com.sba.nutricanbe.userprofile.service.UserProfileService;
+import com.sba.nutricanbe.user.dto.MacroTargetRequest;
+import com.sba.nutricanbe.user.dto.MacroTargetResponse;
+import com.sba.nutricanbe.user.dto.PtProfileSummary;
+import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
+import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
+import com.sba.nutricanbe.user.dto.UserProfileResponse;
+import com.sba.nutricanbe.user.service.UserProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;

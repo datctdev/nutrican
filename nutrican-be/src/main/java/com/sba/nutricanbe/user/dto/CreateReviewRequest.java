@@ -1,4 +1,4 @@
-package com.sba.nutricanbe.userprofile.dto;
+package com.sba.nutricanbe.user.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

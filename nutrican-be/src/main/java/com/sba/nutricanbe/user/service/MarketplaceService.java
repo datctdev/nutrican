@@ -1,11 +1,11 @@
-package com.sba.nutricanbe.userprofile.service;
+package com.sba.nutricanbe.user.service;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
-import com.sba.nutricanbe.userprofile.dto.CreateReviewRequest;
-import com.sba.nutricanbe.userprofile.dto.PtProfileResponse;
-import com.sba.nutricanbe.userprofile.dto.PtSearchRequest;
-import com.sba.nutricanbe.userprofile.dto.ReviewResponse;
+import com.sba.nutricanbe.user.dto.CreateReviewRequest;
+import com.sba.nutricanbe.user.dto.PtProfileResponse;
+import com.sba.nutricanbe.user.dto.PtSearchRequest;
+import com.sba.nutricanbe.user.dto.ReviewResponse;
 
 import java.util.UUID;
 
