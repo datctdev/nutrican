@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.diet.repository;
 
-import com.sba.nutricanbe.diet.entity.SOSTicket;
-import com.sba.nutricanbe.diet.enums.SOSTicketStatus;
+import com.sba.nutricanbe.diet.entity.SosTicket;
+import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,20 +12,20 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface SOSTicketRepository extends JpaRepository<SOSTicket, UUID> {
+public interface SosTicketRepository extends JpaRepository<SosTicket, UUID> {
 
-    Page<SOSTicket> findByStatus(SOSTicketStatus status, Pageable pageable);
+    Page<SosTicket> findByStatus(SosTicketStatus status, Pageable pageable);
 
-    Page<SOSTicket> findByStatusIn(List<SOSTicketStatus> statuses, Pageable pageable);
+    Page<SosTicket> findByStatusIn(List<SosTicketStatus> statuses, Pageable pageable);
 
-    @Query("SELECT t FROM SOSTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE dl.customer.id = :customerId ORDER BY t.createdAt DESC")
-    List<SOSTicket> findByCustomerId(@Param("customerId") UUID customerId);
+    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE dl.customer.id = :customerId ORDER BY t.createdAt DESC")
+    List<SosTicket> findByCustomerId(@Param("customerId") UUID customerId);
 
-    @Query("SELECT t FROM SOSTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE t.pt.id = :ptId ORDER BY t.createdAt DESC")
-    Page<SOSTicket> findByPt_Id(@Param("ptId") UUID ptId, Pageable pageable);
+    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE t.pt.id = :ptId ORDER BY t.createdAt DESC")
+    Page<SosTicket> findByPt_Id(@Param("ptId") UUID ptId, Pageable pageable);
 
-    @Query("SELECT t FROM SOSTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE t.pt.id = :ptId AND t.status = :status")
-    Page<SOSTicket> findByPt_IdAndStatus(@Param("ptId") UUID ptId, @Param("status") SOSTicketStatus status, Pageable pageable);
+    @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl LEFT JOIN FETCH dl.customer LEFT JOIN FETCH t.pt WHERE t.pt.id = :ptId AND t.status = :status")
+    Page<SosTicket> findByPt_IdAndStatus(@Param("ptId") UUID ptId, @Param("status") SosTicketStatus status, Pageable pageable);
 
-    List<SOSTicket> findByDietLog_Id(UUID dietLogId);
+    List<SosTicket> findByDietLog_Id(UUID dietLogId);
 }

@@ -2,8 +2,8 @@ package com.sba.nutricanbe.kyc.service.impl;
 
 import com.sba.nutricanbe.kyc.dto.response.LivenessResponse;
 import com.sba.nutricanbe.kyc.service.FaceLivenessService;
-import com.sba.nutricanbe.kyc.usecase.VNPTClient;
-import com.sba.nutricanbe.kyc.valueObjects.FaceLivenessResult;
+import com.sba.nutricanbe.kyc.client.VnptClient;
+import com.sba.nutricanbe.kyc.valueobject.FaceLivenessResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class FaceLivenessServiceImpl implements FaceLivenessService {
 
-    private final VNPTClient vnpt;
+    private final VnptClient vnpt;
 
     @Override
     public FaceLivenessResult verify(String fileHash, String clientSession) {

@@ -1,6 +1,6 @@
 package com.sba.nutricanbe.admin.dto;
 
-import com.sba.nutricanbe.diet.enums.SOSTicketStatus;
+import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,7 +18,7 @@ public class SosTicketAdminResponse {
     private UUID dietLogId;
     private String note;
     private String priority;
-    private SOSTicketStatus status;
+    private SosTicketStatus status;
     private String customerName;
     private String ptName;
     private LocalDateTime createdAt;

@@ -6,7 +6,7 @@ import com.sba.nutricanbe.common.enums.KycStatus;
 import com.sba.nutricanbe.common.repository.KycDocumentRepository;
 import com.sba.nutricanbe.common.repository.KycSessionRepository;
 import com.sba.nutricanbe.kyc.service.KycSessionAttachService;
-import com.sba.nutricanbe.kyc.valueObjects.AttachDecision;
+import com.sba.nutricanbe.kyc.valueobject.AttachDecision;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

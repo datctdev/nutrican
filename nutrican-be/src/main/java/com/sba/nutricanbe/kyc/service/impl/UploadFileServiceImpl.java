@@ -3,7 +3,7 @@ package com.sba.nutricanbe.kyc.service.impl;
 
 import com.sba.nutricanbe.kyc.dto.response.UploadResponse;
 import com.sba.nutricanbe.kyc.service.UploadFileService;
-import com.sba.nutricanbe.kyc.usecase.VNPTClient;
+import com.sba.nutricanbe.kyc.client.VnptClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -11,7 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 public class UploadFileServiceImpl implements UploadFileService {
-    private final VNPTClient vnpt;
+    private final VnptClient vnpt;
 
     @Override
     public String upload(MultipartFile file, String title, String description) {

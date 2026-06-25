@@ -243,7 +243,7 @@ public class DietLogController {
 
     @PostMapping(value = "/logs/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 
-    public ResponseEntity<ApiResponse<java.util.List<DietLogImageDTO>>> uploadImages(
+    public ResponseEntity<ApiResponse<java.util.List<DietLogImageDto>>> uploadImages(
 
             @PathVariable UUID id,
 
@@ -259,7 +259,7 @@ public class DietLogController {
 
     @GetMapping("/logs/{id}/images")
 
-    public ResponseEntity<ApiResponse<java.util.List<DietLogImageDTO>>> getImages(
+    public ResponseEntity<ApiResponse<java.util.List<DietLogImageDto>>> getImages(
 
             @PathVariable UUID id,
 
@@ -273,7 +273,7 @@ public class DietLogController {
 
     @PutMapping("/logs/{id}/images/{imageId}/primary")
 
-    public ResponseEntity<ApiResponse<DietLogImageDTO>> setPrimaryImage(
+    public ResponseEntity<ApiResponse<DietLogImageDto>> setPrimaryImage(
 
             @PathVariable UUID id,
 

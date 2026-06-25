@@ -4,18 +4,18 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.diet.dto.SosTicketResponse;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
-import com.sba.nutricanbe.diet.entity.SOSTicket;
+import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
-import com.sba.nutricanbe.diet.enums.SOSTicketStatus;
+import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.enums.SosReasonCode;
 import com.sba.nutricanbe.common.event.SosTicketCreatedEvent;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
-import com.sba.nutricanbe.diet.repository.SOSTicketRepository;
+import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.diet.dto.CreateSosRequest;
 import com.sba.nutricanbe.diet.service.SosService;
@@ -41,7 +41,7 @@ public class SosServiceImpl implements SosService {
     @Value("${ai.recognition.confidence-threshold:0.25}")
     private BigDecimal confidenceThreshold;
 
-    private final SOSTicketRepository sosTicketRepository;
+    private final SosTicketRepository sosTicketRepository;
     private final DietLogRepository dietLogRepository;
     private final UserRepository userRepository;
     private final PtClientMappingRepository ptClientMappingRepository;
@@ -69,11 +69,11 @@ public class SosServiceImpl implements SosService {
             reasonCode = resolveAutoSosReason(dietLog);
         }
 
-        SOSTicket ticket = SOSTicket.builder()
+        SosTicket ticket = SosTicket.builder()
                 .dietLog(dietLog)
                 .priority(request.getPriority() != null ? request.getPriority() : "HIGH")
                 .note(request.getNote())
-                .status(SOSTicketStatus.OPEN)
+                .status(SosTicketStatus.OPEN)
                 .reasonCode(reasonCode)
                 .mealSource(request.getMealSource() != null ? request.getMealSource() : (dietLog != null ? dietLog.getMealSource() : null))
                 .autoCreated(request.getAutoCreated() != null ? request.getAutoCreated() : (reasonCode != null && request.getReasonCode() == null))
@@ -137,7 +137,7 @@ public class SosServiceImpl implements SosService {
                 .findFirst();
     }
 
-    private SosTicketResponse toSosResponse(SOSTicket ticket) {
+    private SosTicketResponse toSosResponse(SosTicket ticket) {
         return SosTicketResponse.builder()
                 .id(ticket.getId())
                 .dietLogId(ticket.getDietLog() != null ? ticket.getDietLog().getId() : null)

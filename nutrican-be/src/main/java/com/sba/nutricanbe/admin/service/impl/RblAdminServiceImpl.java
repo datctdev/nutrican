@@ -8,14 +8,14 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.DietLogItem;
-import com.sba.nutricanbe.diet.entity.SOSTicket;
+import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.PtReviewAction;
 import com.sba.nutricanbe.diet.enums.RecognitionSource;
 import com.sba.nutricanbe.diet.enums.SosReasonCode;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
-import com.sba.nutricanbe.diet.repository.SOSTicketRepository;
+import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.RblDatasetFilter;
 import com.sba.nutricanbe.common.util.RblMetricsUtil;
@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 public class RblAdminServiceImpl implements RblAdminService {
 
     private final DietLogRepository dietLogRepository;
-    private final SOSTicketRepository sosTicketRepository;
+    private final SosTicketRepository sosTicketRepository;
     private final PtClientMappingRepository mappingRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -197,7 +197,7 @@ public class RblAdminServiceImpl implements RblAdminService {
 
     private RblExportRowDto toExportRow(DietLog log) {
         SosReasonCode sosReason = null;
-        List<SOSTicket> tickets = sosTicketRepository.findByDietLog_Id(log.getId());
+        List<SosTicket> tickets = sosTicketRepository.findByDietLog_Id(log.getId());
         if (!tickets.isEmpty()) {
             sosReason = tickets.get(0).getReasonCode();
         }

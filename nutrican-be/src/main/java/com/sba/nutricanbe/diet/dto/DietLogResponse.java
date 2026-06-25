@@ -38,7 +38,7 @@ public class DietLogResponse {
     private String ptNote;
     private LocalDate logDate;
     private LocalDateTime createdAt;
-    private java.util.List<DietLogImageDTO> additionalImages;
+    private java.util.List<DietLogImageDto> additionalImages;
     private MealSource mealSource;
     private MealComplexity mealComplexity;
     private String restaurantName;

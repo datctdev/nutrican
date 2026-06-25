@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.diet.dto;
 
 import com.sba.nutricanbe.diet.enums.MealSource;
-import com.sba.nutricanbe.diet.enums.SOSTicketStatus;
+import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.enums.SosReasonCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +20,7 @@ public class SosTicketResponse {
     private UUID dietLogId;
     private String note;
     private String priority;
-    private SOSTicketStatus status;
+    private SosTicketStatus status;
     private SosReasonCode reasonCode;
     private MealSource mealSource;
     private Boolean autoCreated;

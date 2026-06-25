@@ -4,13 +4,13 @@ import com.sba.nutricanbe.admin.dto.SosTicketAdminResponse;
 import com.sba.nutricanbe.admin.service.SosAdminService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
-import com.sba.nutricanbe.diet.entity.SOSTicket;
+import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.user.entity.User;
-import com.sba.nutricanbe.diet.enums.SOSTicketStatus;
+import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
-import com.sba.nutricanbe.diet.repository.SOSTicketRepository;
+import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,21 +29,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SosAdminServiceImpl implements SosAdminService {
 
-    private final SOSTicketRepository sosTicketRepository;
+    private final SosTicketRepository sosTicketRepository;
     private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<PageResponse<SosTicketAdminResponse>> getSosTickets(String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<SOSTicket> ticketPage;
+        Page<SosTicket> ticketPage;
 
         if (status != null) {
             ticketPage = sosTicketRepository.findByStatus(
-                    SOSTicketStatus.valueOf(status), pageable);
+                    SosTicketStatus.valueOf(status), pageable);
         } else {
             ticketPage = sosTicketRepository.findByStatusIn(
-                    List.of(SOSTicketStatus.OPEN, SOSTicketStatus.ASSIGNED), pageable);
+                    List.of(SosTicketStatus.OPEN, SosTicketStatus.ASSIGNED), pageable);
         }
 
         return ApiResponse.success(PageResponse.from(ticketPage.map(this::toResponse)));
@@ -52,7 +52,7 @@ public class SosAdminServiceImpl implements SosAdminService {
     @Override
     @Transactional
     public ApiResponse<Void> assignSosTicket(UUID ticketId, UUID ptId, UUID adminId) {
-        SOSTicket ticket = sosTicketRepository.findById(ticketId)
+        SosTicket ticket = sosTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("SOS Ticket", ticketId));
 
         User pt = userRepository.findById(ptId)
@@ -67,7 +67,7 @@ public class SosAdminServiceImpl implements SosAdminService {
 
         ticket.setPt(pt);
         ticket.setAssignedBy(admin);
-        ticket.setStatus(SOSTicketStatus.ASSIGNED);
+        ticket.setStatus(SosTicketStatus.ASSIGNED);
         sosTicketRepository.save(ticket);
 
         log.info("SOS ticket {} assigned to PT {}", ticketId, ptId);
@@ -77,14 +77,14 @@ public class SosAdminServiceImpl implements SosAdminService {
     @Override
     @Transactional
     public ApiResponse<Void> closeSosTicket(UUID ticketId) {
-        SOSTicket ticket = sosTicketRepository.findById(ticketId)
+        SosTicket ticket = sosTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("SOS Ticket", ticketId));
-        ticket.setStatus(SOSTicketStatus.CLOSED);
+        ticket.setStatus(SosTicketStatus.CLOSED);
         sosTicketRepository.save(ticket);
         return ApiResponse.success(null, "SOS ticket closed");
     }
 
-    private SosTicketAdminResponse toResponse(SOSTicket ticket) {
+    private SosTicketAdminResponse toResponse(SosTicket ticket) {
         return SosTicketAdminResponse.builder()
                 .id(ticket.getId())
                 .dietLogId(ticket.getDietLog() != null ? ticket.getDietLog().getId() : null)

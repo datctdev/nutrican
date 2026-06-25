@@ -15,10 +15,10 @@ import com.sba.nutricanbe.kyc.service.UploadFileService;
 import com.sba.nutricanbe.kyc.service.CardLivenessService;
 import com.sba.nutricanbe.kyc.service.CardClassifyService;
 import com.sba.nutricanbe.kyc.service.KycSessionAttachService;
-import com.sba.nutricanbe.kyc.valueObjects.AttachDecision;
-import com.sba.nutricanbe.kyc.valueObjects.ClassifyResult;
-import com.sba.nutricanbe.kyc.valueObjects.CardLivenessResult;
-import com.sba.nutricanbe.kyc.usecase.VNPTClient;
+import com.sba.nutricanbe.kyc.valueobject.AttachDecision;
+import com.sba.nutricanbe.kyc.valueobject.ClassifyResult;
+import com.sba.nutricanbe.kyc.valueobject.CardLivenessResult;
+import com.sba.nutricanbe.kyc.client.VnptClient;
 import com.sba.nutricanbe.common.enums.KycDocumentType;
 import com.sba.nutricanbe.common.enums.KycStatus;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +40,7 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
 
     private final KycSessionRepository sessions;
     private final KycDocumentRepository docs;
-    private final VNPTClient vnpt;
+    private final VnptClient vnpt;
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
     // Full-flow upload services (used by uploadFileAndAttach)

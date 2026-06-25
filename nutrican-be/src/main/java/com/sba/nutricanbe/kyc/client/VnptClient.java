@@ -1,9 +1,9 @@
-package com.sba.nutricanbe.kyc.usecase;
+package com.sba.nutricanbe.kyc.client;
 
 import com.sba.nutricanbe.kyc.dto.response.*;
 import org.springframework.web.multipart.MultipartFile;
 
-public interface VNPTClient {
+public interface VnptClient {
 
     UploadResponse addFile(MultipartFile file, String title, String description);
 

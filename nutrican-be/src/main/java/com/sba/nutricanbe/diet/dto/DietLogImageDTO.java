@@ -14,7 +14,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DietLogImageDTO {
+public class DietLogImageDto {
     private UUID id;
     private UUID dietLogId;
     private String imageUrl;

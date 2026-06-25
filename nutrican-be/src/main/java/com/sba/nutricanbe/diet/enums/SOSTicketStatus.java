@@ -1,6 +1,6 @@
 package com.sba.nutricanbe.diet.enums;
 
-public enum SOSTicketStatus {
+public enum SosTicketStatus {
     OPEN,
     ASSIGNED,
     RESOLVED,

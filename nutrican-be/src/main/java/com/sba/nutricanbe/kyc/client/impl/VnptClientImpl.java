@@ -1,10 +1,10 @@
-package com.sba.nutricanbe.kyc.usecase.impl;
+package com.sba.nutricanbe.kyc.client.impl;
 
 
 import com.sba.nutricanbe.kyc.config.EKycConfig;
 import com.sba.nutricanbe.kyc.dto.response.*;
 import com.sba.nutricanbe.kyc.dto.request.*;
-import com.sba.nutricanbe.kyc.usecase.VNPTClient;
+import com.sba.nutricanbe.kyc.client.VnptClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
@@ -22,7 +22,7 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class VNPTClientImpl implements VNPTClient {
+public class VnptClientImpl implements VnptClient {
 
     private final RestClient vnptRestClient;
     private final EKycConfig cfg;

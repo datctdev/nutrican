@@ -2,15 +2,15 @@ package com.sba.nutricanbe.kyc.service.impl;
 
 import com.sba.nutricanbe.kyc.dto.response.CardLivenessResponse;
 import com.sba.nutricanbe.kyc.service.CardLivenessService;
-import com.sba.nutricanbe.kyc.usecase.VNPTClient;
-import com.sba.nutricanbe.kyc.valueObjects.CardLivenessResult;
+import com.sba.nutricanbe.kyc.client.VnptClient;
+import com.sba.nutricanbe.kyc.valueobject.CardLivenessResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class CardLivenessServiceImpl implements CardLivenessService {
-    private final VNPTClient vnpt;
+    private final VnptClient vnpt;
 
     @Override
     public CardLivenessResult verify(String fileHash, String clientSession) {

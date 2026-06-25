@@ -4,7 +4,7 @@ import com.sba.nutricanbe.common.entity.BaseEntity;
 
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.diet.enums.MealSource;
-import com.sba.nutricanbe.diet.enums.SOSTicketStatus;
+import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.enums.SosReasonCode;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
 @ToString(exclude = {"dietLog", "pt", "assignedBy"})
-public class SOSTicket extends BaseEntity {
+public class SosTicket extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "diet_log_id")
@@ -37,7 +37,7 @@ public class SOSTicket extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     @Builder.Default
-    private SOSTicketStatus status = SOSTicketStatus.OPEN;
+    private SosTicketStatus status = SosTicketStatus.OPEN;
 
     @Column(name = "priority", length = 20)
     @Builder.Default

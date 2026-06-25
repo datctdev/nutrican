@@ -3,15 +3,15 @@ package com.sba.nutricanbe.kyc.service.impl;
 
 import com.sba.nutricanbe.kyc.dto.response.ClassifyResponse;
 import com.sba.nutricanbe.kyc.service.CardClassifyService;
-import com.sba.nutricanbe.kyc.usecase.VNPTClient;
-import com.sba.nutricanbe.kyc.valueObjects.ClassifyResult;
+import com.sba.nutricanbe.kyc.client.VnptClient;
+import com.sba.nutricanbe.kyc.valueobject.ClassifyResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class CardClassifyServiceImpl implements CardClassifyService {
-    private final VNPTClient vnpt;
+    private final VnptClient vnpt;
 
     @Override
     public ClassifyResult classify(String fileHash, String clientSession) {

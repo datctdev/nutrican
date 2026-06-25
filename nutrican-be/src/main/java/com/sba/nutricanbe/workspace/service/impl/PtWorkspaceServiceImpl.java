@@ -9,7 +9,7 @@ import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.DietLogImage;
 import com.sba.nutricanbe.diet.entity.DietLogItem;
-import com.sba.nutricanbe.diet.entity.SOSTicket;
+import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.BodyMetric;
@@ -17,7 +17,7 @@ import com.sba.nutricanbe.user.entity.BodyMetric;
 // Repositories
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
-import com.sba.nutricanbe.diet.repository.SOSTicketRepository;
+import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
@@ -27,7 +27,7 @@ import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.PtCorrectionReason;
 import com.sba.nutricanbe.diet.enums.PtReviewAction;
-import com.sba.nutricanbe.diet.enums.SOSTicketStatus;
+import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.dto.SosTicketResponse;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.RblDatasetFilter;
@@ -64,7 +64,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final BodyMetricRepository bodyMetricRepository;
     private final UserRepository userRepository;
     private final DietLogImageRepository dietLogImageRepository;
-    private final SOSTicketRepository sosTicketRepository;
+    private final SosTicketRepository sosTicketRepository;
     private final SseEmitterService sseEmitterService;
 
     @Override
@@ -261,7 +261,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .map(m -> m.getClient().getId()).toList();
         long pendingCount = clientIds.isEmpty() ? 0
                 : dietLogRepository.findByCustomerIdInAndStatus(clientIds, DietLogStatus.PT_REVIEWING, PageRequest.of(0, 1)).getTotalElements();
-        long pendingSos = sosTicketRepository.findByPt_IdAndStatus(ptId, SOSTicketStatus.ASSIGNED, PageRequest.of(0, 1)).getTotalElements();
+        long pendingSos = sosTicketRepository.findByPt_IdAndStatus(ptId, SosTicketStatus.ASSIGNED, PageRequest.of(0, 1)).getTotalElements();
 
         PtStatsDto stats = PtStatsDto.builder()
                 .totalClients((int) allClients.getTotalElements())
@@ -373,12 +373,12 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     @Override
     @Transactional
     public ApiResponse<Void> resolveSosTicket(UUID ticketId, UUID ptId, String note) {
-        SOSTicket ticket = sosTicketRepository.findById(ticketId)
+        SosTicket ticket = sosTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("SOS Ticket", ticketId));
         if (ticket.getPt() == null || !ticket.getPt().getId().equals(ptId)) {
             throw new BadRequestException("You can only resolve tickets assigned to you");
         }
-        ticket.setStatus(SOSTicketStatus.RESOLVED);
+        ticket.setStatus(SosTicketStatus.RESOLVED);
         if (note != null) {
             ticket.setNote(note);
         }
@@ -386,7 +386,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         return ApiResponse.success(null, "SOS ticket resolved");
     }
 
-    private SosTicketResponse toSosResponse(SOSTicket ticket) {
+    private SosTicketResponse toSosResponse(SosTicket ticket) {
         return SosTicketResponse.builder()
                 .id(ticket.getId())
                 .dietLogId(ticket.getDietLog() != null ? ticket.getDietLog().getId() : null)

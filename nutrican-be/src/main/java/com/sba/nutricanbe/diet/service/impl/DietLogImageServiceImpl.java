@@ -9,7 +9,7 @@ import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.service.DietLogImageService;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
-import com.sba.nutricanbe.diet.dto.DietLogImageDTO;
+import com.sba.nutricanbe.diet.dto.DietLogImageDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,7 +31,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
 
     @Override
     @Transactional
-    public ApiResponse<List<DietLogImageDTO>> uploadImages(UUID dietLogId, MultipartFile[] files, UUID userId) {
+    public ApiResponse<List<DietLogImageDto>> uploadImages(UUID dietLogId, MultipartFile[] files, UUID userId) {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
 
@@ -43,7 +43,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
             throw new BadRequestException("No files provided");
         }
 
-        List<DietLogImageDTO> uploadedImages = new ArrayList<>();
+        List<DietLogImageDto> uploadedImages = new ArrayList<>();
         int existingCount = dietLogImageRepository.countByDietLogId(dietLogId);
 
         for (int i = 0; i < files.length; i++) {
@@ -71,7 +71,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse<List<DietLogImageDTO>> getImages(UUID dietLogId, UUID userId) {
+    public ApiResponse<List<DietLogImageDto>> getImages(UUID dietLogId, UUID userId) {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
 
@@ -85,7 +85,7 @@ public class DietLogImageServiceImpl implements DietLogImageService {
 
     @Override
     @Transactional
-    public ApiResponse<DietLogImageDTO> setPrimaryImage(UUID dietLogId, UUID imageId, UUID userId) {
+    public ApiResponse<DietLogImageDto> setPrimaryImage(UUID dietLogId, UUID imageId, UUID userId) {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
 
@@ -158,8 +158,8 @@ public class DietLogImageServiceImpl implements DietLogImageService {
         return ApiResponse.success(null, "All images deleted");
     }
 
-    private DietLogImageDTO toDTO(DietLogImage image) {
-        return DietLogImageDTO.builder()
+    private DietLogImageDto toDTO(DietLogImage image) {
+        return DietLogImageDto.builder()
                 .id(image.getId())
                 .dietLogId(image.getDietLog().getId())
                 .imageUrl(image.getImageUrl())

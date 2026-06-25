@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.kyc.service;
 
 
-import com.sba.nutricanbe.kyc.valueObjects.ClassifyResult;
+import com.sba.nutricanbe.kyc.valueobject.ClassifyResult;
 
 public interface CardClassifyService {
 

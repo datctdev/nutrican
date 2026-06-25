@@ -17,7 +17,7 @@ import com.sba.nutricanbe.common.event.DietLogCreatedEvent;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.common.util.MacroUtils;
-import com.sba.nutricanbe.diet.dto.DietLogImageDTO;
+import com.sba.nutricanbe.diet.dto.DietLogImageDto;
 import com.sba.nutricanbe.diet.dto.DietLogItemRequest;
 import com.sba.nutricanbe.diet.dto.DietLogItemResponse;
 import com.sba.nutricanbe.diet.dto.DietLogResponse;
@@ -176,10 +176,10 @@ public class DietLogHelperImpl implements DietLogHelper {
 
     @Override
     public DietLogResponse toResponse(DietLog dietLog) {
-        List<DietLogImageDTO> additionalImages = null;
+        List<DietLogImageDto> additionalImages = null;
         if (dietLog.getAdditionalImages() != null && !dietLog.getAdditionalImages().isEmpty()) {
             additionalImages = dietLog.getAdditionalImages().stream()
-                    .map(img -> DietLogImageDTO.builder()
+                    .map(img -> DietLogImageDto.builder()
                             .id(img.getId())
                             .dietLogId(dietLog.getId())
                             .imageUrl(img.getImageUrl())

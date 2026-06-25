@@ -9,7 +9,7 @@ import com.sba.nutricanbe.kyc.dto.response.CompareResponse;
 import com.sba.nutricanbe.common.entity.EKycSession;
 import com.sba.nutricanbe.common.repository.KycSessionRepository;
 import com.sba.nutricanbe.kyc.service.CompareKycService;
-import com.sba.nutricanbe.kyc.usecase.VNPTClient;
+import com.sba.nutricanbe.kyc.client.VnptClient;
 import com.sba.nutricanbe.common.enums.KycStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +25,7 @@ import java.util.UUID;
 public class CompareKycServiceImpl implements CompareKycService {
 
     private final KycSessionRepository sessions;
-    private final VNPTClient vnpt;
+    private final VnptClient vnpt;
     private final UserRepository userRepository;
     private final ObjectMapper om;
 
