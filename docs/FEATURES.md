@@ -445,9 +445,10 @@ The KYC (Know Your Customer) system collects and verifies identity documents for
 ### 8.3 KYC Status Flow
 
 ```
-SUBMITTED → PENDING_APPROVAL → APPROVED
+DRAFT → IN_PROGRESS → VERIFIED (verified matching face)
                 │
-                └──→ REJECTED (with rejectionReason)
+                ├──→ REJECTED (face mismatch / failed criteria)
+                └──→ FAILED (system failure / OCR issues)
 ```
 
 ### 8.4 KYC Review (Admin)

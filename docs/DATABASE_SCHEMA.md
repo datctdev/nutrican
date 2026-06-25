@@ -17,7 +17,8 @@ This document describes the complete database schema for NutriCan PT application
 | Table | Primary Key | Foreign Keys | Description |
 |-------|-------------|--------------|-------------|
 | `users` | id (UUID) | - | User accounts |
-| `user_kyc` | id (UUID) | user_id (1:1) | KYC verification documents |
+| `sessions` | id (UUID) | user_id (N:1) | KYC verification sessions |
+| `ekyc_document` | id (UUID) | session_id (N:1) | KYC verification documents |
 | `pt_profiles` | id (UUID) | user_id (1:1) | PT extended profiles |
 | `macro_targets` | id (UUID) | user_id (1:1) | Daily macro targets |
 | `diet_logs` | id (UUID) | customer_id, pt_reviewer_id | Meal entries (meal context, RBL fields) |
@@ -35,7 +36,8 @@ This document describes the complete database schema for NutriCan PT application
 ## 2. Entity Relationship Diagram
 
 ```
-users (1) ── (1) user_kyc
+users (1) ── (many) sessions
+sessions (1) ── (many) ekyc_document
          ── (1) pt_profiles
          ── (1) macro_targets
          ── (1) body_metrics
@@ -98,54 +100,72 @@ CREATE INDEX idx_users_google_id ON users(google_id);
 
 ---
 
-### 3.2 user_kyc
+### 3.2 sessions & ekyc_document
 
-KYC (Know Your Customer) verification documents for PT registration.
+Holds KYC (Know Your Customer) session metadata and matching scanned documents.
 
+#### 3.2.1 sessions
 ```sql
-CREATE TABLE user_kyc (
+CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL UNIQUE,
-    id_card_number VARCHAR(20),
-    id_card_front_url VARCHAR(500),
-    id_card_back_url VARCHAR(500),
-    full_name_on_card VARCHAR(255),
-    date_of_birth_on_card DATE,
-    address_on_card TEXT,
-    is_verified BOOLEAN DEFAULT FALSE,
-    verification_status VARCHAR(50) DEFAULT 'PENDING_APPROVAL',
-    rejection_reason TEXT,
-    reviewed_at TIMESTAMP,
-    reviewed_by UUID,
+    user_id UUID NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+    front_file_id UUID,
+    back_file_id UUID,
+    selfie_file_id UUID,
+    front_hash VARCHAR(255),
+    back_hash VARCHAR(255),
+    selfie_hash VARCHAR(255),
+    provider_trace JSONB,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_kyc_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_user_kyc_user_id ON user_kyc(user_id);
-CREATE INDEX idx_user_kyc_status ON user_kyc(verification_status);
+CREATE INDEX idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX idx_sessions_status ON sessions(status);
 ```
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | UUID | PK, NOT NULL | Unique identifier |
-| user_id | UUID | FK, UNIQUE, NOT NULL | Reference to users table |
-| id_card_number | VARCHAR(20) | - | ID card number |
-| id_card_front_url | VARCHAR(500) | - | Front side of ID card image |
-| id_card_back_url | VARCHAR(500) | - | Back side of ID card image |
-| full_name_on_card | VARCHAR(255) | - | Name as on ID card |
-| date_of_birth_on_card | DATE | - | DOB as on ID card |
-| address_on_card | TEXT | - | Address as on ID card |
-| is_verified | BOOLEAN | DEFAULT FALSE | KYC verification status |
-| verification_status | VARCHAR(50) | DEFAULT 'PENDING_APPROVAL' | Admin review status |
-| rejection_reason | TEXT | - | Reason if rejected |
-| reviewed_at | TIMESTAMP | - | When admin reviewed |
-| reviewed_by | UUID | - | Admin who reviewed |
+| user_id | UUID | FK, NOT NULL | Reference to users table |
+| status | VARCHAR(50) | NOT NULL | KYC session status (DRAFT, IN_PROGRESS, VERIFIED, REJECTED, FAILED) |
+| front_file_id | UUID | - | MinIO file ID for front card image |
+| back_file_id | UUID | - | MinIO file ID for back card image |
+| selfie_file_id | UUID | - | MinIO file ID for selfie image |
+| front_hash | VARCHAR(255) | - | Hash checksum of front image |
+| back_hash | VARCHAR(255) | - | Hash checksum of back image |
+| selfie_hash | VARCHAR(255) | - | Hash checksum of selfie image |
+| provider_trace | JSONB | - | JSON metadata returned from external VNPT API |
 | created_at | TIMESTAMP | NOT NULL | Creation timestamp |
 | updated_at | TIMESTAMP | NOT NULL | Last update timestamp |
 
----
+#### 3.2.2 ekyc_document
+```sql
+CREATE TABLE ekyc_document (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    file_hash VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_document_session FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_document_session_id ON ekyc_document(session_id);
+```
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PK, NOT NULL | Unique identifier |
+| session_id | UUID | FK, NOT NULL | Reference to sessions table |
+| type | VARCHAR(50) | NOT NULL | Document side (FRONT, BACK, SELFIE) |
+| file_hash | VARCHAR(255) | - | Unique file checksum |
+| created_at | TIMESTAMP | NOT NULL | Creation timestamp |
+| updated_at | TIMESTAMP | NOT NULL | Last update timestamp |
 
 ### 3.3 pt_profiles
 
@@ -686,8 +706,9 @@ CREATE TYPE sos_ticket_status AS ENUM ('OPEN', 'ASSIGNED', 'RESOLVED', 'CLOSED')
 | users | idx_users_role | role | B-tree |
 | users | idx_users_status | status | B-tree |
 | users | idx_users_google_id | google_id | B-tree |
-| user_kyc | idx_user_kyc_user_id | user_id | B-tree |
-| user_kyc | idx_user_kyc_status | verification_status | B-tree |
+| sessions | idx_sessions_user_id | user_id | B-tree |
+| sessions | idx_sessions_status | status | B-tree |
+| ekyc_document | idx_document_session_id | session_id | B-tree |
 | pt_profiles | idx_pt_profiles_user_id | user_id | B-tree |
 | pt_profiles | idx_pt_profiles_is_verified | is_verified | B-tree |
 | pt_profiles | idx_pt_profiles_tier | tier | B-tree |
@@ -716,7 +737,8 @@ END;
 $$ language 'plpgsql';
 
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_user_kyc_updated_at BEFORE UPDATE ON user_kyc FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_sessions_updated_at BEFORE UPDATE ON sessions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_ekyc_document_updated_at BEFORE UPDATE ON ekyc_document FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_pt_profiles_updated_at BEFORE UPDATE ON pt_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_macro_targets_updated_at BEFORE UPDATE ON macro_targets FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_diet_logs_updated_at BEFORE UPDATE ON diet_logs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

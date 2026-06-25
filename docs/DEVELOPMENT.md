@@ -160,35 +160,27 @@ Mở `http://localhost:5173` → đăng nhập → `/diet` → upload ảnh ph�
 
 ## 2. Project Structure
 
-### 2.1 Backend (Maven Multi-Module)
+### 2.1 Backend Package Structure (Modular Monolith)
 
 ```
 nutrican-be/
-├── pom.xml                          # Parent POM
-├── nutritiontrack-module-core/      # Shared code
-│   ├── pom.xml
-│   └── src/main/java/
-│       └── com/sba/nutrican_be/core/
-│           ├── entity/              # JPA Entities
-│           ├── repository/          # Spring Data Repositories
-│           ├── enums/               # Enumerations
-│           ├── util/                # Utilities
-│           ├── dto/                 # Common DTOs
-│           ├── service/             # Shared services
-│           └── exception/           # Exception handling
-│
-├── nutritiontrack-module-auth/       # Authentication
-├── nutritiontrack-module-user-profile/ # User profiles
-├── nutritiontrack-module-diet-tracker/ # Diet tracking
-├── nutritiontrack-module-ai-gateway/   # AI integration
-├── nutritiontrack-module-pt-management/ # PT workspace
-├── nutritiontrack-module-admin/       # Admin features
-│
-└── nutritiontrack-module-application/  # Main entry point
-    └── src/main/java/com/sba/nutrican_be/
-        └── NutritionTrackApplication.java
+├── pom.xml                          # Project POM
+└── src/main/java/com/sba/nutricanbe/
+    ├── NutricanBeApplication.java   # Main entry point
+    ├── common/                      # Shared code
+    │   ├── entity/                  # BaseEntity
+    │   ├── repository/
+    │   ├── enums/
+    │   ├── util/
+    │   └── dto/
+    ├── auth/                        # Auth module
+    ├── user/                        # User module
+    ├── diet/                        # Diet tracker module
+    ├── ai/                          # AI gateway module
+    ├── kyc/                         # KYC module
+    ├── workspace/                   # PT management / workspace module
+    └── admin/                       # Admin module
 ```
-
 ### 2.2 Frontend (React)
 
 ```
@@ -210,64 +202,28 @@ nutican-fe/
 
 ## 3. Backend Development
 
-### 3.1 Creating a New Module
+### 3.1 Creating a New Feature Package
 
-#### Step 1: Create Module Directory
+To add a new feature domain (e.g. `billing` or `chat`) to our Modular Monolith:
 
+#### Step 1: Create Package under com.sba.nutricanbe
+Create the main package and sub-packages for your controllers, services, DTOs, entities, and repositories.
 ```bash
-cd nutrican-be
-mkdir nutritiontrack-module-newfeature
+cd nutrican-be/src/main/java/com/sba/nutricanbe
+mkdir -p billing/{controller,service,dto,entity,repository}
 ```
 
-#### Step 2: Create pom.xml
+#### Step 2: Define Domain Entities and Repositories
+Define JPA entities inside `billing/entity/` and Spring Data JPA repositories in `billing/repository/`.
 
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-
-    <parent>
-        <groupId>com.sba</groupId>
-        <artifactId>nutrican-be</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
-    </parent>
-
-    <artifactId>nutritiontrack-module-newfeature</artifactId>
-    <name>New Feature Module</name>
-
-    <dependencies>
-        <!-- Dependencies from parent -->
-        <dependency>
-            <groupId>com.sba</groupId>
-            <artifactId>nutritiontrack-module-core</artifactId>
-        </dependency>
-    </dependencies>
-</project>
-```
-
-#### Step 3: Create Package Structure
-
-```bash
-mkdir -p nutritiontrack-module-newfeature/src/main/java/com/sba/nutrican_be/newfeature/{controller,service,dto}
-mkdir -p nutritiontrack-module-newfeature/src/main/resources
-```
-
-#### Step 4: Add to Parent POM
-
-```xml
-<modules>
-    <!-- existing modules -->
-    <module>nutritiontrack-module-newfeature</module>
-</modules>
-```
+#### Step 3: Decouple Interface Calls
+If other modules need to communicate with your new module, expose a Query Service interface (e.g. `BillingQueryService`) inside your package, and let other modules inject it instead of calling your repositories directly.
 
 ### 3.2 Creating a New Entity
 
 ```java
-// src/main/java/com/sba/nutrican_be/core/entity/NewEntity.java
-package com.sba.nutrican_be.core.entity;
+// src/main/java/com/sba/nutricanbe/common/entity/NewEntity.java
+package com.sba.nutricanbe.common.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -306,10 +262,10 @@ public class NewEntity extends BaseEntity {
 ### 3.3 Creating a Repository
 
 ```java
-// src/main/java/com/sba/nutrican_be/core/repository/NewEntityRepository.java
-package com.sba.nutrican_be.core.repository;
+// src/main/java/com/sba/nutricanbe/common/repository/NewEntityRepository.java
+package com.sba.nutricanbe.common.repository;
 
-import com.sba.nutrican_be.core.entity.NewEntity;
+import com.sba.nutricanbe.common.entity.NewEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -333,11 +289,11 @@ public interface NewEntityRepository extends JpaRepository<NewEntity, UUID> {
 #### Service Interface
 
 ```java
-// src/main/java/com/sba/nutrican_be/newfeature/service/NewFeatureService.java
-package com.sba.nutrican_be.newfeature.service;
+// src/main/java/com/sba/nutricanbe/newfeature/service/NewFeatureService.java
+package com.sba.nutricanbe.newfeature.service;
 
-import com.sba.nutrican_be.core.dto.ApiResponse;
-import com.sba.nutrican_be.newfeature.dto.NewEntityResponse;
+import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.newfeature.dto.NewEntityResponse;
 import java.util.UUID;
 
 public interface NewFeatureService {
@@ -355,15 +311,15 @@ public interface NewFeatureService {
 #### Service Implementation
 
 ```java
-// src/main/java/com/sba/nutrican_be/newfeature/service/NewFeatureServiceImpl.java
-package com.sba.nutrican_be.newfeature.service;
+// src/main/java/com/sba/nutricanbe/newfeature/service/NewFeatureServiceImpl.java
+package com.sba.nutricanbe.newfeature.service;
 
-import com.sba.nutrican_be.core.dto.ApiResponse;
-import com.sba.nutrican_be.core.entity.NewEntity;
-import com.sba.nutrican_be.core.entity.User;
-import com.sba.nutrican_be.core.exception.ResourceNotFoundException;
-import com.sba.nutrican_be.core.repository.NewEntityRepository;
-import com.sba.nutrican_be.core.repository.UserRepository;
+import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.common.entity.NewEntity;
+import com.sba.nutricanbe.common.entity.User;
+import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.repository.NewEntityRepository;
+import com.sba.nutricanbe.common.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -437,14 +393,14 @@ public class NewFeatureServiceImpl implements NewFeatureService {
 ### 3.5 Creating a Controller
 
 ```java
-// src/main/java/com/sba/nutrican_be/newfeature/controller/NewFeatureController.java
-package com.sba.nutrican_be.newfeature.controller;
+// src/main/java/com/sba/nutricanbe/newfeature/controller/NewFeatureController.java
+package com.sba.nutricanbe.newfeature.controller;
 
-import com.sba.nutrican_be.core.dto.ApiResponse;
-import com.sba.nutrican_be.core.entity.User;
-import com.sba.nutrican_be.newfeature.dto.CreateRequest;
-import com.sba.nutrican_be.newfeature.dto.NewEntityResponse;
-import com.sba.nutrican_be.newfeature.service.NewFeatureService;
+import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.common.entity.User;
+import com.sba.nutricanbe.newfeature.dto.CreateRequest;
+import com.sba.nutricanbe.newfeature.dto.NewEntityResponse;
+import com.sba.nutricanbe.newfeature.service.NewFeatureService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -493,7 +449,7 @@ public class NewFeatureController {
 
 ```java
 // Request DTO
-package com.sba.nutrican_be.newfeature.dto;
+package com.sba.nutricanbe.newfeature.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -507,7 +463,7 @@ public class CreateRequest {
 }
 
 // Response DTO
-package com.sba.nutrican_be.newfeature.dto;
+package com.sba.nutricanbe.newfeature.dto;
 
 import lombok.Builder;
 import lombok.Data;
@@ -721,11 +677,11 @@ export const EntityCard = ({ entity, onEdit, onDelete }) => {
 ### 5.1 Backend Testing
 
 ```java
-// src/test/java/com/sba/nutrican_be/newfeature/service/NewFeatureServiceTest.java
-package com.sba.nutrican_be.newfeature.service;
+// src/test/java/com/sba/nutricanbe/newfeature/service/NewFeatureServiceTest.java
+package com.sba.nutricanbe.newfeature.service;
 
-import com.sba.nutrican_be.core.entity.User;
-import com.sba.nutrican_be.core.repository.UserRepository;
+import com.sba.nutricanbe.common.entity.User;
+import com.sba.nutricanbe.common.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -181,7 +181,7 @@ sudo ufw enable
 # Build Backend
 cd /opt/nutrican/backend/nutican-be
 ./mvnw clean package -DskipTests
-cp target/nutritiontrack-module-application-*.jar ../application.jar
+cp target/nutrican-be-*.jar ../application.jar
 
 # Build Frontend
 cd /opt/nutrican/frontend/nutican-fe

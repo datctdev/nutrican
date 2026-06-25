@@ -54,265 +54,49 @@ NutriCan PT is an AI-powered nutrition tracking platform that connects users wit
 
 ## 2. Backend Architecture
 
-### 2.1 Module Structure (Multi-Module Maven)
+### 2.1 Package-based Modular Monolith Structure
 
 ```
 nutrican-be/
-├── pom.xml                                  # Parent POM
-├── docker-compose.yml                       # Infrastructure (PostgreSQL, MinIO)
+├── pom.xml                                  # Maven POM (Single Project)
+├── docker-compose.yml                       # Infrastructure (PostgreSQL, Redis, MinIO)
 ├── .env / .env.example                     # Environment configuration
 ├── minio-init.sh                           # MinIO bucket initialization
 ├── ollama-init.sh                          # Ollama model setup
-
-├── nutritiontrack-module-core/              # Shared entities, utils
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/core/
-│       ├── entity/                         # JPA Entities
-│       │   ├── BaseEntity.java
-│       │   ├── User.java
-│       │   ├── DietLog.java
-│       │   ├── DietLogImage.java          # Multi-image support
-│       │   ├── MacroTarget.java
-│       │   ├── PtProfile.java
-│       │   ├── PtClientMapping.java
-│       │   ├── SOSTicket.java
-│       │   ├── BodyMetric.java
-│       │   ├── Review.java
-│       │   ├── Notification.java
-│       │   └── UserKyc.java              # KYC verification
-│       ├── repository/                     # Spring Data Repositories
-│       ├── enums/                          # Enumerations
-│       │   ├── UserRole.java
-│       │   ├── UserStatus.java
-│       │   ├── MealType.java
-│       │   ├── DietLogStatus.java
-│       │   ├── ClientMappingStatus.java
-│       │   ├── Tier.java
-│       │   ├── SOSTicketStatus.java
-│       │   └── PtType.java
-│       ├── util/                           # Utilities
-│       │   ├── JwtUtil.java
-│       │   └── MacroUtils.java
-│       ├── dto/                            # Common DTOs
-│       │   ├── ApiResponse.java
-│       │   └── PageResponse.java
-│       ├── service/                        # Shared services
-│       │   └── MinioService.java
-│       └── exception/                       # Exception handling
-│           ├── GlobalExceptionHandler.java
-│           ├── ResourceNotFoundException.java
-│           ├── UnauthorizedException.java
-│           └── BadRequestException.java
-
-├── nutritiontrack-module-auth/              # Authentication & JWT
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/auth/
-│       ├── controller/
-│       │   ├── AuthController.java          # Auth endpoints (register, login, refresh, logout)
-│       │   └── PtRequestController.java    # PT registration request
-│       ├── service/
-│       │   ├── AuthService.java
-│       │   └── AuthServiceImpl.java
-│       ├── dto/
-│       │   ├── LoginRequest.java
-│       │   ├── RegisterRequest.java
-│       │   ├── RefreshTokenRequest.java
-│       │   ├── AuthResponse.java
-│       │   └── PtRequestDto.java
-│       └── security/
-│           ├── SecurityConfig.java
-│           └── JwtAuthenticationFilter.java
-
-├── nutritiontrack-module-infrastructure/    # Redis, Rate Limiting, External Configs
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/infrastructure/
-│       ├── config/
-│       │   └── RedisConfig.java
-│       └── service/
-│           ├── RateLimitingService.java
-│           └── impl/
-│               └── RateLimitingServiceImpl.java
-│
-├── nutritiontrack-module-kyc/               # KYC Verification (VNPT OCR + Face Liveness)
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/kyc/
-│       ├── controller/
-│       │   └── KycController.java           # KYC submission & status
-│       ├── service/
-│       │   ├── KycService.java
-│       │   ├── KycServiceImpl.java
-│       │   ├── UploadFileService.java      # File upload handling
-│       │   ├── UploadFileServiceImpl.java
-│       │   ├── CardClassifyService.java    # VNPT card classification
-│       │   ├── CardClassifyServiceImpl.java
-│       │   ├── KycOrchestratorService.java # Orchestrates KYC flow
-│       │   └── KycOrchestratorServiceImpl.java
-│       ├── usecase/
-│       │   └── VNPTClient.java            # VNPT API client
-│       ├── dto/
-│       │   ├── KycRequest.java
-│       │   ├── KycStatusDto.java
-│       │   └── CardLivenessRequest.java
-│       └── config/
-│           └── FaceLivenessConfig.java
-
-├── nutritiontrack-module-user-profile/        # User profiles & marketplace
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/userprofile/
-│       ├── controller/
-│       │   ├── UserProfileController.java
-│       │   └── MarketplaceController.java
-│       ├── service/
-│       │   ├── UserProfileService.java
-│       │   ├── UserProfileServiceImpl.java
-│       │   ├── MarketplaceService.java
-│       │   └── MarketplaceServiceImpl.java
-│       └── dto/
-│           ├── UserProfileResponse.java
-│           ├── UpdateProfileRequest.java
-│           ├── MacroTargetRequest.java
-│           ├── MacroTargetResponse.java
-│           ├── PtProfileResponse.java
-│           ├── PtSearchRequest.java
-│           ├── ReviewResponse.java
-│           └── CreateReviewRequest.java
-
-├── nutritiontrack-module-diet-tracker/       # Diet logging
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/diet/
-│       ├── controller/
-│       │   └── DietLogController.java
-│       ├── service/
-│       │   ├── DietLogService.java
-│       │   ├── DietLogServiceImpl.java
-│       │   ├── DietLogImageService.java
-│       │   └── DietLogImageServiceImpl.java
-│       └── dto/
-│           ├── CreateDietLogRequest.java
-│           ├── DietLogResponse.java
-│           ├── AnalyzeMealResponse.java
-│           ├── DietSummaryResponse.java
-│           ├── CreateSosRequest.java
-│           └── DietLogImageDTO.java
-
-├── nutritiontrack-module-ai-gateway/         # AI Integration
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/ai/
-│       ├── controller/
-│       │   └── AiController.java
-│       ├── service/
-│       │   ├── MealRecognitionService.java
-│       │   ├── MealRecognitionServiceImpl.java  # ResNet50 + LLaVA integration
-│       │   ├── ResNetFoodRecognitionClient.java
-│       │   ├── LlavaMealAnalysisService.java
-│       │   ├── OllamaService.java
-│       │   ├── OllamaServiceImpl.java           # WebFlux HTTP client
-│       │   ├── NutritionChatbotService.java
-│       │   └── NutritionChatbotServiceImpl.java
-│       └── dto/
-│           └── MealRecognitionResult.java
-
-├── nutritiontrack-module-pt-management/      # PT Workspace
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/workspace/
-│       ├── controller/
-│       │   └── PtWorkspaceController.java
-│       ├── service/
-│       │   ├── PtWorkspaceService.java
-│       │   ├── PtWorkspaceServiceImpl.java
-│       │   └── SseEmitterService.java          # Real-time SSE
-│       └── dto/
-│           ├── ClientStatusDto.java
-│           ├── DietLogReviewResponse.java
-│           ├── ProgressDataDto.java
-│           ├── ReviewActionRequest.java
-│           └── PtStatsDto.java
-
-├── nutritiontrack-module-admin/               # Admin Dashboard
-│   ├── pom.xml
-│   └── src/main/java/com/sba/nutrican_be/admin/
-│       ├── controller/
-│       │   ├── UserAdminController.java     # User management
-│       │   ├── PtAdminController.java       # PT verification
-│       │   ├── KycAdminController.java     # KYC verification
-│       │   ├── SosAdminController.java     # SOS ticket management
-│       │   └── DashboardController.java     # Dashboard stats
-│       ├── service/
-│       │   ├── impl/
-│       │   │   ├── UserAdminServiceImpl.java
-│       │   │   ├── PtAdminServiceImpl.java
-│       │   │   ├── KycAdminServiceImpl.java
-│       │   │   ├── SosAdminServiceImpl.java
-│       │   │   └── AdminDashboardServiceImpl.java
-│       │   ├── UserAdminService.java
-│       │   ├── PtAdminService.java
-│       │   ├── KycAdminService.java
-│       │   ├── SosAdminService.java
-│       │   └── AdminDashboardService.java
-│       ├── dto/
-│       │   ├── AdminDashboardDto.java
-│       │   ├── PendingPtDto.java
-│       │   ├── PendingKycDto.java
-│       │   └── PtVerificationRequest.java
-│       └── config/
-│           └── DataInitializer.java           # Seeds default admin
-
-└── nutritiontrack-module-application/         # Main Application
-    ├── pom.xml
-    └── src/main/java/com/sba/nutrican_be/
-        ├── NutricanBeApplication.java         # Entry point
-        ├── WebConfig.java
-        ├── WebClientConfig.java              # WebClient beans
-        └── OpenApiConfig.java                # SpringDoc Swagger
+└── src/main/java/com/sba/nutricanbe/
+    ├── NutricanBeApplication.java           # Main Spring Boot Entry Point
+    ├── admin/                               # Admin Dashboard module (management, stats)
+    ├── ai/                                  # AI Integration module (LLM, prompt versions)
+    ├── auth/                                # Authentication, Security & JWT module
+    ├── common/                              # Shared / core library (BaseEntity, generic DTOs, Enums)
+    │   ├── entity/                          # Base JPA Entity
+    │   ├── repository/                      # Common repositories if any
+    │   ├── dto/                             # Generic API response and paging models
+    │   ├── enums/                           # Core enums (UserRole, UserStatus)
+    │   └── util/                            # Shared utilities (MacroUtils, security helpers)
+    ├── config/                              # Global Application Configs (Security, Redis, Web)
+    ├── diet/                                # Diet Tracker module (logging, meals, food catalog)
+    │   ├── entity/                          # DietLog, DietLogItem, FoodItem, DietLogImage, SosTicket
+    │   ├── repository/                      # Diet repositories
+    │   └── service/                         # Diet logging and analysis services
+    ├── infrastructure/                      # Infrastructure services (MinIO storage, Redis, Rate Limiting)
+    ├── kyc/                                 # KYC verification module (VNPT OCR + Face Liveness)
+    │   ├── entity/                          # EkycSession, EkycDocument (consolidated from common)
+    │   ├── repository/                      # KycSessionRepository, KycDocumentRepository
+    │   └── service/                         # KYC orchestration & OCR services
+    ├── user/                                # User profile & marketplace module
+    │   ├── entity/                          # User, PtProfile, PtClientMapping, BodyMetric, Review
+    │   ├── repository/                      # User repositories
+    │   └── service/                         # Profile and UserQueryService (decoupled read service)
+    └── workspace/                           # Personal Trainer Workspace module (PT View, SSE)
 ```
 
-### 2.2 Module Dependencies
+### 2.2 Module Dependencies & Boundaries
 
-```
-nutritiontrack-module-application (Entry Point)
-         │
-         ├──────────────────────────────────────────────┐
-         │                                              │
-         ▼                                              ▼
-nutritiontrack-module-admin               nutritiontrack-module-pt-management
-         │                                              │
-         │                                              ▼
-         │                              nutritiontrack-module-diet-tracker
-         │                                              │
-         │                                              ▼
-         │                              nutritiontrack-module-ai-gateway
-         │                                              │
-         ├──────────────────────────────────────────────┤
-         │                                              │
-         ▼                                              ▼
-nutritiontrack-module-user-profile          nutritiontrack-module-auth
-         │                                    │
-         │                                    ├───────────────────────────┐
-         │                                    │                           │
-         ▼                                    ▼                           ▼
-                        nutritiontrack-module-kyc             nutritiontrack-module-core
-                        (VNPT OCR + Face Liveness)     (Entities, Repositories, Utils,
-                                                     Exceptions, MinioService)
-```
-
-*Note: `nutritiontrack-module-kyc` is independent from auth and can be called by both auth and admin modules.*
-
-### 2.3 Technology Stack
-
-| Component | Technology | Version |
-|-----------|------------|---------|
-| Framework | Spring Boot | 4.0.6 |
-| Language | Java | 17 |
-| ORM | Spring Data JPA | - |
-| Security | Spring Security + JWT | - |
-| Database | PostgreSQL | 17 |
-| Object Storage | MinIO | 8.5.12 |
-| AI | Ollama + WebFlux | ResNet50 + LLaVA |
-| API Documentation | SpringDoc OpenAPI | 2.5.0 |
-| JWT Library | jjwt | 0.12.6 |
-| Build Tool | Maven | 3.9+ |
-
----
+In our Modular Monolith:
+1. **Low Coupling via Services**: Modules communicate using interface-based Services rather than directly querying other modules' database repositories. For example, `diet` uses `UserQueryService` to fetch user information rather than directly injecting `UserRepository`.
+2. **Explicit Security**: Controllers are annotated with `@PreAuthorize` to control role-based access control (e.g. `PtWorkspaceController` is restricted to PTs).
+3. **Database Sharing vs. Logical Separation**: While modules share a single PostgreSQL database instance, they only read/write their own entities. Cross-boundary database queries are strictly prohibited.
 
 ## 3. Frontend Architecture
 
@@ -444,7 +228,7 @@ nutrican-fe/
          │                   │                                   │                  │
          ▼                   ▼                                   ▼                  ▼
 ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-│   user_kyc      │ │  pt_profiles    │ │  macro_targets  │ │  diet_logs     │
+│   sessions      │ │  pt_profiles    │ │  macro_targets  │ │  diet_logs     │
 ├─────────────────┤ ├─────────────────┤ ├─────────────────┤ ├─────────────────┤
 │ id (PK)         │ │ id (PK)         │ │ id (PK)         │ │ id (PK)         │
 │ user_id (FK,1:1)│ │ user_id (FK,1:1)│ │ user_id (FK,1:1)│ │ customer_id (FK)│
@@ -496,7 +280,7 @@ nutrican-fe/
 | Table | Primary Key | Foreign Keys | Description |
 |-------|-------------|--------------|-------------|
 | `users` | id | - | User accounts with roles |
-| `user_kyc` | id | user_id (1:1) | KYC verification documents |
+| `sessions` | id | user_id (1:1) | KYC verification documents |
 | `pt_profiles` | id | user_id (1:1) | PT extended profiles |
 | `macro_targets` | id | user_id (1:1) | Daily macro targets |
 | `diet_logs` | id | customer_id, pt_reviewer_id | Meal entries |

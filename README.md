@@ -6,15 +6,16 @@ Ung dung theo doi dinh duong voi tich hop AI, ket noi PT, va theo doi tien tri.
 
 ```
 nutrican-pt-workspace/
-nutrican-be/                      # Backend - Spring Boot
-  nutritiontrack-module-core/      # Entities, Repositories, Enums, Utils
-  nutritiontrack-module-auth/      # Authentication & JWT
-  nutritiontrack-module-kyc/       # KYC verification (VNPT + Face Liveness)
-  nutritiontrack-module-user-profile/  # User profiles, marketplace
-  nutritiontrack-module-diet-tracker/ # Diet logging, Food Catalog
-  nutritiontrack-module-ai-gateway/   # Ollama AI integration
-  nutritiontrack-module-pt-management/ # PT workspace, SSE
-  nutritiontrack-module-admin/     # Admin dashboard, RBL research
+nutrican-be/                      # Backend - Spring Boot (Modular Monolith)
+  src/main/java/com/sba/nutricanbe/
+    common/                       # Shared models, entities, repositories, enums, utils
+    auth/                         # Authentication, security filters & JWT
+    kyc/                          # KYC verification (VNPT OCR + Face Liveness)
+    user/                         # User profiles, marketplace, body metrics
+    diet/                         # Diet logging, Food Catalog, SOS support tickets
+    ai/                           # Ollama AI integration & dish prediction
+    workspace/                    # Personal Trainer workspace, notifications & SSE
+    admin/                        # Admin dashboard, configurations & system management
 nutrican-fe/                      # Frontend - React 19 + Vite
   src/pages/      # Route pages
   src/components/ # UI components
