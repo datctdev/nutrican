@@ -1,20 +1,25 @@
 // src/components/common/PtProtectedRoute.jsx
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { useSSE } from '../../hooks/useSSE';
+import useWebSocket from '../../hooks/useWebSocket'; // Import hook WebSocket
 
+// Nhận props { children } thay vì dùng <Outlet />
 export default function PtProtectedRoute({ children }) {
-  const { isAuthenticated, user } = useAuthStore();
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const user = useAuthStore((state) => state.user);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+    // Kích hoạt kết nối WebSocket cho PT
+    useWebSocket();
 
-  if (user && !['PT_CERTIFIED', 'PT_FREELANCE'].includes(user.role)) {
-    return <Navigate to="/" replace />;
-  }
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
 
-  useSSE();
+    // Chặn nếu không phải PT
+    if (user && !['PT_CERTIFIED', 'PT_FREELANCE'].includes(user.role)) {
+        return <Navigate to="/" replace />;
+    }
 
-  return children;
+    // Render children (tức là <MainLayout />)
+    return children;
 }

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,4 +63,6 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
     @Query("SELECT m FROM PtClientMapping m WHERE m.pt.id = :ptId AND m.status = :status")
     Page<PtClientMapping> findByPtIdAndStatusWithPagination(
             @Param("ptId") UUID ptId, @Param("status") ClientMappingStatus status, Pageable pageable);
+
+    Optional<PtClientMapping> findFirstByClient_IdAndStatus(UUID clientId, ClientMappingStatus status);
 }

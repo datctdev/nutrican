@@ -7,19 +7,15 @@ import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.service.MarketplaceService;
 import com.sba.nutricanbe.workspace.dto.*;
 import com.sba.nutricanbe.workspace.service.PtWorkspaceService;
-import com.sba.nutricanbe.workspace.service.SseEmitterService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
 import java.util.UUID;
-
-import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/v1/workspace")
@@ -28,7 +24,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 public class PtWorkspaceController {
 
     private final PtWorkspaceService ptWorkspaceService;
-    private final SseEmitterService sseEmitterService;
     private final MarketplaceService marketplaceService;
 
     @GetMapping("/clients")
@@ -38,11 +33,6 @@ public class PtWorkspaceController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String status) {
         return ResponseEntity.ok(ptWorkspaceService.getClients(user.getId(), page, size, status));
-    }
-
-    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(@AuthenticationPrincipal User user) {
-        return sseEmitterService.createEmitter(user.getId());
     }
 
     @GetMapping("/diet-logs/pending")

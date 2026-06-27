@@ -238,7 +238,11 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
 
             dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
             dietLog = dietLogRepository.save(dietLog);
-            dietLogHelper.notifyPtOfNewLog(dietLog);
+
+            // ĐÃ SỬA CHỮA LỖI Ở ĐÂY: Chỉ báo cho PT nếu AI tự tin nộp thẳng!
+            if (dietLog.getStatus() == DietLogStatus.PT_REVIEWING) {
+                dietLogHelper.notifyPtOfNewLog(dietLog);
+            }
 
             log.info("Diet log created via AI: {} for user: {}, confidence: {}",
                     dietLog.getId(), customerId, aiResult.getConfidenceScore());

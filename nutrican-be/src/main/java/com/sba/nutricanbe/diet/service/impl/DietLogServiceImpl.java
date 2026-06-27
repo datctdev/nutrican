@@ -7,6 +7,7 @@ import com.sba.nutricanbe.diet.entity.DietLogImage;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
@@ -18,6 +19,7 @@ import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.DietLogItemRepository;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
+import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.service.UserQueryService;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.diet.dto.CreateDietLogRequest;
@@ -26,8 +28,10 @@ import com.sba.nutricanbe.diet.dto.DietSummaryResponse;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
+import com.sba.nutricanbe.common.event.DietLogCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -59,6 +63,8 @@ public class DietLogServiceImpl implements DietLogService {
     private final FoodItemRepository foodItemRepository;
     private final StorageService minioService;
     private final DietLogHelper dietLogHelper;
+    private final PtClientMappingRepository mappingRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -167,17 +173,38 @@ public class DietLogServiceImpl implements DietLogService {
     public ApiResponse<DietLogResponse> submitForReview(UUID logId, UUID customerId) {
         DietLog dietLog = dietLogRepository.findById(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
+
         if (!dietLog.getCustomerId().equals(customerId)) {
             throw new BadRequestException("You can only submit your own diet logs");
         }
+
         if (dietLog.getStatus() != DietLogStatus.DRAFT) {
             throw new BadRequestException("Only DRAFT logs can be submitted for review");
         }
+
+        // Chuyển trạng thái
         dietLog.setStatus(DietLogStatus.PT_REVIEWING);
         dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
-        dietLog = dietLogRepository.save(dietLog);
-        dietLogHelper.notifyPtOfNewLog(dietLog);
-        return ApiResponse.success(dietLogHelper.toResponse(dietLog), "Log submitted for PT review");
+
+        // Lưu vào DB
+        DietLog savedLog = dietLogRepository.save(dietLog);
+        dietLogHelper.notifyPtOfNewLog(savedLog);
+
+        // VÁ LỖ HỔNG: BẮN SỰ KIỆN WEBSOCKET CHO PT NGAY LẬP TỨC ĐÚNG THỨ TỰ THAM SỐ
+        mappingRepository.findFirstByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE)
+                .ifPresent(mapping -> {
+                    log.info("Pushing WebSocket event: DRAFT submitted for log {}", logId);
+                    eventPublisher.publishEvent(new DietLogCreatedEvent(
+                            this,                                 // Object source
+                            mapping.getPt().getId(),              // UUID ptId
+                            customerId,                           // UUID clientId
+                            mapping.getClient().getFullName(),    // String clientName
+                            savedLog.getId(),                     // UUID logId
+                            savedLog.getMealType().name()         // String mealType
+                    ));
+                });
+
+        return ApiResponse.success(dietLogHelper.toResponse(savedLog), "Log submitted for PT review");
     }
 
     @Override

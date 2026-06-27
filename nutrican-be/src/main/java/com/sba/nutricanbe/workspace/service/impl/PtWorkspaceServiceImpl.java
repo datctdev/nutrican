@@ -7,8 +7,6 @@ import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 
 // Entities
 import com.sba.nutricanbe.diet.entity.DietLog;
-import com.sba.nutricanbe.diet.entity.DietLogImage;
-import com.sba.nutricanbe.diet.entity.DietLogItem;
 import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
@@ -35,7 +33,6 @@ import com.sba.nutricanbe.common.util.RblDatasetFilter;
 import com.sba.nutricanbe.common.util.RblMetricsUtil;
 import com.sba.nutricanbe.workspace.dto.*;
 import com.sba.nutricanbe.workspace.service.PtWorkspaceService;
-import com.sba.nutricanbe.workspace.service.SseEmitterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -66,8 +63,8 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final UserRepository userRepository;
     private final DietLogImageRepository dietLogImageRepository;
     private final SosTicketRepository sosTicketRepository;
-    private final SseEmitterService sseEmitterService;
     private final UserQueryService userQueryService;
+    private final com.sba.nutricanbe.workspace.service.WebSocketSessionService webSocketSessionService;
 
     @Override
     @Transactional(readOnly = true)
@@ -307,7 +304,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         User customer = userQueryService.findUserById(log.getCustomerId()).orElse(null);
         String customerName = customer != null ? customer.getFullName() : null;
         String customerAvatar = customer != null ? customer.getAvatarUrl() : null;
-        
+
         List<DietLogReviewResponse.AdditionalImageInfo> additionalImages = log.getAdditionalImages() == null ? null : log.getAdditionalImages().stream()
                 .map(img -> DietLogReviewResponse.AdditionalImageInfo.builder()
                         .id(img.getId())
@@ -434,5 +431,9 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
 
     private void notifyClientOfReview(UUID clientId, UUID logId, String status) {
         log.info("Notifying client {} about review of log {}: status={}", clientId, logId, status);
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("logId", logId);
+        payload.put("status", status);
+        webSocketSessionService.sendToUser(clientId, "DIET_LOG_REVIEWED", payload);
     }
 }

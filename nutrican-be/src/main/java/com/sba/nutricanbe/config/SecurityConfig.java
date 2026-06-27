@@ -24,12 +24,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * Security configuration — thuộc application module vì nó define URL patterns
- * của toàn bộ hệ thống (cross-cutting concern), không phải của riêng auth module.
- *
- * JwtAuthenticationFilter vẫn ở auth module (nó chỉ là filter, không cần Spring Security context).
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -44,32 +38,32 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable)
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                // Public auth endpoints
-                .requestMatchers("/api/v1/auth/login").permitAll()
-                .requestMatchers("/api/v1/auth/register").permitAll()
-                .requestMatchers("/api/v1/auth/refresh").permitAll()
-                .requestMatchers("/api/v1/auth/google").permitAll()
-                .requestMatchers("/api/v1/auth/pt/**").permitAll()
-                // Authenticated auth endpoints
-                .requestMatchers("/api/v1/auth/kyc/**").authenticated()
-                // Password reset endpoints — public
-                .requestMatchers("/api/v1/auth/forgot-password").permitAll()
-                .requestMatchers("/api/v1/auth/reset-password").permitAll()
-                // SSE endpoint
-                .requestMatchers("/api/v1/workspace/stream").authenticated()
-                // WebSocket handshake. STOMP CONNECT is authenticated in WebSocketConfig.
-                .requestMatchers("/ws/**").permitAll()
-                // Swagger & health
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        // Public auth endpoints
+                        .requestMatchers("/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/v1/auth/register").permitAll()
+                        .requestMatchers("/api/v1/auth/refresh").permitAll()
+                        .requestMatchers("/api/v1/auth/google").permitAll()
+                        .requestMatchers("/api/v1/auth/pt/**").permitAll()
+                        // Authenticated auth endpoints
+                        .requestMatchers("/api/v1/auth/kyc/**").authenticated()
+                        // Password reset endpoints — public
+                        .requestMatchers("/api/v1/auth/forgot-password").permitAll()
+                        .requestMatchers("/api/v1/auth/reset-password").permitAll()
+                        // SSE endpoint
+                        .requestMatchers("/api/v1/workspace/stream").authenticated()
+                        // MỞ KHÓA HOÀN TOÀN ĐƯỜNG TRUYỀN WEBSOCKET TẠI ĐÂY
+                        .requestMatchers("/ws/**").permitAll()
+                        // Swagger & health
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

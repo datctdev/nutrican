@@ -1,0 +1,86 @@
+package com.sba.nutricanbe.workspace.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Builder;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class WebSocketSessionService {
+
+    private final ObjectMapper objectMapper;
+    // Map lưu trữ Session, Value là List để hỗ trợ 1 PT đăng nhập trên nhiều thiết bị (Web, Mobile)
+    private final Map<UUID, CopyOnWriteArrayList<WebSocketSession>> sessions = new ConcurrentHashMap<>();
+
+    public void registerSession(UUID userId, WebSocketSession session) {
+        sessions.computeIfAbsent(userId, k -> new CopyOnWriteArrayList<>()).add(session);
+        log.info("Registered WebSocket session for User [{}]. Total sessions: {}", userId, sessions.get(userId).size());
+    }
+
+    public void removeSession(UUID userId, WebSocketSession session) {
+        CopyOnWriteArrayList<WebSocketSession> userSessions = sessions.get(userId);
+        if (userSessions != null) {
+            userSessions.remove(session);
+            if (userSessions.isEmpty()) {
+                sessions.remove(userId);
+            }
+            log.info("Removed WebSocket session for User [{}].", userId);
+        }
+    }
+
+    public void sendToUser(UUID userId, String event, Object data) {
+        CopyOnWriteArrayList<WebSocketSession> userSessions = sessions.get(userId);
+        if (userSessions == null || userSessions.isEmpty()) {
+            return; // PT đang không online
+        }
+
+        try {
+            WebSocketMessage message = WebSocketMessage.builder()
+                    .event(event)
+                    .data(data)
+                    .build();
+            String jsonPayload = objectMapper.writeValueAsString(message);
+            TextMessage textMessage = new TextMessage(jsonPayload);
+
+            for (WebSocketSession session : userSessions) {
+                if (session.isOpen()) {
+                    try {
+                        session.sendMessage(textMessage);
+                    } catch (IOException e) {
+                        log.error("Failed to send WebSocket message to session [{}] of User [{}]", session.getId(), userId, e);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error serializing WebSocket message for User [{}]", userId, e);
+        }
+    }
+
+    // Các hàm Helper chuẩn hóa Event
+    public void notifyPtOfNewDietLog(UUID ptId, Object dietLogInfo) {
+        sendToUser(ptId, "NEW_DIET_LOG", dietLogInfo);
+    }
+
+    public void broadcastSos(UUID ptId, Object sosInfo) {
+        sendToUser(ptId, "SOS", sosInfo);
+    }
+
+    @Data
+    @Builder
+    public static class WebSocketMessage {
+        private String event;
+        private Object data;
+    }
+}
