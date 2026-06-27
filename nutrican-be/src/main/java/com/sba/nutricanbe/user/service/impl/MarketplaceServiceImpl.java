@@ -3,16 +3,20 @@ package com.sba.nutricanbe.user.service.impl;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.user.entity.PtProfile;
+import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.Review;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.Tier;
+import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.ReviewRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.dto.CreateReviewRequest;
+import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.dto.PtProfileResponse;
 import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
@@ -37,6 +41,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     private final PtProfileRepository ptProfileRepository;
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
+    private final PtClientMappingRepository mappingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -55,7 +60,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
             page = ptProfileRepository.findAll(pageable);
         }
 
-        return ApiResponse.success(PageResponse.from(page.map(this::toPtProfileResponse)));
+        return ApiResponse.success(PageResponse.from(page.map(PtProfileResponse::toPtProfileResponse)));
     }
 
     @Override
@@ -63,7 +68,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     public ApiResponse<PtProfileResponse> getPtDetail(UUID ptId) {
         PtProfile profile = ptProfileRepository.findByIdWithUser(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
-        return ApiResponse.success(toPtProfileResponse(profile));
+        return ApiResponse.success(PtProfileResponse.toPtProfileResponse(profile));
     }
 
     @Override
@@ -71,7 +76,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     public ApiResponse<PageResponse<ReviewResponse>> getPtReviews(UUID ptId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<Review> reviewPage = reviewRepository.findByPtId(ptId, pageable);
-        return ApiResponse.success(PageResponse.from(reviewPage.map(this::toReviewResponse)));
+        return ApiResponse.success(PageResponse.from(reviewPage.map(ReviewResponse::toReviewResponse)));
     }
 
     @Override
@@ -105,38 +110,71 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         ptProfileRepository.save(profile);
 
         log.info("Review created for PT: {} by user: {}", ptId, reviewerId);
-        return ApiResponse.success(toReviewResponse(review), "Review submitted successfully");
+        return ApiResponse.success(ReviewResponse.toReviewResponse(review), "Review submitted successfully");
     }
 
-    private PtProfileResponse toPtProfileResponse(PtProfile profile) {
-        User user = profile.getUser();
-        return PtProfileResponse.builder()
-                .id(profile.getId())
-                .userId(user.getId())
-                .fullName(user.getFullName())
-                .email(user.getEmail())
-                .avatarUrl(user.getAvatarUrl())
-                .isVerified(profile.getIsVerified())
-                .bio(profile.getBio())
-                .trainingPhilosophy(profile.getTrainingPhilosophy())
-                .yearsOfExperience(profile.getYearsOfExperience())
-                .specializations(profile.getSpecializations())
-                .rating(profile.getRating())
-                .totalReviews(profile.getTotalReviews())
-                .tier(profile.getTier().name())
-                .hourlyRate(profile.getHourlyRate())
-                .build();
+    @Override
+    @Transactional
+    public ApiResponse<PtClientMappingResponse> hirePt(UUID ptId, UUID customerId) {
+        User pt = userRepository.findById(ptId)
+                .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
+        if (pt.getRole() != UserRole.PT_CERTIFIED && pt.getRole() != UserRole.PT_FREELANCE) {
+            throw new BadRequestException("User is not a PT");
+        }
+
+        PtProfile profile = ptProfileRepository.findByUserId(ptId)
+                .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
+        if (!Boolean.TRUE.equals(profile.getIsVerified())) {
+            throw new BadRequestException("PT must be verified before accepting clients");
+        }
+
+        User customer = userRepository.findById(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", customerId));
+        if (customer.getRole() != UserRole.CUSTOMER) {
+            throw new BadRequestException("Only customers can hire a PT");
+        }
+        if (pt.getId().equals(customer.getId())) {
+            throw new BadRequestException("You cannot hire yourself");
+        }
+
+        PtClientMapping mapping = mappingRepository.findByPt_IdAndClient_Id(ptId, customerId)
+                .map(existing -> {
+                    if (existing.getStatus() == ClientMappingStatus.ACTIVE) {
+                        throw new BadRequestException("You are already linked with this PT");
+                    }
+                    existing.setStatus(ClientMappingStatus.PENDING);
+                    return existing;
+                })
+                .orElseGet(() -> PtClientMapping.builder()
+                        .pt(pt)
+                        .client(customer)
+                        .status(ClientMappingStatus.PENDING)
+                        .build());
+
+        mapping = mappingRepository.save(mapping);
+        return ApiResponse.success(PtClientMappingResponse.toMappingResponse(mapping), "Hiring request sent");
     }
 
-    private ReviewResponse toReviewResponse(Review review) {
-        return ReviewResponse.builder()
-                .id(review.getId())
-                .ptId(review.getPt().getId())
-                .reviewerId(review.getReviewer().getId())
-                .reviewerName(review.getReviewer().getFullName())
-                .rating(review.getRating())
-                .comment(review.getComment())
-                .createdAt(review.getCreatedAt())
-                .build();
+    @Override
+    @Transactional
+    public ApiResponse<PtClientMappingResponse> updateHireRequest(UUID clientId, UUID ptId, String action) {
+        PtClientMapping mapping = mappingRepository.findByPt_IdAndClient_Id(ptId, clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", clientId));
+
+        if (mapping.getStatus() != ClientMappingStatus.PENDING) {
+            throw new BadRequestException("Only pending hiring requests can be updated");
+        }
+
+        String normalized = action != null ? action.trim().toUpperCase() : "";
+        switch (normalized) {
+            case "ACCEPT" -> mapping.setStatus(ClientMappingStatus.ACTIVE);
+            case "REJECT", "DECLINE" -> mapping.setStatus(ClientMappingStatus.INACTIVE);
+            default -> throw new BadRequestException("Invalid action: " + action);
+        }
+
+        mapping = mappingRepository.save(mapping);
+        String message = mapping.getStatus() == ClientMappingStatus.ACTIVE
+                ? "Hiring request accepted" : "Hiring request rejected";
+        return ApiResponse.success(PtClientMappingResponse.toMappingResponse(mapping), message);
     }
 }
