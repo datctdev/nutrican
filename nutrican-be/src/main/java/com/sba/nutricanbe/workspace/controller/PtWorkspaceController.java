@@ -3,6 +3,8 @@ package com.sba.nutricanbe.workspace.controller;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
+import com.sba.nutricanbe.user.service.MarketplaceService;
 import com.sba.nutricanbe.workspace.dto.*;
 import com.sba.nutricanbe.workspace.service.PtWorkspaceService;
 import com.sba.nutricanbe.workspace.service.SseEmitterService;
@@ -27,6 +29,7 @@ public class PtWorkspaceController {
 
     private final PtWorkspaceService ptWorkspaceService;
     private final SseEmitterService sseEmitterService;
+    private final MarketplaceService marketplaceService;
 
     @GetMapping("/clients")
     public ResponseEntity<ApiResponse<PageResponse<ClientStatusDto>>> getClients(
@@ -72,6 +75,14 @@ public class PtWorkspaceController {
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ptWorkspaceService.assignClient(user.getId(), clientId));
+    }
+
+    @PutMapping("/clients/{clientId}/hire-request")
+    public ResponseEntity<ApiResponse<PtClientMappingResponse>> updateHireRequest(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestParam String action) {
+        return ResponseEntity.ok(marketplaceService.updateHireRequest(clientId, user.getId(), action));
     }
 
     @GetMapping("/stats")

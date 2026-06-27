@@ -25,6 +25,37 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
 
     boolean existsByPt_IdAndClient_Id(UUID ptId, UUID clientId);
 
+    boolean existsByPt_IdAndClient_IdAndStatus(UUID ptId, UUID clientId, ClientMappingStatus status);
+
+    @Query("""
+            SELECT m FROM PtClientMapping m
+            JOIN FETCH m.pt
+            JOIN FETCH m.client
+            WHERE m.id = :mappingId
+            """)
+    Optional<PtClientMapping> findByIdWithUsers(@Param("mappingId") UUID mappingId);
+
+    @Query("""
+            SELECT m FROM PtClientMapping m
+            JOIN FETCH m.pt
+            JOIN FETCH m.client
+            WHERE m.status = :status
+              AND ((m.pt.id = :firstUserId AND m.client.id = :secondUserId)
+                OR (m.pt.id = :secondUserId AND m.client.id = :firstUserId))
+            """)
+    Optional<PtClientMapping> findBetweenUsersByStatus(
+            @Param("firstUserId") UUID firstUserId,
+            @Param("secondUserId") UUID secondUserId,
+            @Param("status") ClientMappingStatus status);
+
+    @Query("""
+            SELECT m FROM PtClientMapping m
+            JOIN FETCH m.pt
+            JOIN FETCH m.client
+            WHERE m.pt.id = :userId OR m.client.id = :userId
+            """)
+    List<PtClientMapping> findThreadsByUserId(@Param("userId") UUID userId);
+
     @Query("SELECT m FROM PtClientMapping m JOIN FETCH m.client WHERE m.pt.id = :ptId")
     List<PtClientMapping> findByPtIdWithClients(@Param("ptId") UUID ptId);
 

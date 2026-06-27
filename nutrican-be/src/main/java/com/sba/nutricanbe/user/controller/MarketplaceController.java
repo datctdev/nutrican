@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.dto.CreateReviewRequest;
+import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.dto.PtProfileResponse;
 import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
@@ -66,5 +67,12 @@ public class MarketplaceController {
             @AuthenticationPrincipal User user,
             @Valid @RequestBody CreateReviewRequest request) {
         return ResponseEntity.ok(marketplaceService.createReview(ptId, user.getId(), request));
+    }
+
+    @PostMapping("/pts/{ptId}/hire")
+    public ResponseEntity<ApiResponse<PtClientMappingResponse>> hirePt(
+            @PathVariable UUID ptId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(marketplaceService.hirePt(ptId, user.getId()));
     }
 }

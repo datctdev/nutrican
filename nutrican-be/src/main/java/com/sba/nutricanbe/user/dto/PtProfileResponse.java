@@ -1,5 +1,7 @@
 package com.sba.nutricanbe.user.dto;
 
+import com.sba.nutricanbe.user.entity.PtProfile;
+import com.sba.nutricanbe.user.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,4 +29,24 @@ public class PtProfileResponse {
     private Integer totalReviews;
     private String tier;
     private BigDecimal hourlyRate;
+
+    public static PtProfileResponse toPtProfileResponse(PtProfile profile) {
+        User user = profile.getUser();
+        return PtProfileResponse.builder()
+                .id(profile.getId())
+                .userId(user.getId())
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .avatarUrl(user.getAvatarUrl())
+                .isVerified(profile.getIsVerified())
+                .bio(profile.getBio())
+                .trainingPhilosophy(profile.getTrainingPhilosophy())
+                .yearsOfExperience(profile.getYearsOfExperience())
+                .specializations(profile.getSpecializations())
+                .rating(profile.getRating())
+                .totalReviews(profile.getTotalReviews())
+                .tier(profile.getTier().name())
+                .hourlyRate(profile.getHourlyRate())
+                .build();
+    }
 }
