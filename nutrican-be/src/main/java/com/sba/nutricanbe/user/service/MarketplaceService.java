@@ -6,6 +6,7 @@ import com.sba.nutricanbe.user.dto.CreateReviewRequest;
 import com.sba.nutricanbe.user.dto.PtProfileResponse;
 import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
+import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 
 import java.util.UUID;
 
@@ -18,4 +19,8 @@ public interface MarketplaceService {
     ApiResponse<PageResponse<ReviewResponse>> getPtReviews(UUID ptId, int page, int size);
 
     ApiResponse<ReviewResponse> createReview(UUID ptId, UUID reviewerId, CreateReviewRequest request);
+
+    ApiResponse<PtClientMappingResponse> hirePt(UUID ptId, UUID customerId);
+
+    ApiResponse<PtClientMappingResponse> updateHireRequest(UUID clientId, UUID ptId, String action);
 }

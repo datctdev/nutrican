@@ -8,9 +8,6 @@ import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.enums.SosReasonCode;
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "sos_tickets")

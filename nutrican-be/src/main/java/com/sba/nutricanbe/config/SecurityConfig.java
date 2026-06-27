@@ -61,6 +61,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/reset-password").permitAll()
                 // SSE endpoint
                 .requestMatchers("/api/v1/workspace/stream").authenticated()
+                // WebSocket handshake. STOMP CONNECT is authenticated in WebSocketConfig.
+                .requestMatchers("/ws/**").permitAll()
                 // Swagger & health
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
