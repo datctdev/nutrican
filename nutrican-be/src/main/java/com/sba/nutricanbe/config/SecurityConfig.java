@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.config;
 
 import com.sba.nutricanbe.auth.security.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;

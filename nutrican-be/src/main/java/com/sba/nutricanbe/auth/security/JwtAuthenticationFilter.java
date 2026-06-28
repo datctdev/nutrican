@@ -1,8 +1,10 @@
 package com.sba.nutricanbe.auth.security;
 
-import com.sba.nutricanbe.common.util.JwtUtil;
+import com.sba.nutricanbe.auth.service.TokenRevocationService;
 import com.sba.nutricanbe.user.entity.User;
-import com.sba.nutricanbe.user.repository.UserRepository; // ĐÃ IMPORT USER REPOSITORY
+import com.sba.nutricanbe.common.enums.UserStatus;
+import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.common.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +30,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final TokenRevocationService tokenRevocationService;
 
     @Override
     protected void doFilterInternal(
@@ -39,7 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         String jwt = null;
 
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.toLowerCase().startsWith("bearer ")) {
             jwt = authHeader.substring(7);
         } else if (request.getRequestURI().startsWith("/ws/workspace")) {
             jwt = request.getParameter("token");
@@ -51,27 +54,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         try {
-            if (jwtUtil.validateToken(jwt)) {
+            if (jwtUtil.validateToken(jwt) && !tokenRevocationService.isRevoked(jwt)) {
                 String role = jwtUtil.getRoleFromToken(jwt);
                 UUID userId = jwtUtil.getUserIdFromToken(jwt);
-
                 User principalUser = userRepository.findById(userId).orElse(null);
 
-                if (principalUser != null) {
+                if (isActiveForAuthentication(principalUser)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             principalUser,
                             null,
                             Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
                     );
-
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
         } catch (Exception e) {
-            log.error("Cannot set user authentication: {}", e.getMessage());
+            log.debug("JWT authentication skipped: {}", e.getMessage());
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isActiveForAuthentication(User user) {
+        return user != null
+                && user.getStatus() != UserStatus.SUSPENDED
+                && user.getStatus() != UserStatus.INACTIVE;
     }
 }
