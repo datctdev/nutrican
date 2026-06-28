@@ -33,11 +33,11 @@ export default function Header() {
         return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     };
 
-    // ĐÃ BỔ SUNG TAB "Messages" CHO QUYỀN PT
     const navItems = {
         CUSTOMER: [
             { label: 'Diet Tracker', href: '/diet' },
             { label: 'Find PT', href: '/marketplace' },
+            { label: 'Messages', href: '/chat' },
             { label: 'Profile', href: '/profile' },
             { label: 'Macro Targets', href: '/macro-targets' },
             { label: 'Verification', href: '/kyc' },

@@ -1,4 +1,4 @@
-// src/pages/pt/ChatPage.jsx
+// src/pages/customer/CustomerChatPage.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
@@ -9,11 +9,12 @@ import { chatService } from '../../services/chatService';
 import { sendWebSocketMessage } from '../../services/websocketService';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
+import useWebSocket from '../../hooks/useWebSocket';
 
-export default function ChatPage() {
+export default function CustomerChatPage() {
     const { user } = useAuthStore();
     const location = useLocation();
-
+    useWebSocket();
     const [threads, setThreads] = useState([]);
     const [activeMappingId, setActiveMappingId] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -47,9 +48,9 @@ export default function ChatPage() {
             if (!isMounted) return;
 
             if (loadedThreads.length > 0) {
-                const targetClientId = location.state?.targetClientId;
-                if (targetClientId) {
-                    const targetThread = loadedThreads.find(t => t.participantId === targetClientId);
+                const targetPtId = location.state?.targetPtId;
+                if (targetPtId) {
+                    const targetThread = loadedThreads.find(t => t.participantId === targetPtId);
                     setActiveMappingId(prev => {
                         const newId = targetThread ? targetThread.mappingId : loadedThreads[0].mappingId;
                         return prev !== newId ? newId : prev;
@@ -86,11 +87,9 @@ export default function ChatPage() {
     useEffect(() => {
         const handleNewMessage = (e) => {
             const newMsg = e.detail;
-
             if (!newMsg.createdAt) {
                 newMsg.createdAt = new Date().toISOString();
             }
-
             if (newMsg.mappingId === activeMappingId) {
                 setMessages(prev => {
                     if (prev.some(m => m.id === newMsg.id)) return prev;
@@ -137,7 +136,7 @@ export default function ChatPage() {
         }
     };
 
-    const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'US';
+    const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'PT';
     const formatTime = (dateStr) => {
         if (!dateStr) return '';
         const date = new Date(dateStr);
@@ -147,14 +146,15 @@ export default function ChatPage() {
     const activeThread = threads.find(t => t.mappingId === activeMappingId);
 
     return (
-        <div className="max-w-7xl mx-auto h-[calc(100vh-120px)] min-h-[600px] flex gap-6 animate-fade-in pb-6">
+        <div className="max-w-7xl mx-auto h-[calc(100vh-120px)] min-h-[600px] flex gap-6 animate-fade-in pb-6 mt-6">
 
-            {/* CỘT TRÁI */}
+            {/* CỘT TRÁI: DANH SÁCH PT */}
             <Card className="w-80 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden flex-shrink-0">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50">
                     <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                        <MessageSquare className="w-5 h-5 text-blue-500" /> Tin nhắn
+                        <MessageSquare className="w-5 h-5 text-blue-500" /> Hỗ trợ
                     </h2>
+                    <p className="text-xs text-slate-500 mt-1">Trò chuyện với Huấn luyện viên</p>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -163,7 +163,14 @@ export default function ChatPage() {
                     ) : threads.length === 0 ? (
                         <div className="text-center py-10">
                             <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                            <p className="text-sm text-slate-500 font-medium">Chưa có cuộc trò chuyện nào</p>
+                            <p className="text-sm text-slate-500 font-medium">Bạn chưa kết nối với PT nào</p>
+                            <Button
+                                variant="link"
+                                className="text-blue-600 mt-2 h-auto p-0"
+                                onClick={() => window.location.href = '/marketplace'}
+                            >
+                                Tìm PT ngay
+                            </Button>
                         </div>
                     ) : (
                         threads.map((thread) => {
@@ -210,13 +217,13 @@ export default function ChatPage() {
                 </div>
             </Card>
 
-            {/* CỘT PHẢI */}
+            {/* CỘT PHẢI: KHUNG CHAT */}
             <Card className="flex-1 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden relative">
                 {!activeMappingId ? (
                     <div className="flex-1 flex flex-col items-center justify-center bg-slate-50/30">
                         <MessageSquare className="w-16 h-16 text-slate-200 mb-4" />
-                        <h3 className="text-xl font-bold text-slate-700">Chưa chọn cuộc trò chuyện</h3>
-                        <p className="text-slate-500 mt-2">Chọn một người bên trái để bắt đầu nhắn tin.</p>
+                        <h3 className="text-xl font-bold text-slate-700">Trợ giúp từ PT</h3>
+                        <p className="text-slate-500 mt-2">Chọn PT của bạn bên trái để bắt đầu nhắn tin.</p>
                     </div>
                 ) : (
                     <>
@@ -229,7 +236,7 @@ export default function ChatPage() {
                             <div>
                                 <h3 className="font-bold text-slate-800 text-lg">{activeThread?.participantName}</h3>
                                 <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Đang kết nối
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Huấn luyện viên của bạn
                                 </p>
                             </div>
                         </div>
@@ -242,12 +249,11 @@ export default function ChatPage() {
                                 </div>
                             ) : messages.length === 0 ? (
                                 <div className="h-full flex items-center justify-center text-slate-400 text-sm font-medium">
-                                    Hãy gửi lời chào đầu tiên!
+                                    Gửi tin nhắn đầu tiên cho PT của bạn!
                                 </div>
                             ) : (
                                 messages.map((msg, index) => {
                                     const isMe = msg.senderId === user?.id;
-
                                     return (
                                         <div key={msg.id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                             <div className={`max-w-[70%] px-5 py-3 text-sm ${
@@ -278,7 +284,7 @@ export default function ChatPage() {
                                             handleSendMessage();
                                         }
                                     }}
-                                    placeholder="Nhập tin nhắn... (Nhấn Enter để gửi)"
+                                    placeholder="Nhập tin nhắn..."
                                     className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none overflow-hidden max-h-32 min-h-[52px]"
                                     rows="1"
                                 />

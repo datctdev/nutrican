@@ -25,6 +25,7 @@ import UserManagementPage from './pages/admin/UserManagementPage';
 import SosTicketsPage from './pages/admin/SosTicketsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import ChatPage from './pages/pt/ChatPage';
+import CustomerChatPage from './pages/customer/CustomerChatPage';
 
 function App() {
     const router = createBrowserRouter([
@@ -63,6 +64,10 @@ function App() {
                 {
                     path: '/kyc',
                     element: <ProtectedRoute><KycPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/chat',
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><CustomerChatPage /></ProtectedRoute>,
                 },
                 {
                     path: '/admin',
