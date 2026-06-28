@@ -2,7 +2,6 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import MainLayout from './components/layouts/MainLayout';
-import AuthLayout from './components/layouts/AuthLayout';
 import PtProtectedRoute from './components/common/PtProtectedRoute';
 
 import LoginPage from './pages/auth/LoginPage';
@@ -25,79 +24,81 @@ import PtVerificationPage from './pages/admin/PtVerificationPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import SosTicketsPage from './pages/admin/SosTicketsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import ChatPage from './pages/pt/ChatPage';
 
 function App() {
-  const router = createBrowserRouter([
-    {
-      element: <MainLayout />,
-      children: [
-        { path: '/', element: <LandingPage /> },
-        { path: '/login', element: <LoginPage /> },
-        { path: '/register', element: <RegisterPage /> },
-        { path: '/forgot-password', element: <ForgotPasswordPage /> },
-        { path: '/reset-password', element: <ResetPasswordPage /> },
+    const router = createBrowserRouter([
         {
-          path: '/set-password',
-          element: <SetPasswordPage />,
+            element: <MainLayout />,
+            children: [
+                { path: '/', element: <LandingPage /> },
+                { path: '/login', element: <LoginPage /> },
+                { path: '/register', element: <RegisterPage /> },
+                { path: '/forgot-password', element: <ForgotPasswordPage /> },
+                { path: '/reset-password', element: <ResetPasswordPage /> },
+                {
+                    path: '/set-password',
+                    element: <SetPasswordPage />,
+                },
+                {
+                    path: '/marketplace',
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><MarketplacePage /></ProtectedRoute>,
+                },
+                {
+                    path: '/pt-profile/:id',
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><PtDetailPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/diet',
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><DietTrackerPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/profile',
+                    element: <ProtectedRoute><ProfilePage /></ProtectedRoute>,
+                },
+                {
+                    path: '/macro-targets',
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><MacroTargetsPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/kyc',
+                    element: <ProtectedRoute><KycPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/admin',
+                    element: <ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboardPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/admin/pts',
+                    element: <ProtectedRoute allowedRoles={['ADMIN']}><PtVerificationPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/admin/users',
+                    element: <ProtectedRoute allowedRoles={['ADMIN']}><UserManagementPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/admin/sos',
+                    element: <ProtectedRoute allowedRoles={['ADMIN']}><SosTicketsPage /></ProtectedRoute>,
+                },
+            ],
         },
         {
-          path: '/marketplace',
-          element: <ProtectedRoute allowedRoles={['CUSTOMER']}><MarketplacePage /></ProtectedRoute>,
+            element: <PtProtectedRoute><MainLayout /></PtProtectedRoute>,
+            children: [
+                { path: '/pt', element: <PtDashboardPage /> },
+                { path: '/pt/clients', element: <ClientListPage /> },
+                { path: '/pt/reviews', element: <ReviewDietLogPage /> },
+                { path: '/pt/chat', element: <ChatPage /> },
+            ],
         },
-        {
-          path: '/pt-profile/:id',
-          element: <ProtectedRoute allowedRoles={['CUSTOMER']}><PtDetailPage /></ProtectedRoute>,
-        },
-        {
-          path: '/diet',
-          element: <ProtectedRoute allowedRoles={['CUSTOMER']}><DietTrackerPage /></ProtectedRoute>,
-        },
-        {
-          path: '/profile',
-          element: <ProtectedRoute><ProfilePage /></ProtectedRoute>,
-        },
-        {
-          path: '/macro-targets',
-          element: <ProtectedRoute allowedRoles={['CUSTOMER']}><MacroTargetsPage /></ProtectedRoute>,
-        },
-        {
-          path: '/kyc',
-          element: <ProtectedRoute><KycPage /></ProtectedRoute>,
-        },
-        {
-          path: '/admin',
-          element: <ProtectedRoute allowedRoles={['ADMIN']}><AdminDashboardPage /></ProtectedRoute>,
-        },
-        {
-          path: '/admin/pts',
-          element: <ProtectedRoute allowedRoles={['ADMIN']}><PtVerificationPage /></ProtectedRoute>,
-        },
-        {
-          path: '/admin/users',
-          element: <ProtectedRoute allowedRoles={['ADMIN']}><UserManagementPage /></ProtectedRoute>,
-        },
-        {
-          path: '/admin/sos',
-          element: <ProtectedRoute allowedRoles={['ADMIN']}><SosTicketsPage /></ProtectedRoute>,
-        },
-      ],
-    },
-    {
-      element: <PtProtectedRoute><MainLayout /></PtProtectedRoute>,
-      children: [
-        { path: '/pt', element: <PtDashboardPage /> },
-        { path: '/pt/clients', element: <ClientListPage /> },
-        { path: '/pt/reviews', element: <ReviewDietLogPage /> },
-      ],
-    },
-  ]);
+    ]);
 
-  return (
-    <>
-      <RouterProvider router={router} />
-      <Toaster position="top-right" richColors closeButton />
-    </>
-  );
+    return (
+        <>
+            <RouterProvider router={router} />
+            <Toaster position="top-right" richColors closeButton />
+        </>
+    );
 }
 
 export default App;
