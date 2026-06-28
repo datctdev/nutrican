@@ -10,14 +10,13 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @Configuration
 @EnableWebSocket
 @RequiredArgsConstructor
-public class WebSocketConfig implements WebSocketConfigurer {
+public class RealtimeWebSocketConfig implements WebSocketConfigurer {
 
     private final WorkspaceWebSocketHandler workspaceWebSocketHandler;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        // Đăng ký URL /ws/workspace và cho phép frontend (CORS) kết nối vào
-        registry.addHandler(workspaceWebSocketHandler, "/ws/workspace")
-                .setAllowedOrigins("*");
+        // Shared realtime endpoint for workspace notifications and chat events.
+        registry.addHandler(workspaceWebSocketHandler, "/ws/workspace").setAllowedOrigins("*");
     }
 }
