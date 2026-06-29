@@ -4,12 +4,14 @@ import { useLocation } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
-import { Send, MessageSquare, Clock, ShieldAlert } from 'lucide-react';
+import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X } from 'lucide-react';
 import { chatService } from '../../services/chatService';
 import { sendWebSocketMessage } from '../../services/websocketService';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import useWebSocket from '../../hooks/useWebSocket';
+
+const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 
 export default function CustomerChatPage() {
     const { user } = useAuthStore();
@@ -19,12 +21,15 @@ export default function CustomerChatPage() {
     const [activeMappingId, setActiveMappingId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [selectedImagePreview, setSelectedImagePreview] = useState('');
 
     const [loadingThreads, setLoadingThreads] = useState(true);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [sending, setSending] = useState(false);
 
     const messagesEndRef = useRef(null);
+    const imageInputRef = useRef(null);
 
     const loadThreads = useCallback(async () => {
         try {
@@ -112,12 +117,63 @@ export default function CustomerChatPage() {
         scrollToBottom();
     }, [messages]);
 
+    useEffect(() => {
+        return () => {
+            if (selectedImagePreview) {
+                URL.revokeObjectURL(selectedImagePreview);
+            }
+        };
+    }, [selectedImagePreview]);
+
+    const handleImageSelect = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (!file.type?.startsWith('image/')) {
+            toast.error('Vui lòng chọn file ảnh');
+            event.target.value = '';
+            return;
+        }
+        if (file.size > MAX_CHAT_IMAGE_SIZE) {
+            toast.error('Ảnh quá lớn. Kích thước tối đa là 5MB.');
+            event.target.value = '';
+            return;
+        }
+
+        if (selectedImagePreview) {
+            URL.revokeObjectURL(selectedImagePreview);
+        }
+        setSelectedImage(file);
+        setSelectedImagePreview(URL.createObjectURL(file));
+    };
+
+    const clearSelectedImage = () => {
+        if (selectedImagePreview) {
+            URL.revokeObjectURL(selectedImagePreview);
+        }
+        setSelectedImage(null);
+        setSelectedImagePreview('');
+        if (imageInputRef.current) {
+            imageInputRef.current.value = '';
+        }
+    };
+
     const handleSendMessage = async (e) => {
         e?.preventDefault();
-        if (!newMessage.trim() || !activeMappingId) return;
+        if ((!newMessage.trim() && !selectedImage) || !activeMappingId) return;
 
         try {
             setSending(true);
+            if (selectedImage) {
+                const res = await chatService.sendImage(activeMappingId, selectedImage, newMessage);
+                const sentMessage = res.data?.data;
+                if (sentMessage) {
+                    setMessages((prev) => prev.some((m) => m.id === sentMessage.id) ? prev : [...prev, sentMessage]);
+                }
+                setNewMessage('');
+                clearSelectedImage();
+                return;
+            }
+
             const success = sendWebSocketMessage('CHAT_SEND', {
                 mappingId: activeMappingId,
                 content: newMessage.trim()
@@ -261,7 +317,14 @@ export default function CustomerChatPage() {
                                                     ? 'bg-blue-600 text-white rounded-3xl rounded-tr-sm shadow-md shadow-blue-500/20'
                                                     : 'bg-white border border-slate-200 text-slate-800 rounded-3xl rounded-tl-sm shadow-sm'
                                             }`}>
-                                                {msg.content}
+                                                {msg.imageUrl && (
+                                                    <img
+                                                        src={msg.imageUrl}
+                                                        alt={msg.content || 'Chat attachment'}
+                                                        className="mb-2 max-h-72 w-full rounded-2xl object-cover"
+                                                    />
+                                                )}
+                                                {msg.content && <p>{msg.content}</p>}
                                             </div>
                                             <span className="text-[10px] text-slate-400 mt-1.5 px-2 font-medium flex items-center gap-1">
                                                 <Clock className="w-3 h-3" /> {formatTime(msg.createdAt)}
@@ -274,7 +337,41 @@ export default function CustomerChatPage() {
                         </div>
 
                         <div className="p-4 bg-white border-t border-slate-100">
+                            {selectedImagePreview && (
+                                <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                                    <img src={selectedImagePreview} alt="Selected attachment" className="h-16 w-16 rounded-xl object-cover" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-bold text-slate-800">{selectedImage?.name}</p>
+                                        <p className="text-xs font-medium text-slate-500">Ảnh sẽ được gửi cùng tin nhắn</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={clearSelectedImage}
+                                        className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-700"
+                                        aria-label="Remove selected image"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            )}
                             <form onSubmit={handleSendMessage} className="flex items-end gap-3">
+                                <input
+                                    ref={imageInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleImageSelect}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => imageInputRef.current?.click()}
+                                    disabled={sending}
+                                    className="h-[52px] w-[52px] flex-shrink-0 rounded-2xl border-slate-200 bg-white p-0 text-slate-600 hover:bg-slate-50"
+                                    aria-label="Attach image"
+                                >
+                                    <ImagePlus className="h-5 w-5" />
+                                </Button>
                                 <textarea
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
@@ -290,7 +387,7 @@ export default function CustomerChatPage() {
                                 />
                                 <Button
                                     type="submit"
-                                    disabled={!newMessage.trim() || sending}
+                                    disabled={(!newMessage.trim() && !selectedImage) || sending}
                                     className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-[52px] w-[52px] flex-shrink-0 shadow-md shadow-blue-500/20 transition-all p-0 flex items-center justify-center"
                                 >
                                     <Send className={`w-5 h-5 ${sending ? 'animate-pulse' : ''}`} />

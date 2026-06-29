@@ -5,6 +5,7 @@ import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -16,5 +17,9 @@ public interface ChatService {
 
     ChatMessageResponse sendMessage(UUID senderId, ChatMessageRequest request);
 
+    ChatMessageResponse sendImageMessage(UUID senderId, UUID mappingId, String content, MultipartFile file);
+
     ApiResponse<Void> markRead(UUID userId, UUID mappingId);
+
+    void publishRealtimeMessage(ChatMessageResponse message);
 }
