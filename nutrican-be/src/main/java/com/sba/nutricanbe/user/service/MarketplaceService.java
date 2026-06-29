@@ -7,6 +7,7 @@ import com.sba.nutricanbe.user.dto.PtProfileResponse;
 import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
 import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
+import com.sba.nutricanbe.user.entity.User;
 
 import java.util.UUID;
 
@@ -14,7 +15,7 @@ public interface MarketplaceService {
 
     ApiResponse<PageResponse<PtProfileResponse>> searchPts(PtSearchRequest request);
 
-    ApiResponse<PtProfileResponse> getPtDetail(UUID ptId);
+    ApiResponse<PtProfileResponse> getPtDetail(UUID ptId, User user);
 
     ApiResponse<PageResponse<ReviewResponse>> getPtReviews(UUID ptId, int page, int size);
 

@@ -65,10 +65,18 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse<PtProfileResponse> getPtDetail(UUID ptId) {
+    public ApiResponse<PtProfileResponse> getPtDetail(UUID ptId, User user) {
         PtProfile profile = ptProfileRepository.findByIdWithUser(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
-        return ApiResponse.success(PtProfileResponse.toPtProfileResponse(profile));
+
+        PtProfileResponse response = PtProfileResponse.toPtProfileResponse(profile);
+
+        if (user != null && user.getRole() == UserRole.CUSTOMER) {
+            mappingRepository.findByPt_IdAndClient_Id(profile.getUser().getId(), user.getId())
+                    .ifPresent(mapping -> response.setMappingStatus(mapping.getStatus().name()));
+        }
+
+        return ApiResponse.success(response);
     }
 
     @Override
@@ -91,6 +99,14 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
         User reviewer = userRepository.findById(reviewerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Reviewer", reviewerId));
+
+        boolean hasHired = mappingRepository.findByPt_IdAndClient_Id(ptId, reviewerId)
+                .map(m -> m.getStatus() == ClientMappingStatus.ACTIVE || m.getStatus() == ClientMappingStatus.INACTIVE)
+                .orElse(false);
+
+        if (!hasHired) {
+            throw new BadRequestException("Bạn chỉ có thể đánh giá Huấn luyện viên mà bạn đã từng làm việc cùng.");
+        }
 
         Review review = Review.builder()
                 .pt(pt)
@@ -140,8 +156,12 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         PtClientMapping mapping = mappingRepository.findByPt_IdAndClient_Id(ptId, customerId)
                 .map(existing -> {
                     if (existing.getStatus() == ClientMappingStatus.ACTIVE) {
-                        throw new BadRequestException("You are already linked with this PT");
+                        throw new BadRequestException("Bạn đã liên kết với Huấn luyện viên này rồi.");
                     }
+                    if (existing.getStatus() == ClientMappingStatus.PENDING) {
+                        throw new BadRequestException("Bạn đã gửi yêu cầu trước đó, vui lòng chờ PT xác nhận.");
+                    }
+
                     existing.setStatus(ClientMappingStatus.PENDING);
                     return existing;
                 })

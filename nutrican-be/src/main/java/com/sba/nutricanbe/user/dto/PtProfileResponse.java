@@ -29,6 +29,7 @@ public class PtProfileResponse {
     private Integer totalReviews;
     private String tier;
     private BigDecimal hourlyRate;
+    private String mappingStatus;
 
     public static PtProfileResponse toPtProfileResponse(PtProfile profile) {
         User user = profile.getUser();
