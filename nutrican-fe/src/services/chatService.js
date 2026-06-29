@@ -19,6 +19,15 @@ export const chatService = {
         return api.get(`/chat/threads/${mappingId}/messages`, { params });
     },
 
+    sendImage: (mappingId, file, content) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (content?.trim()) {
+            formData.append('content', content.trim());
+        }
+        return api.post(`/chat/threads/${mappingId}/images`, formData);
+    },
+
     /**
      * Đánh dấu toàn bộ tin nhắn trong luồng này là đã đọc
      * @param {string} mappingId - ID của luồng chat
