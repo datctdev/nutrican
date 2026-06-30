@@ -28,4 +28,6 @@ public interface SosTicketRepository extends JpaRepository<SosTicket, UUID> {
     Page<SosTicket> findByPt_IdAndStatus(@Param("ptId") UUID ptId, @Param("status") SosTicketStatus status, Pageable pageable);
 
     List<SosTicket> findByDietLog_Id(UUID dietLogId);
+
+    void deleteByDietLogId(UUID dietLogId);
 }

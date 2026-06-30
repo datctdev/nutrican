@@ -239,7 +239,6 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
             dietLog = dietLogRepository.save(dietLog);
 
-            // ĐÃ SỬA CHỮA LỖI Ở ĐÂY: Chỉ báo cho PT nếu AI tự tin nộp thẳng!
             if (dietLog.getStatus() == DietLogStatus.PT_REVIEWING) {
                 dietLogHelper.notifyPtOfNewLog(dietLog);
             }
@@ -341,11 +340,6 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
         aiRaw.put("fat", macros.fat());
         aiRaw.put("needsConfirmation", false);
         dietLog.setAiRawJson(aiRaw);
-
-        if (dietLog.getStatus() == DietLogStatus.DRAFT) {
-            dietLog.setStatus(DietLogStatus.LOGGED);
-        }
-
         dietLog = dietLogRepository.save(dietLog);
         return ApiResponse.success(dietLogHelper.toResponse(dietLog), "Recognition confirmed");
     }
@@ -427,10 +421,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
     }
 
     private DietLogStatus resolveStatus(MealRecognitionResult aiResult) {
-        if (aiResult.isFallback()) return DietLogStatus.DRAFT;
-        if (aiResult.getConfidenceScore() == null) return DietLogStatus.DRAFT;
-        return aiResult.getConfidenceScore().compareTo(confidenceThreshold) >= 0
-                ? DietLogStatus.PT_REVIEWING : DietLogStatus.DRAFT;
+        return DietLogStatus.DRAFT;
     }
 
     private List<FoodPredictionResponse> mapTopPredictions(List<FoodPredictionDto> predictions, BigDecimal portionRatio) {

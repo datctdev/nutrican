@@ -70,6 +70,10 @@ public class DietLog extends BaseEntity {
     @Column(name = "log_date")
     private LocalDate logDate;
 
+    @Column(name = "is_pt_notified")
+    @Builder.Default
+    private Boolean isPtNotified = false;
+
     @OneToMany(mappedBy = "dietLog", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC")
     @Builder.Default

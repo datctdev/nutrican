@@ -5,12 +5,10 @@ import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { dietService } from '../../services/dietService';
 import { toast } from 'sonner';
-import { Upload, Camera, FileText, AlertTriangle, RefreshCw, Trash2, CheckCircle2, Clock, XCircle, Activity, Sparkles, Keyboard, Star, X, Send } from 'lucide-react';
-
-// BƯỚC QUAN TRỌNG NHẤT: Import hệ thống mạng WebSocket
+import { Upload, Camera, FileText, AlertTriangle, RefreshCw, Trash2, CheckCircle2, Clock, XCircle, Activity, Sparkles, Keyboard, Star, X, Send, Edit } from 'lucide-react';
 import useWebSocket from '../../hooks/useWebSocket';
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 const getFullImageUrl = (url) => {
     if (!url) return '';
@@ -30,6 +28,16 @@ const FOOD_CODE_LABELS = {
     com_tam: 'Cơm Tấm (Cơm sườn)',
     goi_cuon: 'Gỏi Cuốn',
     pho: 'Phở',
+};
+
+const REASON_LABELS = {
+    WRONG_FOOD: 'Nhận diện sai món ăn',
+    WRONG_PORTION: 'Sai định lượng/khẩu phần',
+    WRONG_MACROS: 'Sai chỉ số Macros',
+    UNCLEAR_IMAGE: 'Ảnh không rõ nét',
+    RESTAURANT_TOO_COMPLEX: 'Món ăn quá phức tạp',
+    DB_MATCH_INCORRECT: 'Cơ sở dữ liệu ghép sai',
+    OTHER: 'Lý do khác',
 };
 
 function getLogFoodTitle(log) {
@@ -173,8 +181,33 @@ const MacroRing = ({ label, current, target, colorClass }) => {
     );
 };
 
+const SafeImage = ({ src, alt, className }) => {
+    const [hasError, setHasError] = useState(false);
+
+    useEffect(() => {
+        setHasError(false);
+    }, [src]);
+
+    if (hasError || !src) {
+        return (
+            <div className={`${className} bg-slate-100 flex flex-col items-center justify-center text-slate-400 border border-slate-200`}>
+                <Camera className="w-5 h-5 mb-1 opacity-40" />
+                <span className="text-[8px] font-bold uppercase tracking-wider">Lỗi tải ảnh</span>
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={src}
+            alt={alt}
+            className={className}
+            onError={() => setHasError(true)}
+        />
+    );
+};
+
 export default function DietTrackerPage() {
-    // KHỞI ĐỘNG KẾT NỐI WEBSOCKET NGAY KHI VÀO TRANG
     useWebSocket();
 
     const [logs, setLogs] = useState([]);
@@ -206,7 +239,7 @@ export default function DietTrackerPage() {
     const [foodSearchQuery, setFoodSearchQuery] = useState('');
     const [foodSearchResults, setFoodSearchResults] = useState([]);
 
-    const [showSosForm, setShowSosForm] = useState(false);
+    const [isSosModalOpen, setIsSosModalOpen] = useState(false);
     const [sosMessage, setSosMessage] = useState('');
     const [sosSubmitting, setSosSubmitting] = useState(false);
     const [sosTickets, setSosTickets] = useState([]);
@@ -275,23 +308,46 @@ export default function DietTrackerPage() {
     }, []);
 
     useEffect(() => {
+        let isMounted = true;
+        let timeoutId = null;
+
         const init = async () => {
             await Promise.all([fetchData(), loadHotpotData(), loadResNetDishes()]);
         };
-        init();
 
-        const handleRealtimeUpdate = () => {
-            console.log("🔄 Lệnh Reload đã được gọi từ WebSocket!");
-            fetchData();
+        if (isMounted) {
+            init();
+        }
+
+        const handleRealtimeUpdate = (e) => {
+            console.log("🔄 Lệnh Reload đã được gọi từ WebSocket (Phía Học Viên)!", e.type);
+
+            if (e.type === 'SOS_RESOLVED' && e.detail) {
+                setSosTickets(prev => prev.map(t =>
+                    t.id === e.detail.ticketId
+                        ? { ...t, status: 'RESOLVED', note: e.detail.note || t.note }
+                        : t
+                ));
+            }
+
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                if (isMounted) fetchData();
+            }, 1000);
         };
 
-        // Bắt cả 2 loại sự kiện để đảm bảo không bị lọt bất cứ cập nhật nào
         window.addEventListener('realtime_update', handleRealtimeUpdate);
         window.addEventListener('realtime_update_client', handleRealtimeUpdate);
+        window.addEventListener('DIET_LOG_REVIEWED', handleRealtimeUpdate);
+        window.addEventListener('SOS_RESOLVED', handleRealtimeUpdate);
 
         return () => {
+            isMounted = false;
+            if (timeoutId) clearTimeout(timeoutId);
             window.removeEventListener('realtime_update', handleRealtimeUpdate);
             window.removeEventListener('realtime_update_client', handleRealtimeUpdate);
+            window.removeEventListener('DIET_LOG_REVIEWED', handleRealtimeUpdate);
+            window.removeEventListener('SOS_RESOLVED', handleRealtimeUpdate);
         };
     }, [fetchData, loadHotpotData, loadResNetDishes]);
 
@@ -479,6 +535,52 @@ export default function DietTrackerPage() {
         }
     };
 
+    const handleEditLog = (log) => {
+        const raw = log.aiRawJson || {};
+
+        const safeTopPredictions = raw.topPredictions?.length
+            ? raw.topPredictions
+            : [{
+                foodCode: log.aiFoodCode || 'unknown',
+                foodName: log.matchedFoodName || log.foodDescription || 'Chưa rõ',
+                confidence: log.aiConfidenceScore || 0,
+            }];
+
+        const selectedCode = log.aiFoodCode || safeTopPredictions[0]?.foodCode || 'unknown';
+
+        const servingG = getServingGForCode(selectedCode, resnetDishes);
+        const dish = getManualDishOptions(resnetDishes).find((d) => resolveResnetFoodCode(d) === selectedCode);
+        const baseCal = dish?.calories || RESNET_MACRO_ESTIMATES[selectedCode]?.calories;
+
+        let currentGrams = servingG;
+        if (log.macrosJson?.calories && baseCal) {
+            currentGrams = Math.round((Number(log.macrosJson.calories) / Number(baseCal)) * servingG);
+        } else {
+            currentGrams = raw.userAdjustedGrams || raw.portionSize || raw.estimatedTotalGrams || servingG;
+        }
+
+        setConfirmModal({
+            logId: log.id,
+            confirmed: false,
+            isEditing: true,
+            topPredictions: safeTopPredictions,
+            selectedFoodCode: selectedCode,
+            portionRatio: raw.portionRatio ?? 1,
+            portionSize: raw.portionSize,
+            adjustedGrams: currentGrams,
+            calories: log.macrosJson?.calories || 0,
+            protein: log.macrosJson?.protein || 0,
+            carb: log.macrosJson?.carbs || log.macrosJson?.carb || 0,
+            fat: log.macrosJson?.fat || 0,
+            needsConfirmation: false,
+            foodName: log.matchedFoodName || log.foodDescription,
+            llavaUsed: raw.llavaUsed,
+            llavaFoodName: raw.llavaFoodName,
+            macroSource: raw.macroSource,
+            estimatedTotalGrams: raw.estimatedTotalGrams,
+        });
+    };
+
     const handleManualSubmit = async (e) => {
         e.preventDefault();
         if (ingredientItems.length === 0) {
@@ -520,8 +622,11 @@ export default function DietTrackerPage() {
     const handleCancelConfirmation = async () => {
         const logId = confirmModal?.logId;
         const wasConfirmed = confirmModal?.confirmed;
+        const isEditing = confirmModal?.isEditing;
+
         setConfirmModal(null);
-        if (logId && !wasConfirmed) {
+
+        if (logId && !wasConfirmed && !isEditing) {
             try {
                 await dietService.deleteLog(logId);
                 toast.info('Đã hủy — bữa ăn không được lưu');
@@ -529,7 +634,6 @@ export default function DietTrackerPage() {
                 toast.error('Không thể hủy bữa ăn tạm');
             }
         }
-        fetchData();
     };
 
     const handleConfirmRecognition = async () => {
@@ -636,24 +740,23 @@ export default function DietTrackerPage() {
 
     const handleSosSubmit = async (e) => {
         e.preventDefault();
-        if (!sosMessage.trim()) return toast.error('Please enter a message');
+        if (!sosMessage.trim()) return toast.error('Vui lòng nhập nội dung cần hỗ trợ');
         try {
             setSosSubmitting(true);
             await dietService.createSos({
                 note: sosMessage,
                 dietLogId: sosDietLogId || undefined,
                 priority: 'HIGH',
-                mealSource: mealSource === 'RESTAURANT' ? 'RESTAURANT' : 'HOME_COOKED',
                 reasonCode: 'USER_REQUEST',
             });
-            toast.success('SOS Ticket Created!');
-            setShowSosForm(false);
+            toast.success('Đã gửi yêu cầu SOS cho PT thành công!');
+            setIsSosModalOpen(false);
             setSosMessage('');
             setSosDietLogId(null);
             fetchData();
         } catch (error) {
             console.error(error);
-            toast.error('Failed to create SOS ticket');
+            toast.error('Lỗi khi gửi yêu cầu SOS');
         } finally {
             setSosSubmitting(false);
         }
@@ -671,12 +774,13 @@ export default function DietTrackerPage() {
             <div className="flex gap-2 mt-4 flex-wrap">
                 {images.map((img, idx) => (
                     <div key={img.id || `primary-${idx}`} className="relative group">
-                        <img
+
+                        <SafeImage
                             src={img.url}
                             alt="meal"
                             className="w-20 h-20 object-cover rounded-xl border border-slate-200 shadow-sm"
-                            loading="lazy"
                         />
+
                         {img.isPrimary && (
                             <div className="absolute -top-2 -right-2 bg-amber-400 text-amber-900 rounded-full p-1 shadow-sm">
                                 <Star className="w-3 h-3 fill-current" />
@@ -715,7 +819,7 @@ export default function DietTrackerPage() {
 
     return (
         <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mt-6">
                 <div>
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Diet Tracker</h1>
                     <p className="text-slate-500 mt-1 font-medium">Analyze meals instantly and hit your daily goals.</p>
@@ -1015,15 +1119,51 @@ export default function DietTrackerPage() {
                                                             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" />{macros.carbs || macros.carb || 0}g Carb</span>
                                                             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" />{macros.fat || 0}g Fat</span>
                                                         </div>
-                                                        {log.status === 'DRAFT' && (
-                                                            <Button size="sm" onClick={async () => { await dietService.submitForReview(log.id); toast.success('Submitted for PT review'); fetchData(); }} className="mt-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs h-8">
-                                                                Xác nhận & gửi PT
-                                                            </Button>
+
+                                                        {/* BỔ SUNG: HIỂN THỊ LỜI NHẮN VÀ LÝ DO TỪ PT (NẾU CÓ) */}
+                                                        {(log.ptNote || log.ptCorrectionReason) && log.status !== 'DRAFT' && (
+                                                            <div className={`mt-4 p-4 rounded-xl border text-sm ${log.status === 'REJECTED' ? 'bg-red-50 border-red-100 text-red-800' : 'bg-emerald-50 border-emerald-100 text-emerald-800'}`}>
+                                                                <p className="font-extrabold mb-1.5 flex items-center gap-2">
+                                                                    {log.status === 'REJECTED' ? <XCircle className="w-4 h-4"/> : <CheckCircle2 className="w-4 h-4"/>}
+                                                                    Phản hồi từ Huấn luyện viên
+                                                                </p>
+
+                                                                {log.ptCorrectionReason && log.ptCorrectionReason !== 'OTHER' && (
+                                                                    <p className="font-bold text-xs opacity-70 mb-1.5 uppercase tracking-widest">
+                                                                        • Lý do: {REASON_LABELS[log.ptCorrectionReason] || log.ptCorrectionReason}
+                                                                    </p>
+                                                                )}
+
+                                                                {log.ptNote && (
+                                                                    <p className="italic font-medium border-l-2 border-current pl-3 py-1">"{log.ptNote}"</p>
+                                                                )}
+                                                            </div>
                                                         )}
-                                                        {log.suggestSos && (
-                                                            <Button size="sm" variant="outline" onClick={() => { setSosDietLogId(log.id); setShowSosForm(true); }} className="mt-2 border-amber-300 text-amber-700 rounded-lg text-xs h-8">
-                                                                Gửi SOS
-                                                            </Button>
+
+                                                        {/* Tách riêng điều kiện hiển thị các nút */}
+                                                        {log.status === 'DRAFT' && (
+                                                            <div className="flex items-center gap-2 mt-4 flex-wrap">
+                                                                {/* 1. Nút Gửi PT */}
+                                                                <Button size="sm" onClick={async () => { await dietService.submitForReview(log.id); toast.success('Submitted for PT review'); fetchData(); }} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold h-9 shadow-md shadow-amber-500/20">
+                                                                    Xác nhận & gửi PT Duyệt
+                                                                </Button>
+
+                                                                {/* 2. Nút sửa thông số */}
+                                                                <Button size="sm" variant="outline" onClick={() => handleEditLog(log)} className="border-blue-300 text-blue-700 hover:bg-blue-50 rounded-lg text-xs font-bold h-9">
+                                                                    <Edit className="w-3.5 h-3.5 mr-1.5" /> Sửa thông số
+                                                                </Button>
+
+                                                                {/* 3. Nút SOS */}
+                                                                {!log.sosTicketFlag && (
+                                                                    <Button size="sm" variant="outline" onClick={() => {
+                                                                        setSosDietLogId(log.id);
+                                                                        setSosMessage('');
+                                                                        setIsSosModalOpen(true);
+                                                                    }} className="border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg text-xs font-bold h-9">
+                                                                        <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Báo cáo SOS
+                                                                    </Button>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </div>
 
@@ -1077,47 +1217,10 @@ export default function DietTrackerPage() {
                         </CardContent>
                     </Card>
 
-                    {/* SOS Section */}
-                    <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200/60 rounded-3xl p-6 shadow-sm">
-                        <div className="flex gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-full bg-white border border-amber-100 flex items-center justify-center flex-shrink-0 shadow-sm">
-                                <AlertTriangle className="w-6 h-6 text-amber-500" />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-amber-900 mb-1">SOS Request</h4>
-                                <p className="text-sm text-amber-700/80 font-medium">Not sure how to log your restaurant meal? Ask your PT for help.</p>
-                            </div>
-                        </div>
-
-                        {!showSosForm ? (
-                            <Button onClick={() => setShowSosForm(true)} className="w-full bg-amber-500 hover:bg-amber-600 text-white shadow-sm rounded-xl text-sm font-bold h-11">
-                                Create SOS Ticket
-                            </Button>
-                        ) : (
-                            <form onSubmit={handleSosSubmit} className="space-y-3 animate-fade-in bg-white p-4 rounded-2xl border border-amber-100 shadow-inner">
-                <textarea
-                    value={sosMessage}
-                    onChange={(e) => setSosMessage(e.target.value)}
-                    rows="3"
-                    placeholder="Describe your meal or ask a question..."
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none"
-                />
-                                <div className="flex gap-2">
-                                    <Button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-600 text-white rounded-xl" disabled={sosSubmitting}>
-                                        <Send className="w-4 h-4 mr-1.5" /> Send
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={() => setShowSosForm(false)} className="rounded-xl border-slate-200">
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </form>
-                        )}
-                    </div>
-
                     {sosTickets.length > 0 && (
                         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
-                            <h4 className="text-sm font-bold text-slate-800 mb-3">My SOS Tickets</h4>
-                            <div className="space-y-2 max-h-40 overflow-auto">
+                            <h4 className="text-sm font-bold text-slate-800 mb-3">Lịch sử hỗ trợ SOS</h4>
+                            <div className="space-y-2 max-h-64 overflow-auto pr-1">
                                 {sosTickets.map(ticket => (
                                     <button
                                         key={ticket.id}
@@ -1125,20 +1228,75 @@ export default function DietTrackerPage() {
                                         onClick={() => ticket.dietLogId && document.getElementById(`log-${ticket.dietLogId}`)?.scrollIntoView({ behavior: 'smooth' })}
                                         className="w-full text-left p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors"
                                     >
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-xs font-bold text-slate-600">{ticket.status}</span>
-                                            <span className="text-[10px] text-slate-400">{ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : ''}</span>
+                                        <div className="flex justify-between items-center mb-1.5">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${ticket.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {ticket.status}
+                        </span>
+                                            <span className="text-[10px] font-semibold text-slate-400">
+                            {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('vi-VN') : ''}
+                        </span>
                                         </div>
-                                        <p className="text-xs text-slate-500 mt-1 truncate">{ticket.note}</p>
+
+                                        <div className="text-xs text-slate-600">
+                                            {ticket.status === 'RESOLVED' ? (
+                                                <div className="bg-emerald-50/50 border border-emerald-100 p-2.5 rounded-lg mt-2">
+                                <span className="font-bold text-emerald-800 flex items-center gap-1.5 mb-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    PT phản hồi:
+                                </span>
+                                                    <span className="italic leading-relaxed font-medium">"{ticket.note}"</span>
+                                                </div>
+                                            ) : (
+                                                <span className="truncate block font-medium">"{ticket.note}"</span>
+                                            )}
+                                        </div>
                                     </button>
                                 ))}
                             </div>
                         </div>
                     )}
-
                 </div>
             </div>
 
+            {/* MODAL (POPUP) BÁO CÁO SOS MỚI */}
+            {isSosModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
+                            <div className="flex items-center gap-2 text-amber-800">
+                                <AlertTriangle className="w-5 h-5" />
+                                <h3 className="font-bold text-lg">Yêu cầu hỗ trợ (SOS)</h3>
+                            </div>
+                            <button onClick={() => setIsSosModalOpen(false)} className="text-amber-600 hover:bg-amber-100 p-1.5 rounded-full transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSosSubmit} className="p-6 space-y-4">
+                            <p className="text-sm text-slate-600 font-medium leading-relaxed">
+                                Hãy mô tả chi tiết vấn đề hoặc câu hỏi của bạn về bữa ăn này để Huấn luyện viên có thể hỗ trợ định lượng chính xác nhất.
+                            </p>
+                            <textarea
+                                value={sosMessage}
+                                onChange={(e) => setSosMessage(e.target.value)}
+                                rows="4"
+                                autoFocus
+                                placeholder="Ví dụ: Anh ơi, món này em ăn ngoài tiệm, nước dùng khá béo..."
+                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 resize-none transition-all"
+                            />
+                            <div className="flex gap-3 pt-2">
+                                <Button type="button" variant="outline" onClick={() => setIsSosModalOpen(false)} className="flex-1 rounded-xl h-11 border-slate-200 font-bold text-slate-600 hover:bg-slate-50">
+                                    Hủy bỏ
+                                </Button>
+                                <Button type="submit" disabled={sosSubmitting} className="flex-1 rounded-xl h-11 bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-md shadow-amber-500/20">
+                                    {sosSubmitting ? 'Đang gửi...' : <><Send className="w-4 h-4 mr-2" /> Gửi yêu cầu</>}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL XÁC NHẬN MÓN ĂN GIỮ NGUYÊN */}
             {confirmModal && (
                 <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm">
                     <div className="w-full sm:max-w-lg max-h-[92vh] sm:max-h-[88vh] bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-slide-in">

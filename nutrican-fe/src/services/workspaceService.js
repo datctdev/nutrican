@@ -1,3 +1,4 @@
+// src/services/workspaceService.js
 import api from './api';
 
 export const workspaceService = {

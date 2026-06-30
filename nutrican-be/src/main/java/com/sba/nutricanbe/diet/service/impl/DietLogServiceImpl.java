@@ -19,7 +19,7 @@ import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.DietLogItemRepository;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
-import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.service.UserQueryService;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.diet.dto.CreateDietLogRequest;
@@ -28,10 +28,8 @@ import com.sba.nutricanbe.diet.dto.DietSummaryResponse;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
-import com.sba.nutricanbe.common.event.DietLogCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -53,9 +51,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DietLogServiceImpl implements DietLogService {
 
-    private static final Set<DietLogStatus> SUMMARY_STATUSES = Set.of(
-            DietLogStatus.APPROVED, DietLogStatus.LOGGED, DietLogStatus.PT_REVIEWING);
-
+    private static final Set<DietLogStatus> SUMMARY_STATUSES = Set.of(DietLogStatus.APPROVED, DietLogStatus.LOGGED, DietLogStatus.PT_REVIEWING);
     private final DietLogRepository dietLogRepository;
     private final DietLogImageRepository dietLogImageRepository;
     private final DietLogItemRepository dietLogItemRepository;
@@ -63,8 +59,7 @@ public class DietLogServiceImpl implements DietLogService {
     private final FoodItemRepository foodItemRepository;
     private final StorageService minioService;
     private final DietLogHelper dietLogHelper;
-    private final PtClientMappingRepository mappingRepository;
-    private final ApplicationEventPublisher eventPublisher;
+    private final SosTicketRepository sosTicketRepository;
 
     @Override
     @Transactional
@@ -87,6 +82,7 @@ public class DietLogServiceImpl implements DietLogService {
                 .recognitionSource(RecognitionSource.MANUAL)
                 .experimentCohort(ExperimentCohort.MANUAL_ENTRY)
                 .foodItemId(request.getFoodItemId())
+                .isPtNotified(false)
                 .build();
 
         if (request.getItems() != null && !request.getItems().isEmpty()) {
@@ -182,27 +178,12 @@ public class DietLogServiceImpl implements DietLogService {
             throw new BadRequestException("Only DRAFT logs can be submitted for review");
         }
 
-        // Chuyển trạng thái
         dietLog.setStatus(DietLogStatus.PT_REVIEWING);
+        dietLog.setIsPtNotified(true);
         dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
 
-        // Lưu vào DB
         DietLog savedLog = dietLogRepository.save(dietLog);
         dietLogHelper.notifyPtOfNewLog(savedLog);
-
-        // VÁ LỖ HỔNG: BẮN SỰ KIỆN WEBSOCKET CHO PT NGAY LẬP TỨC ĐÚNG THỨ TỰ THAM SỐ
-        mappingRepository.findFirstByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE)
-                .ifPresent(mapping -> {
-                    log.info("Pushing WebSocket event: DRAFT submitted for log {}", logId);
-                    eventPublisher.publishEvent(new DietLogCreatedEvent(
-                            this,                                 // Object source
-                            mapping.getPt().getId(),              // UUID ptId
-                            customerId,                           // UUID clientId
-                            mapping.getClient().getFullName(),    // String clientName
-                            savedLog.getId(),                     // UUID logId
-                            savedLog.getMealType().name()         // String mealType
-                    ));
-                });
 
         return ApiResponse.success(dietLogHelper.toResponse(savedLog), "Log submitted for PT review");
     }
@@ -224,9 +205,12 @@ public class DietLogServiceImpl implements DietLogService {
         for (DietLogImage img : additionalImages) {
             minioService.deleteFile(img.getImageObjectName());
         }
+
         dietLogImageRepository.deleteAll(additionalImages);
         dietLogItemRepository.deleteByDietLogId(logId);
+        sosTicketRepository.deleteByDietLogId(logId);
         dietLogRepository.delete(dietLog);
+
         return ApiResponse.success(null, "Diet log deleted");
     }
 
