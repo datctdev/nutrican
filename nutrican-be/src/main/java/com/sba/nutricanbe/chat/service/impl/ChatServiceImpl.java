@@ -4,22 +4,26 @@ import com.sba.nutricanbe.chat.dto.ChatMessageRequest;
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
 import com.sba.nutricanbe.chat.entity.ChatMessage;
+import com.sba.nutricanbe.chat.enums.ChatMessageType;
 import com.sba.nutricanbe.chat.repository.ChatMessageRepository;
 import com.sba.nutricanbe.chat.service.ChatService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -33,6 +37,17 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final PtClientMappingRepository mappingRepository;
     private final UserRepository userRepository;
+    private final StorageService storageService;
+    private final WebSocketSessionService webSocketSessionService;
+    private static final String CHAT_MESSAGE_EVENT = "CHAT_MESSAGE";
+
+    @Override
+    public void publishRealtimeMessage(ChatMessageResponse message) {
+        webSocketSessionService.sendToUser(message.getSenderId(), CHAT_MESSAGE_EVENT, message);
+        if (!message.getSenderId().equals(message.getRecipientId())) {
+            webSocketSessionService.sendToUser(message.getRecipientId(), CHAT_MESSAGE_EVENT, message);
+        }
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -65,12 +80,9 @@ public class ChatServiceImpl implements ChatService {
         if (request == null || request.getMappingId() == null) {
             throw new BadRequestException("mappingId is required");
         }
-        if (request.getContent() == null || request.getContent().isBlank()) {
-            throw new BadRequestException("content is required");
-        }
-        if (request.getContent().length() > 2000) {
-            throw new BadRequestException("content must be at most 2000 characters");
-        }
+        String content = normalizeContent(request.getContent());
+        String imageUrl = normalizeImageUrl(request.getImageUrl());
+        validateMessagePayload(content, imageUrl);
 
         PtClientMapping mapping = getActiveMappingForUser(request.getMappingId(), senderId);
         User sender = userRepository.findById(senderId)
@@ -81,7 +93,38 @@ public class ChatServiceImpl implements ChatService {
                 .mapping(mapping)
                 .sender(sender)
                 .recipient(recipient)
-                .content(request.getContent().trim())
+                .content(content != null ? content : "")
+                .messageType(imageUrl != null ? ChatMessageType.IMAGE : ChatMessageType.TEXT)
+                .imageUrl(imageUrl)
+                .build());
+        return toMessageResponse(message);
+    }
+
+    @Override
+    @Transactional
+    public ChatMessageResponse sendImageMessage(UUID senderId, UUID mappingId, String content, MultipartFile file) {
+        if (mappingId == null) {
+            throw new BadRequestException("mappingId is required");
+        }
+        validateImageFile(file);
+
+        PtClientMapping mapping = getActiveMappingForUser(mappingId, senderId);
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", senderId));
+        User recipient = mapping.getPt().getId().equals(senderId) ? mapping.getClient() : mapping.getPt();
+
+        String objectName = storageService.uploadFile(file, "chat/" + mappingId);
+        String imageUrl = storageService.getPresignedUrl(objectName);
+        String normalizedContent = normalizeContent(content);
+
+        ChatMessage message = chatMessageRepository.save(ChatMessage.builder()
+                .mapping(mapping)
+                .sender(sender)
+                .recipient(recipient)
+                .content(normalizedContent != null ? normalizedContent : "")
+                .messageType(ChatMessageType.IMAGE)
+                .imageUrl(imageUrl)
+                .imageObjectName(objectName)
                 .build());
         return toMessageResponse(message);
     }
@@ -134,8 +177,48 @@ public class ChatServiceImpl implements ChatService {
                 .recipientName(message.getRecipient().getFullName())
                 .recipientAvatarUrl(message.getRecipient().getAvatarUrl())
                 .content(message.getContent())
+                .messageType(message.getMessageType())
+                .imageUrl(message.getImageUrl())
                 .readAt(message.getReadAt())
                 .createdAt(message.getCreatedAt())
                 .build();
+    }
+
+    private String normalizeContent(String content) {
+        if (content == null || content.isBlank()) {
+            return null;
+        }
+        String normalized = content.trim();
+        if (normalized.length() > 2000) {
+            throw new BadRequestException("content must be at most 2000 characters");
+        }
+        return normalized;
+    }
+
+    private String normalizeImageUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return null;
+        }
+        String normalized = imageUrl.trim();
+        if (normalized.length() > 1000) {
+            throw new BadRequestException("imageUrl must be at most 1000 characters");
+        }
+        return normalized;
+    }
+
+    private void validateMessagePayload(String content, String imageUrl) {
+        if (content == null && imageUrl == null) {
+            throw new BadRequestException("content or imageUrl is required");
+        }
+    }
+
+    private void validateImageFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("image file is required");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BadRequestException("File must be an image");
+        }
     }
 }
