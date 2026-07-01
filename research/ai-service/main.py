@@ -12,45 +12,27 @@ from fastapi import FastAPI, File, UploadFile
 from PIL import Image
 
 from portion_estimator import estimate_portion_ratio
+from class_manifest import (
+    CLASS_NAMES,
+    DISPLAY_NAMES,
+    active_profile,
+    default_model_filename,
+    model_version as manifest_model_version,
+)
 
 APP_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = APP_DIR.parent.parent  # nutrican repo root
-DEFAULT_MODEL = PROJECT_ROOT / "research" / "best_resnet50_model.h5"
+_profile = active_profile()
+_default_model_name = default_model_filename(_profile)
+DEFAULT_MODEL = PROJECT_ROOT / "research" / _default_model_name
 MODEL_PATH = Path(os.environ.get("MODEL_PATH", str(DEFAULT_MODEL)))
-MODEL_VERSION = os.environ.get(
-    "MODEL_VERSION",
-    "resnet50-vtn-10class-phase2" if "phase2" in MODEL_PATH.name else "resnet50-vtn-10class-phase1",
-)
-
-# Alphabetical order — must match training labels (Bien ban §3).
-CLASS_NAMES = [
-    "banh_chung",
-    "banh_khot",
-    "banh_mi",
-    "banh_trang_nuong",
-    "banh_xeo",
-    "bun_dau_mam_tom",
-    "ca_kho_to",
-    "com_tam",
-    "goi_cuon",
-    "pho",
-]
-
-DISPLAY_NAMES = {
-    "banh_chung": "Bánh Chưng",
-    "banh_khot": "Bánh Khọt",
-    "banh_mi": "Bánh Mì",
-    "banh_trang_nuong": "Bánh Tráng Nướng",
-    "banh_xeo": "Bánh Xèo",
-    "bun_dau_mam_tom": "Bún Đậu Mắm Tôm",
-    "ca_kho_to": "Cá Kho Tộ",
-    "com_tam": "Cơm Tấm (Cơm sườn)",
-    "goi_cuon": "Gỏi Cuốn",
-    "pho": "Phở",
-}
+MODEL_VERSION = os.environ.get("MODEL_VERSION", manifest_model_version(_profile))
 
 CONFIDENCE_CONFIRM_THRESHOLD = 85.0
 MARGIN_CONFIRM_THRESHOLD = 20.0
+MULTI_CLASS_COUNT_THRESHOLD = 50
+MULTI_CLASS_TOP_CONF_MIN = 8.0
+MULTI_CLASS_MARGIN_MIN = 2.0
 
 
 def safe_preprocess(x, **kwargs):
@@ -72,16 +54,25 @@ def build_top_predictions(scores: np.ndarray, limit: int = 3) -> list[dict]:
     return predictions
 
 
-def needs_user_confirmation(top_predictions: list[dict]) -> bool:
+def needs_user_confirmation(top_predictions: list[dict], num_classes: int) -> bool:
     if not top_predictions:
         return True
     top_conf = top_predictions[0]["confidence"]
-    if top_conf < CONFIDENCE_CONFIRM_THRESHOLD:
-        return True
+    margin = 0.0
     if len(top_predictions) > 1:
         margin = top_predictions[0]["confidence"] - top_predictions[1]["confidence"]
-        if margin < MARGIN_CONFIRM_THRESHOLD:
+
+    if num_classes >= MULTI_CLASS_COUNT_THRESHOLD:
+        if top_conf < MULTI_CLASS_TOP_CONF_MIN:
             return True
+        if margin < MULTI_CLASS_MARGIN_MIN:
+            return True
+        return False
+
+    if top_conf < CONFIDENCE_CONFIRM_THRESHOLD:
+        return True
+    if margin < MARGIN_CONFIRM_THRESHOLD:
+        return True
     return False
 
 
@@ -113,7 +104,13 @@ def load_model() -> None:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model_loaded": model is not None, "api_version": MODEL_VERSION}
+    return {
+        "status": "ok",
+        "model_loaded": model is not None,
+        "api_version": MODEL_VERSION,
+        "class_profile": _profile,
+        "num_classes": len(CLASS_NAMES),
+    }
 
 
 @app.post("/api/v1/analyze-food")
@@ -137,7 +134,7 @@ async def analyze_food(file: UploadFile = File(...)):
         predicted_class = CLASS_NAMES[class_index]
         confidence = float(scores[class_index]) * 100
         top_predictions = build_top_predictions(scores)
-        confirm_needed = needs_user_confirmation(top_predictions)
+        confirm_needed = needs_user_confirmation(top_predictions, len(CLASS_NAMES))
 
         if len(top_predictions) > 1:
             confidence_margin = round(

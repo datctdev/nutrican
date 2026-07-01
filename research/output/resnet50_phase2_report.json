@@ -1,6 +1,0 @@
-{
-  "note": "Re-run train to regenerate; paths are now stored relative to repo root.",
-  "dataset": "research/Vietnamese_Food_Dataset/Vietnamese_Food_Dataset",
-  "base_model": "research/best_resnet50_model.h5",
-  "output_model": "research/best_resnet50_model_phase2.h5"
-}

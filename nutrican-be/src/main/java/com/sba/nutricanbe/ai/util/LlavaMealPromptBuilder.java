@@ -1,14 +1,15 @@
 package com.sba.nutricanbe.ai.util;
 
+import com.sba.nutricanbe.ai.catalog.FoodCodeCategory;
 import com.sba.nutricanbe.ai.catalog.NutriHomeCatalog;
+import com.sba.nutricanbe.ai.catalog.ResNetClassManifest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Per-dish LLaVA prompts with NutriHome PDF macros and visual disambiguation rules.
- * Loaded from ResNetFoodDefaults — Ollama runs locally on the developer machine.
+ * LLaVA prompts with NutriHome macros and visual disambiguation (VN + Food-101).
  */
 public final class LlavaMealPromptBuilder {
 
@@ -23,12 +24,12 @@ public final class LlavaMealPromptBuilder {
                 ? resnetDisplayName : code;
 
         String focusBlock = focusBlockFor(code);
-        String nutrihomeTable = nutrihomeReferenceTable();
+        String macroTable = macroReferenceFor(code);
         String confusionRules = confusionPairRules();
 
         return """
-                You are a Vietnamese nutrition expert helping fitness students track calories accurately.
-                Analyze this meal photo. ResNet CNN hint (often WRONG — verify visually): %s (%s).
+                You are a clinical nutrition assistant for Vietnamese AND international dishes.
+                Analyze this meal photo carefully. ResNet CNN hint (often WRONG — verify visually): %s (%s).
 
                 %s
 
@@ -38,8 +39,8 @@ public final class LlavaMealPromptBuilder {
 
                 Return ONLY valid JSON, no markdown:
                 {
-                  "food_name_vi": "exact Vietnamese dish name",
-                  "food_code_guess": "com_tam|pho|banh_mi|banh_xeo|banh_khot|ca_kho_to|goi_cuon|bun_dau_mam_tom|banh_chung|banh_trang_nuong|unknown",
+                  "food_name_vi": "exact dish name in Vietnamese or English",
+                  "food_code_guess": "one code from schema below",
                   "items": [{"name":"component","estimated_grams":150,"role":"main|side|rice|protein|broth"}],
                   "total_estimated_grams": 350,
                   "portion_description": "describe visible portion e.g. 1 full plate / 1 bowl",
@@ -51,15 +52,46 @@ public final class LlavaMealPromptBuilder {
                 }
 
                 Rules:
+                - food_code_guess MUST be one exact code from schema (not a Vietnamese generic name).
                 - Use NutriHome reference kcal for ONE standard serving, then scale by estimated grams.
-                - com_tam serving = 350g ~529 kcal; pho serving = 500g ~414 kcal.
-                - Estimate total_estimated_grams from plate/bowl fill level (small=0.7x, large=1.3x standard).
-                - confidence < 0.5 if blurry or multiple dishes; 0.7+ only when dish is clear.
-                - NEVER guess banh_khot when you see broken rice + pork chop (that is com_tam).
-                """.formatted(code, hint, focusBlock, nutrihomeTable, confusionRules);
+                - Estimate total_estimated_grams from visible meat/rice volume on the plate (small=0.7x, large=1.3x standard).
+                - confidence < 0.5 if blurry; 0.7+ only when dish type is unambiguous.
+                - Do NOT label Western raw beef as pho or com tam.
+                - beef_tartare = minced/chopped raw beef MOUND; beef_carpaccio = thin SLICED sheets.
+
+                ### Valid food_code_guess codes
+                %s
+                """.formatted(code, hint, focusBlock, macroTable, confusionRules, manifestFoodCodeSchema());
+    }
+
+    private static String manifestFoodCodeSchema() {
+        return ResNetClassManifest.classOrder().stream()
+                .collect(Collectors.joining("|")) + "|unknown";
+    }
+
+    private static String macroReferenceFor(String resnetCode) {
+        if (FoodCodeCategory.isFood101(resnetCode)) {
+            String line = NutriHomeCatalog.llavaMacroLineForCode(resnetCode);
+            String cluster = NutriHomeCatalog.llavaFood101ReferenceBlock();
+            return "### NutriHome Food-101 reference (standard serving)\n"
+                    + (line.isBlank() ? "" : line + "\n")
+                    + cluster;
+        }
+        String block = NutriHomeCatalog.llavaMacroReferenceBlock();
+        if (block != null && !block.isBlank()) {
+            return "### NutriHome reference (1 standard serving)\n" + block;
+        }
+        return "### NutriHome reference (1 standard serving)\n"
+                + DISH_GUIDES.values().stream()
+                .distinct()
+                .map(DishGuide::macroLine)
+                .collect(Collectors.joining("\n"));
     }
 
     private static String focusBlockFor(String resnetCode) {
+        if (FoodCodeCategory.isFood101(resnetCode)) {
+            return food101FocusBlock(resnetCode);
+        }
         Optional<DishGuide> hinted = Optional.ofNullable(DISH_GUIDES.get(resnetCode));
         if (hinted.isPresent() && !"unknown".equals(resnetCode)) {
             return "### Focus (ResNet hint — verify)\n" + hinted.get().toPromptSection();
@@ -69,16 +101,21 @@ public final class LlavaMealPromptBuilder {
                 + DISH_GUIDES.get("pho").toPromptSection();
     }
 
-    private static String nutrihomeReferenceTable() {
-        String block = NutriHomeCatalog.llavaMacroReferenceBlock();
-        if (block != null && !block.isBlank()) {
-            return "### NutriHome PDF reference (1 standard serving)\n" + block;
+    private static String food101FocusBlock(String resnetCode) {
+        StringBuilder sb = new StringBuilder("### Focus Food-101 (verify ResNet hint)\n");
+        sb.append("""
+                **Raw beef pair (critical)**:
+                - beef_tartare [beef_tartare]: minced/chopped raw beef formed into a ROUND MOUND/patty, often with capers/herb garnish.
+                - beef_carpaccio [beef_carpaccio]: paper-thin SLICED raw beef arranged flat in layers, not a mound.
+                """);
+        if ("beef_carpaccio".equals(resnetCode) || "beef_tartare".equals(resnetCode)) {
+            sb.append("ResNet hint is raw beef — decide tartare (mound) vs carpaccio (slices).\n");
         }
-        return "### NutriHome PDF reference (1 standard serving)\n"
-                + DISH_GUIDES.values().stream()
-                .distinct()
-                .map(DishGuide::macroLine)
-                .collect(Collectors.joining("\n"));
+        String line = NutriHomeCatalog.llavaMacroLineForCode(resnetCode);
+        if (!line.isBlank()) {
+            sb.append(line).append("\n");
+        }
+        return sb.toString();
     }
 
     private static String confusionPairRules() {
@@ -91,6 +128,9 @@ public final class LlavaMealPromptBuilder {
                 | com_tam | Small yellow mini-pancakes in round molds | banh_khot |
                 | pho | Dark braised fish in small clay pot | ca_kho_to |
                 | pho | Crispy yellow crepe folded with shrimp/pork | banh_xeo |
+                | beef_carpaccio | Minced raw beef mound (tartare) | beef_tartare |
+                | beef_tartare | Thin sliced raw beef sheets | beef_carpaccio |
+                | filet_mignon | Raw appetizer beef (carpaccio/tartare) | beef_carpaccio or beef_tartare |
                 """;
     }
 
@@ -144,6 +184,10 @@ public final class LlavaMealPromptBuilder {
                 "VISUAL: square green banana-leaf wrapped sticky rice cake."));
         m.put("banh_trang_nuong", new DishGuide("banh_trang_nuong", "Bánh tráng trộn", 200, 300, 5, 16, 33,
                 "VISUAL: grilled rice paper pizza-style snack with toppings."));
+        m.put("beef_tartare", new DishGuide("beef_tartare", "Beef Tartare", 100, 250, 25, 15, 2,
+                "VISUAL: minced/chopped raw beef MOUND on plate, not thin slices."));
+        m.put("beef_carpaccio", new DishGuide("beef_carpaccio", "Beef Carpaccio", 100, 200, 20, 12, 1,
+                "VISUAL: thin translucent raw beef SLICES laid flat, not a minced mound."));
         return m;
     }
 
@@ -162,4 +206,3 @@ public final class LlavaMealPromptBuilder {
         }
     }
 }
-

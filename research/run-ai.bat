@@ -1,11 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: ============================================================
-::  Nutrican AI — Menu chinh
-::  Dat o: research\run-ai.bat
-:: ============================================================
-
+:: Nutrican AI — Menu chinh (199-class unified)
 set "SCRIPT_DIR=%~dp0"
 set "WORKSPACE=%SCRIPT_DIR%.."
 cd /d "%WORKSPACE%"
@@ -15,27 +11,30 @@ cls
 echo.
 echo  ============================================================
 echo    NUTRICAN AI — MENU
+echo    Model: best_resnet50_unified.h5 (199 class)
 echo    Workspace: %CD%
 echo  ============================================================
 echo.
 echo    [1] Cai dat moi truong (venv + dependencies)
-echo    [2] Chay AI Service (ResNet50 FastAPI — localhost:8000)
-echo    [3] Train ResNet50 Phase 2 (com_tam + pho)
-echo    [4] Kiem tra AI Service (curl health)
-echo    [5] Thoat
+echo    [2] Chay AI Service (199 class)
+echo    [3] Train unified overnight
+echo    [4] Export weights -^> best_resnet50_unified.h5
+echo    [5] Kiem tra AI Service (health)
+echo    [6] Thoat
 echo.
 echo  ============================================================
 echo.
 
-set /p CHOICE="  Chon [1-5]: "
+set /p CHOICE="  Chon [1-6]: "
 
 if "%CHOICE%"=="1" goto :setup
 if "%CHOICE%"=="2" goto :service
 if "%CHOICE%"=="3" goto :train
-if "%CHOICE%"=="4" goto :check
-if "%CHOICE%"=="5" goto :exit
+if "%CHOICE%"=="4" goto :export
+if "%CHOICE%"=="5" goto :check
+if "%CHOICE%"=="6" goto :exit
 
-echo [Sai] Vui long chon 1-5.
+echo [Sai] Vui long chon 1-6.
 timeout /t 2 >nul
 goto :menu
 
@@ -47,35 +46,34 @@ goto :done
 
 :service
 cls
-echo [2] Chay AI Service...
+echo [2] AI Service 199 class...
 call "%SCRIPT_DIR%run-ai-service.bat"
 goto :done
 
 :train
 cls
-echo [3] Train Phase 2...
-call "%SCRIPT_DIR%run-train-phase2.bat"
+echo [3] Train unified overnight...
+call "%SCRIPT_DIR%run-train-unified-overnight.bat"
+goto :done
+
+:export
+cls
+echo [4] Export deployable model...
+"%WORKSPACE%\research\ai-service\.venv\Scripts\python.exe" "%WORKSPACE%\research\scripts\export_resnet_unified.py"
 goto :done
 
 :check
 cls
-echo [4] Kiem tra AI Service...
-echo.
-echo Dang goi curl http://localhost:8000/health ...
-powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing | Select-Object -ExpandProperty Content } catch { Write-Host '[Loi] Service chua chay. Vui long chon [2] de khoi dong service truoc.' -ForegroundColor Red }"
+echo [5] Kiem tra AI Service...
+powershell -Command "try { Invoke-WebRequest -Uri 'http://localhost:8000/health' -UseBasicParsing | Select-Object -ExpandProperty Content } catch { Write-Host '[Loi] Service chua chay.' -ForegroundColor Red }"
 echo.
 pause
 goto :menu
 
 :done
 echo.
-echo Bam phim bat ky de quay ve menu...
 pause >nul
 goto :menu
 
 :exit
-cls
-echo.
-echo  Cam on ban da su dung Nutrican AI!
-echo.
 exit /b 0

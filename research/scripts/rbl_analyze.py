@@ -12,6 +12,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from repo_paths import OUTPUT_RBL
+
 LABELED_ACTIONS = {"APPROVE", "ADJUST", "ADJUST_MACROS"}
 
 
@@ -178,7 +180,7 @@ def main() -> int:
         "-o",
         "--output",
         type=Path,
-        default=Path("research/output/rbl_results.md"),
+        default=OUTPUT_RBL / "rbl_results.md",
         help="Output markdown path",
     )
     args = parser.parse_args()

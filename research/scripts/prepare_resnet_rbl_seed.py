@@ -33,7 +33,7 @@ PT_MACROS = {
 }
 
 SAMPLES_PER_CLASS = 3
-NEGATIVE_DIR = REPO_ROOT / "research" / "seed" / "test"
+NEGATIVE_DIR = REPO_ROOT / "research" / "seed" / "fixtures"
 
 
 def main() -> None:

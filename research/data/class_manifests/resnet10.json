@@ -1,0 +1,31 @@
+{
+  "profile": "resnet10",
+  "description": "Default production profile — 10 Vietnamese dishes (unchanged workflow)",
+  "modelVersion": "resnet50-vtn-10class",
+  "defaultModelFile": "best_resnet50_unified.h5",
+  "datasetPathKey": "VTN_10",
+  "classOrder": [
+    "banh_chung",
+    "banh_khot",
+    "banh_mi",
+    "banh_trang_nuong",
+    "banh_xeo",
+    "bun_dau_mam_tom",
+    "ca_kho_to",
+    "com_tam",
+    "goi_cuon",
+    "pho"
+  ],
+  "displayNames": {
+    "banh_chung": "Bánh Chưng",
+    "banh_khot": "Bánh Khọt",
+    "banh_mi": "Bánh Mì",
+    "banh_trang_nuong": "Bánh Tráng Nướng",
+    "banh_xeo": "Bánh Xèo",
+    "bun_dau_mam_tom": "Bún Đậu Mắm Tôm",
+    "ca_kho_to": "Cá Kho Tộ",
+    "com_tam": "Cơm Tấm (Cơm sườn)",
+    "goi_cuon": "Gỏi Cuốn",
+    "pho": "Phở"
+  }
+}

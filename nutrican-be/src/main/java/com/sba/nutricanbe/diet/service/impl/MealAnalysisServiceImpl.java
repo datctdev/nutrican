@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.diet.service.impl;
 
+import com.sba.nutricanbe.ai.catalog.A1_0FixedMacros;
 import com.sba.nutricanbe.ai.catalog.ResNetFoodCodeMapping;
 import com.sba.nutricanbe.ai.catalog.ResNetFoodDefaults;
 import com.sba.nutricanbe.ai.dto.FoodPredictionDto;
@@ -107,7 +108,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
 
             RecognitionSource recognitionSource = RecognitionSource.AI_ONLY;
             MacroNutrients macros = MacroNutrients.ZERO;
-            MacroNutrients aiPredictedMacros = MacroNutrients.ZERO;
+            MacroNutrients aiPredictedMacros = A1_0FixedMacros.forCode(aiResult.getFoodCode());
             MacroNutrients dbMatchedMacros = null;
             Integer dbMatchScore = null;
             String matchedFoodName = null;
@@ -129,8 +130,8 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                 recognitionSource = RecognitionSource.HYBRID;
                 dbApplied = true;
             } else if (aiResult.getCalories() != null) {
-                aiPredictedMacros = MacroNutrients.of(aiResult.getCalories(), aiResult.getProtein(), aiResult.getCarbs(), aiResult.getFat());
-                macros = aiPredictedMacros;
+                // UI / A1.1: NutriHome × portion from fusion
+                macros = MacroNutrients.of(aiResult.getCalories(), aiResult.getProtein(), aiResult.getCarbs(), aiResult.getFat());
                 if (portionG == null && bestMatch.isPresent()) {
                     FoodItem food = foodItemRepository.findById(bestMatch.get().getId()).orElseThrow();
                     BigDecimal serving = food.getServingSizeG() != null && food.getServingSizeG().compareTo(BigDecimal.ZERO) > 0
@@ -158,12 +159,10 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                         ? food.getServingSizeG() : BigDecimal.valueOf(100);
                 portionG = serving.multiply(portionRatio).setScale(2, RoundingMode.HALF_UP);
                 dbMatchedMacros = dietLogHelper.macrosForFood(food, portionG);
-                aiPredictedMacros = dbMatchedMacros;
                 macros = dbMatchedMacros;
                 recognitionSource = RecognitionSource.HYBRID;
                 dbApplied = true;
             } else {
-                aiPredictedMacros = MacroNutrients.of(BigDecimal.valueOf(300), BigDecimal.valueOf(15), BigDecimal.valueOf(35), BigDecimal.valueOf(10));
                 macros = aiPredictedMacros;
             }
 
@@ -317,13 +316,16 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             portionG = serving.multiply(portionRatio).setScale(2, RoundingMode.HALF_UP);
         }
         MacroNutrients macros = dietLogHelper.macrosForFood(food, portionG);
+        MacroNutrients a10Macros = dietLog.getAiPredictedMacros() != null
+                ? dietLog.getAiPredictedMacros()
+                : A1_0FixedMacros.forCode(foodCode);
 
         String foodName = ResNetFoodCodeMapping.catalogNameVi(foodCode).orElse(food.getNameVi());
         dietLog.setFoodDescription(foodName);
         dietLog.setMatchedFoodName(food.getNameVi());
         dietLog.setFoodItemId(food.getId());
         dietLog.setMacrosJson(macros);
-        dietLog.setAiPredictedMacros(macros);
+        dietLog.setAiPredictedMacros(a10Macros);
         dietLog.setDbMatchedMacros(macros);
         dietLog.setRecognitionSource(RecognitionSource.HYBRID);
 

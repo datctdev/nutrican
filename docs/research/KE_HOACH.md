@@ -21,12 +21,16 @@
 
 ## 2. Ánh xạ A1.0 / A1.1 / ΔA
 
-| Khái niệm | NutriCan (ResNet50) | Field CSV |
-|-----------|---------------------|-----------|
-| `A1.0` | CNN class + `MACRO_DATABASE` (FastAPI) | `ai_cal/pro/carb/fat` |
-| `A1.1` | `food_code` → Food DB → scale portion | `db_cal/pro/carb/fat` |
-| Ground truth | PT APPROVE/ADJUST | `pt_cal/pro/carb/fat` |
-| `ΔA` | Giảm sai số nhờ grounding | `mean(delta_ai_cal) − mean(delta_db_cal)` |
+| Khái niệm | NutriCan (Improve) | Field CSV | Literature ref |
+|-----------|-------------------|-----------|----------------|
+| `A1.0` | CNN `food_code` → **macro cố định** (`a1_0_fixed_macros.json`) | `ai_cal/pro/carb/fat` | Bohlol: ResNet50 no FC ~70% Acc (CV baseline) |
+| `A1.1` | CNN → **NutriHome DB** × `portion_ratio` | `db_cal/pro/carb/fat` | Bohlol: ResNet-50S 97.25% Acc (CV upper bound) |
+| Ground truth | PT APPROVE/ADJUST | `pt_cal/pro/carb/fat` | — |
+| `ΔA` | GAP dinh dưỡng | `mean(delta_ai_cal) − mean(delta_db_cal)` | **A1.0 − A1.1** (kcal) |
+
+**Phân tách đơn vị:** MAE trong [Bohlol Table 4](./BOHLOL_TABLE4_REFERENCE.md) là lỗi phân loại (0–1), **không** phải kcal. ΔA NutriCan tính trên RBL (kcal).
+
+**Paper 1** (Jelodar & Sun): mốc độ lớn MAE kcal (Tcalorie 394.5 vs Tupc 279.4) — dataset khác, không claim beat.
 
 ---
 

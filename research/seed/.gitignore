@@ -1,7 +1,5 @@
-# Do not commit personal meal photos
-images/*
-!images/.gitkeep
+# Do not commit personal meal photos copied during seed prep
+resnet10/*
+!resnet10/.gitkeep
 
-# Local run artifacts
-../output/*.csv
-../output/*.json
+# Legacy slot removed — use resnet10/ instead

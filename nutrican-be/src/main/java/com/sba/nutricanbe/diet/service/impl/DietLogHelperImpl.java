@@ -23,6 +23,7 @@ import com.sba.nutricanbe.diet.dto.DietLogItemResponse;
 import com.sba.nutricanbe.diet.dto.DietLogResponse;
 import com.sba.nutricanbe.diet.dto.FoodItemResponse;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
+import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import com.sba.nutricanbe.user.service.UserQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,6 +49,7 @@ public class DietLogHelperImpl implements DietLogHelper {
     private final FoodCatalogService foodCatalogService;
     private final ApplicationEventPublisher eventPublisher;
     private final UserQueryService userQueryService;
+    private final StorageService minioService;
 
     @Value("${ai.recognition.confidence-threshold:0.25}")
     private BigDecimal confidenceThreshold;
@@ -187,7 +189,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                     .map(img -> DietLogImageDto.builder()
                             .id(img.getId())
                             .dietLogId(dietLog.getId())
-                            .imageUrl(img.getImageUrl())
+                            .imageUrl(resolveImageUrl(img.getImageObjectName(), img.getImageUrl()))
                             .imageObjectName(img.getImageObjectName())
                             .isPrimary(img.getIsPrimary())
                             .sortOrder(img.getSortOrder())
@@ -232,7 +234,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .id(dietLog.getId())
                 .customerId(dietLog.getCustomerId())
                 .customerName(customerName)
-                .imageUrl(dietLog.getImageUrl())
+                .imageUrl(resolveImageUrl(dietLog.getImageObjectName(), dietLog.getImageUrl()))
                 .aiConfidenceScore(dietLog.getAiConfidenceScore())
                 .macrosJson(dietLog.getMacrosJson())
                 .mealType(dietLog.getMealType())
@@ -261,6 +263,14 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .suggestedFoodMatches(suggestedMatches)
                 .items(items)
                 .build();
+    }
+
+    /** Presigned URLs expire; regenerate from durable object name on each read. */
+    private String resolveImageUrl(String objectName, String storedUrl) {
+        if (objectName != null && !objectName.isBlank()) {
+            return minioService.getPresignedUrl(objectName);
+        }
+        return storedUrl;
     }
 }
 

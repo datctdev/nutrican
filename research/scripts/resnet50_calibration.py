@@ -9,19 +9,21 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from repo_paths import OUTPUT_EVAL, REPO_ROOT
+
 sys.path.insert(0, str(REPO_ROOT / "research" / "ai-service"))
+sys.path.insert(0, str(REPO_ROOT / "research" / "scripts"))
 
 from eval_resnet50 import (  # noqa: E402
     CLASS_NAMES,
-    DEFAULT_DATASET,
     collect_images,
     load_model,
     predict_batch,
     stratified_split,
 )
+from repo_paths import DEFAULT_DATASET  # noqa: E402
 
-OUTPUT = REPO_ROOT / "research" / "output" / "resnet50_calibration.json"
+OUTPUT = OUTPUT_EVAL / "resnet50_calibration.json"
 
 BUCKETS = [(0.0, 0.25), (0.25, 0.35), (0.35, 0.50), (0.50, 1.01)]
 

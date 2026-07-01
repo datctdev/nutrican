@@ -4,7 +4,7 @@
 |---------|----------|
 | `resnet10/` | 30 ảnh mẫu 10 món + 3 negative — dùng cho RBL seed |
 | `resnet10_manifest.csv` | Metadata + PT label gợi ý |
-| `test/` | Ảnh smoke test (`smoke_pho.png`, `smoke_pizza.png`) |
+| `fixtures/` | Ảnh negative/smoke (`smoke_pho.png`, `smoke_pizza.png`, …) |
 
 Tạo lại seed ResNet10:
 

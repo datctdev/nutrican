@@ -1,7 +1,23 @@
-# Trained ResNet weights — too large for git (~100–220 MB); share via Drive/OneDrive
+# Trained ResNet weights — share via Drive/OneDrive (~100–250 MB each)
 *.h5
 
-# Python — generated locally when running scripts (not from git)
+# Python runtime
 __pycache__/
 *.py[cod]
 .venv/
+
+# Regenerable artifacts
+output/logs/*
+output/eval/*
+output/rbl/*
+output/reports/*
+output/checkpoints/*
+!output/.gitkeep
+!output/logs/.gitkeep
+!output/eval/.gitkeep
+!output/rbl/.gitkeep
+!output/reports/.gitkeep
+!output/checkpoints/.gitkeep
+
+# Legacy flat log at output root (old runs)
+output/*.log

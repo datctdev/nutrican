@@ -51,6 +51,21 @@ function formatPredictionConfidence(score) {
     return `${pct}%`;
 }
 
+function formatReliabilityScore(score) {
+    if (score == null || Number.isNaN(Number(score))) return null;
+    return `${Math.round(Number(score) * 100)}% độ tin cậy hệ thống`;
+}
+
+function filterDishOptions(dishes, query) {
+    if (!query?.trim()) return dishes;
+    const q = query.trim().toLowerCase();
+    return dishes.filter((dish) => {
+        const code = resolveResnetFoodCode(dish);
+        const label = (dish.nameVi || FOOD_CODE_LABELS[code] || code || '').toLowerCase();
+        return label.includes(q) || (code && code.includes(q.replace(/\s+/g, '_')));
+    });
+}
+
 const RESNET_FOOD_CODES = Object.keys(FOOD_CODE_LABELS);
 
 const RESNET_MACRO_ESTIMATES = {
@@ -214,6 +229,7 @@ export default function DietTrackerPage() {
 
     const [confirmModal, setConfirmModal] = useState(null);
     const [confirmingFood, setConfirmingFood] = useState(false);
+    const [dishSearch, setDishSearch] = useState('');
     const [resnetDishes, setResnetDishes] = useState([]);
 
     const fetchData = useCallback(async () => {
@@ -460,12 +476,15 @@ export default function DietTrackerPage() {
                 carb: analyzed?.carb || 0,
                 fat: analyzed?.fat || 0,
                 needsConfirmation: analyzed?.needsConfirmation ?? true,
+                reliabilityScore: analyzed?.confidenceScore,
                 foodName: analyzed?.foodName || 'Bữa ăn',
                 llavaUsed: analyzed?.llavaUsed,
                 llavaFoodName: analyzed?.llavaFoodName,
                 macroSource: analyzed?.macroSource,
+                fusionNote: analyzed?.fusionNote,
                 estimatedTotalGrams: analyzed?.estimatedTotalGrams,
             });
+            setDishSearch('');
 
             setSelectedFile(null);
             if (fileInputRef.current) {
@@ -581,6 +600,7 @@ export default function DietTrackerPage() {
     };
 
     const manualDishOptions = getManualDishOptions(resnetDishes);
+    const filteredDishOptions = filterDishOptions(manualDishOptions, dishSearch);
 
     const handleUploadAdditionalImages = async (logId) => {
         const input = document.createElement('input');
@@ -1151,8 +1171,18 @@ export default function DietTrackerPage() {
                                         Xác nhận món ăn
                                     </h3>
                                     <p className="text-xs text-slate-600 mt-1">
-                                        ResNet Phase 2 + NutriHome · kéo gram → xác nhận để lưu
+                                        ResNet Phase 2 + NutriHome · gram từ ảnh × macro DB · xác nhận trước khi lưu
                                     </p>
+                                    {confirmModal.reliabilityScore != null && (
+                                        <p className={`text-xs mt-1.5 font-medium ${
+                                            Number(confirmModal.reliabilityScore) >= 0.9
+                                                ? 'text-emerald-700'
+                                                : 'text-amber-700'
+                                        }`}>
+                                            {formatReliabilityScore(confirmModal.reliabilityScore)}
+                                            {Number(confirmModal.reliabilityScore) < 0.9 && ' — cần chọn món thủ công'}
+                                        </p>
+                                    )}
                                     {confirmModal.llavaUsed && confirmModal.llavaFoodName && (
                                         <p className="text-xs text-emerald-700 mt-1.5 font-medium truncate">
                                             LLaVA: {confirmModal.llavaFoodName}
@@ -1216,10 +1246,17 @@ export default function DietTrackerPage() {
                             {manualDishOptions.length > 0 && (
                                 <section className="pt-1 border-t border-slate-100">
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                                        Chọn món đúng (10 món)
+                                        Chọn món đúng ({manualDishOptions.length} món)
                                     </p>
-                                    <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-0.5">
-                                        {manualDishOptions.map((dish) => {
+                                    <input
+                                        type="search"
+                                        value={dishSearch}
+                                        onChange={(e) => setDishSearch(e.target.value)}
+                                        placeholder="Tìm món, ví dụ: tartare, phở, com tam..."
+                                        className="w-full mb-2 px-3 py-2 text-xs rounded-xl border border-slate-200 focus:border-violet-400 focus:outline-none"
+                                    />
+                                    <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-0.5">
+                                        {filteredDishOptions.slice(0, 40).map((dish) => {
                                             const code = resolveResnetFoodCode(dish);
                                             if (!code) return null;
                                             const isSelected = code === confirmModal.selectedFoodCode;
@@ -1247,6 +1284,11 @@ export default function DietTrackerPage() {
                                                 </button>
                                             );
                                         })}
+                                        {filteredDishOptions.length === 0 && (
+                                            <p className="col-span-2 text-xs text-slate-500 py-2 text-center">
+                                                Không tìm thấy món — thử từ khóa khác
+                                            </p>
+                                        )}
                                     </div>
                                 </section>
                             )}
