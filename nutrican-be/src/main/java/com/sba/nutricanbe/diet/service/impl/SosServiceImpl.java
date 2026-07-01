@@ -7,6 +7,7 @@ import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
 import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.enums.SosReasonCode;
@@ -53,7 +54,9 @@ public class SosServiceImpl implements SosService {
         userQueryService.findUserById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
+        UUID activePtId = findActivePt(customerId).map(mapping -> mapping.getPt().getId()).orElse(null);
         DietLog dietLog = null;
+
         if (request.getDietLogId() != null) {
             dietLog = dietLogRepository.findById(request.getDietLogId())
                     .orElseThrow(() -> new ResourceNotFoundException("DietLog", request.getDietLogId()));
@@ -71,6 +74,7 @@ public class SosServiceImpl implements SosService {
 
         SosTicket ticket = SosTicket.builder()
                 .dietLog(dietLog)
+                .ptId(activePtId)
                 .priority(request.getPriority() != null ? request.getPriority() : "HIGH")
                 .note(request.getNote())
                 .status(SosTicketStatus.OPEN)
@@ -80,8 +84,10 @@ public class SosServiceImpl implements SosService {
                 .build();
 
         sosTicketRepository.save(ticket);
+
         notifyPtOfSos(customerId, request.getPriority() != null ? request.getPriority() : "HIGH");
-        log.info("SOS ticket created by user: {}", customerId);
+
+        log.info("SOS ticket created by user: {} for PT: {}", customerId, activePtId);
         return ApiResponse.success(null, "SOS ticket created, your PT has been notified");
     }
 
@@ -105,15 +111,6 @@ public class SosServiceImpl implements SosService {
         if (dietLog.getFoodItemId() == null) {
             return SosReasonCode.UNKNOWN_FOOD;
         }
-        if (dietLog.getAiRawJson() != null) {
-            Object reasons = dietLog.getAiRawJson().get("uncertaintyReasons");
-            if (reasons instanceof List<?> list && !list.isEmpty()) {
-                String joined = list.stream().map(Object::toString).map(String::toLowerCase).reduce("", String::concat);
-                if (joined.contains("portion")) {
-                    return SosReasonCode.PORTION_UNCLEAR;
-                }
-            }
-        }
         return SosReasonCode.USER_REQUEST;
     }
 
@@ -121,11 +118,7 @@ public class SosServiceImpl implements SosService {
         findActivePt(customerId).ifPresent(mapping -> {
             User client = mapping.getClient();
             eventPublisher.publishEvent(new SosTicketCreatedEvent(
-                    this,
-                    mapping.getPt().getId(),
-                    client.getId(),
-                    client.getFullName(),
-                    priority
+                    this, mapping.getPt().getId(), client.getId(), client.getFullName(), priority
             ));
         });
     }
@@ -138,18 +131,12 @@ public class SosServiceImpl implements SosService {
     }
 
     private SosTicketResponse toSosResponse(SosTicket ticket) {
-        String customerName = null;
-        if (ticket.getDietLog() != null && ticket.getDietLog().getCustomerId() != null) {
-            customerName = userQueryService.findUserById(ticket.getDietLog().getCustomerId())
-                    .map(User::getFullName)
-                    .orElse(null);
-        }
-        String ptName = null;
-        if (ticket.getPtId() != null) {
-            ptName = userQueryService.findUserById(ticket.getPtId())
-                    .map(User::getFullName)
-                    .orElse(null);
-        }
+        String customerName = ticket.getDietLog() != null && ticket.getDietLog().getCustomerId() != null
+                ? userQueryService.findUserById(ticket.getDietLog().getCustomerId()).map(User::getFullName).orElse(null)
+                : null;
+        String ptName = ticket.getPtId() != null
+                ? userQueryService.findUserById(ticket.getPtId()).map(User::getFullName).orElse(null)
+                : null;
 
         return SosTicketResponse.builder()
                 .id(ticket.getId())

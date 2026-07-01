@@ -49,8 +49,10 @@ public class MarketplaceController {
     }
 
     @GetMapping("/pts/{ptId}")
-    public ResponseEntity<ApiResponse<PtProfileResponse>> getPtDetail(@PathVariable UUID ptId) {
-        return ResponseEntity.ok(marketplaceService.getPtDetail(ptId));
+    public ResponseEntity<ApiResponse<PtProfileResponse>> getPtDetail(
+            @PathVariable UUID ptId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(marketplaceService.getPtDetail(ptId, user));
     }
 
     @GetMapping("/pts/{ptId}/reviews")

@@ -245,6 +245,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .sosTicketFlag(dietLog.getSosTicketFlag())
                 .ptReviewerId(dietLog.getPtReviewerId())
                 .ptNote(dietLog.getPtNote())
+                .ptCorrectionReason(dietLog.getPtCorrectionReason())
                 .logDate(dietLog.getLogDate())
                 .createdAt(dietLog.getCreatedAt())
                 .additionalImages(additionalImages)

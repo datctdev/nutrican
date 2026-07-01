@@ -5,14 +5,12 @@ import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 
-// Entities
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.BodyMetric;
 
-// Repositories
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.SosTicketRepository;
@@ -21,7 +19,6 @@ import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.service.UserQueryService;
 
-// Enums & DTOs
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.PtCorrectionReason;
@@ -97,7 +94,22 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
 
         Page<DietLog> logPage = dietLogRepository.findByCustomerIdInAndStatus(
                 clientIds, DietLogStatus.PT_REVIEWING, pageable);
-        return ApiResponse.success(PageResponse.from(logPage.map(this::toReviewResponse)));
+
+        List<DietLogReviewResponse> filteredResponses = logPage.getContent().stream()
+                .filter(log -> log.getMacrosJson() != null && log.getMacrosJson().calories() != null)
+                .map(this::toReviewResponse)
+                .toList();
+
+        PageResponse<DietLogReviewResponse> customPageResponse = PageResponse.<DietLogReviewResponse>builder()
+                .content(filteredResponses)
+                .page(logPage.getNumber())
+                .size(logPage.getSize())
+                .totalElements(filteredResponses.size())
+                .totalPages((int) Math.ceil((double) filteredResponses.size() / size))
+                .last(logPage.isLast())
+                .build();
+
+        return ApiResponse.success(customPageResponse);
     }
 
     @Override
@@ -381,10 +393,16 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
             throw new BadRequestException("You can only resolve tickets assigned to you");
         }
         ticket.setStatus(SosTicketStatus.RESOLVED);
-        if (note != null) {
-            ticket.setNote(note);
-        }
+        if (note != null) ticket.setNote(note);
         sosTicketRepository.save(ticket);
+
+        if (ticket.getDietLog() != null && ticket.getDietLog().getCustomerId() != null) {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("ticketId", ticketId);
+            payload.put("status", "RESOLVED");
+            payload.put("note", note);
+            webSocketSessionService.sendToUser(ticket.getDietLog().getCustomerId(), "SOS_RESOLVED", payload);
+        }
         return ApiResponse.success(null, "SOS ticket resolved");
     }
 
