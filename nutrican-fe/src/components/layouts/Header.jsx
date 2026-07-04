@@ -41,7 +41,7 @@ export default function Header() {
             { label: 'Tin nhắn', href: '/chat' },
             { label: 'Trang cá nhân', href: '/profile' },
             { label: 'Mục tiêu dinh dưỡng', href: '/macro-targets' },
-            { label: 'Xác thực thông tin', href: '/kyc' },
+            { label: 'Trở Thành Huấn Luyện Viên', href: '/kyc' },
         ],
         PT_CERTIFIED: [
             { label: 'Bảng điều khiển', href: '/pt' },
@@ -84,11 +84,10 @@ export default function Header() {
                                         <Link
                                             key={item.href}
                                             to={item.href}
-                                            className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                                                isActive
-                                                    ? 'bg-slate-100 text-blue-600'
-                                                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                            }`}
+                                            className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${isActive
+                                                ? 'bg-slate-100 text-blue-600'
+                                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                                                }`}
                                         >
                                             {item.label}
                                         </Link>
