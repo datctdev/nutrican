@@ -5,7 +5,8 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { adminService } from '../../services/adminService';
-import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3, UserPlus } from 'lucide-react';
+import { userService } from '../../services/userService';
+import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3, UserPlus, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AdminDashboardPage() {
@@ -15,6 +16,8 @@ export default function AdminDashboardPage() {
   const [rblFrom, setRblFrom] = useState('');
   const [rblTo, setRblTo] = useState('');
   const [loading, setLoading] = useState(true);
+  const [requireKyc, setRequireKyc] = useState(true);
+  const [updatingKycSetting, setUpdatingKycSetting] = useState(false);
 
   const rblParams = () => {
     const p = { cvOnly: true };
@@ -23,7 +26,35 @@ export default function AdminDashboardPage() {
     return p;
   };
 
-  useEffect(() => { fetchStats(); fetchRbl(); }, []);
+  useEffect(() => { 
+    fetchStats(); 
+    fetchRbl(); 
+    fetchRequireKycSetting();
+  }, []);
+
+  const fetchRequireKycSetting = async () => {
+    try {
+      const res = await userService.getRequireKycSetting();
+      setRequireKyc(res.data.data);
+    } catch (err) {
+      console.error('Failed to fetch requireKyc setting:', err);
+    }
+  };
+
+  const handleToggleRequireKyc = async () => {
+    try {
+      setUpdatingKycSetting(true);
+      const newValue = !requireKyc;
+      await userService.updateRequireKycSetting(newValue);
+      setRequireKyc(newValue);
+      toast.success(newValue ? 'Đã bật yêu cầu KYC khi đăng ký PT' : 'Đã tắt yêu cầu KYC khi đăng ký PT');
+    } catch (err) {
+      toast.error('Không thể cập nhật cấu hình');
+      console.error(err);
+    } finally {
+      setUpdatingKycSetting(false);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -197,6 +228,37 @@ export default function AdminDashboardPage() {
             </Card>
 
           </div>
+
+          {/* Cấu hình hệ thống */}
+          <h3 className="text-xl font-bold text-slate-800 pt-2">Cấu hình hệ thống</h3>
+          <Card className="bg-white border-slate-200 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <h4 className="font-bold text-slate-900 mb-1">Yêu cầu xác thực KYC khi đăng ký PT</h4>
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                    {requireKyc 
+                      ? 'Hiện tại hệ thống yêu cầu người dùng phải hoàn thành xác thực danh tính (CCCD) trước khi được đăng ký làm huấn luyện viên.' 
+                      : 'Hiện tại hệ thống cho phép người dùng tự do đăng ký làm huấn luyện viên mà không cần xác thực danh tính.'}
+                  </p>
+                </div>
+                <button 
+                  type="button"
+                  disabled={updatingKycSetting}
+                  onClick={handleToggleRequireKyc}
+                  className="focus:outline-none transition-all disabled:opacity-50 text-primary border-none bg-transparent"
+                >
+                  {updatingKycSetting ? (
+                    <Loader2 className="w-10 h-10 animate-spin text-slate-400" />
+                  ) : requireKyc ? (
+                    <ToggleRight className="w-12 h-12 text-primary" />
+                  ) : (
+                    <ToggleLeft className="w-12 h-12 text-slate-350" />
+                  )}
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

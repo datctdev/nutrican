@@ -9,6 +9,8 @@ import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.common.entity.SystemSetting;
+import com.sba.nutricanbe.common.repository.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -27,11 +29,20 @@ public class DataInitializer implements CommandLineRunner {
     private final PtProfileRepository ptProfileRepository;
     private final PtClientMappingRepository ptClientMappingRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SystemSettingRepository systemSettingRepository;
 
     @Override
     @Transactional
     public void run(String... args) {
         log.warn("--- BẮT ĐẦU KHỞI TẠO DỮ LIỆU MẪU (TEST DATA) ---");
+
+        if (!systemSettingRepository.existsById("REQUIRE_KYC_FOR_PT")) {
+            systemSettingRepository.save(SystemSetting.builder()
+                    .key("REQUIRE_KYC_FOR_PT")
+                    .value("true")
+                    .build());
+            log.warn("✅ Initialized REQUIRE_KYC_FOR_PT setting to true");
+        }
 
         // 1. Tạo Admin
         if (!userRepository.existsByEmail("admin@nutrican.com")) {

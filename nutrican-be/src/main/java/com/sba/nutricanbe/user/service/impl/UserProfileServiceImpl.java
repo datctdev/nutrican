@@ -17,6 +17,7 @@ import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
 import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
 import com.sba.nutricanbe.user.dto.UserProfileResponse;
 import com.sba.nutricanbe.user.service.UserProfileService;
+import com.sba.nutricanbe.common.repository.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final MacroTargetRepository macroTargetRepository;
     private final PtProfileRepository ptProfileRepository;
     private final StorageService minioService;
+    private final SystemSettingRepository systemSettingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -49,6 +51,15 @@ public class UserProfileServiceImpl implements UserProfileService {
     public ApiResponse<PtProfileSummary> registerAsPt(UUID userId, PtRegistrationRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        // Check REQUIRE_KYC_FOR_PT setting
+        boolean requireKyc = systemSettingRepository.findById("REQUIRE_KYC_FOR_PT")
+                .map(setting -> Boolean.parseBoolean(setting.getValue()))
+                .orElse(true);
+
+        if (requireKyc && (user.getIsKycVerified() == null || !user.getIsKycVerified())) {
+            throw new BadRequestException("Bạn phải xác thực danh tính (KYC) trước khi đăng ký làm PT");
+        }
 
         // Check if user already has a PT profile
         if (ptProfileRepository.findByUserId(userId).isPresent()) {

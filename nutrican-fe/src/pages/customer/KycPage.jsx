@@ -20,6 +20,7 @@ export default function KycPage() {
   const [hasPtProfile, setHasPtProfile] = useState(false);
   const [ptProfileStatus, setPtProfileStatus] = useState(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  const [requireKyc, setRequireKyc] = useState(true);
 
   // KYC Session state
   const [sessionId, setSessionId] = useState(null);
@@ -61,8 +62,13 @@ export default function KycPage() {
     const checkStatus = async () => {
       setIsLoadingStatus(true);
       try {
-        const response = await userService.getProfile();
-        const userData = response.data?.data;
+        const [profileRes, settingRes] = await Promise.all([
+          userService.getProfile(),
+          userService.getRequireKycSetting().catch(() => ({ data: { data: true } }))
+        ]);
+        
+        const userData = profileRes.data?.data;
+        setRequireKyc(settingRes.data?.data ?? true);
 
         if (userData?.ptProfile) {
           setHasPtProfile(true);
@@ -375,8 +381,8 @@ export default function KycPage() {
     );
   }
 
-  // If KYC is verified, show PT Registration page
-  if (user?.isKycVerified) {
+  // If KYC is verified OR requireKyc is false, show PT Registration page
+  if (!requireKyc || user?.isKycVerified) {
     return (
       <div className="max-w-4xl mx-auto pb-12 animate-fade-in">
         {/* Header */}
