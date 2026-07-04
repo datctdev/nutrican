@@ -517,7 +517,7 @@ export default function KycPage() {
 
                     {/* Certifications */}
                     <div>
-                      <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Chứng Chỉ / Certificates</label>
+                      <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Chứng chỉ chuyên môn</label>
                       <textarea
                         value={ptForm.certifications}
                         onChange={(e) => setPtForm(p => ({...p, certifications: e.target.value}))}
@@ -529,7 +529,7 @@ export default function KycPage() {
 
                     {/* CV Upload */}
                     <div>
-                      <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Upload CV (Tùy chọn)</label>
+                      <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Tải lên CV (Tùy chọn)</label>
                       <input ref={cvInputRef} type="file" accept=".pdf,.doc,.docx" onChange={handleCvUpload} className="hidden" />
                       <div 
                         onClick={() => cvInputRef.current?.click()}
@@ -540,13 +540,13 @@ export default function KycPage() {
                             <FileUp className="w-8 h-8 text-emerald-500" />
                             <div className="text-left">
                               <p className="font-semibold text-slate-800">{ptForm.cvFileName || 'CV đã tải lên'}</p>
-                              <p className="text-sm text-emerald-600">Click để thay đổi</p>
+                              <p className="text-sm text-emerald-600">Nhấp để thay đổi</p>
                             </div>
                           </div>
                         ) : (
                           <>
                             <FileUp className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                            <p className="font-medium text-slate-600">Click để upload CV</p>
+                            <p className="font-medium text-slate-600">Nhấp để tải lên CV</p>
                             <p className="text-sm text-slate-400">PDF, DOC, DOCX (tối đa 10MB)</p>
                           </>
                         )}
@@ -591,7 +591,7 @@ export default function KycPage() {
                       <TrendingUp className="w-5 h-5 text-blue-400 mt-0.5" />
                       <div>
                         <p className="font-semibold">Theo dõi tiến độ</p>
-                        <p className="text-sm text-slate-300">Monitor học viên 24/7</p>
+                        <p className="text-sm text-slate-300">Theo dõi học viên 24/7</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">

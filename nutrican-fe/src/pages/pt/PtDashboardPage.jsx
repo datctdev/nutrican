@@ -36,14 +36,14 @@ export default function PtDashboardPage() {
     }, [fetchData]);
 
     const statCards = [
-        { label: 'Total Clients', value: stats?.totalClients || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
-        { label: 'Pending Reviews', value: stats?.pendingReviews || 0, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
-        { label: 'SOS Tickets', value: stats?.pendingSosTickets || 0, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-100' },
+        { label: 'Tổng học viên', value: stats?.totalClients || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
+        { label: 'Chờ nhận xét', value: stats?.pendingReviews || 0, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
+        { label: 'Yêu cầu SOS', value: stats?.pendingSosTickets || 0, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-100' },
     ];
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in">
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome, {user?.fullName?.split(' ')[0]}</h1>
+        <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in">
+            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Xin chào, {user?.fullName?.split(' ')[0]}</h1>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {statCards.map((stat, idx) => (
                     <Card key={idx} className="bg-white border-slate-200 shadow-sm rounded-3xl">

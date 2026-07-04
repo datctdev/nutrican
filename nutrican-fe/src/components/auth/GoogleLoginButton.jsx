@@ -21,8 +21,8 @@ export default function GoogleLoginButton({ isLoading, onLoadingChange }) {
     try {
       await googleLogin();
     } catch (error) {
-      const message = error.response?.data?.message || error.message || 'Google login failed';
-      toast.error('Google login failed', { description: message });
+      const message = error.response?.data?.message || error.message || 'Đăng nhập Google thất bại';
+      toast.error('Đăng nhập bằng Google thất bại', { description: message });
     } finally {
       onLoadingChange?.(false);
     }
@@ -40,7 +40,7 @@ export default function GoogleLoginButton({ isLoading, onLoadingChange }) {
       ) : (
         <GoogleIcon />
       )}
-      {isLoading ? 'Signing in with Google...' : 'Continue with Google'}
+      {isLoading ? 'Đang kết nối Google...' : 'Tiếp tục với Google'}
     </button>
   );
 }

@@ -211,7 +211,7 @@ export default function ReviewDietLogPage() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4">
+        <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4">
             {/* HEADER */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
@@ -277,7 +277,7 @@ export default function ReviewDietLogPage() {
                                     <div>
                                         <p className="font-extrabold text-slate-800 text-lg">{ticket.customerName || 'Học viên'}</p>
                                         <span className="inline-block mt-1.5 text-[10px] font-black px-2.5 py-1 rounded-md bg-red-100 text-red-700 uppercase tracking-widest">
-                                            {ticket.status}
+                                            {ticket.status === 'RESOLVED' ? 'ĐÃ GIẢI QUYẾT' : 'ĐANG CHỜ'}
                                         </span>
                                     </div>
                                     <Button
@@ -340,7 +340,7 @@ export default function ReviewDietLogPage() {
                                         {log.sosTicketFlag && (
                                             <div className="bg-red-500/95 backdrop-blur px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md border border-red-400">
                                                 <AlertTriangle className="w-3.5 h-3.5 text-white" />
-                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">SOS ALERT</span>
+                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">CẦN HỖ TRỢ SOS</span>
                                             </div>
                                         )}
                                     </div>

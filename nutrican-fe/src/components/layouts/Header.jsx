@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import { useState } from 'react';
 import { Menu, X, ChevronDown, Bell, LogOut, User, Settings, LayoutDashboard, Sparkles, Target } from 'lucide-react';
+import logo from '../../assets/nutrican_logo.png';
 
 export default function Header() {
     const { user, logout, isAuthenticated } = useAuthStore();
@@ -14,7 +15,7 @@ export default function Header() {
 
     const handleLogout = () => {
         logout();
-        toast.success('Logged out successfully', { description: 'See you again!' });
+        toast.success('Đăng xuất thành công', { description: 'Hẹn gặp lại bạn!' });
         navigate('/login');
     };
 
@@ -35,30 +36,30 @@ export default function Header() {
 
     const navItems = {
         CUSTOMER: [
-            { label: 'Diet Tracker', href: '/diet' },
-            { label: 'Find PT', href: '/marketplace' },
-            { label: 'Messages', href: '/chat' },
-            { label: 'Profile', href: '/profile' },
-            { label: 'Macro Targets', href: '/macro-targets' },
-            { label: 'Verification', href: '/kyc' },
+            { label: 'Nhật ký ăn uống', href: '/diet' },
+            { label: 'Tìm PT', href: '/marketplace' },
+            { label: 'Tin nhắn', href: '/chat' },
+            { label: 'Trang cá nhân', href: '/profile' },
+            { label: 'Mục tiêu dinh dưỡng', href: '/macro-targets' },
+            { label: 'Xác thực thông tin', href: '/kyc' },
         ],
         PT_CERTIFIED: [
-            { label: 'Dashboard', href: '/pt' },
-            { label: 'My Clients', href: '/pt/clients' },
-            { label: 'Messages', href: '/pt/chat' }, // Tab Chat
-            { label: 'Reviews', href: '/pt/reviews' },
+            { label: 'Bảng điều khiển', href: '/pt' },
+            { label: 'Học viên của tôi', href: '/pt/clients' },
+            { label: 'Tin nhắn', href: '/pt/chat' }, // Tab Chat
+            { label: 'Đánh giá', href: '/pt/reviews' },
         ],
         PT_FREELANCE: [
-            { label: 'Dashboard', href: '/pt' },
-            { label: 'My Clients', href: '/pt/clients' },
-            { label: 'Messages', href: '/pt/chat' }, // Tab Chat
-            { label: 'Reviews', href: '/pt/reviews' },
+            { label: 'Bảng điều khiển', href: '/pt' },
+            { label: 'Học viên của tôi', href: '/pt/clients' },
+            { label: 'Tin nhắn', href: '/pt/chat' }, // Tab Chat
+            { label: 'Đánh giá', href: '/pt/reviews' },
         ],
         ADMIN: [
-            { label: 'Dashboard', href: '/admin' },
-            { label: 'PT Approvals', href: '/admin/pts' },
-            { label: 'Users', href: '/admin/users' },
-            { label: 'SOS Center', href: '/admin/sos' },
+            { label: 'Bảng điều khiển', href: '/admin' },
+            { label: 'Duyệt PT', href: '/admin/pts' },
+            { label: 'Người dùng', href: '/admin/users' },
+            { label: 'Hỗ trợ SOS', href: '/admin/sos' },
         ],
     };
 
@@ -66,14 +67,12 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex h-16 items-center justify-between">
 
                     <div className="flex items-center gap-10">
                         <Link to="/" className="flex items-center gap-2.5 group">
-                            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-all">
-                                <Sparkles className="w-5 h-5 text-white" />
-                            </div>
+                            <img src={logo} alt="Nutrican Logo" className="w-9 h-9 rounded-xl shadow-md group-hover:scale-105 transition-transform object-cover" />
                             <span className="font-extrabold text-xl tracking-tight text-slate-900">Nutrican</span>
                         </Link>
 
@@ -136,18 +135,18 @@ export default function Header() {
                                                 </div>
                                                 <div className="py-2 px-2">
                                                     <Link to={getDashboardLink()} onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
-                                                        <LayoutDashboard className="w-4 h-4 text-slate-400" /> Dashboard
+                                                        <LayoutDashboard className="w-4 h-4 text-slate-400" /> Bảng điều khiển
                                                     </Link>
                                                     <Link to="/profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
-                                                        <User className="w-4 h-4 text-slate-400" /> My Profile
+                                                        <User className="w-4 h-4 text-slate-400" /> Trang cá nhân
                                                     </Link>
                                                     <Link to="/settings" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
-                                                        <Settings className="w-4 h-4 text-slate-400" /> Settings
+                                                        <Settings className="w-4 h-4 text-slate-400" /> Cài đặt
                                                     </Link>
                                                 </div>
                                                 <div className="border-t border-slate-100 pt-2 px-2">
                                                     <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl w-full transition-colors">
-                                                        <LogOut className="w-4 h-4" /> Sign out
+                                                        <LogOut className="w-4 h-4" /> Đăng xuất
                                                     </button>
                                                 </div>
                                             </div>
@@ -157,8 +156,8 @@ export default function Header() {
                             </>
                         ) : (
                             <div className="flex items-center gap-3">
-                                <Link to="/login" className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">Log in</Link>
-                                <Link to="/register" className="px-4 py-2 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-sm transition-all hover:shadow-md">Get Started</Link>
+                                <Link to="/login" className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors">Đăng nhập</Link>
+                                <Link to="/register" className="px-4 py-2 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-sm transition-all hover:shadow-md">Bắt đầu ngay</Link>
                             </div>
                         )}
 

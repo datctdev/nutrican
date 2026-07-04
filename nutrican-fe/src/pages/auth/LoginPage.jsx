@@ -19,8 +19,8 @@ export default function LoginPage() {
 
   const validate = () => {
     const newErrors = {};
-    if (!formData.email) newErrors.email = 'Email is required';
-    if (!formData.password) newErrors.password = 'Password is required';
+    if (!formData.email) newErrors.email = 'Vui lòng nhập Email';
+    if (!formData.password) newErrors.password = 'Vui lòng nhập mật khẩu';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -39,11 +39,11 @@ export default function LoginPage() {
     if (!validate()) return;
     try {
       const response = await login(formData);
-      toast.success('Welcome back!', { description: 'Login successful' });
+      toast.success('Chào mừng quay trở lại!', { description: 'Đăng nhập thành công' });
       const user = response?.data?.data?.user;
       navigate(user ? getRedirectPath(user.role) : '/');
     } catch (error) {
-      toast.error('Login failed', { description: error.response?.data?.message || 'Invalid credentials' });
+      toast.error('Đăng nhập thất bại', { description: error.response?.data?.message || 'Thông tin đăng nhập không hợp lệ' });
     }
   };
 
@@ -58,8 +58,8 @@ export default function LoginPage() {
               <Sparkles className="w-5 h-5 text-white" />
             </div>
           </Link>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Welcome back</h1>
-          <p className="text-slate-500 font-medium">Enter your credentials to access your account</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Chào mừng quay trở lại</h1>
+          <p className="text-slate-500 font-medium">Nhập thông tin của bạn để truy cập tài khoản</p>
         </div>
 
         <Card className="bg-white/80 backdrop-blur-xl border-slate-200/60 shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden">
@@ -73,13 +73,13 @@ export default function LoginPage() {
 
             <div className="flex items-center gap-3 mb-5">
               <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">or</span>
+              <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">hoặc</span>
               <div className="flex-1 h-px bg-slate-200" />
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700">Email Address</label>
+                <label className="text-sm font-bold text-slate-700">Địa chỉ Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
                   <Input type="email" placeholder="you@example.com" className="pl-10 py-6 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 font-medium" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
@@ -88,7 +88,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex justify-between"><label className="text-sm font-bold text-slate-700">Password</label><Link to="/forgot-password" className="text-xs font-bold text-blue-600 hover:text-blue-800">Forgot password?</Link></div>
+                <div className="flex justify-between"><label className="text-sm font-bold text-slate-700">Mật khẩu</label><Link to="/forgot-password" className="text-xs font-bold text-blue-600 hover:text-blue-800">Quên mật khẩu?</Link></div>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
                   <Input type={showPassword ? 'text' : 'password'} placeholder="••••••••" className="pl-10 pr-10 py-6 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 font-medium" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
@@ -100,11 +100,11 @@ export default function LoginPage() {
               </div>
 
               <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-bold shadow-md mt-2" disabled={isLoading}>
-                {isLoading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Signing in...</> : <>Sign In <ArrowRight className="ml-2 h-4 w-4" /></>}
+                {isLoading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Đang đăng nhập...</> : <>Đăng nhập <ArrowRight className="ml-2 h-4 w-4" /></>}
               </Button>
             </form>
             <div className="mt-8 text-center text-sm font-medium text-slate-500">
-              Don't have an account? <Link to="/register" className="text-blue-600 font-bold hover:text-blue-800">Create one now</Link>
+              Chưa có tài khoản? <Link to="/register" className="text-blue-600 font-bold hover:text-blue-800">Tạo tài khoản mới</Link>
             </div>
           </CardContent>
         </Card>

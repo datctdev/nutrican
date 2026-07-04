@@ -203,7 +203,7 @@ export default function ChatPage() {
     const activeThread = threads.find(t => t.mappingId === activeMappingId);
 
     return (
-        <div className="max-w-7xl mx-auto h-[calc(100vh-120px)] min-h-[600px] flex gap-6 animate-fade-in pb-6">
+        <div className="max-w-[1600px] mx-auto h-[calc(100vh-120px)] min-h-[600px] flex gap-6 animate-fade-in pb-6">
 
             {/* CỘT TRÁI */}
             <Card className="w-80 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden flex-shrink-0">
@@ -314,7 +314,7 @@ export default function ChatPage() {
                                                 {msg.imageUrl && (
                                                     <img
                                                         src={msg.imageUrl}
-                                                        alt={msg.content || 'Chat attachment'}
+                                                        alt={msg.content || 'Hình ảnh đính kèm'}
                                                         className="mb-2 max-h-72 w-full rounded-2xl object-cover"
                                                     />
                                                 )}
@@ -333,7 +333,7 @@ export default function ChatPage() {
                         <div className="p-4 bg-white border-t border-slate-100">
                             {selectedImagePreview && (
                                 <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                                    <img src={selectedImagePreview} alt="Selected attachment" className="h-16 w-16 rounded-xl object-cover" />
+                                    <img src={selectedImagePreview} alt="Ảnh đính kèm đã chọn" className="h-16 w-16 rounded-xl object-cover" />
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm font-bold text-slate-800">{selectedImage?.name}</p>
                                         <p className="text-xs font-medium text-slate-500">Ảnh sẽ được gửi cùng tin nhắn</p>
@@ -342,7 +342,7 @@ export default function ChatPage() {
                                         type="button"
                                         onClick={clearSelectedImage}
                                         className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-700"
-                                        aria-label="Remove selected image"
+                                        aria-label="Gỡ bỏ hình ảnh đã chọn"
                                     >
                                         <X className="h-4 w-4" />
                                     </button>
@@ -362,7 +362,7 @@ export default function ChatPage() {
                                     onClick={() => imageInputRef.current?.click()}
                                     disabled={sending}
                                     className="h-[52px] w-[52px] flex-shrink-0 rounded-2xl border-slate-200 bg-white p-0 text-slate-600 hover:bg-slate-50"
-                                    aria-label="Attach image"
+                                    aria-label="Đính kèm hình ảnh"
                                 >
                                     <ImagePlus className="h-5 w-5" />
                                 </Button>

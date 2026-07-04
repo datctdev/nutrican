@@ -176,7 +176,7 @@ const MacroRing = ({ label, current, target, colorClass }) => {
                 </div>
             </div>
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
-            <span className="text-[10px] text-slate-400 mt-0.5">{target || 0}g target</span>
+            <span className="text-[10px] text-slate-400 mt-0.5">Mục tiêu {target || 0}g</span>
         </div>
     );
 };
@@ -611,11 +611,11 @@ export default function DietTrackerPage() {
     const handleDelete = async (logId) => {
         try {
             await dietService.deleteLog(logId);
-            toast.success('Log deleted');
+            toast.success('Đã xóa bữa ăn thành công');
             fetchData();
         } catch (err) {
             console.error(err);
-            toast.error('Failed to delete log');
+            toast.error('Không thể xóa bữa ăn');
         }
     };
 
@@ -695,7 +695,7 @@ export default function DietTrackerPage() {
             const files = Array.from(e.target.files || []);
             const validFiles = files.filter(file => {
                 if (file.size > MAX_IMAGE_SIZE) {
-                    toast.error(`${file.name} is too large. Max 5MB.`);
+                    toast.error(`${file.name} quá lớn. Tối đa 5MB.`);
                     return false;
                 }
                 return true;
@@ -707,10 +707,10 @@ export default function DietTrackerPage() {
                 const formData = new FormData();
                 validFiles.forEach((file) => formData.append('files', file));
                 await dietService.uploadImages(logId, formData);
-                toast.success('Images uploaded successfully!');
+                toast.success('Đã tải hình ảnh lên thành công!');
                 fetchData();
             } catch (err) {
-                toast.error(err.response?.data?.message || 'Failed to upload images');
+                toast.error(err.response?.data?.message || 'Không thể tải hình ảnh lên');
             } finally {
                 setUploading(false);
             }
@@ -721,20 +721,20 @@ export default function DietTrackerPage() {
     const handleSetPrimary = async (logId, imageId) => {
         try {
             await dietService.setPrimaryImage(logId, imageId);
-            toast.success('Primary image updated');
+            toast.success('Đã cập nhật ảnh chính');
             fetchData();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to update');
+            toast.error(err.response?.data?.message || 'Không thể cập nhật');
         }
     };
 
     const handleDeleteImage = async (logId, imageId) => {
         try {
             await dietService.deleteImage(logId, imageId);
-            toast.success('Image deleted');
+            toast.success('Đã xóa hình ảnh');
             fetchData();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to delete');
+            toast.error(err.response?.data?.message || 'Không thể xóa hình ảnh');
         }
     };
 
@@ -809,23 +809,31 @@ export default function DietTrackerPage() {
         };
         const config = map[status] || { color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Activity };
         const Icon = config.icon;
+        const statusVi = {
+            'APPROVED': 'Đã duyệt',
+            'PENDING_AI': 'AI đang xử lý',
+            'PT_REVIEWING': 'PT đang xem xét',
+            'REJECTED': 'Từ chối',
+            'DRAFT': 'Nháp',
+            'LOGGED': 'Đã ghi nhận',
+        }[status] || status || 'Chưa rõ';
         return (
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${config.color}`}>
         <Icon className="w-3.5 h-3.5" />
-                {status?.replace('_', ' ') || 'UNKNOWN'}
+                {statusVi}
       </span>
         );
     };
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in">
+        <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mt-6">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Diet Tracker</h1>
-                    <p className="text-slate-500 mt-1 font-medium">Analyze meals instantly and hit your daily goals.</p>
+                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Nhật Ký Dinh Dưỡng</h1>
+                    <p className="text-slate-500 mt-1 font-medium">Phân tích bữa ăn tức thì và đạt mục tiêu hàng ngày.</p>
                 </div>
                 <Button onClick={fetchData} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl">
-                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Sync Data
+                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Đồng bộ dữ liệu
                 </Button>
             </div>
 
@@ -904,17 +912,17 @@ export default function DietTrackerPage() {
                             )}
 
                             <div className="flex p-1 bg-slate-100 rounded-xl w-full sm:w-max mb-8 border border-slate-200/50">
-                                <button onClick={() => setInputMode('ai')} className={`flex-1 sm:w-40 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'ai' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Sparkles className="w-4 h-4" /> AI Snapshot</button>
-                                <button onClick={() => setInputMode('manual')} className={`flex-1 sm:w-40 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'manual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Keyboard className="w-4 h-4" /> Manual Entry</button>
+                                <button onClick={() => setInputMode('ai')} className={`flex-1 sm:w-40 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'ai' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Sparkles className="w-4 h-4" /> Phân tích AI</button>
+                                <button onClick={() => setInputMode('manual')} className={`flex-1 sm:w-40 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'manual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}><Keyboard className="w-4 h-4" /> Nhập thủ công</button>
                             </div>
 
                             {inputMode === 'ai' && (
                                 <div className="mb-4">
                                     <select value={aiMealType} onChange={(e) => setAiMealType(e.target.value)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700">
-                                        <option value="BREAKFAST">Breakfast</option>
-                                        <option value="LUNCH">Lunch</option>
-                                        <option value="DINNER">Dinner</option>
-                                        <option value="SNACK">Snack</option>
+                                        <option value="BREAKFAST">Bữa sáng</option>
+                                        <option value="LUNCH">Bữa trưa</option>
+                                        <option value="DINNER">Bữa tối</option>
+                                        <option value="SNACK">Bữa phụ</option>
                                     </select>
                                 </div>
                             )}
@@ -929,29 +937,29 @@ export default function DietTrackerPage() {
                                 >
                                     <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
                                     <div className="w-20 h-20 mx-auto bg-white rounded-full flex items-center justify-center mb-6 shadow-md border border-slate-100"><Camera className="w-8 h-8 text-blue-500" /></div>
-                                    <h3 className="text-xl font-bold mb-2 text-slate-800">Upload Meal Photo</h3>
-                                    <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm">Drag & drop or click to browse. One image per AI analysis.</p>
+                                    <h3 className="text-xl font-bold mb-2 text-slate-800">Tải lên hình ảnh bữa ăn</h3>
+                                    <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm">Kéo thả hoặc nhấp để chọn ảnh. Phân tích một ảnh cho mỗi bữa ăn.</p>
 
                                     {selectedFile ? (
                                         <div className="flex flex-col items-center justify-center gap-4 animate-fade-in" onClick={(e) => e.stopPropagation()}>
                                             <span className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full font-bold border border-blue-100">{selectedFile.name}</span>
                                             <Button onClick={handleAnalyze} disabled={analyzing} className="shadow-md bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-8 h-12">
-                                                {analyzing ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Analyzing...</> : 'Process with AI'}
+                                                {analyzing ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Đang phân tích...</> : 'Phân tích bằng AI'}
                                             </Button>
                                         </div>
                                     ) : (
-                                        <Button variant="outline" className="bg-white border-slate-300 text-slate-700 pointer-events-none rounded-xl">Select Image</Button>
+                                        <Button variant="outline" className="bg-white border-slate-300 text-slate-700 pointer-events-none rounded-xl">Chọn hình ảnh</Button>
                                     )}
                                 </div>
                             ) : (
                                 <form onSubmit={handleManualSubmit} className="space-y-5 animate-fade-in bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
                                     <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Meal Type</label>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">Bữa ăn</label>
                                         <select value={manualMealType} onChange={(e) => setManualMealType(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all">
-                                            <option value="BREAKFAST">Breakfast</option>
-                                            <option value="LUNCH">Lunch</option>
-                                            <option value="DINNER">Dinner</option>
-                                            <option value="SNACK">Snack</option>
+                                            <option value="BREAKFAST">Bữa sáng</option>
+                                            <option value="LUNCH">Bữa trưa</option>
+                                            <option value="DINNER">Bữa tối</option>
+                                            <option value="SNACK">Bữa phụ</option>
                                         </select>
                                     </div>
 
@@ -1047,7 +1055,7 @@ export default function DietTrackerPage() {
                     {/* Timeline Logs */}
                     <div className="space-y-5">
                         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <Clock className="w-5 h-5 text-slate-400" /> Today's Log
+                            <Clock className="w-5 h-5 text-slate-400" /> Nhật ký hôm nay
                         </h3>
 
                         {loading ? (
@@ -1057,7 +1065,7 @@ export default function DietTrackerPage() {
                         ) : logs.length === 0 ? (
                             <div className="text-center py-12 bg-white rounded-3xl border border-slate-200 border-dashed">
                                 <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                                <p className="text-slate-600 font-semibold">No meals logged today.</p>
+                                <p className="text-slate-600 font-semibold">Hôm nay chưa có bữa ăn nào được ghi nhận.</p>
                             </div>
                         ) : (
                             <div className="space-y-5 relative before:absolute before:inset-y-0 before:left-[23px] before:w-0.5 before:bg-slate-200">
@@ -1144,7 +1152,7 @@ export default function DietTrackerPage() {
                                                         {log.status === 'DRAFT' && (
                                                             <div className="flex items-center gap-2 mt-4 flex-wrap">
                                                                 {/* 1. Nút Gửi PT */}
-                                                                <Button size="sm" onClick={async () => { await dietService.submitForReview(log.id); toast.success('Submitted for PT review'); fetchData(); }} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold h-9 shadow-md shadow-amber-500/20">
+                                                                <Button size="sm" onClick={async () => { await dietService.submitForReview(log.id); toast.success('Đã gửi cho PT duyệt thành công'); fetchData(); }} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold h-9 shadow-md shadow-amber-500/20">
                                                                     Xác nhận & gửi PT Duyệt
                                                                 </Button>
 
@@ -1193,15 +1201,15 @@ export default function DietTrackerPage() {
                         <div className="h-2 bg-gradient-to-r from-blue-500 to-emerald-400 w-full" />
                         <CardContent className="p-6">
                             <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                <Activity className="w-5 h-5 text-blue-500" /> Daily Target
+                                <Activity className="w-5 h-5 text-blue-500" /> Mục tiêu hàng ngày
                             </h3>
 
                             <div className="mb-8">
                                 <div className="flex justify-between items-end mb-2.5">
-                                    <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Total Calories</span>
+                                    <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Tổng Calo tiêu thụ</span>
                                     <div className="text-right">
                                         <span className="text-3xl font-black text-slate-800">{summary?.totalCalories || 0}</span>
-                                        <span className="text-sm font-semibold text-slate-400"> / {summary?.targetCalories || 2000}</span>
+                                        <span className="text-sm font-semibold text-slate-400"> / {summary?.targetCalories || 2000} kcal</span>
                                     </div>
                                 </div>
                                 <div className="h-3.5 bg-slate-100 rounded-full overflow-hidden">
@@ -1210,9 +1218,9 @@ export default function DietTrackerPage() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <MacroRing label="Protein" current={summary?.totalProtein} target={summary?.targetProtein || 120} colorClass="stroke-blue-500" />
-                                <MacroRing label="Carbs" current={summary?.totalCarbs} target={summary?.targetCarbs || 200} colorClass="stroke-amber-500" />
-                                <MacroRing label="Fat" current={summary?.totalFat} target={summary?.targetFat || 65} colorClass="stroke-red-500" />
+                                <MacroRing label="Đạm (Protein)" current={summary?.totalProtein} target={summary?.targetProtein || 120} colorClass="stroke-blue-500" />
+                                <MacroRing label="Tinh bột (Carbs)" current={summary?.totalCarbs} target={summary?.targetCarbs || 200} colorClass="stroke-amber-500" />
+                                <MacroRing label="Chất béo (Fat)" current={summary?.totalFat} target={summary?.targetFat || 65} colorClass="stroke-red-500" />
                             </div>
                         </CardContent>
                     </Card>
@@ -1230,7 +1238,7 @@ export default function DietTrackerPage() {
                                     >
                                         <div className="flex justify-between items-center mb-1.5">
                         <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${ticket.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {ticket.status}
+                            {ticket.status === 'RESOLVED' ? 'Đã giải quyết' : 'Chưa giải quyết'}
                         </span>
                                             <span className="text-[10px] font-semibold text-slate-400">
                             {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('vi-VN') : ''}
@@ -1442,9 +1450,9 @@ export default function DietTrackerPage() {
                                             <div className="grid grid-cols-4 gap-1.5">
                                                 {[
                                                     { label: 'Kcal', value: selectedPrediction.calories, accent: 'text-emerald-700' },
-                                                    { label: 'Protein', value: `${selectedPrediction.protein ?? '—'}g`, accent: 'text-slate-800' },
-                                                    { label: 'Carb', value: `${selectedPrediction.carb ?? '—'}g`, accent: 'text-slate-800' },
-                                                    { label: 'Fat', value: `${selectedPrediction.fat ?? '—'}g`, accent: 'text-slate-800' },
+                                                    { label: 'Đạm (Pro)', value: `${selectedPrediction.protein ?? '—'}g`, accent: 'text-slate-800' },
+                                                    { label: 'Tinh bột (Carb)', value: `${selectedPrediction.carb ?? '—'}g`, accent: 'text-slate-800' },
+                                                    { label: 'Chất béo (Fat)', value: `${selectedPrediction.fat ?? '—'}g`, accent: 'text-slate-800' },
                                                 ].map(({ label, value, accent }) => (
                                                     <div key={label} className="rounded-xl bg-white border border-slate-100 py-2 text-center shadow-sm">
                                                         <p className="text-[10px] text-slate-500">{label}</p>

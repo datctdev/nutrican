@@ -9,19 +9,19 @@ import { toast } from 'sonner';
 import { Loader2, Lock, Sparkles, Eye, EyeOff, ArrowLeft, AlertCircle } from 'lucide-react';
 
 const PASSWORD_RULES = [
-  { key: 'length', label: 'At least 8 characters', test: (p) => p.length >= 8 },
-  { key: 'upper', label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
-  { key: 'lower', label: 'One lowercase letter', test: (p) => /[a-z]/.test(p) },
-  { key: 'number', label: 'One number', test: (p) => /\d/.test(p) },
+  { key: 'length', label: 'Tối thiểu 8 ký tự', test: (p) => p.length >= 8 },
+  { key: 'upper', label: 'Ít nhất một chữ hoa', test: (p) => /[A-Z]/.test(p) },
+  { key: 'lower', label: 'Ít nhất một chữ thường', test: (p) => /[a-z]/.test(p) },
+  { key: 'number', label: 'Ít nhất một chữ số', test: (p) => /\d/.test(p) },
 ];
 
 const getPasswordStrength = (password) => {
   if (!password) return { score: 0, label: '', color: '' };
   const passed = PASSWORD_RULES.filter((r) => r.test(password)).length;
-  if (passed <= 1) return { score: 1, label: 'Weak', color: 'bg-red-500', textColor: 'text-red-600' };
-  if (passed <= 2) return { score: 2, label: 'Fair', color: 'bg-amber-500', textColor: 'text-amber-600' };
-  if (passed <= 3) return { score: 3, label: 'Good', color: 'bg-blue-500', textColor: 'text-blue-600' };
-  return { score: 4, label: 'Strong', color: 'bg-emerald-500', textColor: 'text-emerald-600' };
+  if (passed <= 1) return { score: 1, label: 'Yếu', color: 'bg-red-500', textColor: 'text-red-600' };
+  if (passed <= 2) return { score: 2, label: 'Trung bình', color: 'bg-amber-500', textColor: 'text-amber-600' };
+  if (passed <= 3) return { score: 3, label: 'Khá', color: 'bg-blue-500', textColor: 'text-blue-600' };
+  return { score: 4, label: 'Mạnh', color: 'bg-emerald-500', textColor: 'text-emerald-600' };
 };
 
 export default function ResetPasswordPage() {
@@ -45,14 +45,14 @@ export default function ResetPasswordPage() {
   const validate = () => {
     const newErrors = {};
     if (!formData.newPassword) {
-      newErrors.newPassword = 'Password is required';
+      newErrors.newPassword = 'Vui lòng nhập mật khẩu';
     } else if (formData.newPassword.length < 8) {
-      newErrors.newPassword = 'Min 8 characters';
+      newErrors.newPassword = 'Mật khẩu tối thiểu 8 ký tự';
     } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.newPassword)) {
-      newErrors.newPassword = 'Must contain uppercase, lowercase, and number';
+      newErrors.newPassword = 'Phải chứa chữ hoa, chữ thường và chữ số';
     }
     if (formData.newPassword !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      newErrors.confirmPassword = 'Mật khẩu nhập lại không khớp';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -65,14 +65,14 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
     try {
       await authService.resetPassword(token, formData.newPassword);
-      toast.success('Password reset!', { description: 'You can now sign in with your new password.' });
+      toast.success('Đặt lại mật khẩu thành công!', { description: 'Bây giờ bạn có thể đăng nhập bằng mật khẩu mới.' });
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
       const msg = err.response?.data?.message;
       if (msg && (msg.includes('expired') || msg.includes('Invalid') || msg.includes('used'))) {
         setTokenError(true);
       } else {
-        toast.error('Reset failed', { description: msg || 'Something went wrong.' });
+        toast.error('Đặt lại mật khẩu thất bại', { description: msg || 'Đã xảy ra lỗi.' });
       }
     } finally {
       setIsLoading(false);
@@ -97,17 +97,17 @@ export default function ResetPasswordPage() {
                   <AlertCircle className="w-8 h-8 text-red-600" />
                 </div>
               </div>
-              <h2 className="text-2xl font-black text-slate-900">Invalid or expired link</h2>
+              <h2 className="text-2xl font-black text-slate-900">Liên kết không hợp lệ hoặc đã hết hạn</h2>
               <p className="text-slate-500 text-sm">
-                This password reset link is invalid or has expired. Please request a new one.
+                Liên kết khôi phục mật khẩu này không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu liên kết mới.
               </p>
               <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 rounded-xl py-6 font-bold mt-2">
-                <Link to="/forgot-password">Request new reset link</Link>
+                <Link to="/forgot-password">Yêu cầu liên kết mới</Link>
               </Button>
               <div className="pt-2">
                 <Link to="/login" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">
                   <ArrowLeft className="w-4 h-4" />
-                  Back to sign in
+                  Quay lại đăng nhập
                 </Link>
               </div>
             </CardContent>
@@ -128,20 +128,20 @@ export default function ResetPasswordPage() {
               <Sparkles className="w-5 h-5 text-white" />
             </div>
           </Link>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Set new password</h1>
-          <p className="text-slate-500 font-medium">Create a strong password for your account</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Đặt mật khẩu mới</h1>
+          <p className="text-slate-500 font-medium">Tạo mật khẩu mạnh cho tài khoản của bạn</p>
         </div>
 
         <Card className="bg-white/80 backdrop-blur-xl border-slate-200/60 shadow-xl shadow-slate-200/50 rounded-3xl">
           <CardContent className="p-8">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700">New Password</label>
+                <label className="text-sm font-bold text-slate-700">Mật khẩu mới</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
                   <Input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="New password"
+                    placeholder="Mật khẩu mới"
                     className="pl-10 pr-10 py-6 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 font-medium"
                     value={formData.newPassword}
                     onChange={(e) => { setFormData({ ...formData, newPassword: e.target.value }); setErrors({ ...errors, newPassword: '' }); }}
@@ -173,12 +173,12 @@ export default function ResetPasswordPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700">Confirm New Password</label>
+                <label className="text-sm font-bold text-slate-700">Xác nhận mật khẩu mới</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
                   <Input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Re-enter new password"
+                    placeholder="Nhập lại mật khẩu mới"
                     className="pl-10 py-6 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 font-medium"
                     value={formData.confirmPassword}
                     onChange={(e) => { setFormData({ ...formData, confirmPassword: e.target.value }); setErrors({ ...errors, confirmPassword: '' }); }}
@@ -193,16 +193,16 @@ export default function ResetPasswordPage() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Resetting...</>
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Đang thiết lập lại...</>
                 ) : (
-                  'Reset password'
+                  'Đặt lại mật khẩu'
                 )}
               </Button>
             </form>
             <div className="mt-6 pt-5 border-t border-slate-100 text-center">
               <Link to="/login" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">
                 <ArrowLeft className="w-4 h-4" />
-                Back to sign in
+                Quay lại đăng nhập
               </Link>
             </div>
           </CardContent>

@@ -5,7 +5,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { adminService } from '../../services/adminService';
-import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3 } from 'lucide-react';
+import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AdminDashboardPage() {
@@ -59,9 +59,9 @@ export default function AdminDashboardPage() {
       a.href = url;
       a.download = 'rbl_export.csv';
       a.click();
-      toast.success('RBL dataset downloaded');
+      toast.success('Đã tải xuống tập dữ liệu RBL');
     } catch (err) {
-      toast.error('Failed to download export');
+      toast.error('Không thể tải xuống dữ liệu RBL');
     }
   };
 
@@ -73,14 +73,14 @@ export default function AdminDashboardPage() {
       a.href = url;
       a.download = 'rbl_report.md';
       a.click();
-      toast.success('RBL report downloaded');
+      toast.success('Đã tải xuống báo cáo RBL');
     } catch (err) {
-      toast.error('Failed to download report');
+      toast.error('Không thể tải xuống báo cáo');
     }
   };
 
   if (loading) return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in">
+    <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in">
       <Skeleton className="h-10 w-64 rounded-xl mb-8 bg-slate-200" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[1,2,3,4].map(i => <Skeleton key={i} className="h-32 rounded-3xl bg-slate-200" />)}
@@ -89,17 +89,17 @@ export default function AdminDashboardPage() {
   );
 
   const mainStats = [
-    { label: 'Total Users', value: stats?.totalUsers || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-    { label: 'Active PTs', value: stats?.totalPts || 0, icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    { label: 'Pending PTs', value: stats?.pendingPtVerifications || 0, icon: UserPlus, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-    { label: 'SOS Tickets', value: stats?.activeSosTickets || 0, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
+    { label: 'Tổng người dùng', value: stats?.totalUsers || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+    { label: 'PT hoạt động', value: stats?.totalPts || 0, icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+    { label: 'PT chờ duyệt', value: stats?.pendingPtVerifications || 0, icon: UserPlus, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+    { label: 'Yêu cầu SOS', value: stats?.activeSosTickets || 0, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in">
+    <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in">
       <div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">System Overview</h1>
-        <p className="text-slate-500 mt-1 font-medium">Nutrican Platform Executive Dashboard</p>
+        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Tổng Quan Hệ Thống</h1>
+        <p className="text-slate-500 mt-1 font-medium">Bảng quản trị hệ thống Nutrican</p>
       </div>
 
       {/* Main KPIs */}
@@ -128,20 +128,20 @@ export default function AdminDashboardPage() {
           <CardContent className="p-8 relative z-10">
             <div className="flex items-center gap-3 mb-8 border-b border-white/10 pb-4">
               <HeartPulse className="w-6 h-6 text-blue-400" />
-              <h3 className="text-xl font-bold">Platform Engagement</h3>
+              <h3 className="text-xl font-bold">Chỉ số tương tác hệ thống</h3>
             </div>
             
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-medium">Total Customers</span>
+                <span className="text-slate-400 font-medium">Tổng học viên</span>
                 <span className="text-2xl font-bold">{stats?.totalCustomers || 0}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-medium">Total Diet Logs</span>
+                <span className="text-slate-400 font-medium">Tổng nhật ký ăn uống</span>
                 <span className="text-2xl font-bold">{stats?.totalDietLogs || 0}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-400 font-medium">Average PT Rating</span>
+                <span className="text-slate-400 font-medium">Đánh giá PT trung bình</span>
                 <span className="text-2xl font-bold flex items-center gap-2">
                   <Star className="w-5 h-5 text-amber-400 fill-amber-400" /> 
                   {stats?.averageRating?.toFixed(1) || '5.0'}
@@ -153,7 +153,7 @@ export default function AdminDashboardPage() {
 
         {/* Action Center */}
         <div className="lg:col-span-2 space-y-6">
-          <h3 className="text-xl font-bold text-slate-800">Action Center</h3>
+          <h3 className="text-xl font-bold text-slate-800">Trung tâm xử lý</h3>
           <div className="grid sm:grid-cols-2 gap-6">
             
             {/* PT Approvals */}
@@ -162,15 +162,15 @@ export default function AdminDashboardPage() {
                 <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mb-4">
                   <ShieldCheck className="w-6 h-6 text-amber-500" />
                 </div>
-                <h4 className="font-bold text-slate-900 mb-1">PT Verifications</h4>
+                <h4 className="font-bold text-slate-900 mb-1">Xác thực PT</h4>
                 <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
                   {stats?.pendingPtVerifications > 0 
-                    ? `You have ${stats.pendingPtVerifications} personal trainers waiting for background check and approval.`
-                    : 'All personal trainer applications have been reviewed.'}
+                    ? `Bạn có ${stats.pendingPtVerifications} hồ sơ huấn luyện viên đang chờ xác minh và duyệt.`
+                    : 'Tất cả hồ sơ đăng ký PT đã được xử lý.'}
                 </p>
                 <Link to="/admin/pts">
                   <Button className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11">
-                    Review Applications <ChevronRight className="w-4 h-4 ml-1" />
+                    Duyệt hồ sơ <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </Link>
               </CardContent>
@@ -182,15 +182,15 @@ export default function AdminDashboardPage() {
                 <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mb-4">
                   <AlertCircle className="w-6 h-6 text-red-500" />
                 </div>
-                <h4 className="font-bold text-slate-900 mb-1">Emergency SOS</h4>
+                <h4 className="font-bold text-slate-900 mb-1">Yêu cầu khẩn cấp SOS</h4>
                 <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
                   {stats?.activeSosTickets > 0 
-                    ? `There are ${stats.activeSosTickets} unresolved SOS tickets from clients needing immediate assistance.`
-                    : 'No active SOS tickets. Platform is running smoothly.'}
+                    ? `Có ${stats.activeSosTickets} yêu cầu SOS chưa giải quyết cần hỗ trợ khẩn cấp.`
+                    : 'Không có yêu cầu SOS nào. Hệ thống hoạt động ổn định.'}
                 </p>
                 <Link to="/admin/sos">
                   <Button variant="outline" className="w-full border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11">
-                    Manage Tickets <ChevronRight className="w-4 h-4 ml-1" />
+                    Quản lý SOS <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </Link>
               </CardContent>
@@ -205,25 +205,25 @@ export default function AdminDashboardPage() {
         <CardContent className="p-8">
           <div className="flex items-center gap-3 mb-6">
             <BarChart3 className="w-6 h-6 text-indigo-600" />
-            <h3 className="text-xl font-bold text-slate-900">RBL Research (CV + PT Ground Truth)</h3>
+            <h3 className="text-xl font-bold text-slate-900">Nghiên cứu RBL (Dữ liệu CV + PT Đối chứng)</h3>
           </div>
           {rblStats ? (
             <>
             <div className="grid md:grid-cols-4 gap-4 mb-4">
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-xs font-bold text-slate-500 uppercase">Reviewed logs</p>
+                <p className="text-xs font-bold text-slate-500 uppercase">Bữa ăn đã duyệt</p>
                 <p className="text-2xl font-black text-slate-900">{rblStats.totalReviewed}</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-xs font-bold text-slate-500 uppercase">CV labeled</p>
+                <p className="text-xs font-bold text-slate-500 uppercase">Ảnh đã gán nhãn</p>
                 <p className="text-2xl font-black text-slate-900">{rblStats.totalLabeledCv}</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-xs font-bold text-slate-500 uppercase">MAE A1.0 (AI kcal)</p>
+                <p className="text-xs font-bold text-slate-500 uppercase">Sai số AI (MAE kcal)</p>
                 <p className="text-2xl font-black text-indigo-600">{rblStats.maeAiCalories}</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-xs font-bold text-slate-500 uppercase">Adjust rate (restaurant)</p>
+                <p className="text-xs font-bold text-slate-500 uppercase">Tỷ lệ sửa (Ăn ngoài)</p>
                 <p className="text-2xl font-black text-amber-600">
                   {rblStats.adjustRateByMealSource?.RESTAURANT != null
                     ? `${Math.round(rblStats.adjustRateByMealSource.RESTAURANT * 100)}%` : '—'}
@@ -232,11 +232,11 @@ export default function AdminDashboardPage() {
             </div>
             <div className="grid md:grid-cols-4 gap-4 mb-6">
               <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                <p className="text-xs font-bold text-emerald-700 uppercase">MAE A1.1 (DB kcal)</p>
+                <p className="text-xs font-bold text-emerald-700 uppercase">Sai số DB (MAE kcal)</p>
                 <p className="text-2xl font-black text-emerald-700">{rblStats.maeDbCalories ?? '—'}</p>
               </div>
               <div className="p-4 bg-violet-50 rounded-2xl border border-violet-100">
-                <p className="text-xs font-bold text-violet-700 uppercase">ΔA (A1.0 − A1.1)</p>
+                <p className="text-xs font-bold text-violet-700 uppercase">Chênh lệch ΔA (AI - DB)</p>
                 <p className="text-2xl font-black text-violet-700">
                   {rblStats.maeAiCalories != null && rblStats.maeDbCalories != null
                     ? (Number(rblStats.maeAiCalories) - Number(rblStats.maeDbCalories)).toFixed(1)
@@ -244,7 +244,7 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-xs font-bold text-slate-500 uppercase">MAE AI_ONLY</p>
+                <p className="text-xs font-bold text-slate-500 uppercase">MAE CHỈ AI</p>
                 <p className="text-2xl font-black text-slate-700">{rblStats.maeByRecognitionSource?.AI_ONLY ?? '—'}</p>
               </div>
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -254,21 +254,21 @@ export default function AdminDashboardPage() {
             </div>
             </>
           ) : (
-            <p className="text-sm text-slate-500 mb-4">No reviewed logs yet — collect PT reviews to populate RBL metrics.</p>
+            <p className="text-sm text-slate-500 mb-4">Chưa có dữ liệu ăn uống nào được phê duyệt từ PT.</p>
           )}
           {rblStats?.insufficientSample && (
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 mb-4">
-              Sample size &lt; 30 — collect more reviewed CV logs before writing Results.
+              Kích thước mẫu &lt; 30 — hãy thu thập thêm nhật ký đã duyệt trước khi phân tích kết quả.
             </p>
           )}
           {rblStats?.cohortCounts && Object.keys(rblStats.cohortCounts).length > 0 && (
             <div className="mb-6 overflow-x-auto">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Cohort distribution (target: ≥8 HOME, ≥8 REST, ≥4 HOTPOT, ≥4 COMPOSITE)</p>
+              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Phân bố nhóm mẫu (Mục tiêu: ≥8 Tự nấu, ≥8 Ăn ngoài, ≥4 Lẩu, ≥4 Buffet)</p>
               <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="text-left px-3 py-2 font-semibold text-slate-600">Cohort</th>
-                    <th className="text-right px-3 py-2 font-semibold text-slate-600">Count</th>
+                    <th className="text-left px-3 py-2 font-semibold text-slate-600">Nhóm</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-600">Số lượng</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -284,13 +284,13 @@ export default function AdminDashboardPage() {
           )}
           {rblStats?.calibrationBuckets && Object.keys(rblStats.calibrationBuckets).length > 0 && (
             <div className="mb-6 overflow-x-auto">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Calibration buckets</p>
+              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Các nhóm hiệu chuẩn (Calibration buckets)</p>
               <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="text-left px-3 py-2 font-semibold text-slate-600">Confidence</th>
-                    <th className="text-right px-3 py-2 font-semibold text-slate-600">Count</th>
-                    <th className="text-right px-3 py-2 font-semibold text-slate-600">MAE kcal</th>
+                    <th className="text-left px-3 py-2 font-semibold text-slate-600">Độ tự tin</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-600">Số lượng</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-600">Sai số MAE (kcal)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -307,23 +307,23 @@ export default function AdminDashboardPage() {
           )}
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">From</label>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Từ ngày</label>
               <input type="date" value={rblFrom} onChange={(e) => setRblFrom(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">To</label>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Đến ngày</label>
               <input type="date" value={rblTo} onChange={(e) => setRblTo(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
             </div>
-            <Button variant="outline" onClick={fetchRbl} className="rounded-xl border-slate-200 h-10">Apply dates</Button>
+            <Button variant="outline" onClick={fetchRbl} className="rounded-xl border-slate-200 h-10">Áp dụng ngày</Button>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleDownloadRbl} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">
-              <Download className="w-4 h-4 mr-2" /> Download CSV
+              <Download className="w-4 h-4 mr-2" /> Tải xuống CSV
             </Button>
             <Button variant="outline" onClick={handleDownloadReport} className="rounded-xl border-slate-200">
-              Download Report (.md)
+              Tải xuống báo cáo (.md)
             </Button>
-            <Button variant="outline" onClick={fetchRbl} className="rounded-xl border-slate-200">Refresh stats</Button>
+            <Button variant="outline" onClick={fetchRbl} className="rounded-xl border-slate-200">Cập nhật chỉ số</Button>
           </div>
           {rblPreview?.message && (
             <p className="text-xs text-slate-400 mt-3">{rblPreview.message}</p>

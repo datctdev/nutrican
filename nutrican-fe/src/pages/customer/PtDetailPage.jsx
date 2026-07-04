@@ -162,7 +162,7 @@ export default function PtDetailPage() {
                                     <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{pt.fullName}</h1>
                                     {pt.tier === 'TIER_1' && (
                                         <span className="bg-blue-100 text-blue-700 text-xs font-black px-2.5 py-1 rounded-lg flex items-center border border-blue-200">
-                                            <ShieldCheck className="w-3 h-3 mr-1" /> CERTIFIED
+                                            <ShieldCheck className="w-3 h-3 mr-1" /> ĐÃ XÁC THỰC
                                         </span>
                                     )}
                                 </div>
