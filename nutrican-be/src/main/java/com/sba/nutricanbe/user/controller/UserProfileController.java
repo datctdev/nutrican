@@ -72,6 +72,13 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.registerAsPt(user.getId(), request));
     }
 
+    @PostMapping(value = "/pt/cert-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<String>> uploadCertImage(
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userProfileService.uploadCertImage(user.getId(), file));
+    }
+
     @PostMapping(value = "/pt/cv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<String>> uploadCv(
             @AuthenticationPrincipal User user,
@@ -79,3 +86,4 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.uploadCv(user.getId(), file));
     }
 }
+

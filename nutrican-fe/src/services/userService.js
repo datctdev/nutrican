@@ -15,6 +15,13 @@ export const userService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  uploadCertImage: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/profile/pt/cert-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   getRequireKycSetting: () => api.get('/settings/require-kyc'),
   updateRequireKycSetting: (value) => api.put(`/admin/settings/require-kyc?value=${value}`),
 };

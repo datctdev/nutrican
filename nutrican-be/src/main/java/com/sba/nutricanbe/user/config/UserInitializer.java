@@ -78,21 +78,19 @@ public class UserInitializer implements CommandLineRunner {
                 certifiedPt,
                 "Certified nutrition coach with strength training focus.",
                 "Build sustainable habits, then optimize performance.",
-                8,
+                LocalDate.of(2016, 3, 1),
                 List.of("Fat loss", "Muscle gain", "Meal planning"),
                 Tier.TIER_1,
-                BigDecimal.valueOf(450000),
-                "NASM-CPT, Precision Nutrition Level 1");
+                BigDecimal.valueOf(450000));
 
         seedPtProfile(
                 freelancePt,
                 "Freelance PT specializing in busy professional meal routines.",
                 "Simple tracking, honest feedback, and practical adjustments.",
-                5,
+                LocalDate.of(2019, 6, 1),
                 List.of("Lifestyle coaching", "Home workout", "Vietnamese diet"),
                 Tier.TIER_2,
-                BigDecimal.valueOf(300000),
-                "ACE-CPT");
+                BigDecimal.valueOf(300000));
 
         seedMapping(certifiedPt, customerOne, ClientMappingStatus.ACTIVE);
         seedMapping(freelancePt, customerTwo, ClientMappingStatus.PENDING);
@@ -144,11 +142,10 @@ public class UserInitializer implements CommandLineRunner {
     private void seedPtProfile(User pt,
                                String bio,
                                String philosophy,
-                               int yearsOfExperience,
+                               LocalDate experienceStartDate,
                                List<String> specializations,
                                Tier tier,
-                               BigDecimal hourlyRate,
-                               String certifications) {
+                               BigDecimal hourlyRate) {
         ptProfileRepository.findByUserId(pt.getId())
                 .ifPresentOrElse(profile -> {
                     profile.setIsVerified(true);
@@ -160,11 +157,10 @@ public class UserInitializer implements CommandLineRunner {
                         .isVerified(true)
                         .bio(bio)
                         .trainingPhilosophy(philosophy)
-                        .yearsOfExperience(yearsOfExperience)
+                        .experienceStartDate(experienceStartDate)
                         .specializations(specializations)
                         .tier(tier)
                         .hourlyRate(hourlyRate)
-                        .certifications(certifications)
                         .rating(BigDecimal.valueOf(5.0))
                         .totalReviews(0)
                         .verificationStatus(UserStatus.ACTIVE)

@@ -86,7 +86,7 @@ public class PtAdminServiceImpl implements PtAdminService {
                 log.info("PT {} approved as {} by admin", userId, ptType);
             }
             case "REJECT" -> {
-                user.setStatus(UserStatus.SUSPENDED);
+                // BUG FIX: Chỉ update trạng thái hồ sơ PT, KHÔNG suspend tài khoản người dùng
                 profile.setVerificationStatus(UserStatus.SUSPENDED);
                 profile.setPtRequestStatus(UserStatus.SUSPENDED);
                 profile.setIsVerified(false);
@@ -126,11 +126,21 @@ public class PtAdminServiceImpl implements PtAdminService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
+                .preferredTrack(profile.getPreferredTrack())
                 .bio(profile.getBio())
                 .trainingPhilosophy(profile.getTrainingPhilosophy())
+                .contactPhone(profile.getContactPhone())
+                .experienceStartDate(profile.getExperienceStartDate())
                 .yearsOfExperience(profile.getYearsOfExperience())
+                .specializations(profile.getSpecializations())
+                .trainingMode(profile.getTrainingMode())
+                .location(profile.getLocation())
+                .hourlyRate(profile.getHourlyRate())
+                .rateUnit(profile.getRateUnit())
                 .certifications(profile.getCertifications())
                 .cvUrl(profile.getCvUrl())
+                .instagramUrl(profile.getInstagramUrl())
+                .linkedinUrl(profile.getLinkedinUrl())
                 .documentUrls(profile.getDocumentUrls())
                 .verificationStatus(profile.getVerificationStatus().name())
                 .createdAt(profile.getCreatedAt())

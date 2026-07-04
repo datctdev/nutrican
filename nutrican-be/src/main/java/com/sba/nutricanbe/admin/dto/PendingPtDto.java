@@ -1,10 +1,16 @@
 package com.sba.nutricanbe.admin.dto;
 
+import com.sba.nutricanbe.user.dto.CertificationData;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -17,11 +23,21 @@ public class PendingPtDto {
     private String email;
     private String fullName;
     private String avatarUrl;
+    private String preferredTrack;
     private String bio;
     private String trainingPhilosophy;
+    private String contactPhone;
+    private LocalDate experienceStartDate;
     private Integer yearsOfExperience;
-    private String certifications;
+    private List<String> specializations;
+    private TrainingMode trainingMode;
+    private String location;
+    private BigDecimal hourlyRate;
+    private String rateUnit;
+    private List<CertificationData> certifications;
     private String cvUrl;
+    private String instagramUrl;
+    private String linkedinUrl;
     private String documentUrls;
     private String verificationStatus;
     private LocalDateTime createdAt;

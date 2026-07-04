@@ -39,9 +39,9 @@ public class DataInitializer implements CommandLineRunner {
         if (!systemSettingRepository.existsById("REQUIRE_KYC_FOR_PT")) {
             systemSettingRepository.save(SystemSetting.builder()
                     .key("REQUIRE_KYC_FOR_PT")
-                    .value("true")
+                    .value("false")
                     .build());
-            log.warn("✅ Initialized REQUIRE_KYC_FOR_PT setting to true");
+            log.warn("✅ Initialized REQUIRE_KYC_FOR_PT setting to false");
         }
 
         // 1. Tạo Admin
@@ -72,7 +72,7 @@ public class DataInitializer implements CommandLineRunner {
             PtProfile ptProfile = PtProfile.builder()
                     .user(pt)
                     .bio("Đây là PT được tạo tự động để test hệ thống.")
-                    .yearsOfExperience(5) // Đã sửa thành yearsOfExperience
+                    .experienceStartDate(java.time.LocalDate.of(2019, 1, 1)) // 5+ năm kinh nghiệm
                     .isVerified(true)
                     .build();
             ptProfileRepository.save(ptProfile);

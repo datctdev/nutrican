@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.user.dto.CertificationData;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.entity.User;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -66,15 +68,43 @@ public class UserProfileServiceImpl implements UserProfileService {
             throw new BadRequestException("User already has a PT profile");
         }
 
+        // Map certifications from request DTOs to entity data objects
+        List<CertificationData> certDataList = null;
+        if (request.getCertifications() != null && !request.getCertifications().isEmpty()) {
+            certDataList = request.getCertifications().stream()
+                    .map(c -> CertificationData.builder()
+                            .name(c.getName())
+                            .issuingOrganization(c.getIssuingOrganization())
+                            .issueDate(c.getIssueDate())
+                            .expiryDate(c.getExpiryDate())
+                            .neverExpires(Boolean.TRUE.equals(c.getNeverExpires()))
+                            .certificateImageUrl(c.getCertificateImageUrl())
+                            .build())
+                    .toList();
+        }
+
+        if ("CERTIFIED".equalsIgnoreCase(request.getPreferredTrack())) {
+            if (certDataList == null || certDataList.isEmpty()) {
+                throw new BadRequestException("PT Chuyên nghiệp (Certified) yêu cầu tối thiểu 1 chứng chỉ");
+            }
+        }
+
         PtProfile ptProfile = PtProfile.builder()
                 .user(user)
+                .preferredTrack(request.getPreferredTrack())
                 .bio(request.getBio())
                 .trainingPhilosophy(request.getTrainingPhilosophy())
-                .yearsOfExperience(request.getYearsOfExperience())
+                .experienceStartDate(request.getExperienceStartDate())
+                .contactPhone(request.getContactPhone())
+                .trainingMode(request.getTrainingMode())
+                .location(request.getLocation())
+                .rateUnit(request.getRateUnit())
                 .specializations(request.getSpecializations())
-                .certifications(request.getCertifications())
+                .certifications(certDataList)
                 .hourlyRate(request.getHourlyRate())
                 .cvUrl(request.getCvUrl())
+                .instagramUrl(request.getInstagramUrl())
+                .linkedinUrl(request.getLinkedinUrl())
                 .isVerified(false)
                 .build();
 
@@ -82,6 +112,26 @@ public class UserProfileServiceImpl implements UserProfileService {
         log.info("PT profile created for user: {}", userId);
 
         return ApiResponse.success(toPtProfileSummary(ptProfile), "PT registration submitted successfully");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> uploadCertImage(UUID userId, MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType == null || (!contentType.startsWith("image/") && !contentType.equals("application/pdf"))) {
+            throw new BadRequestException("Chỉ chấp nhận ảnh (JPG, PNG) hoặc PDF");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BadRequestException("File không được vượt quá 5MB");
+        }
+        try {
+            String objectName = minioService.uploadFile(file, "pt-certs");
+            String url = minioService.getPresignedUrl(objectName);
+            log.info("Cert image uploaded for user: {}", userId);
+            return ApiResponse.success(url, "Ảnh chứng chỉ đã tải lên thành công");
+        } catch (Exception e) {
+            throw new BadRequestException("Upload ảnh chứng chỉ thất bại: " + e.getMessage());
+        }
     }
 
     @Override
@@ -215,14 +265,24 @@ public class UserProfileServiceImpl implements UserProfileService {
         return PtProfileSummary.builder()
                 .id(ptProfile.getId())
                 .isVerified(ptProfile.getIsVerified())
+                .preferredTrack(ptProfile.getPreferredTrack())
                 .bio(ptProfile.getBio())
                 .trainingPhilosophy(ptProfile.getTrainingPhilosophy())
+                .experienceStartDate(ptProfile.getExperienceStartDate())
                 .yearsOfExperience(ptProfile.getYearsOfExperience())
+                .contactPhone(ptProfile.getContactPhone())
+                .trainingMode(ptProfile.getTrainingMode())
+                .location(ptProfile.getLocation())
+                .rateUnit(ptProfile.getRateUnit())
                 .specializations(ptProfile.getSpecializations())
+                .certifications(ptProfile.getCertifications())
                 .rating(ptProfile.getRating())
                 .totalReviews(ptProfile.getTotalReviews())
                 .tier(ptProfile.getTier() != null ? ptProfile.getTier().name() : null)
                 .hourlyRate(ptProfile.getHourlyRate())
+                .cvUrl(ptProfile.getCvUrl())
+                .instagramUrl(ptProfile.getInstagramUrl())
+                .linkedinUrl(ptProfile.getLinkedinUrl())
                 .ptRequestStatus(ptProfile.getPtRequestStatus() != null ? ptProfile.getPtRequestStatus().name() : null)
                 .verificationStatus(ptProfile.getVerificationStatus() != null ? ptProfile.getVerificationStatus().name() : null)
                 .build();
