@@ -50,11 +50,6 @@ export default function ForgotPasswordPage() {
 
       <div className="w-full max-w-[420px] animate-fade-in">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center justify-center gap-2.5 mb-6 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-          </Link>
           {sent ? (
             <>
               <div className="flex justify-center mb-4">

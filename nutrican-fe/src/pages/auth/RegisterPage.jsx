@@ -65,7 +65,6 @@ export default function RegisterPage() {
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-blue-100/50 to-transparent rounded-full blur-[100px] -z-10" />
       <div className="w-full max-w-[460px] animate-fade-in">
         <div className="text-center mb-8">
-          <div className="w-10 h-10 mx-auto rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg mb-6"><Sparkles className="w-5 h-5 text-white" /></div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Đăng ký tài khoản</h1>
         </div>
 
@@ -76,7 +75,7 @@ export default function RegisterPage() {
                 <label className="text-sm font-bold text-slate-700">Họ và tên</label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                  <Input placeholder="Nguyễn Văn A" className="pl-10 py-5 rounded-xl bg-slate-50" value={formData.fullName} onChange={(e) => setFormData({...formData, fullName: e.target.value})} />
+                  <Input placeholder="Nguyễn Văn A" className="pl-10 py-5 rounded-xl bg-slate-50" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} />
                 </div>
                 {errors.fullName && <p className="text-xs text-red-500 font-bold">{errors.fullName}</p>}
               </div>
@@ -85,7 +84,7 @@ export default function RegisterPage() {
                 <label className="text-sm font-bold text-slate-700">Địa chỉ Email</label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                  <Input type="email" placeholder="you@example.com" className="pl-10 py-5 rounded-xl bg-slate-50" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                  <Input type="email" placeholder="you@example.com" className="pl-10 py-5 rounded-xl bg-slate-50" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
                 </div>
                 {errors.email && <p className="text-xs text-red-500 font-bold">{errors.email}</p>}
               </div>
@@ -94,7 +93,7 @@ export default function RegisterPage() {
                 <label className="text-sm font-bold text-slate-700">Mật khẩu</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                  <Input type={showPassword ? 'text' : 'password'} placeholder="Tạo mật khẩu" className="pl-10 pr-10 py-5 rounded-xl bg-slate-50" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                  <Input type={showPassword ? 'text' : 'password'} placeholder="Tạo mật khẩu" className="pl-10 pr-10 py-5 rounded-xl bg-slate-50" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400"><Eye className="w-4.5 h-4.5" /></button>
                 </div>
                 {errors.password && <p className="text-xs text-red-500 font-bold">{errors.password}</p>}
@@ -114,7 +113,7 @@ export default function RegisterPage() {
                 <label className="text-sm font-bold text-slate-700">Xác nhận mật khẩu</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400" />
-                  <Input type={showPassword ? 'text' : 'password'} placeholder="Nhập lại mật khẩu" className="pl-10 pr-10 py-5 rounded-xl bg-slate-50" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} />
+                  <Input type={showPassword ? 'text' : 'password'} placeholder="Nhập lại mật khẩu" className="pl-10 pr-10 py-5 rounded-xl bg-slate-50" value={formData.confirmPassword} onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} />
                 </div>
                 {errors.confirmPassword && <p className="text-xs text-red-500 font-bold">{errors.confirmPassword}</p>}
               </div>

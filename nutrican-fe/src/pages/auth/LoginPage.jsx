@@ -50,14 +50,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-[400px] bg-gradient-to-b from-blue-100/50 to-transparent -z-10" />
-      
+
       <div className="w-full max-w-[420px] animate-fade-in">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center justify-center gap-2.5 mb-6 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-          </Link>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Chào mừng quay trở lại</h1>
           <p className="text-slate-500 font-medium">Nhập thông tin của bạn để truy cập tài khoản</p>
         </div>
