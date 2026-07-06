@@ -97,7 +97,7 @@ export default function ClientListPage() {
     ];
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4">
+        <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4">
 
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>

@@ -5,7 +5,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { Loader2, Lock, ArrowRight, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Loader2, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 
 const getPasswordStrength = (password) => {
   if (!password) return { score: 0, label: '', color: '' };
@@ -14,14 +14,14 @@ const getPasswordStrength = (password) => {
   if (/[A-Z]/.test(password)) passed++;
   if (/[a-z]/.test(password)) passed++;
   if (/\d/.test(password)) passed++;
-  if (passed <= 1) return { score: 1, label: 'Weak', color: 'bg-red-500', textColor: 'text-red-600' };
-  if (passed <= 2) return { score: 2, label: 'Fair', color: 'bg-amber-500', textColor: 'text-amber-600' };
-  if (passed <= 3) return { score: 3, label: 'Good', color: 'bg-blue-500', textColor: 'text-blue-600' };
-  return { score: 4, label: 'Strong', color: 'bg-emerald-500', textColor: 'text-emerald-600' };
+  if (passed <= 1) return { score: 1, label: 'Yếu', color: 'bg-red-500', textColor: 'text-red-600' };
+  if (passed <= 2) return { score: 2, label: 'Trung bình', color: 'bg-amber-500', textColor: 'text-amber-600' };
+  if (passed <= 3) return { score: 3, label: 'Khá', color: 'bg-blue-500', textColor: 'text-blue-600' };
+  return { score: 4, label: 'Mạnh', color: 'bg-emerald-500', textColor: 'text-emerald-600' };
 };
 
 export default function SetPasswordPage() {
-  const { user, setPassword, isLoading, setAccessToken } = useAuthStore();
+  const { user, setPassword, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const [password, setPasswordValue] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -43,29 +43,29 @@ export default function SetPasswordPage() {
     setLocalError('');
 
     if (!password) {
-      setLocalError('Password is required');
+      setLocalError('Vui lòng nhập mật khẩu');
       return;
     }
     if (password.length < 8) {
-      setLocalError('Password must be at least 8 characters');
+      setLocalError('Mật khẩu phải tối thiểu 8 ký tự');
       return;
     }
     if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      setLocalError('Password must contain uppercase, lowercase, and a number');
+      setLocalError('Mật khẩu phải chứa chữ hoa, chữ thường và chữ số');
       return;
     }
     if (password !== confirmPassword) {
-      setLocalError('Passwords do not match');
+      setLocalError('Mật khẩu nhập lại không khớp');
       return;
     }
 
     try {
       const response = await setPassword(password);
-      toast.success('Password set successfully!', { description: 'Welcome to Nutrican PT' });
+      toast.success('Thiết lập mật khẩu thành công!', { description: 'Chào mừng bạn đến với Nutrican PT' });
       const newUser = response?.data?.data?.user;
       navigate(newUser ? getRedirectPath(newUser.role) : '/diet');
     } catch (error) {
-      toast.error('Failed to set password', { description: error.response?.data?.message || 'Please try again' });
+      toast.error('Thiết lập mật khẩu thất bại', { description: error.response?.data?.message || 'Vui lòng thử lại' });
     }
   };
 
@@ -78,9 +78,9 @@ export default function SetPasswordPage() {
           <div className="w-10 h-10 mx-auto rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-200 mb-6">
             <Lock className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Set Your Password</h1>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Thiết lập mật khẩu</h1>
           <p className="text-slate-500 font-medium">
-            Set a password to secure your account so you can also log in with email and password.
+            Thiết lập mật khẩu để bảo vệ tài khoản của bạn, giúp bạn có thể đăng nhập bằng email và mật khẩu.
           </p>
           {user?.email && (
             <p className="mt-2 text-sm font-semibold text-blue-600">{user.email}</p>
@@ -91,12 +91,12 @@ export default function SetPasswordPage() {
           <CardContent className="p-8">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700">New Password</label>
+                <label className="text-sm font-bold text-slate-700">Mật khẩu mới</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
                   <Input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Create a strong password"
+                    placeholder="Tạo mật khẩu mạnh"
                     className="pl-10 pr-10 py-6 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-amber-500/20 font-medium"
                     value={password}
                     onChange={(e) => setPasswordValue(e.target.value)}
@@ -118,12 +118,12 @@ export default function SetPasswordPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-slate-700">Confirm Password</label>
+                <label className="text-sm font-bold text-slate-700">Xác nhận mật khẩu</label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
                   <Input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Re-enter your password"
+                    placeholder="Nhập lại mật khẩu"
                     className="pl-10 pr-10 py-6 rounded-xl bg-slate-50 border-slate-200 focus:bg-white focus:ring-2 focus:ring-amber-500/20 font-medium"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -135,7 +135,7 @@ export default function SetPasswordPage() {
 
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
                 <p className="text-xs text-amber-700 font-medium">
-                  Your password must have at least 8 characters, including uppercase, lowercase, and a number.
+                  Mật khẩu phải có tối thiểu 8 ký tự, bao gồm cả chữ hoa, chữ thường và chữ số.
                 </p>
               </div>
 
@@ -145,15 +145,15 @@ export default function SetPasswordPage() {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Setting password...</>
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Đang thiết lập...</>
                 ) : (
-                  <>Set Password <ArrowRight className="ml-2 h-4 w-4" /></>
+                  <>Thiết lập mật khẩu <ArrowRight className="ml-2 h-4 w-4" /></>
                 )}
               </Button>
             </form>
 
             <div className="mt-6 text-center text-sm font-medium text-slate-500">
-              You can log in with Google again at any time
+              Bạn vẫn có thể đăng nhập bằng Google bất kỳ lúc nào
             </div>
           </CardContent>
         </Card>

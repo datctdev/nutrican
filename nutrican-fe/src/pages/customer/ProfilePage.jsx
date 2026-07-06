@@ -5,8 +5,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import Modal from '../../components/common/Modal';
 import { toast } from 'sonner';
-import { Link } from 'react-router-dom';
-import { Loader2, Camera, User, Mail, Phone, MapPin, Target, ChevronRight, Edit3, Camera as CameraIcon } from 'lucide-react';
+import { Loader2, Camera, User, Mail, Phone, MapPin, Edit3 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 
 export default function ProfilePage() {
@@ -19,7 +18,6 @@ export default function ProfilePage() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
   useEffect(() => { fetchProfile(); }, []);
 
@@ -35,15 +33,15 @@ export default function ProfilePage() {
       };
       setProfile(p);
       setEditForm({ fullName: p.fullName, phoneNumber: p.phoneNumber, address: p.address });
-    } catch (error) { toast.error('Failed to load profile'); } 
+    } catch (error) { toast.error('Không thể tải hồ sơ cá nhân'); } 
     finally { setIsLoadingProfile(false); }
   };
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) return toast.error('Please select an image file');
-    if (file.size > 5 * 1024 * 1024) return toast.error('Image size must be less than 5MB');
+    if (!file.type.startsWith('image/')) return toast.error('Vui lòng chọn một tệp hình ảnh');
+    if (file.size > 5 * 1024 * 1024) return toast.error('Dung lượng hình ảnh phải dưới 5MB');
 
     setIsUploadingAvatar(true);
     try {
@@ -53,9 +51,9 @@ export default function ProfilePage() {
       const newAvatarUrl = response.data.data;
       setProfile(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
       setAuthUser({ ...authUser, avatarUrl: newAvatarUrl });
-      toast.success('Avatar updated successfully!');
+      toast.success('Cập nhật ảnh đại diện thành công!');
     } catch (error) {
-      toast.error('Failed to upload avatar');
+      toast.error('Tải ảnh đại diện thất bại');
     } finally {
       setIsUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -70,9 +68,9 @@ export default function ProfilePage() {
       });
       setAuthUser({ ...authUser, ...response.data.data });
       setProfile(prev => ({ ...prev, ...editForm }));
-      toast.success('Profile updated successfully!');
+      toast.success('Cập nhật hồ sơ thành công!');
       setIsEditModalOpen(false);
-    } catch (error) { toast.error('Failed to update profile'); } 
+    } catch (error) { toast.error('Cập nhật hồ sơ thất bại'); } 
     finally { setIsSavingProfile(false); }
   };
 
@@ -91,8 +89,8 @@ export default function ProfilePage() {
     <div className="max-w-3xl mx-auto pb-12 animate-fade-in">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Profile</h1>
-        <p className="text-slate-500 mt-1 font-medium">View and manage your personal information.</p>
+        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Trang cá nhân</h1>
+        <p className="text-slate-500 mt-1 font-medium">Xem và quản lý thông tin cá nhân của bạn.</p>
       </div>
 
       {/* Profile Card */}
@@ -126,7 +124,7 @@ export default function ProfilePage() {
 
           {/* Name & email */}
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-slate-900">{profile.fullName || 'Member'}</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{profile.fullName || 'Thành viên'}</h2>
             <p className="text-slate-500 mt-1">{profile.email}</p>
           </div>
 
@@ -138,7 +136,7 @@ export default function ProfilePage() {
                   <User className="w-5 h-5 text-slate-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Full Name</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Họ và tên</p>
                   <p className="text-slate-900 font-medium mt-0.5">{profile.fullName || '—'}</p>
                 </div>
               </div>
@@ -162,8 +160,8 @@ export default function ProfilePage() {
                   <Phone className="w-5 h-5 text-slate-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phone Number</p>
-                  <p className="text-slate-900 font-medium mt-0.5">{profile.phoneNumber || 'Not set'}</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Số điện thoại</p>
+                  <p className="text-slate-900 font-medium mt-0.5">{profile.phoneNumber || 'Chưa thiết lập'}</p>
                 </div>
               </div>
             </div>
@@ -174,8 +172,8 @@ export default function ProfilePage() {
                   <MapPin className="w-5 h-5 text-slate-600" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address</p>
-                  <p className="text-slate-900 font-medium mt-0.5">{profile.address || 'Not set'}</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Địa chỉ</p>
+                  <p className="text-slate-900 font-medium mt-0.5">{profile.address || 'Chưa thiết lập'}</p>
                 </div>
               </div>
             </div>
@@ -184,51 +182,51 @@ export default function ProfilePage() {
           <div className="pt-6">
             <Button onClick={openEditModal} className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-semibold flex items-center justify-center gap-2">
               <Edit3 className="w-4 h-4" />
-              Edit Profile
+              Chỉnh sửa hồ sơ
             </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Edit Profile Modal */}
-      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Profile">
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Chỉnh sửa hồ sơ">
         <div className="space-y-5">
           <div className="space-y-1.5">
-            <label className="text-sm font-bold text-slate-700">Full Name</label>
+            <label className="text-sm font-bold text-slate-700">Họ và tên</label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 value={editForm.fullName}
                 onChange={(e) => setEditForm(f => ({...f, fullName: e.target.value}))}
-                placeholder="Enter your full name"
+                placeholder="Nhập họ và tên của bạn"
                 className="w-full py-2.5 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-bold text-slate-700">Phone Number</label>
+            <label className="text-sm font-bold text-slate-700">Số điện thoại</label>
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
                 value={editForm.phoneNumber}
                 onChange={(e) => setEditForm(f => ({...f, phoneNumber: e.target.value}))}
-                placeholder="e.g. +84 123 456 789"
+                placeholder="Ví dụ: +84 123 456 789"
                 className="w-full py-2.5 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-bold text-slate-700">Address</label>
+            <label className="text-sm font-bold text-slate-700">Địa chỉ</label>
             <div className="relative">
               <MapPin className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
               <textarea
                 value={editForm.address}
                 onChange={(e) => setEditForm(f => ({...f, address: e.target.value}))}
-                placeholder="Enter your address"
+                placeholder="Nhập địa chỉ của bạn"
                 rows={3}
                 className="w-full py-2.5 pl-9 pr-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none"
               />
@@ -237,10 +235,10 @@ export default function ProfilePage() {
 
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setIsEditModalOpen(false)} className="flex-1 rounded-xl py-5">
-              Cancel
+              Hủy
             </Button>
             <Button onClick={handleSaveProfile} disabled={isSavingProfile} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-5">
-              {isSavingProfile ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : 'Save Changes'}
+              {isSavingProfile ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Đang lưu...</> : 'Lưu thay đổi'}
             </Button>
           </div>
         </div>

@@ -4,12 +4,13 @@ import { useLocation } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
-import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X } from 'lucide-react';
+import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X, UploadCloud } from 'lucide-react';
 import { chatService } from '../../services/chatService';
 import { sendWebSocketMessage } from '../../services/websocketService';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import useWebSocket from '../../hooks/useWebSocket';
+import ImageLightbox from '../../components/common/ImageLightbox';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 
@@ -27,6 +28,8 @@ export default function CustomerChatPage() {
     const [loadingThreads, setLoadingThreads] = useState(true);
     const [loadingMessages, setLoadingMessages] = useState(false);
     const [sending, setSending] = useState(false);
+    const [dragActive, setDragActive] = useState(false);
+    const [lightboxImage, setLightboxImage] = useState('');
 
     const messagesEndRef = useRef(null);
     const imageInputRef = useRef(null);
@@ -125,17 +128,13 @@ export default function CustomerChatPage() {
         };
     }, [selectedImagePreview]);
 
-    const handleImageSelect = (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
+    const handleFile = (file) => {
         if (!file.type?.startsWith('image/')) {
             toast.error('Vui lòng chọn file ảnh');
-            event.target.value = '';
             return;
         }
         if (file.size > MAX_CHAT_IMAGE_SIZE) {
             toast.error('Ảnh quá lớn. Kích thước tối đa là 5MB.');
-            event.target.value = '';
             return;
         }
 
@@ -144,6 +143,40 @@ export default function CustomerChatPage() {
         }
         setSelectedImage(file);
         setSelectedImagePreview(URL.createObjectURL(file));
+    };
+
+    const handleImageSelect = (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        handleFile(file);
+        event.target.value = '';
+    };
+
+    const handlePaste = (e) => {
+        const file = e.clipboardData?.files?.[0];
+        if (file) {
+            e.preventDefault();
+            handleFile(file);
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        setDragActive(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        setDragActive(false);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        setDragActive(false);
+        const file = e.dataTransfer?.files?.[0];
+        if (file) {
+            handleFile(file);
+        }
     };
 
     const clearSelectedImage = () => {
@@ -202,13 +235,13 @@ export default function CustomerChatPage() {
     const activeThread = threads.find(t => t.mappingId === activeMappingId);
 
     return (
-        <div className="max-w-7xl mx-auto h-[calc(100vh-120px)] min-h-[600px] flex gap-6 animate-fade-in pb-6 mt-6">
+        <div className="max-w-[1600px] mx-auto h-[calc(100vh-120px)] min-h-[600px] flex gap-6 animate-fade-in pb-6 mt-6">
 
             {/* CỘT TRÁI: DANH SÁCH PT */}
             <Card className="w-80 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden flex-shrink-0">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50">
                     <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-                        <MessageSquare className="w-5 h-5 text-blue-500" /> Hỗ trợ
+                        <MessageSquare className="w-5 h-5 text-primary" /> Hỗ trợ
                     </h2>
                     <p className="text-xs text-slate-500 mt-1">Trò chuyện với Huấn luyện viên</p>
                 </div>
@@ -222,7 +255,7 @@ export default function CustomerChatPage() {
                             <p className="text-sm text-slate-500 font-medium">Bạn chưa kết nối với PT nào</p>
                             <Button
                                 variant="link"
-                                className="text-blue-600 mt-2 h-auto p-0"
+                                className="text-primary mt-2 h-auto p-0"
                                 onClick={() => window.location.href = '/marketplace'}
                             >
                                 Tìm PT ngay
@@ -235,13 +268,13 @@ export default function CustomerChatPage() {
                                 <button
                                     key={thread.mappingId}
                                     onClick={() => setActiveMappingId(thread.mappingId)}
-                                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-left ${
-                                        isActive ? 'bg-blue-50 border border-blue-100' : 'hover:bg-slate-50 border border-transparent'
+                                    className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-left border ${
+                                        isActive ? 'bg-primary/5 border-primary/10' : 'hover:bg-slate-50 border-transparent'
                                     }`}
                                 >
                                     <div className="relative flex-shrink-0">
                                         <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ${
-                                            isActive ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-600'
+                                            isActive ? 'bg-primary text-white shadow-md' : 'bg-slate-100 text-slate-600'
                                         }`}>
                                             {thread.participantAvatarUrl ? (
                                                 <img src={thread.participantAvatarUrl} alt={thread.participantName} className="w-full h-full rounded-full object-cover" />
@@ -255,7 +288,7 @@ export default function CustomerChatPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-baseline mb-1">
-                                            <h3 className={`text-sm truncate ${isActive ? 'font-bold text-blue-900' : 'font-semibold text-slate-700'}`}>
+                                            <h3 className={`text-sm truncate ${isActive ? 'font-bold text-primary-dark' : 'font-semibold text-slate-700'}`}>
                                                 {thread.participantName}
                                             </h3>
                                             <span className="text-[10px] text-slate-400 font-medium flex-shrink-0">
@@ -274,7 +307,21 @@ export default function CustomerChatPage() {
             </Card>
 
             {/* CỘT PHẢI: KHUNG CHAT */}
-            <Card className="flex-1 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden relative">
+            <Card 
+                className="flex-1 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden relative"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+            >
+                {/* Drag Overlay */}
+                {dragActive && (
+                    <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm z-50 flex flex-col items-center justify-center border-2 border-dashed border-primary m-4 rounded-2xl pointer-events-none animate-in fade-in duration-100">
+                        <UploadCloud className="w-16 h-16 text-primary animate-bounce mb-3" />
+                        <h3 className="text-xl font-bold text-slate-800">Thả hình ảnh vào đây</h3>
+                        <p className="text-sm text-slate-500 mt-1">Để tự động đính kèm gửi cho PT</p>
+                    </div>
+                )}
+
                 {!activeMappingId ? (
                     <div className="flex-1 flex flex-col items-center justify-center bg-slate-50/30">
                         <MessageSquare className="w-16 h-16 text-slate-200 mb-4" />
@@ -284,7 +331,7 @@ export default function CustomerChatPage() {
                 ) : (
                     <>
                         <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center gap-4 z-10 shadow-sm">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-blue-700 font-bold">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-indigo-50/50 flex items-center justify-center text-primary font-bold">
                                 {activeThread?.participantAvatarUrl ? (
                                     <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
                                 ) : getInitials(activeThread?.participantName)}
@@ -301,7 +348,7 @@ export default function CustomerChatPage() {
                             {loadingMessages ? (
                                 <div className="flex flex-col gap-4">
                                     <Skeleton className="h-16 w-2/3 rounded-2xl rounded-tl-none self-start bg-slate-200" />
-                                    <Skeleton className="h-16 w-2/3 rounded-2xl rounded-tr-none self-end bg-blue-100" />
+                                    <Skeleton className="h-16 w-2/3 rounded-2xl rounded-tr-none self-end bg-primary/10" />
                                 </div>
                             ) : messages.length === 0 ? (
                                 <div className="h-full flex items-center justify-center text-slate-400 text-sm font-medium">
@@ -314,14 +361,15 @@ export default function CustomerChatPage() {
                                         <div key={msg.id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                             <div className={`max-w-[70%] px-5 py-3 text-sm ${
                                                 isMe
-                                                    ? 'bg-blue-600 text-white rounded-3xl rounded-tr-sm shadow-md shadow-blue-500/20'
+                                                    ? 'bg-primary text-white rounded-3xl rounded-tr-sm shadow-md shadow-primary/20'
                                                     : 'bg-white border border-slate-200 text-slate-800 rounded-3xl rounded-tl-sm shadow-sm'
                                             }`}>
                                                 {msg.imageUrl && (
                                                     <img
                                                         src={msg.imageUrl}
-                                                        alt={msg.content || 'Chat attachment'}
-                                                        className="mb-2 max-h-72 w-full rounded-2xl object-cover"
+                                                        alt={msg.content || 'Hình ảnh đính kèm'}
+                                                        onClick={() => setLightboxImage(msg.imageUrl)}
+                                                        className="mb-2 max-h-72 w-full rounded-2xl object-cover cursor-zoom-in hover:opacity-95 transition-opacity"
                                                     />
                                                 )}
                                                 {msg.content && <p>{msg.content}</p>}
@@ -339,7 +387,7 @@ export default function CustomerChatPage() {
                         <div className="p-4 bg-white border-t border-slate-100">
                             {selectedImagePreview && (
                                 <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                                    <img src={selectedImagePreview} alt="Selected attachment" className="h-16 w-16 rounded-xl object-cover" />
+                                    <img src={selectedImagePreview} alt="Ảnh đính kèm đã chọn" className="h-16 w-16 rounded-xl object-cover" />
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm font-bold text-slate-800">{selectedImage?.name}</p>
                                         <p className="text-xs font-medium text-slate-500">Ảnh sẽ được gửi cùng tin nhắn</p>
@@ -348,7 +396,7 @@ export default function CustomerChatPage() {
                                         type="button"
                                         onClick={clearSelectedImage}
                                         className="rounded-full p-2 text-slate-400 hover:bg-white hover:text-slate-700"
-                                        aria-label="Remove selected image"
+                                        aria-label="Gỡ bỏ hình ảnh đã chọn"
                                     >
                                         <X className="h-4 w-4" />
                                     </button>
@@ -368,27 +416,28 @@ export default function CustomerChatPage() {
                                     onClick={() => imageInputRef.current?.click()}
                                     disabled={sending}
                                     className="h-[52px] w-[52px] flex-shrink-0 rounded-2xl border-slate-200 bg-white p-0 text-slate-600 hover:bg-slate-50"
-                                    aria-label="Attach image"
+                                    aria-label="Đính kèm hình ảnh"
                                 >
                                     <ImagePlus className="h-5 w-5" />
                                 </Button>
                                 <textarea
                                     value={newMessage}
                                     onChange={(e) => setNewMessage(e.target.value)}
+                                    onPaste={handlePaste}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter' && !e.shiftKey) {
                                             e.preventDefault();
                                             handleSendMessage();
                                         }
                                     }}
-                                    placeholder="Nhập tin nhắn..."
-                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 resize-none overflow-hidden max-h-32 min-h-[52px]"
+                                    placeholder="Nhập tin nhắn... (Ctrl+V hoặc kéo thả ảnh)"
+                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-hidden max-h-32 min-h-[52px]"
                                     rows="1"
                                 />
                                 <Button
                                     type="submit"
                                     disabled={(!newMessage.trim() && !selectedImage) || sending}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-[52px] w-[52px] flex-shrink-0 shadow-md shadow-blue-500/20 transition-all p-0 flex items-center justify-center"
+                                    className="bg-primary hover:bg-primary/90 text-white rounded-2xl h-[52px] w-[52px] flex-shrink-0 shadow-md shadow-primary/20 transition-all p-0 flex items-center justify-center animate-fade-in"
                                 >
                                     <Send className={`w-5 h-5 ${sending ? 'animate-pulse' : ''}`} />
                                 </Button>
@@ -397,6 +446,13 @@ export default function CustomerChatPage() {
                     </>
                 )}
             </Card>
+
+            {/* Lightbox Preview */}
+            <ImageLightbox
+                isOpen={!!lightboxImage}
+                imageUrl={lightboxImage}
+                onClose={() => setLightboxImage('')}
+            />
         </div>
     );
 }

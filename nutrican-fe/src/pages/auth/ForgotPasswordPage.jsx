@@ -14,16 +14,16 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
 
-    const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     if (!email.trim()) {
-      setError('Email is required');
+      setError('Vui lòng nhập Email');
       return;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
-      setError('Invalid email format');
+      setError('Định dạng Email không hợp lệ');
       return;
     }
 
@@ -35,9 +35,9 @@ export default function ForgotPasswordPage() {
       const status = err?.response?.status;
       const message = err?.response?.data?.message || '';
       if (status === 429 || message.toLowerCase().includes('wait')) {
-        toast.error('Please wait', { description: 'You can only request one reset email per minute.' });
+        toast.error('Vui lòng chờ', { description: 'Bạn chỉ có thể yêu cầu gửi lại email khôi phục sau mỗi 1 phút.' });
       } else {
-        toast.error('Request failed', { description: 'Something went wrong. Please try again.' });
+        toast.error('Yêu cầu thất bại', { description: 'Đã xảy ra lỗi. Vui lòng thử lại.' });
       }
     } finally {
       setIsLoading(false);
@@ -50,11 +50,6 @@ export default function ForgotPasswordPage() {
 
       <div className="w-full max-w-[420px] animate-fade-in">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center justify-center gap-2.5 mb-6 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-          </Link>
           {sent ? (
             <>
               <div className="flex justify-center mb-4">
@@ -62,16 +57,16 @@ export default function ForgotPasswordPage() {
                   <CheckCircle className="w-8 h-8 text-emerald-600" />
                 </div>
               </div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Check your email</h1>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Kiểm tra Email</h1>
               <p className="text-slate-500 font-medium">
-                If an account with <span className="font-semibold text-slate-700">{email}</span> exists, we sent a password reset link.
+                Nếu tài khoản với email <span className="font-semibold text-slate-700">{email}</span> tồn tại trên hệ thống, chúng tôi đã gửi liên kết đặt lại mật khẩu.
               </p>
             </>
           ) : (
             <>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Forgot password?</h1>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Quên mật khẩu?</h1>
               <p className="text-slate-500 font-medium">
-                No worries, we'll send you a reset link.
+                Đừng lo lắng, chúng tôi sẽ gửi liên kết khôi phục cho bạn.
               </p>
             </>
           )}
@@ -82,19 +77,19 @@ export default function ForgotPasswordPage() {
             {sent ? (
               <div className="space-y-6 text-center">
                 <p className="text-sm text-slate-500">
-                  Click the link in the email to reset your password. The link expires in <strong>15 minutes</strong>.
+                  Nhấp vào liên kết trong email để đặt lại mật khẩu của bạn. Liên kết có hiệu lực trong vòng <strong>15 phút</strong>.
                 </p>
                 <Button
                   onClick={() => { setSent(false); setEmail(''); }}
                   variant="outline"
                   className="w-full rounded-xl py-5 font-bold"
                 >
-                  Resend email
+                  Gửi lại email
                 </Button>
                 <div className="pt-2 border-t border-slate-100">
                   <Link to="/login" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">
                     <ArrowLeft className="w-4 h-4" />
-                    Back to sign in
+                    Quay lại đăng nhập
                   </Link>
                 </div>
               </div>
@@ -102,7 +97,7 @@ export default function ForgotPasswordPage() {
               <>
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-sm font-bold text-slate-700">Email Address</label>
+                    <label className="text-sm font-bold text-slate-700">Địa chỉ Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-slate-400 pointer-events-none" />
                       <Input
@@ -122,16 +117,16 @@ export default function ForgotPasswordPage() {
                     disabled={isLoading}
                   >
                     {isLoading ? (
-                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Sending...</>
+                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Đang gửi...</>
                     ) : (
-                      'Send reset link'
+                      'Gửi liên kết khôi phục'
                     )}
                   </Button>
                 </form>
                 <div className="mt-6 pt-5 border-t border-slate-100 text-center">
                   <Link to="/login" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors">
                     <ArrowLeft className="w-4 h-4" />
-                    Back to sign in
+                    Quay lại đăng nhập
                   </Link>
                 </div>
               </>
