@@ -39,17 +39,17 @@ export function getLogFoodTitle(log) {
 }
 
 export function formatAiConfidence(score) {
-    if (score == null || Number.isNaN(Number(score))) return null;
-    return `${Math.round(Number(score) * 100)}%`;
+    const label = formatPredictionConfidence(score);
+    return label === '—' ? null : label;
 }
 
+/** 199-class Top-1 ~44% is normal — show qualitative labels, not raw %. */
 export function formatPredictionConfidence(score) {
     if (score == null || Number.isNaN(Number(score))) return '—';
-    const raw = Number(score) <= 1 ? Number(score) * 100 : Number(score);
-    const pct = Math.round(raw);
-    if (pct < 30) return `Độ tin thấp · ${pct}%`;
-    if (pct < 60) return `Độ tin TB · ${pct}%`;
-    return `Độ tin cao · ${pct}%`;
+    const pct = Math.round(Number(score) <= 1 ? Number(score) * 100 : Number(score));
+    if (pct >= 60) return 'Có thể đúng';
+    if (pct >= 35) return 'Có thể là — xác nhận';
+    return 'Chưa chắc — vui lòng xác nhận';
 }
 
 export const RESNET_FOOD_CODES = Object.keys(FOOD_CODE_LABELS);

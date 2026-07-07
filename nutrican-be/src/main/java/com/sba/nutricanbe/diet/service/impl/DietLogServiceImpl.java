@@ -58,6 +58,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DietLogServiceImpl implements DietLogService {
 
+    /** Dual-state: only {@link DietLogStatus#LOGGED} counts toward daily summary; PT review uses reviewStatus. */
     private static final Set<DietLogStatus> SUMMARY_STATUSES = Set.of(DietLogStatus.LOGGED);
     private final DietLogRepository dietLogRepository;
     private final DietLogImageRepository dietLogImageRepository;

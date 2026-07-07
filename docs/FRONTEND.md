@@ -85,7 +85,6 @@ nutrican-fe/
 │   │
 │   ├── stores/                        # Zustand state stores
 │   │   ├── authStore.js               # Auth state + persist
-│   │   ├── dietStore.js               # Diet log state
 │   │   └── notificationStore.js       # Notifications + SSE state
 │   │
 │   ├── hooks/                        # Custom hooks
@@ -235,27 +234,9 @@ const useAuthStore = create(
 
 **Persisted to localStorage:** user, accessToken, refreshToken, isAuthenticated
 
-#### 4.1.2 Diet Store
+Diet log state nằm trong `DietTrackerPage` (local React state) — không dùng Zustand store riêng.
 
-```javascript
-// src/stores/dietStore.js
-const useDietStore = create((set) => ({
-  logs: [],
-  currentLog: null,
-  summary: null,
-  isLoading: false,
-  error: null,
-
-  setLogs: (logs) => set({ logs }),
-  setCurrentLog: (log) => set({ currentLog: log }),
-  setSummary: (summary) => set({ summary }),
-  setLoading: (isLoading) => set({ isLoading }),
-  setError: (error) => set({ error }),
-  clearLogs: () => set({ logs: [], currentLog: null, summary: null }),
-}));
-```
-
-#### 4.1.3 Notification Store
+#### 4.1.2 Notification Store
 
 ```javascript
 // src/stores/notificationStore.js

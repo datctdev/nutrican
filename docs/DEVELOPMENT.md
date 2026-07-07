@@ -78,6 +78,17 @@ docker-compose up -d
 docker ps
 ```
 
+### 1.4.1 Database schema (dev)
+
+Dev profile dùng `spring.jpa.hibernate.ddl-auto=update` trong [`application.properties`](../nutrican-be/src/main/resources/application.properties) — **data Postgres giữ qua restart BE** (không mất seed sau lần chạy đầu).
+
+| Profile | `ddl-auto` | Ghi chú |
+|---------|------------|---------|
+| `dev` (main) | `update` | Docker Postgres volume persist |
+| `test` (H2) | `create-drop` | Mỗi `./mvnw test` schema sạch — không đổi |
+
+Nếu entity đổi mạnh và schema lệch: `docker compose down -v` rồi `docker compose up -d` + restart BE (một lần). Production cần Flyway migration — chưa có trong repo.
+
 ### 1.5 Start AI Service (ResNet50 — bắt buộc cho Analyze ảnh)
 
 Chụp ảnh món trên `/diet` cần **FastAPI** chạy song song với Spring Boot.

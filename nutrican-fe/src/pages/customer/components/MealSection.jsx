@@ -197,7 +197,7 @@ export default function MealSection({
                                         )}
                                         {formatAiConfidence(log.aiConfidenceScore) && (
                                             <span className="text-[10px] font-semibold text-slate-500">
-                                                AI {formatAiConfidence(log.aiConfidenceScore)} tin cậy
+                                                AI: {formatAiConfidence(log.aiConfidenceScore)}
                                             </span>
                                         )}
                                         {log.matchedFoodName && log.recognitionSource === 'HYBRID' && (

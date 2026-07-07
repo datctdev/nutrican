@@ -13,7 +13,7 @@
 3. Chạy tests: `cd nutrican-be; ./mvnw test` (**120**) · `cd nutrican-fe; npm run build` · `cd e2e; npx playwright test tests/` (cần BE:8080).
 4. Ma trận AC: [TESTING_E2E_MATRIX.md](./TESTING_E2E_MATRIX.md) (cột Happy/Bad).
 5. Drift có chủ đích: dual-state PT review; `INACTIVE` thay `TERMINATED`; ResNet `preCheck` thay LLaVA binary gate.
-6. **Addendum v3.1:** ADD-01..08 **closed**. Còn mở: GAP-06..10; polish E2E (SOS resolve, notification deep-link).
+6. **Addendum v3.1:** ADD-01..08 **closed**. Còn mở: GAP-02; polish E2E (SOS resolve, notification deep-link).
 
 ### v3 MVP P1 roadmap (2026-07-06)
 
@@ -376,7 +376,7 @@ Customer POST /refunds → admin review → WebSocket REFUND_UPDATE (customer + 
 **Summary (`getSummary`):**
 
 ```
-Cộng macro chỉ log: APPROVED | LOGGED | PT_REVIEWING
+Cộng macro chỉ log status=LOGGED (dual-state — reviewStatus không ảnh hưởng tổng)
 → DRAFT / MANUAL_REQUIRED không tính
 ```
 
@@ -409,11 +409,11 @@ REJECT → profile.verificationStatus=SUSPENDED, ptRequestStatus=SUSPENDED
 ### 5.5 PT review log (`PtWorkspaceServiceImpl`)
 
 ```
-getPendingLogs: clientIds ACTIVE + status PT_REVIEWING
+getPendingLogs: clientIds ACTIVE + reviewStatus=PENDING (status vẫn LOGGED)
 review:
-  APPROVE → APPROVED, pt_adjusted_macros = macros hiện tại
-  ADJUST  → APPROVED, pt_adjusted_macros = PT nhập
-  REJECT  → REJECTED
+  APPROVE → reviewStatus=APPROVED, status=LOGGED, pt_adjusted_macros = macros hiện tại
+  ADJUST  → reviewStatus=APPROVED, pt_adjusted_macros = PT nhập
+  REJECT  → reviewStatus=REJECTED
 Ghi macros_at_review, pt_correction_reason, pt_note
 ```
 
@@ -683,7 +683,7 @@ User.notificationOptIn.postMealRating — Profile toggle; DietTracker respect op
 | DIET-01 | Analyze (gate PASS) → **DRAFT** |
 | DIET-02 | Manual → **LOGGED** |
 | DIET-03 | `DRAFT`, `MANUAL_REQUIRED`, hoặc `LOGGED` → `submitForReview` |
-| DIET-04 | Summary: APPROVED, LOGGED, PT_REVIEWING only |
+| DIET-04 | Summary: chỉ `status=LOGGED` (dual-state; không dùng PT_REVIEWING) |
 | DIET-05 | Confirm → **LOGGED**, `HYBRID` macros *(GAP-01 closed)* |
 | DIET-06 | Cancel modal → deleteLog |
 | DIET-07 | Owner-only CRUD |
@@ -845,7 +845,7 @@ GET /settings/require-kyc
 
 ```
 Marketplace hire PENDING → PT accept ACTIVE → chat
-Customer submit log → PT_REVIEWING → review
+Customer submit log → reviewStatus=PENDING → PT review (status=LOGGED)
 ```
 
 ### WF-F: SOS
@@ -890,7 +890,7 @@ analyze freeze → PT review ground truth → admin export CSV
 |---|-------|------|------|
 | AC-3.1 | DRAFT | confirm | HYBRID macros, status LOGGED |
 | AC-3.2 | MANUAL_REQUIRED | confirm | HYBRID macros, status LOGGED |
-| AC-3.3 | LOGGED/PT_REVIEWING | summary | tính total |
+| AC-3.3 | LOGGED | summary | tính total (DRAFT/MANUAL_REQUIRED bỏ qua) |
 | AC-3.4 | Cancel modal | cancel | log deleted |
 
 ### AC-4 PT Review
@@ -1034,11 +1034,11 @@ ResNet → Fusion(+LLaVA) → A1_0 (ai_predicted) + A1_1 (macros_json)
 | # | Mô tả | Impact |
 |---|--------|--------|
 | GAP-02 | Không auto chuyển review khi AI confidence cao | Workflow optional |
-| GAP-06 | `create-drop` | Dev data loss |
-| GAP-07 | 199-class low softmax % | User confusion |
-| GAP-08 | `dietStore` unused | Dead code FE |
+| GAP-06 | `create-drop` dev | **✅ Mitigated** — dev `ddl-auto=update`; test H2 vẫn create-drop |
+| GAP-07 | 199-class low softmax % | **✅ Closed** — qualitative labels FE (`dietUtils`) |
+| GAP-08 | `dietStore` unused | **✅ Closed** — removed |
 | GAP-09 | React Query unused | Pattern |
-| GAP-10 | `registerAsPt` không set User PENDING_APPROVAL | Admin filter by `ptRequestStatus` |
+| GAP-10 | `registerAsPt` không set User PENDING_APPROVAL | **✅ Closed — by design** — `ptRequestStatus` on PtProfile |
 | BR-17 | PT alert chỉ khi không có log PENDING review cùng ngày | **✅ Closed** (v3.1 ADD-08) |
 | TEST | Milestone auto-evaluator chưa có class test riêng | Coverage gap nhỏ |
 | E2E | Bad path: appointment cancel <48h; PT khác client không thấy queue | Playwright partial |
