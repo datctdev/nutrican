@@ -37,7 +37,7 @@
 
 **Regression gate (2026-07-07):** `./mvnw test` → **120** tests · `npm run build` pass · Playwright **58** cases (**22** spec) · v3.1 layers **34** pass (`BE-only|FE-only|Hybrid`).
 
-**Còn mở (polish / manual):** GAP-06..10 · marketplace diet chips FE · chat reject `.exe`/`.zip` · SOS full resolve E2E · email SOS/refund/weekly integration tests.
+**Còn mở (polish / manual):** GAP-02 · marketplace diet chips FE · chat reject `.exe`/`.zip` · SOS full resolve E2E · email SOS/refund/weekly integration tests.
 
 ---
 
@@ -1391,11 +1391,11 @@ cancel_reason TEXT
 | 2 | GAP-04 | WS URL hardcode | Deploy | P0 | ✅ Closed |
 | 3 | GAP-05 | RBL thiếu `@PreAuthorize` | Security | P0 | ✅ Closed |
 | 4 | GAP-02 | Auto PT_REVIEWING hardcode | UX | P3 | Open (dual-state giải quyết tốt hơn) |
-| 5 | GAP-06 | DB `create-drop` | Dev data | P1 | Open |
-| 6 | GAP-07 | 199-class softmax % thấp → user hiểu nhầm | UX | P1 | Open — cần UX copy |
-| 7 | GAP-08 | `dietStore` FE unused dead code | Maintain | P2 | Open |
+| 5 | GAP-06 | DB `create-drop` | Dev data | P1 | **✅ Mitigated (dev)** — `ddl-auto=update` |
+| 6 | GAP-07 | 199-class softmax % thấp → user hiểu nhầm | UX | P1 | **✅ Closed** — FE label copy |
+| 7 | GAP-08 | `dietStore` FE unused dead code | Maintain | P2 | **✅ Closed** |
 | 8 | GAP-09 | React Query unused | Perf | P3 | Open |
-| 9 | GAP-10 | `registerAsPt` không set User PENDING_APPROVAL | Logic | P1 | Open — dùng `ptRequestStatus` |
+| 9 | GAP-10 | `registerAsPt` không set User PENDING_APPROVAL | Logic | P1 | **✅ Closed — by design** |
 | 10 | **v3-A** | Diet preference không filter gì | UX liên mạch | P1 | **✅ Closed** |
 | 11 | **v3-B** | Food log control loop bị đứt | Core feature | P1 | **✅ Closed** |
 | 12 | **v3-C** | Progress không đủ chiều sâu | PT value | P1 | **✅ Closed** |
@@ -1448,7 +1448,7 @@ cancel_reason TEXT
 
 **Verify nhanh:** `./mvnw test` → **120** pass · `npm run build` · Playwright **58** cases (cần BE :8080) · v3.1 layers **34** (`-g "BE-only|FE-only|Hybrid"`).
 
-**Ưu tiên rà soát còn mở:** GAP-06..10, polish E2E (SOS resolve flow, notification deep-link), marketplace diet UI. **ADD-01..08 closed** — xem Addendum.
+**Ưu tiên rà soát còn mở:** GAP-02, polish E2E (SOS resolve flow, notification deep-link), marketplace diet UI. **ADD-01..08 closed** — xem Addendum.
 
 ---
 

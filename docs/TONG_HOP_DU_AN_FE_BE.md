@@ -294,7 +294,7 @@ Refresh → rotate; logout → revoke revoked_tokens
 10. `suggestSos` nếu ăn ngoài + (confidence thấp hoặc không DB match)
 
 **Confirm:** `macros_json` cập nhật, `HYBRID`, status **LOGGED**.  
-**Summary:** chỉ `APPROVED | LOGGED | PT_REVIEWING` — DRAFT / `MANUAL_REQUIRED` không tính.
+**Summary:** chỉ `LOGGED` (dual-state — `reviewStatus` không ảnh hưởng tổng macro) — DRAFT / `MANUAL_REQUIRED` không tính.
 
 ### 6.3 PT registration (`UserProfileServiceImpl.registerAsPt`)
 
@@ -796,11 +796,12 @@ Chi tiết: [`RBL_METHODOLOGY.md`](./RBL_METHODOLOGY.md) · [`research/TONG_HOP_
 | **v3-A..K** | Diet pref, control loop, progress, recipe, meal plan, post-meal, RBL cohort | **✅ Closed** (audit QA 2026-07-06) |
 | **ADD-01..08** | Onboarding, body metric, chat context, marketplace, SOS SLA, notifications, lifecycle, BR-17 | **✅ Closed** (Addendum v3.1, 2026-07-07) |
 | GAP-02 | Không auto PT_REVIEWING trên `status` | Dual-state đủ; auto-review khi confidence cao — chưa làm |
-| GAP-06 | `create-drop` | Mất data dev |
-| GAP-07 | 199-class softmax % thấp | User confusion — cần UX copy |
-| GAP-08 | `dietStore` unused | Dead code FE |
+| GAP-06 | `create-drop` | **✅ Mitigated (dev)** — `ddl-auto=update`; test profile vẫn create-drop |
+| GAP-07 | 199-class softmax % thấp | **✅ Closed** — UX label trong `dietUtils` (không hiện % raw) |
+| GAP-08 | `dietStore` unused | **✅ Closed** — file đã xóa |
 | GAP-09 | React Query unused | — |
-| GAP-10 | `registerAsPt` vs User PENDING_APPROVAL | Lọc `ptRequestStatus` |
+| GAP-10 | `registerAsPt` vs User PENDING_APPROVAL | **✅ Closed — by design** — lọc `ptRequestStatus` trên PtProfile |
+| Summary drift | Docs cũ ghi PT_REVIEWING trong summary | **✅ Closed** — code chỉ `LOGGED`; docs đã sync |
 | BR-17 | PT alert chỉ khi không có log PENDING review cùng ngày | **✅ Closed** (v3.1 ADD-08) |
 | E2E | Cancel appointment <48h bad path | Manual / chưa Playwright |
 | GATE-LLaVA | Spec LLaVA binary vs ResNet preCheck | Drift có chủ đích |

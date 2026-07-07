@@ -174,7 +174,6 @@ nutrican-fe/
 │   │
 │   ├── stores/
 │   │   ├── authStore.js              # Zustand + persist
-│   │   ├── dietStore.js
 │   │   └── notificationStore.js
 │   │
 │   ├── hooks/
