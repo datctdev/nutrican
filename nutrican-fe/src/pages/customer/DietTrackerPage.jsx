@@ -2,9 +2,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '../../components/ui/button';
 import { dietService } from '../../services/dietService';
+import { recipeService } from '../../services/recipeService';
+import PostMealRatingSheet from './components/PostMealRatingSheet';
 import { toast } from 'sonner';
 import { RefreshCw, AlertTriangle, X, Send, Clock, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import useWebSocket from '../../hooks/useWebSocket';
+import { profileExtensionsService } from '../../services/profileExtensionsService';
 
 // Import subcomponents
 import NutritionProgress from './components/NutritionProgress';
@@ -15,6 +19,18 @@ import ConfirmFoodModal from './components/ConfirmFoodModal';
 import { initialAdjustedGrams } from './components/dietUtils';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const POST_MEAL_PROMPT_KEY = 'nutrican_post_meal_prompt';
+
+function schedulePostMealPrompt(logId) {
+    try {
+        const raw = localStorage.getItem('nutrican_post_meal_opt_in');
+        if (raw === 'false' || raw === JSON.stringify(false)) return;
+        localStorage.setItem(POST_MEAL_PROMPT_KEY, JSON.stringify({
+            logId,
+            at: Date.now() + 30 * 60 * 1000,
+        }));
+    } catch { /* ignore */ }
+}
 
 export default function DietTrackerPage() {
     useWebSocket();
@@ -73,6 +89,8 @@ export default function DietTrackerPage() {
                 targetProtein: Number(rawData.targetProtein) || 120,
                 targetCarbs: Number(rawData.targetCarbs || rawData.targetCarb) || 200,
                 targetFat: Number(rawData.targetFat) || 65,
+                intakeStatus: rawData.intakeStatus || 'OK',
+                controlLoopMessage: rawData.controlLoopMessage || null,
             };
             setSummary(summaryData);
             setSosTickets(sosRes.data.data || []);
@@ -103,6 +121,10 @@ export default function DietTrackerPage() {
         if (isMounted) {
             init();
         }
+
+        profileExtensionsService.getOnboardingStatus()
+            .then((res) => setOnboardingBanner(!!res.data?.data?.showBanner))
+            .catch(() => setOnboardingBanner(false));
 
         const handleRealtimeUpdate = (e) => {
             console.log("🔄 Lệnh Reload đã được gọi từ WebSocket (Phía Học Viên)!", e.type);
@@ -136,6 +158,53 @@ export default function DietTrackerPage() {
         };
     }, [fetchData, loadResNetDishes]);
 
+    const [dietFilterOn, setDietFilterOn] = useState(true);
+    const [manualSendToPt, setManualSendToPt] = useState(false);
+    const [pendingSubmitPrompt, setPendingSubmitPrompt] = useState(null);
+    const [savedRecipes, setSavedRecipes] = useState([]);
+    const [recipeName, setRecipeName] = useState('');
+    const [postMealPrompt, setPostMealPrompt] = useState(null);
+    const [onboardingBanner, setOnboardingBanner] = useState(false);
+
+    const loadSavedRecipes = useCallback(async () => {
+        try {
+            const res = await recipeService.list();
+            setSavedRecipes(res.data.data || []);
+        } catch {
+            setSavedRecipes([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (inputMode === 'recipe') {
+            loadSavedRecipes();
+        }
+    }, [inputMode, loadSavedRecipes]);
+
+    useEffect(() => {
+        const checkPrompt = () => {
+            try {
+                const raw = localStorage.getItem(POST_MEAL_PROMPT_KEY);
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (parsed?.logId && parsed.at && Date.now() >= parsed.at) {
+                    setPostMealPrompt(parsed.logId);
+                    localStorage.removeItem(POST_MEAL_PROMPT_KEY);
+                }
+            } catch { /* ignore */ }
+        };
+        checkPrompt();
+        const id = setInterval(checkPrompt, 60000);
+        return () => clearInterval(id);
+    }, []);
+
+    useEffect(() => {
+        if (foodSearchQuery && foodSearchQuery.length >= 2) {
+            searchFoods(foodSearchQuery);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dietFilterOn]);
+
     const searchFoods = async (q) => {
         setFoodSearchQuery(q);
         if (!q || q.length < 2) {
@@ -143,7 +212,7 @@ export default function DietTrackerPage() {
             return;
         }
         try {
-            const res = await dietService.searchFoods(q);
+            const res = await dietService.searchFoods(q, { dietFilter: dietFilterOn });
             setFoodSearchResults(res.data.data || []);
         } catch (err) {
             console.error('Food search failed', err);
@@ -240,6 +309,16 @@ export default function DietTrackerPage() {
             const res = await dietService.analyzeMeal(formData);
             const analyzed = res.data.data;
 
+            if (analyzed?.manualRequired || analyzed?.gateResult === 'OUT_OF_CLASS') {
+                toast.warning(analyzed?.message || 'Món này chưa được hỗ trợ. Vui lòng nhập tay.');
+                if (analyzed?.logId) {
+                    try { await dietService.deleteLog(analyzed.logId); } catch { /* orphan cleanup best-effort */ }
+                }
+                setInputMode('manual');
+                setSelectedFile(null);
+                return;
+            }
+
             if (analyzed?.suggestSos) {
                 toast.warning('Độ tin cậy thấp — hãy kiểm tra lại thông tin.');
             }
@@ -279,6 +358,7 @@ export default function DietTrackerPage() {
                 llavaFoodName: analyzed?.llavaFoodName,
                 macroSource: analyzed?.macroSource,
                 estimatedTotalGrams: analyzed?.estimatedTotalGrams,
+                sendToPt: false,
             });
 
             setSelectedFile(null);
@@ -287,7 +367,12 @@ export default function DietTrackerPage() {
             }
         } catch (err) {
             console.error('API Error:', err);
-            toast.error(err.response?.data?.message || 'Lỗi nhận diện ảnh');
+            const msg = err.response?.data?.message || '';
+            if (msg.includes('GATE_FAIL_NOT_FOOD') || msg.includes('không phải thực phẩm')) {
+                toast.error('Ảnh không phải thực phẩm. Vui lòng chụp lại bữa ăn.');
+            } else {
+                toast.error(msg || 'Lỗi nhận diện ảnh');
+            }
         } finally {
             setAnalyzing(false);
         }
@@ -347,13 +432,107 @@ export default function DietTrackerPage() {
             await dietService.createLog({
                 mealType: manualMealType,
                 mealSource: 'HOME_COOKED',
+                sendToPt: manualSendToPt,
                 items: ingredientItems.map((it) => ({
                     foodItemId: it.foodItemId,
                     quantityG: it.quantityG,
                 })),
             });
-            toast.success('Đã lưu bữa ăn!');
+            toast.success(manualSendToPt ? 'Đã lưu và gửi PT kiểm tra!' : 'Đã lưu bữa ăn!');
+            const logsRes = await dietService.getLogs({ page: 0, size: 1 });
+            const newLogId = logsRes.data.data?.content?.[0]?.id;
+            if (newLogId) schedulePostMealPrompt(newLogId);
+            setManualSendToPt(false);
             setIngredientItems([]);
+            fetchData();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Lưu thất bại');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleSaveRecipe = async () => {
+        if (!recipeName?.trim() || ingredientItems.length === 0) {
+            toast.error('Nhập tên và ít nhất 1 nguyên liệu');
+            return;
+        }
+        try {
+            setUploading(true);
+            await recipeService.create({
+                name: recipeName.trim(),
+                ingredients: ingredientItems.map((it) => ({
+                    foodItemId: it.foodItemId,
+                    gram: it.quantityG,
+                })),
+            });
+            toast.success('Đã lưu công thức!');
+            setRecipeName('');
+            loadSavedRecipes();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Không lưu được công thức');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleLogFromRecipe = async (e) => {
+        e.preventDefault();
+        if (ingredientItems.length === 0) {
+            toast.error('Vui lòng chọn ít nhất 1 nguyên liệu');
+            return;
+        }
+        try {
+            setUploading(true);
+            let recipeId = null;
+            if (recipeName?.trim()) {
+                const saved = await recipeService.create({
+                    name: recipeName.trim(),
+                    ingredients: ingredientItems.map((it) => ({
+                        foodItemId: it.foodItemId,
+                        gram: it.quantityG,
+                    })),
+                });
+                recipeId = saved.data.data?.id;
+                loadSavedRecipes();
+            }
+            const res = await dietService.createLog({
+                mealType: manualMealType,
+                mealSource: 'HOME_COOKED',
+                sendToPt: manualSendToPt,
+                recipeId,
+                items: recipeId ? undefined : ingredientItems.map((it) => ({
+                    foodItemId: it.foodItemId,
+                    quantityG: it.quantityG,
+                })),
+            });
+            toast.success('Đã ghi nhật ký từ công thức!');
+            const logId = res.data.data?.id;
+            if (logId) schedulePostMealPrompt(logId);
+            setManualSendToPt(false);
+            setIngredientItems([]);
+            setRecipeName('');
+            fetchData();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Lưu thất bại');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleLogFromSavedRecipe = async (recipeId) => {
+        try {
+            setUploading(true);
+            const res = await dietService.createLog({
+                mealType: manualMealType,
+                mealSource: 'HOME_COOKED',
+                sendToPt: manualSendToPt,
+                recipeId,
+            });
+            toast.success('Đã ghi nhật ký từ công thức đã lưu!');
+            const logId = res.data.data?.id;
+            if (logId) schedulePostMealPrompt(logId);
+            setManualSendToPt(false);
             fetchData();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Lưu thất bại');
@@ -395,15 +574,37 @@ export default function DietTrackerPage() {
         try {
             setConfirmingFood(true);
 
-            await dietService.confirmRecognition(
+            const res = await dietService.confirmRecognition(
                 confirmModal.logId,
                 confirmModal.selectedFoodCode,
-                confirmModal.adjustedGrams
+                confirmModal.adjustedGrams,
+                confirmModal.sendToPt ?? false
             );
 
+            const data = res.data?.data;
+            const warnings = data?.allergyWarnings;
             toast.success('Xác nhận & lưu thành công');
-            setConfirmModal(null);
-            fetchData();
+            if (confirmModal.logId) schedulePostMealPrompt(confirmModal.logId);
+            if (data?.dietPrefWarning) {
+                toast.warning(data.dietPrefWarning);
+                setConfirmModal((prev) => prev ? { ...prev, dietPrefWarning: data.dietPrefWarning } : prev);
+            }
+            if (data?.controlLoopMessage && data?.intakeStatus && data.intakeStatus !== 'OK') {
+                toast.info(data.controlLoopMessage);
+            }
+            if (data?.suggestSubmitToPt) {
+                setPendingSubmitPrompt({ logId: confirmModal.logId, message: data.controlLoopMessage });
+            }
+            if (warnings?.length) {
+                setConfirmModal((prev) => ({ ...prev, allergyWarnings: warnings }));
+                setTimeout(() => {
+                    setConfirmModal(null);
+                    fetchData();
+                }, 2500);
+            } else {
+                setConfirmModal(null);
+                fetchData();
+            }
         } catch (err) {
             toast.error(err.response?.data?.message || 'Không thể xác nhận món ăn');
         } finally {
@@ -488,7 +689,17 @@ export default function DietTrackerPage() {
     };
 
     return (
-        <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in">
+        <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in min-w-0 overflow-x-hidden">
+            {onboardingBanner && (
+                <div className="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <p className="text-sm text-amber-900 font-medium">
+                        Hoàn thiện hồ sơ để theo dõi macro chính xác hơn.
+                    </p>
+                    <Link to="/onboarding" className="text-sm font-bold text-amber-800 hover:underline shrink-0">
+                        Hoàn thiện ngay →
+                    </Link>
+                </div>
+            )}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mt-6">
                 <div>
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-sans">Nhật Ký Dinh Dưỡng</h1>
@@ -528,7 +739,39 @@ export default function DietTrackerPage() {
                         ingredientTotals={ingredientTotals}
                         handleManualSubmit={handleManualSubmit}
                         uploading={uploading}
+                        dietFilterOn={dietFilterOn}
+                        setDietFilterOn={setDietFilterOn}
+                        manualSendToPt={manualSendToPt}
+                        setManualSendToPt={setManualSendToPt}
+                        savedRecipes={savedRecipes}
+                        recipeName={recipeName}
+                        setRecipeName={setRecipeName}
+                        handleSaveRecipe={handleSaveRecipe}
+                        handleLogFromRecipe={handleLogFromRecipe}
+                        handleLogFromSavedRecipe={handleLogFromSavedRecipe}
                     />
+
+                    {pendingSubmitPrompt && (
+                        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <p className="font-semibold text-violet-900">Gửi PT kiểm tra?</p>
+                                <p className="text-sm text-violet-700">{pendingSubmitPrompt.message || 'Bữa này lệch macro — PT có thể hỗ trợ điều chỉnh.'}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => setPendingSubmitPrompt(null)}>Không</Button>
+                                <Button size="sm" onClick={async () => {
+                                    try {
+                                        await dietService.submitForReview(pendingSubmitPrompt.logId);
+                                        toast.success('Đã gửi PT kiểm tra');
+                                        setPendingSubmitPrompt(null);
+                                        fetchData();
+                                    } catch (e) {
+                                        toast.error(e.response?.data?.message || 'Không gửi được');
+                                    }
+                                }}>Gửi PT</Button>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="space-y-5">
                         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -581,7 +824,7 @@ export default function DietTrackerPage() {
                                                         <CheckCircle2 className="w-3.5 h-3.5" />
                                                         PT phản hồi:
                                                     </span>
-                                                    <span className="italic leading-relaxed font-medium">"{ticket.note}"</span>
+                                                    <span className="italic leading-relaxed font-medium">"{ticket.resolutionNote || ticket.note}"</span>
                                                 </div>
                                             ) : (
                                                 <span className="truncate block font-medium">"{ticket.note}"</span>
@@ -641,6 +884,12 @@ export default function DietTrackerPage() {
                 handleCancelConfirmation={handleCancelConfirmation}
                 handleConfirmRecognition={handleConfirmRecognition}
                 setConfirmModal={setConfirmModal}
+            />
+
+            <PostMealRatingSheet
+                logId={postMealPrompt}
+                open={!!postMealPrompt}
+                onClose={() => setPostMealPrompt(null)}
             />
         </div>
     );

@@ -1,15 +1,22 @@
 package com.sba.nutricanbe.diet.service.impl;
 
+import com.sba.nutricanbe.ai.catalog.A1_0FixedMacros;
 import com.sba.nutricanbe.ai.catalog.ResNetFoodCodeMapping;
 import com.sba.nutricanbe.ai.catalog.ResNetFoodDefaults;
+import com.sba.nutricanbe.ai.dto.FoodGatePreCheckResult;
 import com.sba.nutricanbe.ai.dto.FoodPredictionDto;
 import com.sba.nutricanbe.ai.dto.MealRecognitionResult;
+import com.sba.nutricanbe.ai.dto.ResNetAnalyzeResponse;
 import com.sba.nutricanbe.ai.service.MealRecognitionService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.DietPreference;
+import com.sba.nutricanbe.ai.service.FoodGateService;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
+import com.sba.nutricanbe.diet.enums.FoodGateResult;
 import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
 import com.sba.nutricanbe.diet.enums.MealSource;
@@ -31,6 +38,11 @@ import com.sba.nutricanbe.diet.dto.FoodItemResponse;
 import com.sba.nutricanbe.diet.dto.FoodPredictionResponse;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
+import com.sba.nutricanbe.diet.enums.AllergenType;
+import com.sba.nutricanbe.diet.dto.IntakeControlResult;
+import com.sba.nutricanbe.diet.service.AllergyCheckService;
+import com.sba.nutricanbe.diet.service.DietPrefCheckService;
+import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
 import com.sba.nutricanbe.diet.service.MealAnalysisService;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import lombok.RequiredArgsConstructor;
@@ -67,6 +79,10 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
     private final StorageService minioService;
     private final FoodCatalogService foodCatalogService;
     private final DietLogHelper dietLogHelper;
+    private final FoodGateService foodGateService;
+    private final AllergyCheckService allergyCheckService;
+    private final DietPrefCheckService dietPrefCheckService;
+    private final IntakeControlLoopService intakeControlLoopService;
 
     @Override
     @Transactional
@@ -80,11 +96,53 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                 throw new BadRequestException("restaurantName is required when mealSource is RESTAURANT");
             }
 
+            boolean skipGate = mealComplexity == MealComplexity.HOTPOT || mealComplexity == MealComplexity.COMPOSITE;
+            ResNetAnalyzeResponse cachedResNet = null;
+            if (!skipGate) {
+                FoodGatePreCheckResult preCheck = foodGateService.preCheck(file);
+                FoodGateResult gateResult = preCheck.gateResult();
+                if (gateResult == FoodGateResult.NOT_FOOD) {
+                    throw new BadRequestException("GATE_FAIL_NOT_FOOD: Ảnh không phải thực phẩm. Vui lòng chụp lại bữa ăn.");
+                }
+                if (gateResult == FoodGateResult.OUT_OF_CLASS) {
+                    String objectName = minioService.uploadFile(file, "diet-logs/" + customerId);
+                    String imageUrl = minioService.getPresignedUrl(objectName);
+                    MealType mealType = dietLogHelper.parseMealType(ctx.getMealType());
+                    DietLog manualLog = DietLog.builder()
+                            .customerId(customerId)
+                            .imageUrl(imageUrl)
+                            .imageObjectName(objectName)
+                            .mealType(mealType)
+                            .status(DietLogStatus.MANUAL_REQUIRED)
+                            .reviewStatus(DietLogReviewStatus.NOT_REQUIRED)
+                            .logDate(LocalDate.now())
+                            .mealSource(mealSource)
+                            .mealComplexity(mealComplexity)
+                            .restaurantName(ctx.getRestaurantName())
+                            .recognitionSource(RecognitionSource.MANUAL)
+                            .experimentCohort(ExperimentCohort.MANUAL_ENTRY)
+                            .foodDescription("Món chưa được hỗ trợ — nhập tay")
+                            .aiRawJson(Map.of("gateResult", "OUT_OF_CLASS", "manualRequired", true))
+                            .build();
+                    manualLog = dietLogRepository.save(manualLog);
+                    AnalyzeMealResponse outOfClass = AnalyzeMealResponse.builder()
+                            .logId(manualLog.getId())
+                            .message("GATE_WARN_OUT_OF_CLASS: Món này chưa được hỗ trợ. Vui lòng nhập tay.")
+                            .manualRequired(true)
+                            .gateResult("OUT_OF_CLASS")
+                            .mealType(mealType)
+                            .build();
+                    return ApiResponse.success(outOfClass, outOfClass.getMessage());
+                }
+                cachedResNet = preCheck.resNetResponse();
+            }
+
             MealRecognitionResult aiResult = mealRecognitionService.recognizeMealFromFile(
                     file,
                     ctx.getMealType(),
                     mealSource.name(),
-                    mealComplexity.name());
+                    mealComplexity.name(),
+                    cachedResNet);
 
             String objectName = minioService.uploadFile(file, "diet-logs/" + customerId);
             String imageUrl = minioService.getPresignedUrl(objectName);
@@ -107,7 +165,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
 
             RecognitionSource recognitionSource = RecognitionSource.AI_ONLY;
             MacroNutrients macros = MacroNutrients.ZERO;
-            MacroNutrients aiPredictedMacros = MacroNutrients.ZERO;
+            MacroNutrients aiPredictedMacros = A1_0FixedMacros.forCode(aiResult.getFoodCode());
             MacroNutrients dbMatchedMacros = null;
             Integer dbMatchScore = null;
             String matchedFoodName = null;
@@ -129,8 +187,8 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                 recognitionSource = RecognitionSource.HYBRID;
                 dbApplied = true;
             } else if (aiResult.getCalories() != null) {
-                aiPredictedMacros = MacroNutrients.of(aiResult.getCalories(), aiResult.getProtein(), aiResult.getCarbs(), aiResult.getFat());
-                macros = aiPredictedMacros;
+                // UI / A1.1: NutriHome × portion from fusion
+                macros = MacroNutrients.of(aiResult.getCalories(), aiResult.getProtein(), aiResult.getCarbs(), aiResult.getFat());
                 if (portionG == null && bestMatch.isPresent()) {
                     FoodItem food = foodItemRepository.findById(bestMatch.get().getId()).orElseThrow();
                     BigDecimal serving = food.getServingSizeG() != null && food.getServingSizeG().compareTo(BigDecimal.ZERO) > 0
@@ -158,12 +216,10 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                         ? food.getServingSizeG() : BigDecimal.valueOf(100);
                 portionG = serving.multiply(portionRatio).setScale(2, RoundingMode.HALF_UP);
                 dbMatchedMacros = dietLogHelper.macrosForFood(food, portionG);
-                aiPredictedMacros = dbMatchedMacros;
                 macros = dbMatchedMacros;
                 recognitionSource = RecognitionSource.HYBRID;
                 dbApplied = true;
             } else {
-                aiPredictedMacros = MacroNutrients.of(BigDecimal.valueOf(300), BigDecimal.valueOf(15), BigDecimal.valueOf(35), BigDecimal.valueOf(10));
                 macros = aiPredictedMacros;
             }
 
@@ -220,6 +276,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                     .promptVersion(mealRecognitionService.getPromptVersionHash())
                     .experimentCohort(cohort)
                     .status(status)
+                    .reviewStatus(DietLogReviewStatus.NOT_REQUIRED)
                     .logDate(LocalDate.now())
                     .mealSource(mealSource)
                     .mealComplexity(mealComplexity)
@@ -237,9 +294,12 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             }
 
             dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
+            DietPreference pref = customer.getDietPreference() != null ? customer.getDietPreference() : DietPreference.NORMAL;
+            dietLog.setExperimentCohortKey(com.sba.nutricanbe.common.util.RblCohortUtil.resolveKey(
+                    mealSource, mealComplexity, recognitionSource, pref));
             dietLog = dietLogRepository.save(dietLog);
 
-            if (dietLog.getStatus() == DietLogStatus.PT_REVIEWING) {
+            if (dietLog.getReviewStatus() == DietLogReviewStatus.PENDING) {
                 dietLogHelper.notifyPtOfNewLog(dietLog);
             }
 
@@ -316,13 +376,16 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             portionG = serving.multiply(portionRatio).setScale(2, RoundingMode.HALF_UP);
         }
         MacroNutrients macros = dietLogHelper.macrosForFood(food, portionG);
+        MacroNutrients a10Macros = dietLog.getAiPredictedMacros() != null
+                ? dietLog.getAiPredictedMacros()
+                : A1_0FixedMacros.forCode(foodCode);
 
         String foodName = ResNetFoodCodeMapping.catalogNameVi(foodCode).orElse(food.getNameVi());
         dietLog.setFoodDescription(foodName);
         dietLog.setMatchedFoodName(food.getNameVi());
         dietLog.setFoodItemId(food.getId());
         dietLog.setMacrosJson(macros);
-        dietLog.setAiPredictedMacros(macros);
+        dietLog.setAiPredictedMacros(a10Macros);
         dietLog.setDbMatchedMacros(macros);
         dietLog.setRecognitionSource(RecognitionSource.HYBRID);
 
@@ -339,9 +402,37 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
         aiRaw.put("carbs", macros.carbs());
         aiRaw.put("fat", macros.fat());
         aiRaw.put("needsConfirmation", false);
+        dietLog.setStatus(DietLogStatus.LOGGED);
+        boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
+        dietLog.setReviewStatus(sendToPt ? DietLogReviewStatus.PENDING : DietLogReviewStatus.NOT_REQUIRED);
         dietLog.setAiRawJson(aiRaw);
         dietLog = dietLogRepository.save(dietLog);
-        return ApiResponse.success(dietLogHelper.toResponse(dietLog), "Recognition confirmed");
+        if (sendToPt) {
+            dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
+            dietLogHelper.notifyPtOfNewLog(dietLog);
+        }
+        DietLogResponse response = dietLogHelper.toResponse(dietLog);
+        response.setAllergyWarnings(allergyCheckService.checkFoodCode(customerId, foodCode));
+        User customer = userQueryService.findUserById(customerId).orElse(null);
+        if (customer != null && dietPrefCheckService.hasMismatch(customerId, foodCode)) {
+            response.setDietPrefWarning(dietPrefCheckService.buildWarningMessage(
+                    customer.getDietPreference(),
+                    ResNetFoodCodeMapping.catalogNameViOrDisplay(foodCode, foodName)));
+        }
+        boolean reviewNotRequired = !sendToPt;
+        IntakeControlResult loop = intakeControlLoopService.evaluateAfterLog(
+                customerId, dietLog.getLogDate(), reviewNotRequired);
+        applyControlLoop(response, loop);
+        return ApiResponse.success(response, "Recognition confirmed");
+    }
+
+    private void applyControlLoop(DietLogResponse response, IntakeControlResult loop) {
+        if (loop == null) {
+            return;
+        }
+        response.setIntakeStatus(loop.getIntakeStatus());
+        response.setControlLoopMessage(loop.getControlLoopMessage());
+        response.setSuggestSubmitToPt(loop.isSuggestSubmitToPt());
     }
 
     private MacroNutrients buildHotpotMacros(AnalyzeMealContext ctx) {

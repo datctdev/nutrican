@@ -1,21 +1,27 @@
 // src/pages/pt/ChatPage.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
-import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X, UploadCloud } from 'lucide-react';
+import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X, UploadCloud, FileText } from 'lucide-react';
 import { chatService } from '../../services/chatService';
+import { workspaceService } from '../../services/workspaceService';
 import { sendWebSocketMessage } from '../../services/websocketService';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import ImageLightbox from '../../components/common/ImageLightbox';
+import ChatContextCard from './components/ChatContextCard';
+import ChatMessageContextCard from './components/ChatMessageContextCard';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 
 export default function ChatPage() {
     const { user } = useAuthStore();
     const location = useLocation();
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const contextLogId = searchParams.get('contextLogId');
 
     const [threads, setThreads] = useState([]);
     const [activeMappingId, setActiveMappingId] = useState(null);
@@ -23,6 +29,7 @@ export default function ChatPage() {
     const [newMessage, setNewMessage] = useState('');
     const [selectedImage, setSelectedImage] = useState(null);
     const [selectedImagePreview, setSelectedImagePreview] = useState('');
+    const [chatContext, setChatContext] = useState(null);
 
     const [loadingThreads, setLoadingThreads] = useState(true);
     const [loadingMessages, setLoadingMessages] = useState(false);
@@ -32,6 +39,7 @@ export default function ChatPage() {
 
     const messagesEndRef = useRef(null);
     const imageInputRef = useRef(null);
+    const pdfInputRef = useRef(null);
 
     const loadThreads = useCallback(async () => {
         try {
@@ -65,11 +73,26 @@ export default function ChatPage() {
                 } else {
                     setActiveMappingId(prev => prev || loadedThreads[0].mappingId);
                 }
+                if (contextLogId) {
+                    setNewMessage((prev) => prev || `Tôi muốn hỏi về nhật ký bữa ăn (${contextLogId.slice(0, 8)}…)`);
+                }
             }
         };
         initChat();
         return () => { isMounted = false; };
-    }, [location.state, loadThreads]);
+    }, [location.state, loadThreads, contextLogId]);
+
+    const activeThread = threads.find(t => t.mappingId === activeMappingId);
+
+    useEffect(() => {
+        if (!activeThread?.participantId) {
+            setChatContext(null);
+            return;
+        }
+        workspaceService.getChatContext(activeThread.participantId)
+            .then((res) => setChatContext(res.data?.data || null))
+            .catch(() => setChatContext(null));
+    }, [activeThread?.participantId]);
 
     useEffect(() => {
         if (!activeMappingId) return;
@@ -191,6 +214,42 @@ export default function ChatPage() {
         }
     };
 
+    const handlePdfSelect = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file || !activeMappingId) return;
+        if (file.type !== 'application/pdf') {
+            toast.error('Chỉ chấp nhận file PDF');
+            event.target.value = '';
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('PDF tối đa 10MB');
+            event.target.value = '';
+            return;
+        }
+        try {
+            setSending(true);
+            const res = await chatService.sendAttachment(
+                activeMappingId,
+                file,
+                newMessage.trim() || 'Tài liệu đính kèm',
+                contextLogId ? 'DIET_LOG' : null,
+                contextLogId || null,
+            );
+            const sentMessage = res.data?.data;
+            if (sentMessage) {
+                setMessages((prev) => prev.some((m) => m.id === sentMessage.id) ? prev : [...prev, sentMessage]);
+            }
+            setNewMessage('');
+            toast.success('Đã gửi PDF');
+        } catch (err) {
+            toast.error('Không thể gửi PDF');
+        } finally {
+            setSending(false);
+            event.target.value = '';
+        }
+    };
+
     const handleSendMessage = async (e) => {
         e?.preventDefault();
         if ((!newMessage.trim() && !selectedImage) || !activeMappingId) return;
@@ -233,7 +292,13 @@ export default function ChatPage() {
         return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
     };
 
-    const activeThread = threads.find(t => t.mappingId === activeMappingId);
+    const handleContextNavigate = (path, refId) => {
+        if (path === '/pt/reviews') {
+            navigate('/pt/reviews');
+            return;
+        }
+        navigate(path);
+    };
 
     return (
         <div className="max-w-[1600px] mx-auto h-[calc(100vh-120px)] min-h-[600px] flex gap-6 animate-fade-in pb-6 mt-6">
@@ -299,6 +364,15 @@ export default function ChatPage() {
                 </div>
             </Card>
 
+            {activeThread && (
+                <div className="w-72 flex-shrink-0 hidden xl:block space-y-4">
+                    <ChatContextCard
+                        context={chatContext}
+                        onViewDiet={() => navigate('/pt/reviews')}
+                    />
+                </div>
+            )}
+
             {/* CỘT PHẢI */}
             <Card 
                 className="flex-1 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden relative"
@@ -358,6 +432,13 @@ export default function ChatPage() {
                                                     ? 'bg-primary text-white rounded-3xl rounded-tr-sm shadow-md shadow-primary/20'
                                                     : 'bg-white border border-slate-200 text-slate-800 rounded-3xl rounded-tl-sm shadow-sm'
                                             }`}>
+                                                {msg.contextType && msg.contextRefId && (
+                                                    <ChatMessageContextCard
+                                                        contextType={msg.contextType}
+                                                        contextRefId={msg.contextRefId}
+                                                        onNavigate={handleContextNavigate}
+                                                    />
+                                                )}
                                                 {msg.imageUrl && (
                                                     <img
                                                         src={msg.imageUrl}
@@ -365,6 +446,16 @@ export default function ChatPage() {
                                                         onClick={() => setLightboxImage(msg.imageUrl)}
                                                         className="mb-2 max-h-72 w-full rounded-2xl object-cover cursor-zoom-in hover:opacity-95 transition-opacity"
                                                     />
+                                                )}
+                                                {msg.attachmentUrl && (
+                                                    <a
+                                                        href={msg.attachmentUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className={`mb-2 flex items-center gap-2 text-sm font-semibold underline ${isMe ? 'text-white/90' : 'text-blue-600'}`}
+                                                    >
+                                                        <FileText className="w-4 h-4" /> Tệp PDF đính kèm
+                                                    </a>
                                                 )}
                                                 {msg.content && <p>{msg.content}</p>}
                                             </div>
@@ -404,6 +495,13 @@ export default function ChatPage() {
                                     className="hidden"
                                     onChange={handleImageSelect}
                                 />
+                                <input
+                                    ref={pdfInputRef}
+                                    type="file"
+                                    accept="application/pdf"
+                                    className="hidden"
+                                    onChange={handlePdfSelect}
+                                />
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -413,6 +511,16 @@ export default function ChatPage() {
                                     aria-label="Đính kèm hình ảnh"
                                 >
                                     <ImagePlus className="h-5 w-5" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => pdfInputRef.current?.click()}
+                                    disabled={sending}
+                                    className="h-[52px] w-[52px] flex-shrink-0 rounded-2xl border-slate-200 bg-white p-0 text-slate-600 hover:bg-slate-50"
+                                    aria-label="Đính kèm PDF"
+                                >
+                                    <FileText className="h-5 w-5" />
                                 </Button>
                                 <textarea
                                     value={newMessage}

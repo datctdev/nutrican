@@ -18,14 +18,22 @@ import MacroTargetsPage from './pages/customer/MacroTargetsPage';
 import KycPage from './pages/customer/KycPage';
 import PtDashboardPage from './pages/pt/PtDashboardPage';
 import ClientListPage from './pages/pt/ClientListPage';
+import ClientProgressPage from './pages/pt/ClientProgressPage';
+import PtMealPlanPage from './pages/pt/PtMealPlanPage';
+import PtAppointmentsPage from './pages/pt/PtAppointmentsPage';
 import ReviewDietLogPage from './pages/pt/ReviewDietLogPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import PtVerificationPage from './pages/admin/PtVerificationPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import SosTicketsPage from './pages/admin/SosTicketsPage';
+import RefundReviewPage from './pages/admin/RefundReviewPage';
+import AllergenMappingPage from './pages/admin/AllergenMappingPage';
+import FoodTagsPage from './pages/admin/FoodTagsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import OnboardingGuard from './components/common/OnboardingGuard';
 import ChatPage from './pages/pt/ChatPage';
 import CustomerChatPage from './pages/customer/CustomerChatPage';
+import OnboardingPage from './pages/customer/OnboardingPage';
 
 function App() {
     const router = createBrowserRouter([
@@ -42,16 +50,20 @@ function App() {
                     element: <SetPasswordPage />,
                 },
                 {
+                    path: '/onboarding',
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><OnboardingPage /></ProtectedRoute>,
+                },
+                {
                     path: '/marketplace',
-                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><MarketplacePage /></ProtectedRoute>,
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><OnboardingGuard><MarketplacePage /></OnboardingGuard></ProtectedRoute>,
                 },
                 {
                     path: '/pt-profile/:id',
-                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><PtDetailPage /></ProtectedRoute>,
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><OnboardingGuard><PtDetailPage /></OnboardingGuard></ProtectedRoute>,
                 },
                 {
                     path: '/diet',
-                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><DietTrackerPage /></ProtectedRoute>,
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><OnboardingGuard><DietTrackerPage /></OnboardingGuard></ProtectedRoute>,
                 },
                 {
                     path: '/profile',
@@ -85,6 +97,18 @@ function App() {
                     path: '/admin/sos',
                     element: <ProtectedRoute allowedRoles={['ADMIN']}><SosTicketsPage /></ProtectedRoute>,
                 },
+                {
+                    path: '/admin/refunds',
+                    element: <ProtectedRoute allowedRoles={['ADMIN']}><RefundReviewPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/admin/allergens',
+                    element: <ProtectedRoute allowedRoles={['ADMIN']}><AllergenMappingPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/admin/food-tags',
+                    element: <ProtectedRoute allowedRoles={['ADMIN']}><FoodTagsPage /></ProtectedRoute>,
+                },
             ],
         },
         {
@@ -92,6 +116,9 @@ function App() {
             children: [
                 { path: '/pt', element: <PtDashboardPage /> },
                 { path: '/pt/clients', element: <ClientListPage /> },
+                { path: '/pt/clients/:clientId/meal-plan', element: <PtMealPlanPage /> },
+                { path: '/pt/appointments', element: <PtAppointmentsPage /> },
+                { path: '/pt/progress/:clientId', element: <ClientProgressPage /> },
                 { path: '/pt/reviews', element: <ReviewDietLogPage /> },
                 { path: '/pt/chat', element: <ChatPage /> },
             ],

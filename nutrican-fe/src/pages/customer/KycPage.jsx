@@ -17,6 +17,22 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
+const GOAL_OPTIONS_KYC = [
+  { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
+  { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
+  { value: 'MAINTAIN', label: 'Duy trì' },
+  { value: 'PREGNANT', label: 'Mang thai' },
+  { value: 'RECOVERY', label: 'Phục hồi' },
+];
+
+const DIET_OPTIONS_KYC = [
+  { value: 'NORMAL', label: 'Ăn thường' },
+  { value: 'VEGETARIAN', label: 'Ăn chay' },
+  { value: 'VEGAN', label: 'Thuần chay' },
+  { value: 'KETO', label: 'Keto' },
+  { value: 'EAT_CLEAN', label: 'Eat clean' },
+];
+
 const SPECIALIZATION_OPTIONS = [
   'Giảm cân', 'Tăng cơ', 'Thể hình', 'Yoga', 'Pilates',
   'Cardio', 'CrossFit', 'Boxing', 'Bơi lội', 'Dinh dưỡng',
@@ -62,6 +78,8 @@ function validatePtForm(form, certList) {
     return 'Triết lý huấn luyện tối thiểu 50 ký tự';
   if (!form.contactPhone.trim())
     return 'Vui lòng nhập số điện thoại liên hệ';
+  if (!form.gender)
+    return 'Vui lòng chọn giới tính';
   if (!form.experienceStartDate)
     return 'Vui lòng chọn ngày bắt đầu làm PT';
   if (form.specializations.length === 0)
@@ -70,8 +88,8 @@ function validatePtForm(form, certList) {
     return 'Vui lòng chọn hình thức huấn luyện';
   if (!form.location)
     return 'Vui lòng chọn địa điểm hoạt động';
-  if (!form.hourlyRate || parseFloat(form.hourlyRate) <= 0)
-    return 'Vui lòng nhập phí dịch vụ hợp lệ';
+  if (form.hourlyRate === '' || form.hourlyRate == null || parseFloat(form.hourlyRate) < 0)
+    return 'Phí dịch vụ không được âm';
   if (!form.rateUnit)
     return 'Vui lòng chọn đơn vị tính phí';
 
@@ -94,7 +112,9 @@ function validatePtForm(form, certList) {
 // ─── Computed helpers ──────────────────────────────────────────────────────
 function calcExperience(dateStr) {
   if (!dateStr) return null;
-  const start = new Date(dateStr);
+  const normalized = dateStr.length === 7 ? `${dateStr}-01` : dateStr;
+  const start = new Date(normalized);
+  if (Number.isNaN(start.getTime())) return null;
   const now = new Date();
   const diffMs = now - start;
   if (diffMs < 0) return null;
@@ -326,6 +346,7 @@ export default function KycPage() {
   const { user, checkAuth } = useAuthStore();
   const [hasPtProfile, setHasPtProfile] = useState(false);
   const [ptProfileStatus, setPtProfileStatus] = useState(null);
+  const [adminRejectNote, setAdminRejectNote] = useState('');
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const [requireKyc, setRequireKyc] = useState(true);
 
@@ -350,6 +371,7 @@ export default function KycPage() {
     bio: '',
     trainingPhilosophy: '',
     contactPhone: '',
+    gender: '',
     experienceStartDate: '',
     specializations: [],
     trainingMode: '',
@@ -360,6 +382,8 @@ export default function KycPage() {
     cvFileName: '',
     instagramUrl: '',
     linkedinUrl: '',
+    preferredGoals: [],
+    preferredDietTypes: [],
   });
   const [certList, setCertList] = useState([newEmptyCert()]);
   const [isSubmittingPt, setIsSubmittingPt] = useState(false);
@@ -382,6 +406,7 @@ export default function KycPage() {
         if (userData?.ptProfile) {
           setHasPtProfile(true);
           setPtProfileStatus(userData.ptProfile.ptRequestStatus || userData.ptProfile.verificationStatus);
+          setAdminRejectNote(userData.ptProfile.adminRejectNote || '');
         }
       } catch (error) {
         console.error('Error checking status:', error);
@@ -465,6 +490,22 @@ export default function KycPage() {
         : [...p.specializations, spec],
     }));
 
+  const togglePreferredGoal = (value) =>
+    setPtForm(p => ({
+      ...p,
+      preferredGoals: p.preferredGoals.includes(value)
+        ? p.preferredGoals.filter((g) => g !== value)
+        : [...p.preferredGoals, value],
+    }));
+
+  const togglePreferredDiet = (value) =>
+    setPtForm(p => ({
+      ...p,
+      preferredDietTypes: p.preferredDietTypes.includes(value)
+        ? p.preferredDietTypes.filter((d) => d !== value)
+        : [...p.preferredDietTypes, value],
+    }));
+
   const handleCvUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -523,7 +564,9 @@ export default function KycPage() {
         bio: ptForm.bio.trim(),
         trainingPhilosophy: ptForm.trainingPhilosophy.trim(),
         contactPhone: ptForm.contactPhone.trim(),
-        experienceStartDate: ptForm.experienceStartDate,
+        gender: ptForm.gender,
+        experienceStartDate: ptForm.experienceStartDate?.length === 7
+          ? `${ptForm.experienceStartDate}-01` : ptForm.experienceStartDate,
         specializations: ptForm.specializations,
         trainingMode: ptForm.trainingMode,
         location: ptForm.location,
@@ -540,8 +583,14 @@ export default function KycPage() {
         cvUrl: ptForm.cvUrl || null,
         instagramUrl: ptForm.instagramUrl || null,
         linkedinUrl: ptForm.linkedinUrl || null,
+        preferredGoals: ptForm.preferredGoals,
+        preferredDietTypes: ptForm.preferredDietTypes,
       };
-      await userService.registerAsPt(payload);
+      if (ptProfileStatus === 'SUSPENDED') {
+        await userService.resubmitPt(payload);
+      } else {
+        await userService.registerAsPt(payload);
+      }
       toast.success('Đăng ký thành công! Vui lòng chờ admin duyệt hồ sơ.');
       setHasPtProfile(true);
       setPtProfileStatus('PENDING_APPROVAL');
@@ -785,6 +834,11 @@ export default function KycPage() {
                     ? 'Thời gian xét duyệt thường trong vòng 1-3 ngày làm việc.'
                     : 'Hãy bổ sung thêm thông tin và chứng chỉ rõ ràng hơn.'}
                 </p>
+                {ptProfileStatus === 'SUSPENDED' && adminRejectNote && (
+                  <p className="mt-3 text-sm text-red-800 bg-red-100/80 border border-red-200 rounded-xl px-3 py-2">
+                    <span className="font-semibold">Lý do từ chối: </span>{adminRejectNote}
+                  </p>
+                )}
               </div>
               {(ptProfileStatus === 'ACTIVE' || ptProfileStatus === 'VERIFIED') && (
                 <Button onClick={() => navigate('/pt')} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex-shrink-0">
@@ -934,6 +988,17 @@ export default function KycPage() {
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none text-sm" />
                   </div>
                   <div>
+                    <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Giới Tính *</label>
+                    <select value={ptForm.gender}
+                      onChange={(e) => setPtForm(p => ({ ...p, gender: e.target.value }))}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none text-sm">
+                      <option value="">Chọn giới tính</option>
+                      <option value="MALE">Nam</option>
+                      <option value="FEMALE">Nữ</option>
+                      <option value="OTHER">Khác</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Số Điện Thoại Liên Hệ *</label>
                     <div className="relative">
                       <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -958,8 +1023,8 @@ export default function KycPage() {
                     <div className="flex gap-3 items-center">
                       <div className="relative flex-1">
                         <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input type="date" value={ptForm.experienceStartDate}
-                          max={new Date().toISOString().split('T')[0]}
+                        <input type="month" value={ptForm.experienceStartDate?.slice(0, 7) || ptForm.experienceStartDate}
+                          max={new Date().toISOString().slice(0, 7)}
                           onChange={(e) => setPtForm(p => ({ ...p, experienceStartDate: e.target.value }))}
                           className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm" />
                       </div>
@@ -990,6 +1055,42 @@ export default function KycPage() {
                               : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400 hover:text-emerald-600'
                           }`}>
                           {spec}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-slate-600 mb-2 block">
+                      Mục tiêu khách hàng phù hợp
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {GOAL_OPTIONS_KYC.map((opt) => (
+                        <button key={opt.value} type="button" onClick={() => togglePreferredGoal(opt.value)}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                            ptForm.preferredGoals.includes(opt.value)
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'
+                          }`}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-slate-600 mb-2 block">
+                      Chế độ ăn hỗ trợ
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {DIET_OPTIONS_KYC.map((opt) => (
+                        <button key={opt.value} type="button" onClick={() => togglePreferredDiet(opt.value)}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+                            ptForm.preferredDietTypes.includes(opt.value)
+                              ? 'bg-indigo-600 text-white border-indigo-600'
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400'
+                          }`}>
+                          {opt.label}
                         </button>
                       ))}
                     </div>

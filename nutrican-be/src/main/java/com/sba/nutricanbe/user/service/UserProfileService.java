@@ -27,5 +27,7 @@ public interface UserProfileService {
     ApiResponse<String> uploadCertImage(UUID userId, MultipartFile file);
 
     ApiResponse<String> uploadCv(UUID userId, MultipartFile file);
+
+    ApiResponse<PtProfileSummary> resubmitPt(UUID userId, PtRegistrationRequest request);
 }
 

@@ -21,8 +21,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Seeds / updates 10 ResNet50 dish entries for A1.1 hybrid Food DB matching.
- * Source column value: {@link ResNetFoodDefaults#SOURCE} (= {@code NUTRIHOME_PDF}).
+ * Seeds / updates ResNet manifest dish entries for A1.1 hybrid Food DB matching.
+ * VTN-10 + 100 VN dishes use NutriHome PDF; Food-101 uses nutrition.csv macros.
  */
 @Slf4j
 @Component

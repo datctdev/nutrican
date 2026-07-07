@@ -23,4 +23,12 @@ export const adminService = {
   getRblExportPreview: (params) => api.get('/admin/rbl/export/preview', { params }),
   downloadRblExport: (params) => api.get('/admin/rbl/export', { params, responseType: 'blob' }),
   getRblReport: (params) => api.get('/admin/rbl/report', { params, responseType: 'text' }),
+  getRefunds: () => api.get('/admin/refunds'),
+  reviewRefund: (id, data) => api.put(`/admin/refunds/${id}`, data),
+  getAllergenMappings: () => api.get('/admin/allergen-mappings'),
+  createAllergenMapping: (data) => api.post('/admin/allergen-mappings', data),
+  updateAllergenMapping: (id, data) => api.put(`/admin/allergen-mappings/${id}`, data),
+  deleteAllergenMapping: (id) => api.delete(`/admin/allergen-mappings/${id}`),
+  getFoodTags: () => api.get('/admin/food-tags'),
+  updateFoodTags: (foodCode, dietTags) => api.put(`/admin/food-tags/${foodCode}`, { dietTags }),
 };

@@ -674,7 +674,62 @@ export const EntityCard = ({ entity, onEdit, onDelete }) => {
 
 ## 5. Testing
 
-### 5.1 Backend Testing
+NutriCan v2 uses a **test pyramid** documented in [TESTING_E2E_MATRIX.md](./TESTING_E2E_MATRIX.md) and [TESTING_V2_FLOWS.md](./TESTING_V2_FLOWS.md).
+
+### 5.1 Backend (unit + integration)
+
+```powershell
+cd nutrican-be
+.\mvnw test
+```
+
+- **Unit tests:** `nutrican-be/src/test/java/**` (Mockito) — allergy, meal plan macro warning, appointment validation, refund policy, progress adherence.
+- **Integration tests:** `nutrican-be/src/test/java/com/sba/nutricanbe/integration/**` — MockMvc + H2 (`test` profile), mocked `MealRecognitionService` + `StorageService` + `RateLimitingService`.
+
+### 5.2 Playwright E2E (stub AI — CI default)
+
+**Prerequisites:** Docker (Postgres/Redis/MinIO), backend on `:8080`, optional stub AI (`ai.resnet.enabled=false` in BE).
+
+```powershell
+cd nutrican-be
+docker compose up -d
+.\mvnw spring-boot:run
+
+# terminal 2
+cd e2e
+npm install
+npx playwright install chromium
+$env:E2E_SKIP_WEBSERVER = "1"   # if FE already running
+npm run test:e2e
+```
+
+Playwright starts Vite (`nutrican-fe`) automatically unless `E2E_SKIP_WEBSERVER=1`.
+
+| Env | Purpose |
+|-----|---------|
+| `E2E_BASE_URL` | FE URL (default `http://localhost:5173`) |
+| `E2E_API_URL` | BE API (default `http://localhost:8080/api/v1`) |
+| `E2E_REAL_AI=1` | Enable `@smoke` real AI specs (requires `research/run-ai-service.bat`) |
+
+```powershell
+npm run test:e2e:smoke   # only @smoke tagged tests
+```
+
+Seed users: `customer1@gmail.com` / `123456`, `pt.certified@gmail.com` / `123456`, `admin@nutrican.com` / `Admin123!`
+
+### 5.3 Run all layers
+
+```powershell
+.\scripts\test-all.ps1
+```
+
+### 5.4 Frontend unit tests (optional)
+
+Vitest/RTL is not wired yet; prefer Playwright for UI flows.
+
+---
+
+## 5 (legacy examples). Backend / Frontend Testing Snippets
 
 ```java
 // src/test/java/com/sba/nutricanbe/newfeature/service/NewFeatureServiceTest.java

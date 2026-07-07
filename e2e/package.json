@@ -1,0 +1,16 @@
+{
+  "name": "nutrican-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:be": "playwright test -g BE-only",
+    "test:fe": "playwright test -g FE-only",
+    "test:hybrid": "playwright test -g Hybrid",
+    "test:e2e:smoke": "playwright test --grep @smoke",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

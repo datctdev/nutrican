@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public interface FoodCatalogService {
 
-    List<FoodItemResponse> search(String query, String category);
+    List<FoodItemResponse> search(String query, String category, boolean dietFilter, UUID userId);
 
     FoodItemResponse getById(UUID id);
 

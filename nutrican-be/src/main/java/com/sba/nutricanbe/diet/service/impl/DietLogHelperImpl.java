@@ -10,6 +10,7 @@ import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.diet.enums.DietLogItemSource;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
@@ -23,6 +24,7 @@ import com.sba.nutricanbe.diet.dto.DietLogItemResponse;
 import com.sba.nutricanbe.diet.dto.DietLogResponse;
 import com.sba.nutricanbe.diet.dto.FoodItemResponse;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
+import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import com.sba.nutricanbe.user.service.UserQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,6 +50,7 @@ public class DietLogHelperImpl implements DietLogHelper {
     private final FoodCatalogService foodCatalogService;
     private final ApplicationEventPublisher eventPublisher;
     private final UserQueryService userQueryService;
+    private final StorageService minioService;
 
     @Value("${ai.recognition.confidence-threshold:0.25}")
     private BigDecimal confidenceThreshold;
@@ -127,7 +130,7 @@ public class DietLogHelperImpl implements DietLogHelper {
 
     @Override
     public void assignPtReviewerIfNeeded(DietLog dietLog, UUID customerId) {
-        if (dietLog.getStatus() != DietLogStatus.PT_REVIEWING) return;
+        if (dietLog.getReviewStatus() != DietLogReviewStatus.PENDING) return;
         findActivePt(customerId).ifPresent(mapping -> dietLog.setPtReviewerId(mapping.getPt().getId()));
     }
 
@@ -141,7 +144,7 @@ public class DietLogHelperImpl implements DietLogHelper {
 
     @Override
     public void notifyPtOfNewLog(DietLog dietLog) {
-        if (dietLog.getStatus() != DietLogStatus.PT_REVIEWING) return;
+        if (dietLog.getReviewStatus() != DietLogReviewStatus.PENDING) return;
         UUID ptId = dietLog.getPtReviewerId();
         if (ptId == null) {
             ptId = findActivePt(dietLog.getCustomerId()).map(m -> m.getPt().getId()).orElse(null);
@@ -187,7 +190,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                     .map(img -> DietLogImageDto.builder()
                             .id(img.getId())
                             .dietLogId(dietLog.getId())
-                            .imageUrl(img.getImageUrl())
+                            .imageUrl(resolveImageUrl(img.getImageObjectName(), img.getImageUrl()))
                             .imageObjectName(img.getImageObjectName())
                             .isPrimary(img.getIsPrimary())
                             .sortOrder(img.getSortOrder())
@@ -232,11 +235,12 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .id(dietLog.getId())
                 .customerId(dietLog.getCustomerId())
                 .customerName(customerName)
-                .imageUrl(dietLog.getImageUrl())
+                .imageUrl(resolveImageUrl(dietLog.getImageObjectName(), dietLog.getImageUrl()))
                 .aiConfidenceScore(dietLog.getAiConfidenceScore())
                 .macrosJson(dietLog.getMacrosJson())
                 .mealType(dietLog.getMealType())
                 .status(dietLog.getStatus())
+                .reviewStatus(dietLog.getReviewStatus())
                 .foodDescription(dietLog.getFoodDescription())
                 .matchedFoodName(dietLog.getMatchedFoodName())
                 .aiFoodCode(aiFoodCode)
@@ -256,12 +260,21 @@ public class DietLogHelperImpl implements DietLogHelper {
                         dietLog.getMealSource() != null ? dietLog.getMealSource() : MealSource.HOME_COOKED,
                         MealRecognitionResult.builder()
                                 .confidenceScore(dietLog.getAiConfidenceScore())
-                                .fallback(dietLog.getStatus() == DietLogStatus.DRAFT)
+                                .fallback(dietLog.getStatus() == DietLogStatus.DRAFT
+                                        || dietLog.getStatus() == DietLogStatus.MANUAL_REQUIRED)
                                 .build(),
                         dietLog.getFoodItemId() != null))
                 .suggestedFoodMatches(suggestedMatches)
                 .items(items)
                 .build();
+    }
+
+    /** Presigned URLs expire; regenerate from durable object name on each read. */
+    private String resolveImageUrl(String objectName, String storedUrl) {
+        if (objectName != null && !objectName.isBlank()) {
+            return minioService.getPresignedUrl(objectName);
+        }
+        return storedUrl;
     }
 }
 

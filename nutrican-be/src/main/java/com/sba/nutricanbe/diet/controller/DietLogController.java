@@ -15,9 +15,11 @@ import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.common.util.MultipartUtils;
 
 import com.sba.nutricanbe.diet.dto.*;
+import com.sba.nutricanbe.diet.entity.DietLogFeedback;
 
 import com.sba.nutricanbe.diet.service.DietLogImageService;
 
+import com.sba.nutricanbe.diet.service.DietLogFeedbackService;
 import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.diet.service.MealAnalysisService;
 import com.sba.nutricanbe.diet.service.SosService;
@@ -68,6 +70,7 @@ public class DietLogController {
     private final DietLogImageService dietLogImageService;
     private final MealAnalysisService mealAnalysisService;
     private final SosService sosService;
+    private final DietLogFeedbackService dietLogFeedbackService;
 
 
 
@@ -207,6 +210,22 @@ public class DietLogController {
 
         return ResponseEntity.ok(dietLogService.submitForReview(id, user.getId()));
 
+    }
+
+    @PutMapping("/logs/{id}/review-request")
+    public ResponseEntity<ApiResponse<DietLogResponse>> reviewRequest(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(dietLogService.submitForReview(id, user.getId()));
+    }
+
+    @PutMapping("/logs/{id}/feedback")
+    public ResponseEntity<ApiResponse<DietLogFeedback>> saveFeedback(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
+            @RequestBody DietLogFeedbackRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                dietLogFeedbackService.saveFeedback(user.getId(), id, request), "Feedback saved"));
     }
 
 

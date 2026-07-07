@@ -23,6 +23,10 @@ export const useNotificationStore = create((set) => ({
     unreadCount: 0,
   })),
 
+  setNotifications: (notifications) => set({ notifications }),
+
+  setUnreadCount: (unreadCount) => set({ unreadCount }),
+
   setSseConnection: (conn) => set({ sseConnection: conn }),
   clearNotifications: () => set({ notifications: [], unreadCount: 0 }),
 }));

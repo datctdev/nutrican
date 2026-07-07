@@ -36,4 +36,6 @@ public class AnalyzeMealResponse {
     private String macroSource;
     private String llavaFoodName;
     private BigDecimal estimatedTotalGrams;
+    private Boolean manualRequired;
+    private String gateResult;
 }

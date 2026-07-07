@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.common.enums.UserStatus;
 import com.sba.nutricanbe.user.dto.CertificationData;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtProfile;
@@ -69,19 +70,7 @@ public class UserProfileServiceImpl implements UserProfileService {
         }
 
         // Map certifications from request DTOs to entity data objects
-        List<CertificationData> certDataList = null;
-        if (request.getCertifications() != null && !request.getCertifications().isEmpty()) {
-            certDataList = request.getCertifications().stream()
-                    .map(c -> CertificationData.builder()
-                            .name(c.getName())
-                            .issuingOrganization(c.getIssuingOrganization())
-                            .issueDate(c.getIssueDate())
-                            .expiryDate(c.getExpiryDate())
-                            .neverExpires(Boolean.TRUE.equals(c.getNeverExpires()))
-                            .certificateImageUrl(c.getCertificateImageUrl())
-                            .build())
-                    .toList();
-        }
+        List<CertificationData> certDataList = mapCerts(request);
 
         if ("CERTIFIED".equalsIgnoreCase(request.getPreferredTrack())) {
             if (certDataList == null || certDataList.isEmpty()) {
@@ -102,6 +91,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .specializations(request.getSpecializations())
                 .certifications(certDataList)
                 .hourlyRate(request.getHourlyRate())
+                .gender(request.getGender())
                 .cvUrl(request.getCvUrl())
                 .instagramUrl(request.getInstagramUrl())
                 .linkedinUrl(request.getLinkedinUrl())
@@ -112,6 +102,74 @@ public class UserProfileServiceImpl implements UserProfileService {
         log.info("PT profile created for user: {}", userId);
 
         return ApiResponse.success(toPtProfileSummary(ptProfile), "PT registration submitted successfully");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<PtProfileSummary> resubmitPt(UUID userId, PtRegistrationRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+        PtProfile profile = ptProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new BadRequestException("No PT profile to resubmit"));
+        if (profile.getPtRequestStatus() != UserStatus.SUSPENDED) {
+            throw new BadRequestException("Only rejected profiles can be resubmitted");
+        }
+        boolean requireKyc = systemSettingRepository.findById("REQUIRE_KYC_FOR_PT")
+                .map(s -> Boolean.parseBoolean(s.getValue())).orElse(true);
+        if (requireKyc && !Boolean.TRUE.equals(user.getIsKycVerified())) {
+            throw new BadRequestException("KYC required before resubmit");
+        }
+        List<CertificationData> certDataList = mapCerts(request);
+        if ("CERTIFIED".equalsIgnoreCase(request.getPreferredTrack())
+                && (certDataList == null || certDataList.isEmpty())) {
+            throw new BadRequestException("CERTIFIED requires at least one certificate");
+        }
+        applyPtFields(profile, request, certDataList);
+        profile.setPtRequestStatus(UserStatus.PENDING_APPROVAL);
+        profile.setVerificationStatus(UserStatus.PENDING_APPROVAL);
+        profile.setAdminRejectNote(null);
+        profile = ptProfileRepository.save(profile);
+        return ApiResponse.success(toPtProfileSummary(profile), "PT profile resubmitted");
+    }
+
+    private List<CertificationData> mapCerts(PtRegistrationRequest request) {
+        if (request.getCertifications() == null || request.getCertifications().isEmpty()) {
+            return null;
+        }
+        return request.getCertifications().stream()
+                .map(c -> CertificationData.builder()
+                        .name(c.getName())
+                        .issuingOrganization(c.getIssuingOrganization())
+                        .issueDate(c.getIssueDate())
+                        .expiryDate(c.getExpiryDate())
+                        .neverExpires(Boolean.TRUE.equals(c.getNeverExpires()))
+                        .certificateImageUrl(c.getCertificateImageUrl())
+                        .build())
+                .toList();
+    }
+
+    private void applyPtFields(PtProfile profile, PtRegistrationRequest request, List<CertificationData> certs) {
+        profile.setPreferredTrack(request.getPreferredTrack());
+        profile.setBio(request.getBio());
+        profile.setTrainingPhilosophy(request.getTrainingPhilosophy());
+        profile.setExperienceStartDate(request.getExperienceStartDate());
+        profile.setContactPhone(request.getContactPhone());
+        profile.setTrainingMode(request.getTrainingMode());
+        profile.setLocation(request.getLocation());
+        profile.setRateUnit(request.getRateUnit());
+        profile.setSpecializations(request.getSpecializations());
+        profile.setCertifications(certs);
+        profile.setHourlyRate(request.getHourlyRate());
+        profile.setGender(request.getGender());
+        profile.setCvUrl(request.getCvUrl());
+        profile.setInstagramUrl(request.getInstagramUrl());
+        profile.setLinkedinUrl(request.getLinkedinUrl());
+        if (request.getPreferredGoals() != null) {
+            profile.setPreferredGoals(request.getPreferredGoals());
+        }
+        if (request.getPreferredDietTypes() != null) {
+            profile.setPreferredDietTypes(request.getPreferredDietTypes());
+        }
     }
 
     @Override
@@ -257,6 +315,11 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .status(user.getStatus().name())
                 .isKycVerified(user.getIsKycVerified())
                 .ptProfile(ptProfileSummary)
+                .allergens(user.getAllergens())
+                .dietPreference(user.getDietPreference())
+                .nutritionGoal(user.getNutritionGoal())
+                .pregnancyTrimester(user.getPregnancyTrimester())
+                .notificationOptIn(user.getNotificationOptIn())
                 .createdAt(user.getCreatedAt())
                 .build();
     }
@@ -283,6 +346,8 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .cvUrl(ptProfile.getCvUrl())
                 .instagramUrl(ptProfile.getInstagramUrl())
                 .linkedinUrl(ptProfile.getLinkedinUrl())
+                .gender(ptProfile.getGender() != null ? ptProfile.getGender().name() : null)
+                .adminRejectNote(ptProfile.getAdminRejectNote())
                 .ptRequestStatus(ptProfile.getPtRequestStatus() != null ? ptProfile.getPtRequestStatus().name() : null)
                 .verificationStatus(ptProfile.getVerificationStatus() != null ? ptProfile.getVerificationStatus().name() : null)
                 .build();

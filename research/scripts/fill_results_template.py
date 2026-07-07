@@ -15,7 +15,8 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from rbl_analyze import LABELED_ACTIONS, labeled, load_csv, mae_series, rmse_series  # noqa: E402
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from repo_paths import OUTPUT_RBL, REPO_ROOT
+
 TEMPLATE = REPO_ROOT / "docs" / "research" / "RESULTS_TEMPLATE.md"
 
 
@@ -121,19 +122,24 @@ def fill_template(df: pd.DataFrame) -> str:
 
     text = TEMPLATE.read_text(encoding="utf-8")
     today = pd.Timestamp.now().strftime("%Y-%m-%d")
-    text = text.replace("*Template v1.0*", f"*Filled {today} — n={n} labeled*")
+    text = re.sub(
+        r"\*Template v[\d.]+.*?\*",
+        f"*Filled {today} — n={n} labeled*",
+        text,
+        count=1,
+    )
 
     table1_rows = [
-        "| Model | Role | MAE (kcal) | MAE% | RMSE (kcal) | Paper 1 ref |",
-        "|-------|------|------------|------|-------------|-------------|",
-        f"| **A1.0** | VLM direct | {fmt(mae_ai)} | {fmt(mae_pct)}% | {fmt(rmse_ai)} | Tcalorie 394.5 / 49.9% |",
-        f"| **A1.1** | Hybrid CV→DB | {fmt(mae_db)} | — | {fmt(rmse_db)} | Tupc 279.4 / 37.5% |",
-        f"| **ΔA** | A1.0 − A1.1 | {fmt(delta_a)} | — | — | ≈115 kcal |",
+        "| Model | Role | MAE (kcal) | MAE% | RMSE (kcal) | F1 (food) |",
+        "|-------|------|------------|------|-------------|-----------|",
+        f"| **A1.0** | ResNet + macro cố định | {fmt(mae_ai)} | {fmt(mae_pct)}% | {fmt(rmse_ai)} | _offline_ |",
+        f"| **A1.1** | ResNet + NutriHome grounding | {fmt(mae_db)} | — | {fmt(rmse_db)} | _offline_ |",
+        f"| **ΔA** | GAP (A1.0 − A1.1) | {fmt(delta_a)} | — | — | — |",
     ]
     table1 = "\n".join(table1_rows)
 
     text = re.sub(
-        r"\| Model \| Role \| MAE \(kcal\) \| MAE% \| RMSE \(kcal\) \| Paper 1 ref \|\n"
+        r"\| Model \| Role \| MAE \(kcal\) \| MAE% \| RMSE \(kcal\) \| F1 \(food\) \|\n"
         r"\|[-| ]+\|\n"
         r"\| \*\*A1\.0\*\*.*?\n"
         r"\| \*\*A1\.1\*\*.*?\n"
@@ -188,8 +194,8 @@ def main() -> int:
         "-o",
         "--output",
         type=Path,
-        default=REPO_ROOT / "research" / "output" / "RESULTS_FILLED.md",
-        help="Output path (default: research/output/RESULTS_FILLED.md)",
+        default=OUTPUT_RBL / "RESULTS_FILLED.md",
+        help="Output path (default: research/output/rbl/RESULTS_FILLED.md)",
     )
     args = parser.parse_args()
     if not args.csv.exists():

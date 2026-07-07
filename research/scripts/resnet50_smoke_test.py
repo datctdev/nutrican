@@ -17,7 +17,8 @@ from research_api import ResearchClient, git_commit_short  # noqa: E402
 AI_BASE = "http://localhost:8000"
 DATASET = DEFAULT_DATASET
 G0_DOC = REPO_ROOT / "docs" / "research" / "G0_VERIFICATION.md"
-EXPECTED_MODEL = "resnet50-vtn-10class"
+EXPECTED_MODEL = "resnet50-unified-vtn-food101"
+EXPECTED_CLASSES = 199
 
 CLASS_SAMPLES = [
     "pho",
@@ -33,7 +34,10 @@ def check_fastapi() -> tuple[bool, str]:
         body = r.json()
         if not body.get("model_loaded"):
             return False, "model not loaded"
-        return True, "FastAPI health OK"
+        nc = body.get("num_classes")
+        if nc != EXPECTED_CLASSES:
+            return False, f"expected {EXPECTED_CLASSES} classes, got {nc}"
+        return True, f"FastAPI health OK ({nc} classes, profile={body.get('class_profile')})"
     except requests.RequestException as e:
         return False, f"FastAPI unreachable: {e}"
 

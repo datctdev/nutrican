@@ -77,6 +77,7 @@ public class AuthServiceImpl implements AuthService {
                 .role(UserRole.CUSTOMER)
                 .status(UserStatus.ACTIVE)
                 .passwordSetRequired(false)
+                .onboardingStep(1)
                 .build();
 
         user = userRepository.save(user);

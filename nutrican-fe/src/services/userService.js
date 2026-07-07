@@ -8,6 +8,12 @@ export const userService = {
   setMacroTarget: (data) => api.put('/profile/macro-target', data),
   getUserById: (userId) => api.get(`/profile/${userId}`),
   registerAsPt: (data) => api.post('/profile/pt/register', data),
+  resubmitPt: (data) => api.put('/profile/pt/resubmit', data),
+  getAllergies: () => api.get('/profile/allergies'),
+  updateAllergies: (allergens) => api.put('/profile/allergies', { allergens }),
+  updatePreferences: (data) => api.put('/profile/preferences', data),
+  setMaxClients: (maxClients) => api.put('/profile/pt/max-clients', { maxClients }),
+  getMacroSuggestion: (params) => api.get('/profile/macro-suggestion', { params }),
   uploadCv: (file) => {
     const formData = new FormData();
     formData.append('file', file);

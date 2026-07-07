@@ -38,6 +38,8 @@ public class PendingPtDto {
     private String cvUrl;
     private String instagramUrl;
     private String linkedinUrl;
+    private String gender;
+    private String adminRejectNote;
     private String documentUrls;
     private String verificationStatus;
     private LocalDateTime createdAt;

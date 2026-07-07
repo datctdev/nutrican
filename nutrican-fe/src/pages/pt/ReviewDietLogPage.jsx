@@ -1,17 +1,19 @@
 // src/pages/pt/ReviewDietLogPage.jsx
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import {
     CheckCircle2, XCircle, SlidersHorizontal, Clock,
     Image as ImageIcon, AlertTriangle, RefreshCw,
-    Flame, Target, Activity, EyeOff, Eye
+    Flame, Target, Activity, EyeOff, Eye, MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { workspaceService } from '../../services/workspaceService';
 
 export default function ReviewDietLogPage() {
+    const navigate = useNavigate();
     const [logs, setLogs] = useState([]);
     const [sosTickets, setSosTickets] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -139,7 +141,7 @@ export default function ReviewDietLogPage() {
     const handleResolveSos = async (ticketId) => {
         try {
             setResolvingId(ticketId);
-            await workspaceService.resolveSosTicket(ticketId, { note: resolveNotes[ticketId] || '' });
+            await workspaceService.resolveSosTicket(ticketId, { resolutionNote: resolveNotes[ticketId] || '' });
             toast.success('Đã giải quyết yêu cầu SOS');
             setResolveNotes((prev) => ({ ...prev, [ticketId]: '' }));
             fetchSosTickets();
@@ -271,7 +273,9 @@ export default function ReviewDietLogPage() {
                     </div>
                 ) : (
                     <div className="grid md:grid-cols-2 gap-4">
-                        {sosTickets.filter(t => t.status !== 'RESOLVED').map(ticket => (
+                        {sosTickets.filter(t => t.status !== 'RESOLVED').map(ticket => {
+                            const linkedLog = logs.find((l) => l.id === ticket.dietLogId);
+                            return (
                             <div key={ticket.id} className="bg-white border border-red-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start gap-3 mb-4">
                                     <div>
@@ -291,6 +295,25 @@ export default function ReviewDietLogPage() {
                                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-3">
                                     <p className="text-sm font-medium text-slate-700 italic">"{ticket.note}"</p>
                                 </div>
+                                {linkedLog && (
+                                    <div className="mb-3 p-3 rounded-xl border border-blue-100 bg-blue-50/50 text-xs text-slate-700">
+                                        <p className="font-bold text-blue-800 mb-1">Nhật ký liên quan</p>
+                                        <p>{linkedLog.foodDescription || 'Bữa ăn'} · {linkedLog.mealType} · {linkedLog.logDate}</p>
+                                        <p className="mt-1">~{linkedLog.macrosJson?.calories || linkedLog.aiPredictedMacros?.calories || 0} kcal</p>
+                                    </div>
+                                )}
+                                {ticket.dietLogId && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mb-3 w-full rounded-xl text-xs"
+                                        onClick={() => navigate(`/pt/chat?contextLogId=${ticket.dietLogId}`, {
+                                            state: { targetClientId: linkedLog?.customerId },
+                                        })}
+                                    >
+                                        <MessageSquare className="w-3.5 h-3.5 mr-1.5" /> Hỏi qua chat
+                                    </Button>
+                                )}
                                 <input
                                     type="text"
                                     placeholder="Nhập ghi chú phản hồi cho học viên..."
@@ -299,7 +322,7 @@ export default function ReviewDietLogPage() {
                                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-red-400 focus:bg-white transition-colors"
                                 />
                             </div>
-                        ))}
+                        );})}
                     </div>
                 )}
             </div>
@@ -484,6 +507,16 @@ export default function ReviewDietLogPage() {
                                     {/* THANH HÀNH ĐỘNG CHÍNH */}
                                     {!adjustingLog && (
                                         <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-3 mt-6 pt-6 border-t border-slate-100">
+
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => navigate(`/pt/chat?contextLogId=${log.id}`, {
+                                                    state: { targetClientId: log.customerId },
+                                                })}
+                                                className="w-full sm:w-auto text-slate-700 border-slate-200 hover:bg-slate-50 rounded-xl h-11 px-4 font-bold"
+                                            >
+                                                <MessageSquare className="w-4 h-4 mr-2" /> Hỏi qua chat
+                                            </Button>
 
                                             <div className="flex w-full sm:w-auto items-center gap-2">
                                                 <select

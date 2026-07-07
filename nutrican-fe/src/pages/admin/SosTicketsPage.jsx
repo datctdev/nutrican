@@ -65,9 +65,22 @@ export default function SosTicketsPage() {
     switch (s) {
       case 'OPEN': return { color: 'bg-red-100 text-red-700 border-red-200', label: 'Đang mở', icon: AlertTriangle };
       case 'ASSIGNED': return { color: 'bg-amber-100 text-amber-700 border-amber-200', label: 'Đã phân công', icon: Clock };
+      case 'IN_PROGRESS': return { color: 'bg-orange-100 text-orange-700 border-orange-200', label: 'Đang xử lý', icon: Clock };
       case 'RESOLVED': return { color: 'bg-emerald-100 text-emerald-700 border-emerald-200', label: 'Đã giải quyết', icon: CheckCircle2 };
       default: return { color: 'bg-slate-100 text-slate-600 border-slate-200', label: s || 'Nháp', icon: FileText };
     }
+  };
+
+  const slaCountdown = (ticket) => {
+    const base = ticket.assignedAt || ticket.createdAt;
+    if (!base || ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') return null;
+    const deadline = new Date(base);
+    deadline.setHours(deadline.getHours() + 24);
+    const ms = deadline.getTime() - Date.now();
+    if (ms <= 0 || ticket.slaBreached) return { text: 'Quá hạn 24h', breached: true };
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    return { text: `${h}h ${m}m còn lại`, breached: false };
   };
 
   const formatDate = (dateString) => dateString ? new Date(dateString).toLocaleString('vi-VN') : 'Không có';
@@ -81,7 +94,7 @@ export default function SosTicketsPage() {
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
-          {[{val: '', label:'Tất cả'}, {val:'OPEN', label:'Mở'}, {val:'ASSIGNED', label:'Đã giao'}, {val:'RESOLVED', label:'Đã giải quyết'}].map(s => (
+          {[{val: '', label:'Tất cả'}, {val:'OPEN', label:'Mở'}, {val:'ASSIGNED', label:'Đã giao'}, {val:'SLA_BREACHED', label:'Quá hạn 24h'}, {val:'RESOLVED', label:'Đã giải quyết'}].map(s => (
             <button
               key={s.val}
               onClick={() => { setStatus(s.val); setPage(0); }}
@@ -108,9 +121,10 @@ export default function SosTicketsPage() {
           {tickets.map((ticket) => {
             const config = getStatusConfig(ticket.status);
             const Icon = config.icon;
+            const sla = slaCountdown(ticket);
 
             return (
-              <Card key={ticket.id} className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
+              <Card key={ticket.id} className={`bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow group ${ticket.slaBreached ? 'ring-2 ring-red-200' : ''}`}>
                 <CardContent className="p-6">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex-1">
@@ -119,6 +133,14 @@ export default function SosTicketsPage() {
                           <Icon className="w-3.5 h-3.5" /> {config.label}
                         </span>
                         <span className="text-xs font-bold text-slate-400">YÊU CẦU #{ticket.id?.slice(0, 8)}</span>
+                        {ticket.slaBreached && (
+                          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-red-600 text-white">SLA breached</span>
+                        )}
+                        {sla && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${sla.breached ? 'bg-red-100 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                            {sla.text}
+                          </span>
+                        )}
                         <span className="text-xs font-medium text-slate-400 flex items-center"><Clock className="w-3 h-3 mr-1"/> {formatDate(ticket.createdAt)}</span>
                       </div>
 
@@ -137,7 +159,7 @@ export default function SosTicketsPage() {
                       </div>
                     </div>
 
-                    {ticket.status === 'OPEN' && (
+                    {(ticket.status === 'OPEN' || (ticket.slaBreached && ['ASSIGNED', 'IN_PROGRESS'].includes(ticket.status))) && (
                       <div className="border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[220px]">
                         {assigningId === ticket.id ? (
                           <div className="space-y-2">
@@ -158,7 +180,7 @@ export default function SosTicketsPage() {
                           </div>
                         ) : (
                           <Button onClick={() => setAssigningId(ticket.id)} className="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-12 shadow-sm">
-                            Giao Huấn Luyện Viên <ArrowRight className="w-4 h-4 ml-2" />
+                            {ticket.slaBreached ? 'Giao lại PT' : 'Giao Huấn Luyện Viên'} <ArrowRight className="w-4 h-4 ml-2" />
                           </Button>
                         )}
                       </div>

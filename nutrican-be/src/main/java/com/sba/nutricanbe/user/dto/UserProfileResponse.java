@@ -6,7 +6,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import com.sba.nutricanbe.user.enums.DietPreference;
+import com.sba.nutricanbe.user.enums.NutritionGoal;
+import com.sba.nutricanbe.diet.enums.AllergenType;
 
 @Data
 @Builder
@@ -25,4 +30,9 @@ public class UserProfileResponse {
     private LocalDateTime createdAt;
     private Boolean isKycVerified;
     private PtProfileSummary ptProfile;
+    private List<AllergenType> allergens;
+    private DietPreference dietPreference;
+    private NutritionGoal nutritionGoal;
+    private Integer pregnancyTrimester;
+    private Map<String, Boolean> notificationOptIn;
 }

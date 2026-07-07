@@ -8,6 +8,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -25,15 +26,24 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final RateLimitingService rateLimitingService;
     private final ObjectMapper objectMapper;
 
+    @Value("${nutrican.rate-limit.enabled:true}")
+    private boolean enabled;
+
+    @Value("${nutrican.rate-limit.global-per-minute:100}")
+    private int globalPerMinute;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        
+        if (!enabled || isLoopback(getClientIp(request))) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String ip = getClientIp(request);
         String rateLimitKey = "rl:global:" + ip;
 
-        // Global limit: 100 requests per minute per IP
-        if (!rateLimitingService.tryConsume(rateLimitKey, 100, Duration.ofMinutes(1))) {
+        if (!rateLimitingService.tryConsume(rateLimitKey, globalPerMinute, Duration.ofMinutes(1))) {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json;charset=UTF-8");
             
@@ -51,6 +61,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return request.getRemoteAddr();
         }
         return xfHeader.split(",")[0];
+    }
+
+    private static boolean isLoopback(String ip) {
+        return "127.0.0.1".equals(ip)
+                || "0:0:0:0:0:0:0:1".equals(ip)
+                || "::1".equals(ip);
     }
 }
 

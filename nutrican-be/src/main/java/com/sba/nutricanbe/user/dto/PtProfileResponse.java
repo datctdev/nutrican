@@ -30,6 +30,13 @@ public class PtProfileResponse {
     private String tier;
     private BigDecimal hourlyRate;
     private String mappingStatus;
+    private Integer maxClients;
+    private Long activeClientCount;
+    private Boolean slotsAvailable;
+    private List<String> preferredGoals;
+    private List<String> preferredDietTypes;
+    private Boolean goalMatch;
+    private Boolean dietMatch;
 
     public static PtProfileResponse toPtProfileResponse(PtProfile profile) {
         User user = profile.getUser();
@@ -48,6 +55,9 @@ public class PtProfileResponse {
                 .totalReviews(profile.getTotalReviews())
                 .tier(profile.getTier().name())
                 .hourlyRate(profile.getHourlyRate())
+                .maxClients(profile.getMaxClients())
+                .preferredGoals(profile.getPreferredGoals())
+                .preferredDietTypes(profile.getPreferredDietTypes())
                 .build();
     }
 }

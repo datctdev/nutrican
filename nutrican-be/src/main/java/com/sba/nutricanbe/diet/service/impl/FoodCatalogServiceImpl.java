@@ -6,7 +6,11 @@ import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.dto.FoodItemResponse;
+import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
+import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.DietPreference;
+import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,26 +31,58 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
     private static final String HOTPOT_ITEM = "HOTPOT_ITEM";
 
     private final FoodItemRepository foodItemRepository;
+    private final DietPrefCheckService dietPrefCheckService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
-    public List<FoodItemResponse> search(String query, String category) {
-        List<FoodItem> results;
+    public List<FoodItemResponse> search(String query, String category, boolean dietFilter, UUID userId) {
+        DietPreference preference = resolvePreference(userId);
+        boolean applyFilter = dietFilter && preference != null && preference != DietPreference.NORMAL;
+
+        List<FoodItemResponse> results;
         if (query == null || query.isBlank()) {
-            results = category != null
+            List<FoodItem> items = category != null
                     ? foodItemRepository.findByCategoryOrderByNameViAsc(category)
                     : foodItemRepository.findAll();
+            results = items.stream().map(this::toResponse).collect(Collectors.toList());
         } else {
             String normalizedQuery = normalize(query);
-            results = foodItemRepository.searchByName(query.trim());
-            results = results.stream()
+            List<FoodItem> items = foodItemRepository.searchByName(query.trim());
+            results = items.stream()
                     .filter(f -> category == null || category.equals(f.getCategory()))
                     .filter(f -> matchesQuery(f, normalizedQuery))
                     .sorted(Comparator.comparing(FoodItem::getNameVi))
                     .limit(20)
+                    .map(this::toResponse)
                     .collect(Collectors.toList());
         }
-        return results.stream().map(this::toResponse).collect(Collectors.toList());
+        if (applyFilter) {
+            DietPreference pref = preference;
+            results = results.stream()
+                    .filter(r -> dietPrefCheckService.matchesPreference(pref, r.getDietTags()))
+                    .collect(Collectors.toList());
+        }
+        if (preference != null && preference != DietPreference.NORMAL) {
+            DietPreference pref = preference;
+            results = results.stream()
+                    .map(r -> {
+                        boolean mismatch = !dietPrefCheckService.matchesPreference(pref, r.getDietTags());
+                        r.setPrefMismatch(mismatch);
+                        return r;
+                    })
+                    .collect(Collectors.toList());
+        }
+        return results;
+    }
+
+    private DietPreference resolvePreference(UUID userId) {
+        if (userId == null) {
+            return DietPreference.NORMAL;
+        }
+        return userRepository.findById(userId)
+                .map(User::getDietPreference)
+                .orElse(DietPreference.NORMAL);
     }
 
     @Override
@@ -204,6 +240,7 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
                 .carb(item.getCarb())
                 .fat(item.getFat())
                 .matchScore(matchScore)
+                .dietTags(item.getDietTags())
                 .build();
     }
 }

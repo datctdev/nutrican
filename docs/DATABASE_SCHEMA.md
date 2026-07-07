@@ -617,17 +617,23 @@ CREATE TYPE meal_type AS ENUM ('BREAKFAST', 'LUNCH', 'DINNER', 'SNACK');
 ### 4.4 DietLogStatus
 
 ```sql
-CREATE TYPE diet_log_status AS ENUM ('PENDING_AI', 'DRAFT', 'LOGGED', 'PT_REVIEWING', 'APPROVED', 'REJECTED');
+CREATE TYPE diet_log_status AS ENUM (
+  'PENDING_AI', 'DRAFT', 'MANUAL_REQUIRED', 'LOGGED',
+  'PT_REVIEWING', 'APPROVED', 'REJECTED'  -- legacy v2, deprecated
+);
 ```
 
 | Value | Description |
 |-------|-------------|
 | PENDING_AI | Awaiting AI analysis |
 | DRAFT | Draft entry (low AI confidence) |
-| LOGGED | Manually logged |
-| PT_REVIEWING | Pending PT review |
-| APPROVED | Approved by PT |
-| REJECTED | Rejected by PT |
+| MANUAL_REQUIRED | Needs manual input |
+| LOGGED | Confirmed / manually logged (canonical runtime) |
+| PT_REVIEWING | **Deprecated** — use `review_status` instead |
+| APPROVED | **Deprecated** — use `review_status` instead |
+| REJECTED | **Deprecated** — use `review_status` instead |
+
+**v3 dual-state:** `status` ∈ {DRAFT, MANUAL_REQUIRED, LOGGED}; PT review on `review_status` ∈ {NOT_REQUIRED, PENDING, APPROVED, REJECTED}.
 
 ### 4.5 ClientMappingStatus
 
@@ -774,6 +780,21 @@ VALUES (
     CURRENT_TIMESTAMP
 );
 ```
+
+---
+
+## 8.1 v3 tables (P1+P2, 2026-07-06)
+
+| Table | Purpose |
+|-------|---------|
+| `client_goals` | Nutrition goal, target/baseline weight, target date |
+| `client_goal_milestones` | Auto/manual milestone badges |
+| `user_recipes` / `user_recipe_ingredients` | Saved HOME_COOKED recipes |
+| `meal_plan_suggestions` | Customer replacement requests (PENDING/APPROVED/REJECTED) |
+| `weekly_summaries` | PT weekly client summary |
+| `diet_log_feedback` | Post-meal energy/hunger/digestion ratings |
+
+**diet_logs** additions: `experiment_cohort_key` (RBL diet pref dimension snapshot).
 
 ---
 

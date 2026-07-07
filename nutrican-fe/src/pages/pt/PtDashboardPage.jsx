@@ -1,13 +1,18 @@
 // src/pages/pt/PtDashboardPage.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
 import { Users, Clock, AlertTriangle } from 'lucide-react';
 import { workspaceService } from '../../services/workspaceService';
+import { userService } from '../../services/userService';
 import { useAuthStore } from '../../stores/authStore';
+import { toast } from 'sonner';
 
 export default function PtDashboardPage() {
     const { user } = useAuthStore();
     const [stats, setStats] = useState(null);
+    const [maxClients, setMaxClients] = useState(10);
+    const [savingMax, setSavingMax] = useState(false);
 
     const fetchData = useCallback(async () => {
         try {
@@ -21,6 +26,11 @@ export default function PtDashboardPage() {
     useEffect(() => {
         const init = async () => {
             await fetchData();
+            try {
+                const res = await userService.getProfile();
+                const max = res.data?.data?.maxClients;
+                if (max) setMaxClients(max);
+            } catch { /* ignore */ }
         };
         init();
 
@@ -34,6 +44,23 @@ export default function PtDashboardPage() {
             window.removeEventListener('realtime_update', handleRealtimeUpdate);
         };
     }, [fetchData]);
+
+    const handleSaveMaxClients = async () => {
+        const value = Number(maxClients);
+        if (value < 1 || value > 20) {
+            toast.error('Số học viên tối đa phải từ 1 đến 20');
+            return;
+        }
+        setSavingMax(true);
+        try {
+            await userService.setMaxClients(value);
+            toast.success('Đã cập nhật số học viên tối đa');
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Không thể lưu');
+        } finally {
+            setSavingMax(false);
+        }
+    };
 
     const statCards = [
         { label: 'Tổng học viên', value: stats?.totalClients || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -59,6 +86,26 @@ export default function PtDashboardPage() {
                     </Card>
                 ))}
             </div>
+
+            <Card className="bg-white border-slate-200 shadow-sm rounded-3xl max-w-md">
+                <CardContent className="p-6 space-y-3">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Giới hạn học viên</p>
+                    <p className="text-sm text-slate-600">Số client ACTIVE tối đa bạn chấp nhận (1–20).</p>
+                    <div className="flex gap-3">
+                        <input
+                            type="number"
+                            min={1}
+                            max={20}
+                            value={maxClients}
+                            onChange={(e) => setMaxClients(e.target.value)}
+                            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        />
+                        <Button onClick={handleSaveMaxClients} disabled={savingMax} className="rounded-xl">
+                            Lưu
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

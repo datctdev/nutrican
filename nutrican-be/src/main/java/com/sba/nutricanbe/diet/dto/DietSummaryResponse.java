@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.diet.dto;
 
+import com.sba.nutricanbe.diet.enums.IntakeStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,4 +24,6 @@ public class DietSummaryResponse {
     private BigDecimal targetCarb;
     private BigDecimal targetFat;
     private List<DietLogResponse> logs;
+    private IntakeStatus intakeStatus;
+    private String controlLoopMessage;
 }

@@ -72,6 +72,13 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.registerAsPt(user.getId(), request));
     }
 
+    @PutMapping("/pt/resubmit")
+    public ResponseEntity<ApiResponse<PtProfileSummary>> resubmitPt(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody PtRegistrationRequest request) {
+        return ResponseEntity.ok(userProfileService.resubmitPt(user.getId(), request));
+    }
+
     @PostMapping(value = "/pt/cert-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<String>> uploadCertImage(
             @AuthenticationPrincipal User user,

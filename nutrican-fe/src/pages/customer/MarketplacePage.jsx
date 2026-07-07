@@ -13,13 +13,16 @@ export default function MarketplacePage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [goalFilter, setGoalFilter] = useState('');
+  const [sortMode, setSortMode] = useState('tier');
 
-  useEffect(() => { fetchPts(); }, [page]);
+  useEffect(() => { fetchPts(); }, [page, goalFilter, sortMode]);
 
   const fetchPts = async (searchTerm = search) => {
     try {
       setLoading(true);
-      const params = { page, size: 12, verified: true };
+      const params = { page, size: 12, verifiedOnly: true, sort: sortMode };
+      if (goalFilter) params.goalFilter = goalFilter;
       if (searchTerm) params.search = searchTerm;
       const response = await marketplaceService.getPts(params);
       setPts(response.data.data.content || []);
@@ -63,9 +66,22 @@ export default function MarketplacePage() {
 
       {/* Results Section */}
       <div>
-        <div className="flex justify-between items-end mb-6 px-2">
+        <div className="flex flex-wrap justify-between items-end gap-4 mb-6 px-2">
           <h2 className="text-2xl font-bold text-slate-800">Huấn luyện viên nổi bật</h2>
-          <span className="text-sm font-semibold text-slate-500">Đang hiển thị trang {page + 1} / {totalPages || 1}</span>
+          <div className="flex flex-wrap gap-2 items-center">
+            {['', 'WEIGHT_LOSS', 'WEIGHT_GAIN', 'MAINTAIN'].map((g) => (
+              <button key={g || 'all'} type="button" onClick={() => { setGoalFilter(g); setPage(0); }}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold border ${goalFilter === g ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+                {g === '' ? 'Tất cả' : g === 'WEIGHT_LOSS' ? 'Giảm cân' : g === 'WEIGHT_GAIN' ? 'Tăng cân' : 'Duy trì'}
+              </button>
+            ))}
+            <select value={sortMode} onChange={(e) => { setSortMode(e.target.value); setPage(0); }}
+              className="text-xs font-semibold border border-slate-200 rounded-lg px-2 py-1.5">
+              <option value="tier">Theo tier</option>
+              <option value="compatibility">Phù hợp nhất</option>
+            </select>
+          </div>
+          <span className="text-sm font-semibold text-slate-500 w-full sm:w-auto">Trang {page + 1} / {totalPages || 1}</span>
         </div>
 
         {loading ? (
@@ -117,10 +133,15 @@ export default function MarketplacePage() {
                         </div>
 
                         <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">{pt.bio || 'Đam mê giúp bạn đạt được mục tiêu thể hình bằng phương pháp khoa học.'}</p>
+                        {pt.goalMatch && <span className="inline-block mt-2 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Phù hợp mục tiêu bạn</span>}
+                        {pt.dietMatch && <span className="inline-block mt-2 ml-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">Phù hợp chế độ ăn</span>}
+                        {pt.slotsAvailable === false && <span className="inline-block mt-2 ml-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Hết chỗ</span>}
                       </div>
 
                       <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-400 uppercase">{pt.yearsExperience || 0} năm kinh nghiệm</span>
+                        <span className="text-xs font-bold text-slate-400 uppercase">
+                          {pt.activeClientCount != null ? `${pt.activeClientCount}/${pt.maxClients || 10} học viên` : `${pt.yearsExperience || 0} năm KN`}
+                        </span>
                         <span className="text-blue-600 group-hover:text-blue-700 font-bold text-sm flex items-center">Chi tiết <ChevronRight className="w-4 h-4 ml-0.5" /></span>
                       </div>
                     </CardContent>

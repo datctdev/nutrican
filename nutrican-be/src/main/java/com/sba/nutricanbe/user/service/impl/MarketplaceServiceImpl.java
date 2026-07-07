@@ -21,6 +21,7 @@ import com.sba.nutricanbe.user.dto.PtProfileResponse;
 import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
 import com.sba.nutricanbe.user.service.MarketplaceService;
+import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -31,6 +32,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -42,13 +47,25 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
     private final PtClientMappingRepository mappingRepository;
+    private final WebSocketSessionService webSocketSessionService;
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse<PageResponse<PtProfileResponse>> searchPts(PtSearchRequest request) {
-        Sort sort = request.getSortDir().equalsIgnoreCase("asc")
-                ? Sort.by(request.getSortBy()).ascending()
-                : Sort.by(request.getSortBy()).descending();
+    public ApiResponse<PageResponse<PtProfileResponse>> searchPts(PtSearchRequest request, User customer) {
+        if (customer != null && customer.getRole() == UserRole.CUSTOMER) {
+            request.setCustomerId(customer.getId());
+            if (customer.getNutritionGoal() != null) {
+                request.setCustomerNutritionGoal(customer.getNutritionGoal().name());
+            }
+            if (customer.getDietPreference() != null) {
+                request.setCustomerDietPreference(customer.getDietPreference().name());
+            }
+        }
+        return searchPtsInternal(request);
+    }
+
+    private ApiResponse<PageResponse<PtProfileResponse>> searchPtsInternal(PtSearchRequest request) {
+        Sort sort = buildSort(request);
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize(), sort);
 
         Page<PtProfile> page;
@@ -60,7 +77,92 @@ public class MarketplaceServiceImpl implements MarketplaceService {
             page = ptProfileRepository.findAll(pageable);
         }
 
-        return ApiResponse.success(PageResponse.from(page.map(PtProfileResponse::toPtProfileResponse)));
+        java.util.List<PtProfileResponse> mapped = page.getContent().stream()
+                .map(profile -> enrichSearchResult(profile, request))
+                .filter(r -> matchesFilters(r, request))
+                .toList();
+
+        if ("compatibility".equalsIgnoreCase(request.getSort())) {
+            mapped = mapped.stream()
+                    .sorted(Comparator.comparing(this::compatibilityScore).reversed())
+                    .toList();
+        }
+
+        PageResponse<PtProfileResponse> response = PageResponse.<PtProfileResponse>builder()
+                .content(mapped)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .first(page.isFirst())
+                .last(page.isLast())
+                .build();
+        return ApiResponse.success(response);
+    }
+
+    private Sort buildSort(PtSearchRequest request) {
+        if ("compatibility".equalsIgnoreCase(request.getSort())) {
+            return Sort.unsorted();
+        }
+        String sortBy = request.getSortBy() != null ? request.getSortBy() : "tier";
+        return request.getSortDir().equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+    }
+
+    private PtProfileResponse enrichSearchResult(PtProfile profile, PtSearchRequest request) {
+        PtProfileResponse response = PtProfileResponse.toPtProfileResponse(profile);
+        UUID ptUserId = profile.getUser().getId();
+        long active = mappingRepository.countByPt_IdAndStatus(ptUserId, ClientMappingStatus.ACTIVE);
+        int max = profile.getMaxClients() != null ? profile.getMaxClients() : 10;
+        response.setActiveClientCount(active);
+        response.setSlotsAvailable(active < max);
+        String goalForMatch = request.getGoalFilter() != null
+                ? request.getGoalFilter() : request.getCustomerNutritionGoal();
+        String dietForMatch = request.getDietFilter() != null
+                ? request.getDietFilter() : request.getCustomerDietPreference();
+        if (goalForMatch != null && profile.getPreferredGoals() != null) {
+            response.setGoalMatch(profile.getPreferredGoals().contains(goalForMatch));
+        }
+        if (dietForMatch != null && profile.getPreferredDietTypes() != null) {
+            response.setDietMatch(profile.getPreferredDietTypes().contains(dietForMatch));
+        }
+        return response;
+    }
+
+    private boolean matchesFilters(PtProfileResponse r, PtSearchRequest request) {
+        if (request.getGoalFilter() != null && !Boolean.TRUE.equals(r.getGoalMatch())) {
+            return false;
+        }
+        if (request.getDietFilter() != null && !Boolean.TRUE.equals(r.getDietMatch())) {
+            return false;
+        }
+        String term = request.getSearch();
+        if (term == null || term.isBlank()) {
+            term = request.getSpecialization();
+        }
+        if (term != null && !term.isBlank()) {
+            String q = term.toLowerCase(Locale.ROOT);
+            boolean nameMatch = r.getFullName() != null && r.getFullName().toLowerCase(Locale.ROOT).contains(q);
+            boolean bioMatch = r.getBio() != null && r.getBio().toLowerCase(Locale.ROOT).contains(q);
+            boolean specMatch = r.getSpecializations() != null && r.getSpecializations().stream()
+                    .anyMatch(s -> s != null && s.toLowerCase(Locale.ROOT).contains(q));
+            if (!nameMatch && !bioMatch && !specMatch) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int compatibilityScore(PtProfileResponse r) {
+        int score = 0;
+        if (Boolean.TRUE.equals(r.getGoalMatch())) score += 2;
+        if (Boolean.TRUE.equals(r.getDietMatch())) score += 2;
+        if (Boolean.TRUE.equals(r.getSlotsAvailable())) score += 1;
+        if (r.getRating() != null) {
+            score += r.getRating().intValue();
+        }
+        return score;
     }
 
     @Override
@@ -153,6 +255,13 @@ public class MarketplaceServiceImpl implements MarketplaceService {
             throw new BadRequestException("You cannot hire yourself");
         }
 
+        mappingRepository.findFirstByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE)
+                .ifPresent(active -> {
+                    if (!active.getPt().getId().equals(ptId)) {
+                        throw new BadRequestException("Bạn đang có PT. Kết thúc coaching hiện tại trước.");
+                    }
+                });
+
         PtClientMapping mapping = mappingRepository.findByPt_IdAndClient_Id(ptId, customerId)
                 .map(existing -> {
                     if (existing.getStatus() == ClientMappingStatus.ACTIVE) {
@@ -187,7 +296,16 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
         String normalized = action != null ? action.trim().toUpperCase() : "";
         switch (normalized) {
-            case "ACCEPT" -> mapping.setStatus(ClientMappingStatus.ACTIVE);
+            case "ACCEPT" -> {
+                PtProfile profile = ptProfileRepository.findByUserId(ptId)
+                        .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
+                int max = profile.getMaxClients() != null ? profile.getMaxClients() : 10;
+                long active = mappingRepository.countByPt_IdAndStatus(ptId, ClientMappingStatus.ACTIVE);
+                if (active >= max) {
+                    throw new BadRequestException("PT đã đủ số client tối đa (" + max + ")");
+                }
+                mapping.setStatus(ClientMappingStatus.ACTIVE);
+            }
             case "REJECT", "DECLINE" -> mapping.setStatus(ClientMappingStatus.INACTIVE);
             default -> throw new BadRequestException("Invalid action: " + action);
         }
@@ -195,6 +313,16 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         mapping = mappingRepository.save(mapping);
         String message = mapping.getStatus() == ClientMappingStatus.ACTIVE
                 ? "Hiring request accepted" : "Hiring request rejected";
+        notifyHireResult(clientId, ptId, mapping.getStatus() == ClientMappingStatus.ACTIVE);
         return ApiResponse.success(PtClientMappingResponse.toMappingResponse(mapping), message);
+    }
+
+    private void notifyHireResult(UUID customerId, UUID ptId, boolean accepted) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("ptId", ptId);
+        payload.put("customerId", customerId);
+        payload.put("accepted", accepted);
+        String event = accepted ? "HIRE_ACCEPTED" : "HIRE_REJECTED";
+        webSocketSessionService.sendToUser(customerId, event, payload);
     }
 }

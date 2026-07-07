@@ -10,6 +10,7 @@ import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -21,10 +22,14 @@ import java.util.Optional;
 public final class NutriHomeCatalog {
 
     private static final String RESNET10_RESOURCE = "/data/nutrihome_resnet10.json";
+    private static final String UNIFIED_VN_RESOURCE = "/data/nutrihome_unified_vn.json";
+    private static final String FOOD101_RESOURCE = "/data/nutrihome_food101.json";
     private static final String FULL_CATALOG_RESOURCE = "/data/nutrihome_foods.json";
 
     private static volatile boolean loaded;
     private static Map<String, MacroServing> resnet10 = Map.of();
+    private static Map<String, MacroServing> unifiedVn = Map.of();
+    private static Map<String, MacroServing> food101 = Map.of();
     private static Map<String, MacroServing> variants = Map.of();
     private static Map<String, String> variantAliases = Map.of();
     private static List<FoodRow> allFoods = List.of();
@@ -89,6 +94,24 @@ public final class NutriHomeCatalog {
         } catch (Exception e) {
             log.error("Failed to load NutriHome catalog: {}", e.getMessage());
         }
+        try (InputStream vnStream = NutriHomeCatalog.class.getResourceAsStream(UNIFIED_VN_RESOURCE)) {
+            if (vnStream != null) {
+                Map<String, Object> bundle = mapper.readValue(vnStream, new TypeReference<>() {});
+                unifiedVn = parseMacroMap(castMap(bundle.get("unified_vn")));
+                log.info("NutriHome unified VN macros: {} dishes (100-dishes dataset)", unifiedVn.size());
+            }
+        } catch (Exception e) {
+            log.warn("Unified VN NutriHome bundle not loaded: {}", e.getMessage());
+        }
+        try (InputStream f101Stream = NutriHomeCatalog.class.getResourceAsStream(FOOD101_RESOURCE)) {
+            if (f101Stream != null) {
+                Map<String, Object> bundle = mapper.readValue(f101Stream, new TypeReference<>() {});
+                food101 = parseMacroMap(castMap(bundle.get("food101")));
+                log.info("Food-101 nutrition macros: {} dishes (nutrition.csv)", food101.size());
+            }
+        } catch (Exception e) {
+            log.warn("Food-101 nutrition bundle not loaded: {}", e.getMessage());
+        }
         try (InputStream fullStream = NutriHomeCatalog.class.getResourceAsStream(FULL_CATALOG_RESOURCE)) {
             if (fullStream != null) {
                 Map<String, Object> full = mapper.readValue(fullStream, new TypeReference<>() {});
@@ -117,6 +140,14 @@ public final class NutriHomeCatalog {
         MacroServing variant = variants.get(code);
         if (variant != null) {
             return Optional.of(variant);
+        }
+        MacroServing vn = unifiedVn.get(code);
+        if (vn != null) {
+            return Optional.of(vn);
+        }
+        MacroServing f101 = food101.get(code);
+        if (f101 != null) {
+            return Optional.of(f101);
         }
         return Optional.empty();
     }
@@ -161,6 +192,20 @@ public final class NutriHomeCatalog {
                 .toList();
     }
 
+    public static boolean isFood101Code(String foodCode) {
+        ensureLoaded();
+        return foodCode != null && food101.containsKey(foodCode.trim().toLowerCase(Locale.ROOT));
+    }
+
+    public static boolean isUnifiedVnCode(String foodCode) {
+        ensureLoaded();
+        return foodCode != null && unifiedVn.containsKey(foodCode.trim().toLowerCase(Locale.ROOT));
+    }
+
+    public static Optional<MacroServing> macroForCode(String foodCode) {
+        return forCode(foodCode);
+    }
+
     /** Compact NutriHome table for LLaVA prompt (ResNet10 + key variants). */
     public static String llavaMacroReferenceBlock() {
         ensureLoaded();
@@ -171,6 +216,31 @@ public final class NutriHomeCatalog {
         for (Map.Entry<String, MacroServing> e : variants.entrySet()) {
             if (!e.getKey().contains("alias")) {
                 sb.append(formatMacroLine(e.getValue())).append("\n");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    /** Macro line for one catalog code (used when ResNet hint is Food-101). */
+    public static String llavaMacroLineForCode(String foodCode) {
+        ensureLoaded();
+        return forCode(foodCode)
+                .map(NutriHomeCatalog::formatMacroLine)
+                .orElse("");
+    }
+
+    /** Top Food-101 entries for LLaVA prompt (raw-meat / steak confusion cluster). */
+    public static String llavaFood101ReferenceBlock() {
+        ensureLoaded();
+        String[] focusCodes = {
+                "beef_carpaccio", "beef_tartare", "filet_mignon", "peking_duck",
+                "steak", "prime_rib", "pork_chop", "lobster_bisque", "caesar_salad"
+        };
+        StringBuilder sb = new StringBuilder();
+        for (String code : focusCodes) {
+            MacroServing m = food101.get(code);
+            if (m != null) {
+                sb.append(formatMacroLine(m)).append("\n");
             }
         }
         return sb.toString().trim();

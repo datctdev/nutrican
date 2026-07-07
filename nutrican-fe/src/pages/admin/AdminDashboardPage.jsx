@@ -15,6 +15,7 @@ export default function AdminDashboardPage() {
   const [rblPreview, setRblPreview] = useState(null);
   const [rblFrom, setRblFrom] = useState('');
   const [rblTo, setRblTo] = useState('');
+  const [rblCohortKey, setRblCohortKey] = useState('');
   const [loading, setLoading] = useState(true);
   const [requireKyc, setRequireKyc] = useState(true);
   const [updatingKycSetting, setUpdatingKycSetting] = useState(false);
@@ -23,6 +24,7 @@ export default function AdminDashboardPage() {
     const p = { cvOnly: true };
     if (rblFrom) p.from = rblFrom;
     if (rblTo) p.to = rblTo;
+    if (rblCohortKey) p.experimentCohortKey = rblCohortKey;
     return p;
   };
 
@@ -227,6 +229,40 @@ export default function AdminDashboardPage() {
               </CardContent>
             </Card>
 
+            <Card className="bg-white border-slate-200 shadow-sm flex flex-col justify-between">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center mb-4">
+                  <HeartPulse className="w-6 h-6 text-orange-500" />
+                </div>
+                <h4 className="font-bold text-slate-900 mb-1">Mapping dị ứng món ăn</h4>
+                <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
+                  Quản lý foodCode → allergen cho cảnh báo khi ghi nhận bữa ăn và lên thực đơn.
+                </p>
+                <Link to="/admin/allergens">
+                  <Button variant="outline" className="w-full border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11">
+                    Quản lý dị ứng <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-slate-200 shadow-sm flex flex-col justify-between">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4">
+                  <HeartPulse className="w-6 h-6 text-emerald-600" />
+                </div>
+                <h4 className="font-bold text-slate-900 mb-1">Diet tags món ăn</h4>
+                <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
+                  Gán VEGAN, KETO, … cho foodCode — hỗ trợ lọc chế độ ăn và badge !PREF.
+                </p>
+                <Link to="/admin/food-tags">
+                  <Button variant="outline" className="w-full border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11">
+                    Quản lý diet tags <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
           </div>
 
           {/* Cấu hình hệ thống */}
@@ -323,6 +359,29 @@ export default function AdminDashboardPage() {
               Kích thước mẫu &lt; 30 — hãy thu thập thêm nhật ký đã duyệt trước khi phân tích kết quả.
             </p>
           )}
+          {rblStats?.cohortKeyCounts && Object.keys(rblStats.cohortKeyCounts).length > 0 && (
+            <div className="mb-6 overflow-x-auto">
+              <p className="text-xs font-bold text-slate-500 uppercase mb-2">Phân bố experimentCohortKey</p>
+              <table className="w-full text-sm border border-slate-100 rounded-xl overflow-hidden">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-semibold text-slate-600">Cohort key</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-600">Số lượng</th>
+                    <th className="text-right px-3 py-2 font-semibold text-slate-600">MAE (kcal)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(rblStats.cohortKeyCounts).map(([key, count]) => (
+                    <tr key={key} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-mono text-xs">{key}</td>
+                      <td className="px-3 py-2 text-right">{count}</td>
+                      <td className="px-3 py-2 text-right">{rblStats.maeByCohortKey?.[key] ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {rblStats?.cohortCounts && Object.keys(rblStats.cohortCounts).length > 0 && (
             <div className="mb-6 overflow-x-auto">
               <p className="text-xs font-bold text-slate-500 uppercase mb-2">Phân bố nhóm mẫu (Mục tiêu: ≥8 Tự nấu, ≥8 Ăn ngoài, ≥4 Lẩu, ≥4 Buffet)</p>
@@ -375,6 +434,16 @@ export default function AdminDashboardPage() {
             <div>
               <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Đến ngày</label>
               <input type="date" value={rblTo} onChange={(e) => setRblTo(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm" />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Cohort key</label>
+              <select value={rblCohortKey} onChange={(e) => setRblCohortKey(e.target.value)}
+                className="px-3 py-2 border border-slate-200 rounded-xl text-sm min-w-[180px]">
+                <option value="">Tất cả</option>
+                {Object.keys(rblStats?.cohortKeyCounts || {}).map((key) => (
+                  <option key={key} value={key}>{key}</option>
+                ))}
+              </select>
             </div>
             <Button variant="outline" onClick={fetchRbl} className="rounded-xl border-slate-200 h-10">Áp dụng ngày</Button>
           </div>

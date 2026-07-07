@@ -75,6 +75,16 @@ export default function ConfirmFoodModal({
                             Độ tin cậy thấp — chọn đúng món và chỉnh gram trước khi lưu.
                         </p>
                     )}
+                    {confirmModal.dietPrefWarning && (
+                        <p className="mt-2 text-[11px] text-orange-900 bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-1.5">
+                            {confirmModal.dietPrefWarning}
+                        </p>
+                    )}
+                    {confirmModal.allergyWarnings?.length > 0 && (
+                        <p className="mt-2 text-[11px] text-amber-900 bg-amber-100 border border-amber-300 rounded-lg px-2.5 py-1.5">
+                            Cảnh báo dị ứng: {confirmModal.allergyWarnings.join(', ')}
+                        </p>
+                    )}
                 </div>
 
                 {/* Body */}
@@ -207,6 +217,15 @@ export default function ConfirmFoodModal({
                             Tổng: {selectedPrediction.calories ?? '—'} kcal · {confirmModal.adjustedGrams ?? '—'}g
                         </p>
                     )}
+                    <label className="flex items-center gap-2 mb-3 text-sm text-slate-600 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            className="rounded border-slate-300"
+                            checked={confirmModal.sendToPt ?? false}
+                            onChange={(e) => setConfirmModal((prev) => ({ ...prev, sendToPt: e.target.checked }))}
+                        />
+                        Gửi PT duyệt sau khi lưu
+                    </label>
                     <div className="flex gap-3">
                         <Button
                             type="button"

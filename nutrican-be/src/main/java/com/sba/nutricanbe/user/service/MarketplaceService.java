@@ -13,7 +13,7 @@ import java.util.UUID;
 
 public interface MarketplaceService {
 
-    ApiResponse<PageResponse<PtProfileResponse>> searchPts(PtSearchRequest request);
+    ApiResponse<PageResponse<PtProfileResponse>> searchPts(PtSearchRequest request, User customer);
 
     ApiResponse<PtProfileResponse> getPtDetail(UUID ptId, User user);
 

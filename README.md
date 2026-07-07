@@ -47,9 +47,21 @@ cd ../nutrican-fe && npm install && npm run dev
 | Vai tro | Email | Mat khau |
 |---------|-------|----------|
 | Admin | admin@nutrican.com | Admin123! |
+| Customer (test) | customer1@gmail.com | 123456 |
+| PT (test) | pt.certified@gmail.com | 123456 |
 
-## Documentation
+## Test & QA (trước khi push)
 
+```powershell
+.\scripts\test-all.ps1 -Layer be -SkipDocker   # 120 BE tests (H2, không cần Docker)
+.\scripts\test-all.ps1 -Layer fe -SkipDocker   # FE production build
+```
+
+Chi tiết E2E Playwright (BE-only / FE-only / Hybrid): [docs/TEAM_ONBOARDING.md](docs/TEAM_ONBOARDING.md)
+
+
+- [Team onboarding & test gate](docs/TEAM_ONBOARDING.md) — pull, env, seed users, BE→FE→E2E
+- [E2E test matrix](docs/TESTING_E2E_MATRIX.md) — ADD-01..08 happy/bad coverage
 - [API Documentation](docs/API_DOCUMENTATION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Features](docs/FEATURES.md)
@@ -61,4 +73,4 @@ cd ../nutrican-fe && npm install && npm run dev
 Swagger UI: http://localhost:8080/swagger-ui.html
 
 ---
-*Version 3.0.0 | Last Updated: 2026-06-20*
+*Version 3.1.0 | Last Updated: 2026-07-07*

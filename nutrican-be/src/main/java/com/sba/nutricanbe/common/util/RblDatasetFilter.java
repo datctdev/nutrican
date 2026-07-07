@@ -27,7 +27,18 @@ public final class RblDatasetFilter {
         return log.getPtAction() == PtReviewAction.REJECT;
     }
 
+    public static boolean isOutOfClassGate(DietLog log) {
+        if (log.getAiRawJson() == null) {
+            return false;
+        }
+        Object gate = log.getAiRawJson().get("gateResult");
+        return "OUT_OF_CLASS".equals(String.valueOf(gate));
+    }
+
     public static boolean matchesExport(DietLog log, boolean cvOnly, boolean includeRejected) {
+        if (isOutOfClassGate(log)) {
+            return false;
+        }
         if (!isReviewed(log)) {
             return false;
         }

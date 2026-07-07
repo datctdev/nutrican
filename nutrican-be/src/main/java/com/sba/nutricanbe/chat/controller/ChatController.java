@@ -55,6 +55,22 @@ public class ChatController {
         return ResponseEntity.ok(ApiResponse.success(message, "Image message sent"));
     }
 
+    @PostMapping(value = "/threads/{mappingId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ChatMessageResponse>> sendAttachment(
+            @PathVariable UUID mappingId,
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) String contextType,
+            @RequestParam(required = false) UUID contextRefId) {
+        com.sba.nutricanbe.chat.enums.ChatContextType ctx = contextType != null
+                ? com.sba.nutricanbe.chat.enums.ChatContextType.valueOf(contextType) : null;
+        ChatMessageResponse message = chatService.sendAttachmentMessage(
+                user.getId(), mappingId, content, file, ctx, contextRefId);
+        chatService.publishRealtimeMessage(message);
+        return ResponseEntity.ok(ApiResponse.success(message, "Attachment sent"));
+    }
+
     @PutMapping("/threads/{mappingId}/read")
     public ResponseEntity<ApiResponse<Void>> markRead(
             @PathVariable UUID mappingId,

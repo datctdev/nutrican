@@ -2,6 +2,7 @@ package com.sba.nutricanbe.diet.entity;
 
 import java.util.UUID;
 import com.sba.nutricanbe.common.entity.BaseEntity;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
@@ -53,6 +54,11 @@ public class DietLog extends BaseEntity {
     @Column(length = 50)
     @Builder.Default
     private DietLogStatus status = DietLogStatus.PENDING_AI;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_status", length = 30)
+    @Builder.Default
+    private DietLogReviewStatus reviewStatus = DietLogReviewStatus.NOT_REQUIRED;
 
     @Column(name = "food_description", columnDefinition = "TEXT")
     private String foodDescription;
@@ -128,6 +134,9 @@ public class DietLog extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "experiment_cohort", length = 30)
     private ExperimentCohort experimentCohort;
+
+    @Column(name = "experiment_cohort_key", length = 80)
+    private String experimentCohortKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "pt_action", length = 20)

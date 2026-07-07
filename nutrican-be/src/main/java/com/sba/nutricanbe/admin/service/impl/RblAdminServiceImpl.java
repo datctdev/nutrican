@@ -46,7 +46,7 @@ public class RblAdminServiceImpl implements RblAdminService {
     public ApiResponse<List<RblExportRowDto>> exportPreview(LocalDate from, LocalDate to, boolean cvOnly, boolean includeRejected) {
         LocalDate start = from != null ? from : LocalDate.now().minusMonths(1);
         LocalDate end = to != null ? to : LocalDate.now();
-        List<RblExportRowDto> rows = loadRows(start, end, null, null, cvOnly, includeRejected);
+        List<RblExportRowDto> rows = loadRows(start, end, null, null, null, cvOnly, includeRejected);
         List<RblExportRowDto> preview = rows.stream().limit(10).toList();
         return ApiResponse.success(preview, "Preview: " + rows.size() + " total rows");
     }
@@ -62,10 +62,11 @@ public class RblAdminServiceImpl implements RblAdminService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<byte[]> exportCsv(LocalDate from, LocalDate to, MealSource mealSource,
-                                          RecognitionSource recognitionSource, boolean cvOnly, boolean includeRejected) {
+                                          RecognitionSource recognitionSource, String experimentCohortKey,
+                                          boolean cvOnly, boolean includeRejected) {
         LocalDate start = from != null ? from : LocalDate.now().minusMonths(1);
         LocalDate end = to != null ? to : LocalDate.now();
-        List<RblExportRowDto> rows = loadRows(start, end, mealSource, recognitionSource, cvOnly, includeRejected);
+        List<RblExportRowDto> rows = loadRows(start, end, mealSource, recognitionSource, experimentCohortKey, cvOnly, includeRejected);
         StringBuilder csv = new StringBuilder();
         csv.append("# food_db_version=v2-60\n");
         csv.append("log_id,log_date,meal_source,meal_complexity,recognition_source,experiment_cohort,ai_confidence,db_match_score,");
@@ -186,11 +187,14 @@ public class RblAdminServiceImpl implements RblAdminService {
     }
 
     private List<RblExportRowDto> loadRows(LocalDate from, LocalDate to, MealSource mealSource,
-                                            RecognitionSource recognitionSource, boolean cvOnly, boolean includeRejected) {
+                                            RecognitionSource recognitionSource, String experimentCohortKey,
+                                            boolean cvOnly, boolean includeRejected) {
         return loadReviewed(from, to).stream()
                 .filter(l -> RblDatasetFilter.matchesExport(l, cvOnly, includeRejected))
                 .filter(l -> mealSource == null || l.getMealSource() == mealSource)
                 .filter(l -> recognitionSource == null || l.getRecognitionSource() == recognitionSource)
+                .filter(l -> experimentCohortKey == null || experimentCohortKey.isBlank()
+                        || experimentCohortKey.equals(l.getExperimentCohortKey()))
                 .map(this::toExportRow)
                 .collect(Collectors.toList());
     }
@@ -221,6 +225,8 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .mealComplexity(log.getMealComplexity() != null ? log.getMealComplexity().name() : null)
                 .recognitionSource(log.getRecognitionSource() != null ? log.getRecognitionSource().name() : null)
                 .experimentCohort(log.getExperimentCohort() != null ? log.getExperimentCohort().name() : null)
+                .experimentCohortKey(log.getExperimentCohortKey())
+                .dietPreference(extractDietPrefFromKey(log.getExperimentCohortKey()))
                 .aiConfidence(log.getAiConfidenceScore())
                 .dbMatchScore(log.getDbMatchScore())
                 .modelVersion(log.getModelVersion())
@@ -255,6 +261,13 @@ public class RblAdminServiceImpl implements RblAdminService {
                 "quantityG", i.getQuantityG() != null ? i.getQuantityG() : 0,
                 "calories", i.getCalories() != null ? i.getCalories() : 0
         )).toList();
+    }
+
+    private static String extractDietPrefFromKey(String key) {
+        if (key == null || !key.contains("_")) {
+            return null;
+        }
+        return key.substring(key.lastIndexOf('_') + 1);
     }
 
     private RblStatsResponse buildStats(List<DietLog> reviewed, List<DietLog> allReviewed) {
@@ -307,6 +320,16 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .collect(Collectors.groupingBy(l -> l.getExperimentCohort().name(),
                         Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
 
+        Map<String, BigDecimal> maeByCohortKey = new LinkedHashMap<>();
+        Map<String, Integer> cohortKeyCounts = new LinkedHashMap<>();
+        cvLabeled.stream()
+                .filter(l -> l.getExperimentCohortKey() != null && !l.getExperimentCohortKey().isBlank())
+                .collect(Collectors.groupingBy(DietLog::getExperimentCohortKey))
+                .forEach((key, logs) -> {
+                    maeByCohortKey.put(key, maeCalories(logs));
+                    cohortKeyCounts.put(key, logs.size());
+                });
+
         return RblStatsResponse.builder()
                 .totalReviewed(reviewed.size())
                 .totalLabeledCv(cvLabeled.size())
@@ -331,6 +354,8 @@ public class RblAdminServiceImpl implements RblAdminService {
                         && l.getMealComplexity().name().equals("COMPOSITE")).count())
                 .avgTimeToReviewHours(BigDecimal.valueOf(avgHours).setScale(2, RoundingMode.HALF_UP).doubleValue())
                 .cohortCounts(cohortCounts)
+                .maeByCohortKey(maeByCohortKey)
+                .cohortKeyCounts(cohortKeyCounts)
                 .build();
     }
 

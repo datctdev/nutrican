@@ -27,6 +27,9 @@ public final class ResNetFoodDefaults {
             Map.entry("pho", new MacroServing(414, 18, 59, 12, 500, "1 tô"))
     );
 
+    /** Generic per-100g estimate for unified classes without NutriHome mapping yet. */
+    private static final MacroServing GENERIC_FALLBACK = new MacroServing(300, 15, 35, 10, 100, "100g");
+
     private static final Map<String, String> ALIASES = Map.ofEntries(
             Map.entry("banh_chung", "banh_chung,banh chung"),
             Map.entry("banh_khot", "banh_khot,banh khot"),
@@ -59,7 +62,14 @@ public final class ResNetFoodDefaults {
                     m.servingG(),
                     m.unit()));
         }
-        return Optional.ofNullable(FALLBACK.get(code));
+        MacroServing fallback = FALLBACK.get(code);
+        if (fallback != null) {
+            return Optional.of(fallback);
+        }
+        if (ResNetClassManifest.isKnownCode(code)) {
+            return Optional.of(GENERIC_FALLBACK);
+        }
+        return Optional.empty();
     }
 
     public static BigDecimal defaultServingG(String foodCode) {

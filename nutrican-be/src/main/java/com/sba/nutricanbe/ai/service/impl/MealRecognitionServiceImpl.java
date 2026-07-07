@@ -49,6 +49,13 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
     @Override
     public MealRecognitionResult recognizeMealFromFile(
             MultipartFile file, String mealType, String mealSource, String mealComplexity) {
+        return recognizeMealFromFile(file, mealType, mealSource, mealComplexity, null);
+    }
+
+    @Override
+    public MealRecognitionResult recognizeMealFromFile(
+            MultipartFile file, String mealType, String mealSource, String mealComplexity,
+            ResNetAnalyzeResponse cachedResNet) {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("Image file is required");
         }
@@ -57,7 +64,7 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
             throw new BadRequestException("File must be an image");
         }
 
-        ResNetAnalyzeResponse response = resNetClient.analyze(file);
+        ResNetAnalyzeResponse response = cachedResNet != null ? cachedResNet : resNetClient.analyze(file);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             String msg = response != null && response.getMessage() != null
                     ? response.getMessage()
@@ -80,6 +87,9 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
                 ? data.getTopPredictions()
                 : Collections.emptyList();
         boolean resnetNeedsConfirmation = Boolean.TRUE.equals(data.getNeedsConfirmation());
+        BigDecimal confidenceMargin = data.getConfidenceMargin() != null
+                ? BigDecimal.valueOf(data.getConfidenceMargin()).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)
+                : null;
 
         // LLaVA vision analysis (Ollama) — corrects ResNet on dishes like com tam suon
         LlavaMealAnalysisResult llava = llavaMealAnalysisService.analyzeMealImage(file, resnetName, resnetCode);
@@ -91,7 +101,7 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
         }
 
         MealAnalysisFusion.FusedMealAnalysis fused = MealAnalysisFusion.fuse(
-                resnetCode, resnetName, resnetConfidence, resnetPortionRatio,
+                resnetCode, resnetName, resnetConfidence, confidenceMargin, resnetPortionRatio,
                 resnetNeedsConfirmation, llava);
 
         log.info("Fused meal: code={}, name={}, grams={}, kcal={}, source={}",
@@ -100,9 +110,6 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
 
         BigDecimal foodAreaRatio = data.getFoodAreaRatio() != null
                 ? BigDecimal.valueOf(data.getFoodAreaRatio()).setScale(4, RoundingMode.HALF_UP)
-                : null;
-        BigDecimal confidenceMargin = data.getConfidenceMargin() != null
-                ? BigDecimal.valueOf(data.getConfidenceMargin()).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)
                 : null;
 
         return MealRecognitionResult.builder()
@@ -141,13 +148,13 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
 
     @Override
     public String getModelName() {
-        return ResNetFoodCodeMapping.MODEL_VERSION + "-hybrid-llava";
+        return ResNetFoodCodeMapping.modelVersion() + "-hybrid-llava";
     }
 
     @Override
     public String getPromptVersionHash() {
         return PromptVersionUtil.hashPrompt(String.join(",", ResNetFoodCodeMapping.classOrder())
-                + ":nutrihome-llava-v1");
+                + ":nutrihome-llava-v2-reliability");
     }
 
     private MealRecognitionResult buildFallbackResult(String message) {
