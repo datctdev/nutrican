@@ -1,8 +1,10 @@
 // src/components/layouts/Header.jsx
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useNotificationStore } from '../../stores/notificationStore';
+import { notificationService } from '../../services/notificationService';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Menu, X, ChevronDown, Bell, LogOut, User, Settings, LayoutDashboard, Sparkles, Target } from 'lucide-react';
 import logo from '../../assets/nutrican_logo.png';
 
@@ -12,6 +14,18 @@ export default function Header() {
     const location = useLocation();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+    const [notifOpen, setNotifOpen] = useState(false);
+    const { unreadCount, notifications, setNotifications, markAsRead, markAllAsRead } = useNotificationStore();
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        notificationService.unreadCount()
+            .then((res) => useNotificationStore.setState({ unreadCount: res.data?.data ?? 0 }))
+            .catch(() => {});
+        notificationService.list({ page: 0, size: 10 })
+            .then((res) => setNotifications(res.data?.data?.content || []))
+            .catch(() => {});
+    }, [isAuthenticated, setNotifications]);
 
     const handleLogout = () => {
         logout();
@@ -27,6 +41,57 @@ export default function Header() {
             case 'PT_FREELANCE': return '/pt';
             default: return '/diet';
         }
+    };
+
+    const navigateFromNotification = (n) => {
+        const role = user?.role;
+        const link = n.linkType;
+        switch (link) {
+            case 'DIET_LOG':
+                return role?.startsWith('PT') ? '/pt/reviews' : '/diet';
+            case 'CHAT':
+                return role?.startsWith('PT') ? '/pt/chat' : '/chat';
+            case 'SOS':
+                return role === 'ADMIN' ? '/admin/sos' : role?.startsWith('PT') ? '/pt/reviews' : '/diet';
+            case 'HIRE':
+                return role?.startsWith('PT') ? '/pt/clients' : '/marketplace';
+            case 'REFUND':
+            case 'WEEKLY_SUMMARY':
+                return '/profile';
+            default:
+                return getDashboardLink();
+        }
+    };
+
+    const handleNotificationClick = (n) => {
+        if (n.id) {
+            markAsRead(n.id);
+            notificationService.markRead(n.id);
+        }
+        setNotifOpen(false);
+        const base = navigateFromNotification(n);
+        if (n.linkRefId) {
+            if (n.linkType === 'DIET_LOG') {
+                navigate(rolePath(base, n.linkRefId, 'log'));
+                return;
+            }
+            if (n.linkType === 'SOS') {
+                navigate(user?.role === 'ADMIN' ? `/admin/sos` : '/diet');
+                return;
+            }
+            if (n.linkType === 'CHAT') {
+                navigate(user?.role?.startsWith('PT') ? `/pt/chat` : '/chat');
+                return;
+            }
+        }
+        navigate(base);
+    };
+
+    const rolePath = (base, refId, kind) => {
+        if (kind === 'log' && base === '/diet') {
+            return `/diet#log-${refId}`;
+        }
+        return base;
     };
 
     const getInitials = (name) => {
@@ -46,18 +111,21 @@ export default function Header() {
         PT_CERTIFIED: [
             { label: 'Bảng điều khiển', href: '/pt' },
             { label: 'Học viên của tôi', href: '/pt/clients' },
-            { label: 'Tin nhắn', href: '/pt/chat' }, // Tab Chat
+            { label: 'Lịch hẹn', href: '/pt/appointments' },
+            { label: 'Tin nhắn', href: '/pt/chat' },
             { label: 'Đánh giá', href: '/pt/reviews' },
         ],
         PT_FREELANCE: [
             { label: 'Bảng điều khiển', href: '/pt' },
             { label: 'Học viên của tôi', href: '/pt/clients' },
-            { label: 'Tin nhắn', href: '/pt/chat' }, // Tab Chat
+            { label: 'Lịch hẹn', href: '/pt/appointments' },
+            { label: 'Tin nhắn', href: '/pt/chat' },
             { label: 'Đánh giá', href: '/pt/reviews' },
         ],
         ADMIN: [
             { label: 'Bảng điều khiển', href: '/admin' },
             { label: 'Duyệt PT', href: '/admin/pts' },
+            { label: 'Hoàn tiền', href: '/admin/refunds' },
             { label: 'Người dùng', href: '/admin/users' },
             { label: 'Hỗ trợ SOS', href: '/admin/sos' },
         ],
@@ -100,10 +168,45 @@ export default function Header() {
                     <div className="flex items-center gap-3">
                         {isAuthenticated ? (
                             <>
-                                <button className="relative p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors">
+                                <div className="relative">
+                                <button
+                                    type="button"
+                                    aria-label="Thông báo"
+                                    onClick={() => setNotifOpen(!notifOpen)}
+                                    className="relative p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
+                                >
                                     <Bell className="w-5 h-5" />
-                                    <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+                                    {unreadCount > 0 && (
+                                        <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center">
+                                            {unreadCount > 9 ? '9+' : unreadCount}
+                                        </span>
+                                    )}
                                 </button>
+                                {notifOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                                        <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-xl shadow-lg border border-slate-200 z-50">
+                                            <div className="flex items-center justify-between px-4 py-3 border-b">
+                                                <span className="font-semibold text-sm">Thông báo</span>
+                                                <button type="button" className="text-xs text-blue-600" onClick={() => { markAllAsRead(); notificationService.markAllRead(); }}>Đọc tất cả</button>
+                                            </div>
+                                            {notifications?.length ? notifications.map((n) => (
+                                                <button
+                                                    key={n.id}
+                                                    type="button"
+                                                    className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${!n.isRead ? 'bg-blue-50/50' : ''}`}
+                                                    onClick={() => handleNotificationClick(n)}
+                                                >
+                                                    <p className="text-sm font-medium text-slate-900">{n.title || n.type}</p>
+                                                    <p className="text-xs text-slate-500 line-clamp-2">{n.body || n.message}</p>
+                                                </button>
+                                            )) : (
+                                                <p className="px-4 py-6 text-sm text-slate-500 text-center">Chưa có thông báo</p>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                                </div>
 
                                 <div className="relative">
                                     <button

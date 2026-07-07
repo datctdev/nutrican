@@ -6,10 +6,17 @@ import com.sba.nutricanbe.workspace.dto.BlindEstimateRequest;
 import com.sba.nutricanbe.workspace.dto.ClientStatusDto;
 import com.sba.nutricanbe.workspace.dto.DietLogReviewResponse;
 import com.sba.nutricanbe.workspace.dto.ProgressDataDto;
+import com.sba.nutricanbe.workspace.dto.PtClientAlertDto;
 import com.sba.nutricanbe.workspace.dto.PtRblStatsDto;
 import com.sba.nutricanbe.workspace.dto.PtStatsDto;
 import com.sba.nutricanbe.workspace.dto.ReviewActionRequest;
+import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionDto;
+import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionReviewRequest;
+import com.sba.nutricanbe.workspace.dto.WeeklySummaryDto;
+import com.sba.nutricanbe.workspace.dto.WeeklySummaryRequest;
 
+import com.sba.nutricanbe.user.dto.MacroTargetRequest;
+import com.sba.nutricanbe.user.dto.MacroTargetResponse;
 import com.sba.nutricanbe.diet.dto.SosTicketResponse;
 
 import java.time.LocalDate;
@@ -37,4 +44,16 @@ public interface PtWorkspaceService {
     ApiResponse<DietLogReviewResponse> submitBlindEstimate(UUID logId, UUID ptId, BlindEstimateRequest request);
 
     ApiResponse<PtRblStatsDto> getRblStats(UUID ptId);
+
+    ApiResponse<MacroTargetResponse> setClientMacroTarget(UUID ptId, UUID clientId, MacroTargetRequest request);
+
+    ApiResponse<List<PtClientAlertDto>> getClientAlerts(UUID ptId);
+
+    ApiResponse<MealPlanSuggestionDto> reviewMealPlanSuggestion(UUID ptId, UUID suggestionId, MealPlanSuggestionReviewRequest request);
+
+    ApiResponse<WeeklySummaryDto> createWeeklySummary(UUID ptId, WeeklySummaryRequest request);
+
+    ApiResponse<List<MealPlanSuggestionDto>> getPendingMealPlanSuggestions(UUID ptId, UUID clientId);
+
+    ApiResponse<com.sba.nutricanbe.chat.dto.ChatContextSummaryDto> getChatContext(UUID ptId, UUID clientId);
 }

@@ -39,6 +39,12 @@ public interface DietLogRepository extends JpaRepository<DietLog, UUID> {
     @Query("SELECT d FROM DietLog d WHERE d.id = :id")
     Optional<DietLog> findByIdWithCustomer(@Param("id") UUID id);
 
+    @Query("SELECT d FROM DietLog d WHERE d.customerId IN :customerIds AND d.reviewStatus = :reviewStatus")
+    Page<DietLog> findByCustomerIdInAndReviewStatus(
+            @Param("customerIds") List<UUID> customerIds,
+            @Param("reviewStatus") com.sba.nutricanbe.diet.enums.DietLogReviewStatus reviewStatus,
+            Pageable pageable);
+
     @Query("SELECT d FROM DietLog d WHERE d.customerId IN :customerIds AND d.status = :status")
     Page<DietLog> findByCustomerIdInAndStatus(
             @Param("customerIds") List<UUID> customerIds,
@@ -52,6 +58,13 @@ public interface DietLogRepository extends JpaRepository<DietLog, UUID> {
             @Param("endDate") LocalDate endDate,
             @Param("status") DietLogStatus status,
             Pageable pageable);
+
+    List<DietLog> findByCustomerIdOrderByCreatedAtDesc(UUID customerId, Pageable pageable);
+
+    boolean existsByCustomerIdAndLogDateAndReviewStatus(
+            UUID customerId,
+            LocalDate logDate,
+            com.sba.nutricanbe.diet.enums.DietLogReviewStatus reviewStatus);
 
     @Query("SELECT d FROM DietLog d WHERE d.ptReviewedAt IS NOT NULL AND d.logDate BETWEEN :from AND :to ORDER BY d.ptReviewedAt DESC")
     List<DietLog> findReviewedBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);

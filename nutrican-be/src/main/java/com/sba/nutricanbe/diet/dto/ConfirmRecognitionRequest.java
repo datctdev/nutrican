@@ -15,4 +15,6 @@ public class ConfirmRecognitionRequest {
     private String foodCode;
     /** User-adjusted portion weight (grams) from confirmation modal slider */
     private BigDecimal portionGrams;
+    /** When true, queue log for PT review after confirmation */
+    private Boolean sendToPt;
 }

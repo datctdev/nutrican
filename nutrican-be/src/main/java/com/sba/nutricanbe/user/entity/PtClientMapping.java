@@ -35,5 +35,19 @@ public class PtClientMapping extends BaseEntity {
     @CreationTimestamp
     @Column(name = "assigned_at", updatable = false)
     private LocalDateTime assignedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "end_requested_by", length = 20)
+    private com.sba.nutricanbe.user.enums.CoachingEndRequestedBy endRequestedBy;
+
+    @Column(name = "end_requested_at")
+    private LocalDateTime endRequestedAt;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "termination_reason", length = 30)
+    private com.sba.nutricanbe.user.enums.TerminationReason terminationReason;
 }
 

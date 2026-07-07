@@ -5,5 +5,6 @@ public enum RecognitionSource {
     DB_MATCH,
     HYBRID,
     MANUAL,
+    MANUAL_RECIPE,
     PT_ADJUSTED
 }

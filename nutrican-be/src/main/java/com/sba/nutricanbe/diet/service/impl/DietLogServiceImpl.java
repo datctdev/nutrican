@@ -13,6 +13,8 @@ import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.RecognitionSource;
+import com.sba.nutricanbe.common.util.RblCohortUtil;
+import com.sba.nutricanbe.user.enums.DietPreference;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
@@ -26,7 +28,12 @@ import com.sba.nutricanbe.diet.dto.CreateDietLogRequest;
 import com.sba.nutricanbe.diet.dto.DietLogResponse;
 import com.sba.nutricanbe.diet.dto.DietSummaryResponse;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
+import com.sba.nutricanbe.diet.dto.IntakeControlResult;
+import com.sba.nutricanbe.diet.enums.IntakeStatus;
 import com.sba.nutricanbe.diet.service.DietLogService;
+import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
+import com.sba.nutricanbe.diet.service.AllergyCheckService;
+import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +58,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DietLogServiceImpl implements DietLogService {
 
-    private static final Set<DietLogStatus> SUMMARY_STATUSES = Set.of(DietLogStatus.APPROVED, DietLogStatus.LOGGED, DietLogStatus.PT_REVIEWING);
+    private static final Set<DietLogStatus> SUMMARY_STATUSES = Set.of(DietLogStatus.LOGGED);
     private final DietLogRepository dietLogRepository;
     private final DietLogImageRepository dietLogImageRepository;
     private final DietLogItemRepository dietLogItemRepository;
@@ -60,6 +67,10 @@ public class DietLogServiceImpl implements DietLogService {
     private final StorageService minioService;
     private final DietLogHelper dietLogHelper;
     private final SosTicketRepository sosTicketRepository;
+    private final IntakeControlLoopService intakeControlLoopService;
+    private final com.sba.nutricanbe.diet.service.UserRecipeService userRecipeService;
+    private final AllergyCheckService allergyCheckService;
+    private final DietPrefCheckService dietPrefCheckService;
 
     @Override
     @Transactional
@@ -69,6 +80,7 @@ public class DietLogServiceImpl implements DietLogService {
 
         MealSource mealSource = request.getMealSource() != null ? request.getMealSource() : MealSource.HOME_COOKED;
         MealComplexity mealComplexity = request.getMealComplexity() != null ? request.getMealComplexity() : MealComplexity.SIMPLE;
+        boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
 
         DietLog dietLog = DietLog.builder()
                 .customerId(customerId)
@@ -76,6 +88,9 @@ public class DietLogServiceImpl implements DietLogService {
                 .foodDescription(request.getFoodDescription())
                 .logDate(request.getLogDate() != null ? request.getLogDate() : LocalDate.now())
                 .status(DietLogStatus.LOGGED)
+                .reviewStatus(sendToPt
+                        ? com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING
+                        : com.sba.nutricanbe.diet.enums.DietLogReviewStatus.NOT_REQUIRED)
                 .mealSource(mealSource)
                 .mealComplexity(mealComplexity)
                 .restaurantName(request.getRestaurantName())
@@ -85,9 +100,15 @@ public class DietLogServiceImpl implements DietLogService {
                 .isPtNotified(false)
                 .build();
 
-        if (request.getItems() != null && !request.getItems().isEmpty()) {
+        if (request.getRecipeId() != null) {
+            var recipeItems = userRecipeService.toLogItems(customerId, request.getRecipeId());
+            dietLogHelper.applyItemsToLog(dietLog, recipeItems);
+            dietLog.setRecognitionSource(RecognitionSource.MANUAL_RECIPE);
+            dietLog.setMealSource(MealSource.HOME_COOKED);
+            dietLog.setMealComplexity(MealComplexity.HOME_COOKED_RECIPE);
+        } else if (request.getItems() != null && !request.getItems().isEmpty()) {
             dietLogHelper.applyItemsToLog(dietLog, request.getItems());
-            dietLog.setRecognitionSource(RecognitionSource.DB_MATCH);
+            dietLog.setRecognitionSource(RecognitionSource.MANUAL);
         } else if (request.getCalories() != null) {
             MacroNutrients macros = MacroNutrients.of(request.getCalories(), request.getProtein(), request.getCarb(), request.getFat());
             dietLog.setMacrosJson(macros);
@@ -101,9 +122,57 @@ public class DietLogServiceImpl implements DietLogService {
         }
 
         dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
+        DietPreference pref = customer.getDietPreference() != null ? customer.getDietPreference() : DietPreference.NORMAL;
+        dietLog.setExperimentCohortKey(RblCohortUtil.resolveKey(
+                dietLog.getMealSource(), dietLog.getMealComplexity(), dietLog.getRecognitionSource(), pref));
         dietLog = dietLogRepository.save(dietLog);
+        if (sendToPt) {
+            dietLog.setIsPtNotified(true);
+            dietLogHelper.notifyPtOfNewLog(dietLog);
+        }
         log.info("Diet log created: {} by user: {}", dietLog.getId(), customerId);
-        return ApiResponse.success(dietLogHelper.toResponse(dietLog), "Diet log created");
+        DietLogResponse response = dietLogHelper.toResponse(dietLog);
+        applyManualWarnings(customerId, request, response);
+        IntakeControlResult loop = intakeControlLoopService.evaluateAfterLog(
+                customerId, dietLog.getLogDate(), !sendToPt);
+        if (loop != null) {
+            response.setIntakeStatus(loop.getIntakeStatus());
+            response.setControlLoopMessage(loop.getControlLoopMessage());
+            response.setSuggestSubmitToPt(loop.isSuggestSubmitToPt());
+        }
+        return ApiResponse.success(response, "Diet log created");
+    }
+
+    private void applyManualWarnings(UUID customerId, CreateDietLogRequest request, DietLogResponse response) {
+        List<UUID> foodItemIds = new ArrayList<>();
+        List<FoodItem> foods = new ArrayList<>();
+        if (request.getRecipeId() != null) {
+            userRecipeService.toLogItems(customerId, request.getRecipeId()).forEach(item -> {
+                if (item.getFoodItemId() != null) {
+                    foodItemIds.add(item.getFoodItemId());
+                    foodItemRepository.findById(item.getFoodItemId()).ifPresent(foods::add);
+                }
+            });
+        } else if (request.getItems() != null) {
+            for (var item : request.getItems()) {
+                if (item.getFoodItemId() != null) {
+                    foodItemIds.add(item.getFoodItemId());
+                    foodItemRepository.findById(item.getFoodItemId()).ifPresent(foods::add);
+                }
+            }
+        }
+        if (!foodItemIds.isEmpty()) {
+            var allergies = allergyCheckService.checkFoodItems(customerId, foodItemIds);
+            if (!allergies.isEmpty()) {
+                response.setAllergyWarnings(allergies);
+            }
+        }
+        if (!foods.isEmpty()) {
+            var prefWarnings = dietPrefCheckService.checkFoodItems(customerId, foods);
+            if (!prefWarnings.isEmpty()) {
+                response.setDietPrefWarning(prefWarnings.get(0).getMessage());
+            }
+        }
     }
 
     @Override
@@ -174,11 +243,14 @@ public class DietLogServiceImpl implements DietLogService {
             throw new BadRequestException("You can only submit your own diet logs");
         }
 
-        if (dietLog.getStatus() != DietLogStatus.DRAFT) {
-            throw new BadRequestException("Only DRAFT logs can be submitted for review");
+        if (dietLog.getStatus() != DietLogStatus.LOGGED
+                && dietLog.getStatus() != DietLogStatus.DRAFT
+                && dietLog.getStatus() != DietLogStatus.MANUAL_REQUIRED) {
+            throw new BadRequestException("Only DRAFT, MANUAL_REQUIRED or LOGGED logs can be submitted for review");
         }
 
-        dietLog.setStatus(DietLogStatus.PT_REVIEWING);
+        dietLog.setStatus(DietLogStatus.LOGGED);
+        dietLog.setReviewStatus(com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING);
         dietLog.setIsPtNotified(true);
         dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
 
@@ -241,6 +313,8 @@ public class DietLogServiceImpl implements DietLogService {
 
         MacroTarget target = userQueryService.findMacroTargetByUserId(customerId).orElse(null);
 
+        IntakeControlResult loop = intakeControlLoopService.evaluateAfterLog(customerId, date, true);
+
         DietSummaryResponse summary = DietSummaryResponse.builder()
                 .date(date)
                 .totalCalories(totalCalories)
@@ -252,6 +326,8 @@ public class DietLogServiceImpl implements DietLogService {
                 .targetCarb(target != null ? target.getCarb() : BigDecimal.valueOf(200))
                 .targetFat(target != null ? target.getFat() : BigDecimal.valueOf(65))
                 .logs(countableLogs)
+                .intakeStatus(loop != null ? loop.getIntakeStatus() : IntakeStatus.OK)
+                .controlLoopMessage(loop != null ? loop.getControlLoopMessage() : null)
                 .build();
 
         return ApiResponse.success(summary);

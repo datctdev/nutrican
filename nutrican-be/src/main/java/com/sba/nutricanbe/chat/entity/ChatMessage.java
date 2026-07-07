@@ -20,6 +20,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "chat_messages")
@@ -59,4 +60,17 @@ public class ChatMessage extends BaseEntity {
 
     @Column(name = "read_at")
     private LocalDateTime readAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "context_type", length = 20)
+    private com.sba.nutricanbe.chat.enums.ChatContextType contextType;
+
+    @Column(name = "context_ref_id")
+    private UUID contextRefId;
+
+    @Column(name = "attachment_url", length = 1000)
+    private String attachmentUrl;
+
+    @Column(name = "attachment_object_name", length = 500)
+    private String attachmentObjectName;
 }

@@ -58,4 +58,8 @@ public class FoodItem extends BaseEntity {
     @Column(length = 50)
     @Builder.Default
     private String source = "INTERNAL_SEED";
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "diet_tags", columnDefinition = "jsonb")
+    private List<String> dietTags;
 }

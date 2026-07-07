@@ -2,11 +2,14 @@ package com.sba.nutricanbe.user.config;
 
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
+import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.enums.NutritionGoal;
 import com.sba.nutricanbe.user.enums.Tier;
+import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
@@ -20,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -33,6 +37,7 @@ public class UserInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PtProfileRepository ptProfileRepository;
     private final PtClientMappingRepository ptClientMappingRepository;
+    private final MacroTargetRepository macroTargetRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -94,6 +99,13 @@ public class UserInitializer implements CommandLineRunner {
 
         seedMapping(certifiedPt, customerOne, ClientMappingStatus.ACTIVE);
         seedMapping(freelancePt, customerTwo, ClientMappingStatus.PENDING);
+
+        seedCustomerE2eProfile(customerOne, NutritionGoal.WEIGHT_LOSS, 170, "MALE");
+        seedCustomerE2eProfile(customerTwo, NutritionGoal.WEIGHT_LOSS, 165, "FEMALE");
+        seedMacroTarget(customerOne, 2000, 120, 220, 65);
+        seedMacroTarget(customerTwo, 1900, 110, 200, 60);
+        seedPtMarketplacePrefs(certifiedPt, List.of("WEIGHT_LOSS", "WEIGHT_GAIN"), List.of("NORMAL", "VEGETARIAN"));
+        seedPtMarketplacePrefs(freelancePt, List.of("WEIGHT_LOSS", "MAINTAIN"), List.of("NORMAL", "KETO"));
 
         log.info("Seeded default users for hiring/chat test: {}, {}, {}, {}",
                 customerOne.getEmail(), customerTwo.getEmail(), certifiedPt.getEmail(), freelancePt.getEmail());
@@ -171,14 +183,47 @@ public class UserInitializer implements CommandLineRunner {
     private void seedMapping(User pt, User customer, ClientMappingStatus status) {
         ptClientMappingRepository.findByPt_IdAndClient_Id(pt.getId(), customer.getId())
                 .ifPresentOrElse(mapping -> {
-                    if (mapping.getStatus() != status) {
-                        mapping.setStatus(status);
-                        ptClientMappingRepository.save(mapping);
-                    }
+                    mapping.setStatus(status);
+                    ptClientMappingRepository.save(mapping);
                 }, () -> ptClientMappingRepository.save(PtClientMapping.builder()
                         .pt(pt)
                         .client(customer)
                         .status(status)
                         .build()));
+    }
+
+    private void seedCustomerE2eProfile(User customer, NutritionGoal goal, int heightCm, String gender) {
+        customer.setHeightCm(heightCm);
+        customer.setGender(gender);
+        customer.setNutritionGoal(goal);
+        customer.setOnboardingCompletedAt(LocalDateTime.now());
+        customer.setOnboardingStep(null);
+        customer.setOnboardingSkippedAt(null);
+        userRepository.save(customer);
+    }
+
+    private void seedMacroTarget(User customer, int calories, int protein, int carb, int fat) {
+        macroTargetRepository.findByUserId(customer.getId())
+                .ifPresentOrElse(existing -> {
+                    existing.setDailyCalories(BigDecimal.valueOf(calories));
+                    existing.setProtein(BigDecimal.valueOf(protein));
+                    existing.setCarb(BigDecimal.valueOf(carb));
+                    existing.setFat(BigDecimal.valueOf(fat));
+                    macroTargetRepository.save(existing);
+                }, () -> macroTargetRepository.save(MacroTarget.builder()
+                        .user(customer)
+                        .dailyCalories(BigDecimal.valueOf(calories))
+                        .protein(BigDecimal.valueOf(protein))
+                        .carb(BigDecimal.valueOf(carb))
+                        .fat(BigDecimal.valueOf(fat))
+                        .build()));
+    }
+
+    private void seedPtMarketplacePrefs(User pt, List<String> goals, List<String> diets) {
+        ptProfileRepository.findByUserId(pt.getId()).ifPresent(profile -> {
+            profile.setPreferredGoals(goals);
+            profile.setPreferredDietTypes(diets);
+            ptProfileRepository.save(profile);
+        });
     }
 }

@@ -6,7 +6,15 @@ import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import com.sba.nutricanbe.user.enums.DietPreference;
+import com.sba.nutricanbe.user.enums.NutritionGoal;
+import com.sba.nutricanbe.diet.enums.AllergenType;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "users")
@@ -48,6 +56,21 @@ public class User extends BaseEntity {
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
+    @Column(name = "height_cm")
+    private Integer heightCm;
+
+    @Column(length = 10)
+    private String gender;
+
+    @Column(name = "onboarding_completed_at")
+    private java.time.LocalDateTime onboardingCompletedAt;
+
+    @Column(name = "onboarding_step")
+    private Integer onboardingStep;
+
+    @Column(name = "onboarding_skipped_at")
+    private java.time.LocalDateTime onboardingSkippedAt;
+
     @Column(name = "google_id", unique = true)
     private String googleId;
 
@@ -61,6 +84,27 @@ public class User extends BaseEntity {
     @Column(name = "is_kyc_verified")
     @Builder.Default
     private Boolean isKycVerified = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "diet_preference", length = 20)
+    @Builder.Default
+    private DietPreference dietPreference = DietPreference.NORMAL;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "nutrition_goal", length = 20)
+    private NutritionGoal nutritionGoal;
+
+    @Column(name = "pregnancy_trimester")
+    private Integer pregnancyTrimester;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "allergens", columnDefinition = "jsonb")
+    private List<AllergenType> allergens;
+
+    /** NFR-14: e.g. {"postMealRating": true} */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "notification_opt_in", columnDefinition = "jsonb")
+    private Map<String, Boolean> notificationOptIn;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private PtProfile ptProfile;

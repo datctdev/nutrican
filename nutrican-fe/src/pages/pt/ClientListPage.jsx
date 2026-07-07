@@ -1,16 +1,17 @@
 // src/pages/pt/ClientListPage.jsx
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import {
     Search, Activity, MessageSquare,
-    Users, Clock, ShieldAlert, TrendingUp,
+    Users, Clock, ShieldAlert, TrendingUp, Utensils,
     ChevronDown, UserCheck, UserX
 } from 'lucide-react';
 import { workspaceService } from '../../services/workspaceService';
 import { toast } from 'sonner';
+import Modal from '../../components/common/Modal';
 
 export default function ClientListPage() {
     const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function ClientListPage() {
     const [statusFilter, setStatusFilter] = useState(''); // Bộ lọc local: GREEN, YELLOW, RED
     const [activeTab, setActiveTab] = useState('ACTIVE'); // Tab API: ACTIVE hoặc PENDING
     const [processingId, setProcessingId] = useState(null); // Trạng thái loading khi bấm Duyệt
+    const [endCoachingModal, setEndCoachingModal] = useState(null); // { clientId, mappingStatus, fullName }
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -33,6 +35,24 @@ export default function ClientListPage() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const [alerts, setAlerts] = useState([]);
+
+    const fetchAlerts = useCallback(async () => {
+        try {
+            const res = await workspaceService.getAlerts();
+            setAlerts(res.data?.data || []);
+        } catch {
+            setAlerts([]);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchAlerts();
+        const onAlert = () => fetchAlerts();
+        window.addEventListener('pt_client_alert', onAlert);
+        return () => window.removeEventListener('pt_client_alert', onAlert);
+    }, [fetchAlerts]);
 
     const fetchClients = useCallback(async () => {
         try {
@@ -97,7 +117,22 @@ export default function ClientListPage() {
     ];
 
     return (
-        <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4">
+        <>
+        <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4 min-w-0 overflow-x-hidden">
+
+            {alerts.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
+                    <p className="font-bold text-amber-900 flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4" /> Cảnh báo học viên ({alerts.length})
+                    </p>
+                    {alerts.map((a) => (
+                        <div key={a.clientId} className="text-sm text-amber-800 flex justify-between gap-2">
+                            <span className="font-semibold">{a.clientName}</span>
+                            <span>{a.intakeStatus} — {a.reason}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
@@ -249,20 +284,45 @@ export default function ClientListPage() {
 
                                     {/* NÚT ACTION */}
                                     {activeTab === 'ACTIVE' ? (
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => navigate('/pt/chat', { state: { targetClientId: client.clientId } })}
+                                                    className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl h-11 shadow-sm font-bold transition-colors"
+                                                >
+                                                    <MessageSquare className="w-4 h-4 mr-2" /> Nhắn tin
+                                                </Button>
+                                                <Button
+                                                    onClick={() => navigate(`/pt/progress/${client.clientId}`)}
+                                                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 shadow-sm font-bold transition-all"
+                                                >
+                                                    Tiến độ <TrendingUp className="w-4 h-4 ml-1.5" />
+                                                </Button>
+                                            </div>
                                             <Button
                                                 variant="outline"
-                                                onClick={() => navigate('/pt/chat', { state: { targetClientId: client.clientId } })}
-                                                className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl h-11 shadow-sm font-bold transition-colors"
+                                                onClick={() => navigate(`/pt/clients/${client.clientId}/meal-plan`)}
+                                                className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-xl h-10 font-semibold text-sm"
                                             >
-                                                <MessageSquare className="w-4 h-4 mr-2" /> Nhắn tin
+                                                <Utensils className="w-4 h-4 mr-2" /> Thực đơn tuần
                                             </Button>
-
                                             <Button
-                                                onClick={() => navigate(`/pt/progress/${client.clientId}`)}
-                                                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 shadow-sm font-bold transition-all"
+                                                variant="outline"
+                                                onClick={() => setEndCoachingModal({
+                                                    clientId: client.clientId,
+                                                    mappingStatus: client.mappingStatus,
+                                                    fullName: client.fullName,
+                                                })}
+                                                className={`w-full rounded-xl h-10 font-semibold text-sm ${
+                                                    client.mappingStatus === 'END_REQUESTED'
+                                                        ? 'border-emerald-200 text-emerald-800 hover:bg-emerald-50'
+                                                        : 'border-amber-200 text-amber-800 hover:bg-amber-50'
+                                                }`}
                                             >
-                                                Tiến độ <TrendingUp className="w-4 h-4 ml-1.5" />
+                                                {client.mappingStatus === 'END_REQUESTED'
+                                                    ? 'Xác nhận kết thúc coaching'
+                                                    : 'Kết thúc coaching'}
                                             </Button>
                                         </div>
                                     ) : (
@@ -291,5 +351,32 @@ export default function ClientListPage() {
                 </div>
             )}
         </div>
+
+        <Modal isOpen={!!endCoachingModal} onClose={() => setEndCoachingModal(null)}
+            title={endCoachingModal?.mappingStatus === 'END_REQUESTED' ? 'Xác nhận kết thúc coaching?' : 'Kết thúc coaching?'}>
+            <p className="text-sm text-slate-600 mb-4">
+                {endCoachingModal?.mappingStatus === 'END_REQUESTED'
+                    ? `Xác nhận kết thúc coaching với ${endCoachingModal?.fullName || 'khách hàng'}?`
+                    : `Gửi yêu cầu kết thúc coaching với ${endCoachingModal?.fullName || 'khách hàng'}? Khách hàng cần xác nhận.`}
+            </p>
+            <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setEndCoachingModal(null)}>Hủy</Button>
+                <Button onClick={async () => {
+                    if (!endCoachingModal) return;
+                    try {
+                        if (endCoachingModal.mappingStatus === 'END_REQUESTED') {
+                            await workspaceService.confirmEndCoaching(endCoachingModal.clientId);
+                            toast.success('Đã xác nhận kết thúc coaching');
+                        } else {
+                            await workspaceService.requestEndCoaching(endCoachingModal.clientId);
+                            toast.success('Đã gửi yêu cầu kết thúc coaching');
+                        }
+                        setEndCoachingModal(null);
+                        fetchClients();
+                    } catch (e) { toast.error(e.response?.data?.message || 'Lỗi'); }
+                }}>Xác nhận</Button>
+            </div>
+        </Modal>
+        </>
     );
 }

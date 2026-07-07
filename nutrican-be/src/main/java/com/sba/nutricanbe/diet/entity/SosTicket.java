@@ -52,4 +52,24 @@ public class SosTicket extends BaseEntity {
     @Column(name = "auto_created")
     @Builder.Default
     private Boolean autoCreated = false;
+
+    @Column(name = "assigned_at")
+    private java.time.LocalDateTime assignedAt;
+
+    @Column(name = "first_response_at")
+    private java.time.LocalDateTime firstResponseAt;
+
+    @Column(name = "resolved_at")
+    private java.time.LocalDateTime resolvedAt;
+
+    @Column(name = "resolution_note", columnDefinition = "TEXT")
+    private String resolutionNote;
+
+    @Column(name = "sla_breached")
+    @Builder.Default
+    private Boolean slaBreached = false;
+
+    @Column(name = "escalation_count")
+    @Builder.Default
+    private Integer escalationCount = 0;
 }

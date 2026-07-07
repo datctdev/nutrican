@@ -56,6 +56,30 @@ public class SmtpMailService implements MailService {
         }
     }
 
+    @Override
+    public void sendNotificationEmail(String toEmail, String fullName, String title, String body, String templateName) {
+        try {
+            Context context = new Context();
+            context.setVariable("fullName", fullName != null ? fullName : "");
+            context.setVariable("title", title);
+            context.setVariable("body", body);
+            context.setVariable("frontendUrl", frontendUrl);
+            String template = templateName != null ? templateName : "generic-notification";
+            String htmlContent = templateEngine.process(template, context);
+
+            var mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject(title != null ? title : "NutriCan PT");
+            helper.setText(htmlContent, true);
+            mailSender.send(mimeMessage);
+            log.info("Notification email sent to: {}", maskEmail(toEmail));
+        } catch (Exception e) {
+            log.warn("Failed to send notification email to {}: {}", maskEmail(toEmail), e.getMessage());
+        }
+    }
+
     private String maskEmail(String email) {
         if (email == null || !email.contains("@")) return "***";
         int at = email.indexOf("@");

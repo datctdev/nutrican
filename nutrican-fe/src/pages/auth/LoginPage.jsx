@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { resolveCustomerHomePath } from '../../services/profileExtensionsService';
 import { Card, CardContent } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
@@ -41,7 +42,13 @@ export default function LoginPage() {
       const response = await login(formData);
       toast.success('Chào mừng quay trở lại!', { description: 'Đăng nhập thành công' });
       const user = response?.data?.data?.user;
-      navigate(user ? getRedirectPath(user.role) : '/');
+      const role = user?.role;
+      if (role === 'CUSTOMER') {
+        const path = await resolveCustomerHomePath();
+        navigate(path);
+      } else {
+        navigate(user ? getRedirectPath(role) : '/');
+      }
     } catch (error) {
       toast.error('Đăng nhập thất bại', { description: error.response?.data?.message || 'Thông tin đăng nhập không hợp lệ' });
     }

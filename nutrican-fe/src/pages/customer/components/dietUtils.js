@@ -44,9 +44,12 @@ export function formatAiConfidence(score) {
 }
 
 export function formatPredictionConfidence(score) {
-    if (score == null || Number.isNaN(Number(score))) return '--%';
-    const pct = Number(score) <= 1 ? Math.round(Number(score) * 100) : Math.round(Number(score));
-    return `${pct}%`;
+    if (score == null || Number.isNaN(Number(score))) return '—';
+    const raw = Number(score) <= 1 ? Number(score) * 100 : Number(score);
+    const pct = Math.round(raw);
+    if (pct < 30) return `Độ tin thấp · ${pct}%`;
+    if (pct < 60) return `Độ tin TB · ${pct}%`;
+    return `Độ tin cao · ${pct}%`;
 }
 
 export const RESNET_FOOD_CODES = Object.keys(FOOD_CODE_LABELS);

@@ -24,7 +24,9 @@ export const createWebSocketConnection = (token) => {
 
     isIntentionallyClosed = false;
 
-    const wsUrl = `ws://localhost:8080/ws/workspace?token=${token}`;
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const wsBase = import.meta.env.VITE_WS_URL || apiBase.replace(/^http/, 'ws');
+    const wsUrl = `${wsBase}/ws/workspace?token=${token}`;
     console.log('🔗 Attempting to connect WebSocket to:', wsUrl);
     ws = new WebSocket(wsUrl);
 
@@ -114,6 +116,69 @@ const handleWebSocketMessage = (message) => {
                 toast.info(`Tin nhắn mới từ ${data.senderName}`, { description: data.content });
             }
             break;
+
+        case 'REFUND_UPDATE': {
+            const status = data?.status || '';
+            const action = data?.action || '';
+            const isApproved = status === 'APPROVED' || status === 'AUTO_APPROVED';
+            const isRejected = status === 'REJECTED';
+            const title = isApproved ? 'Hoàn tiền đã được duyệt' : isRejected ? 'Yêu cầu hoàn tiền bị từ chối' : 'Cập nhật hoàn tiền';
+            const message = data?.adminNote
+                ? `${title}: ${data.adminNote}`
+                : title;
+            addNotification({
+                id: data?.refundId || `refund-${Date.now()}`,
+                type: isApproved ? 'success' : isRejected ? 'error' : 'info',
+                title,
+                message,
+                isRead: false,
+                createdAt: new Date().toISOString(),
+            });
+            if (isApproved) {
+                toast.success(message);
+            } else if (isRejected) {
+                toast.error(message);
+            } else {
+                toast.info(message);
+            }
+            window.dispatchEvent(new CustomEvent('refund_update', { detail: data }));
+            break;
+        }
+
+        case 'PT_CLIENT_ALERT': {
+            const message = data?.reason || `Client ${data?.clientName || ''} cần chú ý (${data?.intakeStatus || 'AT_RISK'})`;
+            addNotification({
+                id: `alert-${data?.clientId || Date.now()}`,
+                type: 'warning',
+                title: 'Cảnh báo học viên',
+                message,
+                isRead: false,
+                createdAt: new Date().toISOString(),
+            });
+            toast.warning(message);
+            window.dispatchEvent(new CustomEvent('pt_client_alert', { detail: data }));
+            break;
+        }
+
+        case 'WEEKLY_SUMMARY': {
+            addNotification({
+                id: data?.id || `weekly-${Date.now()}`,
+                type: 'info',
+                title: 'Tổng kết tuần từ PT',
+                message: data?.summaryText || 'PT vừa gửi tổng kết tuần cho bạn.',
+                isRead: false,
+                createdAt: new Date().toISOString(),
+            });
+            toast.info('PT vừa gửi tổng kết tuần', { description: data?.summaryText?.slice(0, 80) });
+            window.dispatchEvent(new CustomEvent('weekly_summary', { detail: data }));
+            break;
+        }
+
+        case 'NOTIFICATION_COUNT': {
+            const count = data?.unreadCount ?? 0;
+            useNotificationStore.setState({ unreadCount: count });
+            break;
+        }
 
         default:
             console.log('Unhandled WebSocket event:', event);

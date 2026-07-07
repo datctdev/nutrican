@@ -16,14 +16,16 @@ export const dietService = {
     createSos: (data) => api.post('/diet/sos', data),
     getSosTickets: () => api.get('/diet/sos'),
 
-    confirmRecognition: (logId, foodCode, portionGrams) => api.put(`/diet/logs/${logId}/confirm-recognition`, {
+    confirmRecognition: (logId, foodCode, portionGrams, sendToPt = false) => api.put(`/diet/logs/${logId}/confirm-recognition`, {
         foodCode,
         portionGrams: portionGrams != null ? Number(portionGrams) : undefined,
+        sendToPt: Boolean(sendToPt),
     }),
 
     submitForReview: (id) => api.put(`/diet/logs/${id}/submit-for-review`),
+    saveFeedback: (logId, data) => api.put(`/diet/logs/${logId}/feedback`, data),
     getResNetDishes: () => api.get('/foods/resnet-dishes'),
-    searchFoods: (q, params = {}) => api.get('/foods/search', { params: { q, ...params } }),
+    searchFoods: (q, params = {}) => api.get('/foods/search', { params: { q, dietFilter: true, ...params } }),
     getHotpotBroths: () => api.get('/foods/hotpot/broths'),
     getHotpotItems: () => api.get('/foods/hotpot/items'),
 

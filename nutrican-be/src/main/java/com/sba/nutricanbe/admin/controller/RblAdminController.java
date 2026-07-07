@@ -7,6 +7,7 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.RecognitionSource;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -20,6 +21,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/admin/rbl")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('ADMIN')")
 public class RblAdminController {
 
     private final RblAdminService rblAdminService;
@@ -44,9 +46,10 @@ public class RblAdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) MealSource mealSource,
             @RequestParam(required = false) RecognitionSource recognitionSource,
+            @RequestParam(required = false) String experimentCohortKey,
             @RequestParam(defaultValue = "true") boolean cvOnly,
             @RequestParam(defaultValue = "false") boolean includeRejected) {
-        ApiResponse<byte[]> result = rblAdminService.exportCsv(from, to, mealSource, recognitionSource, cvOnly, includeRejected);
+        ApiResponse<byte[]> result = rblAdminService.exportCsv(from, to, mealSource, recognitionSource, experimentCohortKey, cvOnly, includeRejected);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=rbl_export.csv")
                 .contentType(MediaType.parseMediaType("text/csv"))

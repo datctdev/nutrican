@@ -40,7 +40,9 @@ public class SosAdminServiceImpl implements SosAdminService {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<SosTicket> ticketPage;
 
-        if (status != null) {
+        if ("SLA_BREACHED".equalsIgnoreCase(status)) {
+            ticketPage = sosTicketRepository.findBySlaBreachedTrue(pageable);
+        } else if (status != null && !status.isBlank()) {
             ticketPage = sosTicketRepository.findByStatus(
                     SosTicketStatus.valueOf(status), pageable);
         } else {
@@ -57,6 +59,14 @@ public class SosAdminServiceImpl implements SosAdminService {
         SosTicket ticket = sosTicketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("SOS Ticket", ticketId));
 
+        boolean canAssign = ticket.getStatus() == SosTicketStatus.OPEN
+                || (Boolean.TRUE.equals(ticket.getSlaBreached())
+                && (ticket.getStatus() == SosTicketStatus.ASSIGNED
+                    || ticket.getStatus() == SosTicketStatus.IN_PROGRESS));
+        if (!canAssign) {
+            throw new BadRequestException("Ticket cannot be assigned in current status");
+        }
+
         User pt = userRepository.findById(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
 
@@ -70,6 +80,11 @@ public class SosAdminServiceImpl implements SosAdminService {
         ticket.setPtId(ptId);
         ticket.setAssignedById(adminId);
         ticket.setStatus(SosTicketStatus.ASSIGNED);
+        ticket.setAssignedAt(java.time.LocalDateTime.now());
+        if (Boolean.TRUE.equals(ticket.getSlaBreached())) {
+            ticket.setSlaBreached(false);
+            ticket.setEscalationCount((ticket.getEscalationCount() != null ? ticket.getEscalationCount() : 0) + 1);
+        }
         sosTicketRepository.save(ticket);
 
         log.info("SOS ticket {} assigned to PT {}", ticketId, ptId);
@@ -109,6 +124,11 @@ public class SosAdminServiceImpl implements SosAdminService {
                 .customerName(customerName)
                 .ptName(ptName)
                 .createdAt(ticket.getCreatedAt())
+                .assignedAt(ticket.getAssignedAt())
+                .firstResponseAt(ticket.getFirstResponseAt())
+                .resolvedAt(ticket.getResolvedAt())
+                .slaBreached(ticket.getSlaBreached())
+                .escalationCount(ticket.getEscalationCount())
                 .build();
     }
 }

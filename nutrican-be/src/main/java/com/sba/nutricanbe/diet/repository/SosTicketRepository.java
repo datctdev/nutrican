@@ -18,6 +18,8 @@ public interface SosTicketRepository extends JpaRepository<SosTicket, UUID> {
 
     Page<SosTicket> findByStatusIn(List<SosTicketStatus> statuses, Pageable pageable);
 
+    Page<SosTicket> findBySlaBreachedTrue(Pageable pageable);
+
     @Query("SELECT t FROM SosTicket t LEFT JOIN FETCH t.dietLog dl WHERE dl.customerId = :customerId ORDER BY t.createdAt DESC")
     List<SosTicket> findByCustomerId(@Param("customerId") UUID customerId);
 

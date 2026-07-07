@@ -23,4 +23,6 @@ public class CreateDietLogRequest {
     private String restaurantName;
     private UUID foodItemId;
     private List<DietLogItemRequest> items;
+    private Boolean sendToPt;
+    private UUID recipeId;
 }

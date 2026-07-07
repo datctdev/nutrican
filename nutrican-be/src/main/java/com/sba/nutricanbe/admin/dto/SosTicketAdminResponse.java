@@ -22,4 +22,9 @@ public class SosTicketAdminResponse {
     private String customerName;
     private String ptName;
     private LocalDateTime createdAt;
+    private LocalDateTime assignedAt;
+    private LocalDateTime firstResponseAt;
+    private LocalDateTime resolvedAt;
+    private Boolean slaBreached;
+    private Integer escalationCount;
 }

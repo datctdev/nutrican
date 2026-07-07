@@ -3,6 +3,11 @@
 ## Quick Links
 
 - [README](../README.md) - Project overview
+- [NUTRICAN_PT_MASTER_SPEC_v3](./NUTRICAN_PT_MASTER_SPEC_v3.md) - **Master Spec v3 (source of truth)**
+- [NUTRICAN_PT_GAP_ADDENDUM_v3_1](./NUTRICAN_PT_GAP_ADDENDUM_v3_1.md) - **Addendum v3.1 (ADD-01..08)**
+- [NUTRICAN_PT_MASTER_SPEC_v2](./NUTRICAN_PT_MASTER_SPEC_v2.md) - Master Spec v2 (archive — lõi v2)
+- [PRODUCT_REQUIREMENTS_SUMMARY](./PRODUCT_REQUIREMENTS_SUMMARY.md) - **PRD đầy đủ: BR, FR, AC, Constraints, Business Rules**
+- [TONG_HOP_DU_AN_FE_BE](./TONG_HOP_DU_AN_FE_BE.md) - **Tổng hợp FE+BE kỹ thuật — workflow, code map, chạy local**
 - [API_DOCUMENTATION](./API_DOCUMENTATION.md) - Full API reference
 - [ARCHITECTURE](./ARCHITECTURE.md) - System architecture
 - [FEATURES](./FEATURES.md) - Feature descriptions
@@ -43,6 +48,17 @@ cd nutrican-fe && npm install && npm run dev
 admin@nutrican.com / Admin123!
 ```
 
----
+- [TESTING_E2E_MATRIX](./TESTING_E2E_MATRIX.md) - AC → test matrix (Happy/Bad)
+- [TESTING_V2_FLOWS](./TESTING_V2_FLOWS.md) - Manual flows + regression gate
+- [TEAM_ONBOARDING](./TEAM_ONBOARDING.md) - Dev onboarding + seed users
 
-*Version 2.3.0 | Last Updated: 2026-06-20*
+## Regression gate (2026-07-07)
+
+| Layer | Command | Expected |
+|-------|---------|----------|
+| BE | `cd nutrican-be; ./mvnw test` | **120** pass |
+| FE | `cd nutrican-fe; npm run build` | pass |
+| E2E | `cd e2e; npx playwright test tests/` (BE :8080) | **58** cases |
+| v3.1 layers | `npx playwright test -g "BE-only\|FE-only\|Hybrid"` | **34** cases |
+
+---

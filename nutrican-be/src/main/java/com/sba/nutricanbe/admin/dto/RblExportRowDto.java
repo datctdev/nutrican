@@ -19,6 +19,8 @@ public class RblExportRowDto {
     private String mealComplexity;
     private String recognitionSource;
     private String experimentCohort;
+    private String experimentCohortKey;
+    private String dietPreference;
     private BigDecimal aiConfidence;
     private Integer dbMatchScore;
     private String modelVersion;

@@ -86,10 +86,10 @@ public class PtAdminServiceImpl implements PtAdminService {
                 log.info("PT {} approved as {} by admin", userId, ptType);
             }
             case "REJECT" -> {
-                // BUG FIX: Chỉ update trạng thái hồ sơ PT, KHÔNG suspend tài khoản người dùng
                 profile.setVerificationStatus(UserStatus.SUSPENDED);
                 profile.setPtRequestStatus(UserStatus.SUSPENDED);
                 profile.setIsVerified(false);
+                profile.setAdminRejectNote(request.getAdminNote());
                 log.info("PT {} rejected by admin", userId);
             }
             default -> throw new BadRequestException("Invalid action: " + action);
@@ -141,6 +141,8 @@ public class PtAdminServiceImpl implements PtAdminService {
                 .cvUrl(profile.getCvUrl())
                 .instagramUrl(profile.getInstagramUrl())
                 .linkedinUrl(profile.getLinkedinUrl())
+                .gender(profile.getGender() != null ? profile.getGender().name() : null)
+                .adminRejectNote(profile.getAdminRejectNote())
                 .documentUrls(profile.getDocumentUrls())
                 .verificationStatus(profile.getVerificationStatus().name())
                 .createdAt(profile.getCreatedAt())

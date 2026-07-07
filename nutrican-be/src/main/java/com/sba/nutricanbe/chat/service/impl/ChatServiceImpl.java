@@ -4,9 +4,14 @@ import com.sba.nutricanbe.chat.dto.ChatMessageRequest;
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
 import com.sba.nutricanbe.chat.entity.ChatMessage;
+import com.sba.nutricanbe.chat.enums.ChatContextType;
 import com.sba.nutricanbe.chat.enums.ChatMessageType;
+import com.sba.nutricanbe.diet.entity.SosTicket;
+import com.sba.nutricanbe.diet.enums.SosTicketStatus;
+import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.chat.repository.ChatMessageRepository;
 import com.sba.nutricanbe.chat.service.ChatService;
+import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
@@ -39,6 +44,7 @@ public class ChatServiceImpl implements ChatService {
     private final UserRepository userRepository;
     private final StorageService storageService;
     private final WebSocketSessionService webSocketSessionService;
+    private final SosTicketRepository sosTicketRepository;
     private static final String CHAT_MESSAGE_EVENT = "CHAT_MESSAGE";
 
     @Override
@@ -96,8 +102,72 @@ public class ChatServiceImpl implements ChatService {
                 .content(content != null ? content : "")
                 .messageType(imageUrl != null ? ChatMessageType.IMAGE : ChatMessageType.TEXT)
                 .imageUrl(imageUrl)
+                .contextType(request.getContextType())
+                .contextRefId(request.getContextRefId())
                 .build());
+        recordPtFirstResponse(sender, mapping);
         return toMessageResponse(message);
+    }
+
+    @Override
+    @Transactional
+    public ChatMessageResponse sendAttachmentMessage(UUID senderId, UUID mappingId, String content,
+            MultipartFile file, ChatContextType contextType, UUID contextRefId) {
+        if (mappingId == null) {
+            throw new BadRequestException("mappingId is required");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("file is required");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BadRequestException("PDF must be at most 5MB");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.equals("application/pdf")) {
+            throw new BadRequestException("Only PDF attachments are allowed");
+        }
+
+        PtClientMapping mapping = getActiveMappingForUser(mappingId, senderId);
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", senderId));
+        User recipient = mapping.getPt().getId().equals(senderId) ? mapping.getClient() : mapping.getPt();
+
+        String objectName = storageService.uploadFile(file, "chat-attachments/" + mappingId);
+        String attachmentUrl = storageService.getPresignedUrl(objectName);
+        String normalizedContent = normalizeContent(content);
+
+        ChatMessage message = chatMessageRepository.save(ChatMessage.builder()
+                .mapping(mapping)
+                .sender(sender)
+                .recipient(recipient)
+                .content(normalizedContent != null ? normalizedContent : "")
+                .messageType(ChatMessageType.FILE)
+                .attachmentUrl(attachmentUrl)
+                .attachmentObjectName(objectName)
+                .contextType(contextType)
+                .contextRefId(contextRefId)
+                .build());
+        recordPtFirstResponse(sender, mapping);
+        return toMessageResponse(message);
+    }
+
+    private void recordPtFirstResponse(User sender, PtClientMapping mapping) {
+        if (sender.getRole() != UserRole.PT_CERTIFIED && sender.getRole() != UserRole.PT_FREELANCE) {
+            return;
+        }
+        UUID clientId = mapping.getClient().getId();
+        sosTicketRepository.findByCustomerId(clientId).stream()
+                .filter(t -> t.getPtId() != null && t.getPtId().equals(sender.getId()))
+                .filter(t -> t.getFirstResponseAt() == null
+                        && t.getStatus() != SosTicketStatus.RESOLVED
+                        && t.getStatus() != SosTicketStatus.CLOSED)
+                .forEach(ticket -> {
+                    ticket.setFirstResponseAt(LocalDateTime.now());
+                    if (ticket.getStatus() == SosTicketStatus.ASSIGNED) {
+                        ticket.setStatus(SosTicketStatus.IN_PROGRESS);
+                    }
+                    sosTicketRepository.save(ticket);
+                });
     }
 
     @Override
@@ -179,6 +249,9 @@ public class ChatServiceImpl implements ChatService {
                 .content(message.getContent())
                 .messageType(message.getMessageType())
                 .imageUrl(message.getImageUrl())
+                .contextType(message.getContextType())
+                .contextRefId(message.getContextRefId())
+                .attachmentUrl(message.getAttachmentUrl())
                 .readAt(message.getReadAt())
                 .createdAt(message.getCreatedAt())
                 .build();

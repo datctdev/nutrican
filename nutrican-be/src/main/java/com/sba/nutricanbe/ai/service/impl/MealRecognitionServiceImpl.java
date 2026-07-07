@@ -49,6 +49,13 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
     @Override
     public MealRecognitionResult recognizeMealFromFile(
             MultipartFile file, String mealType, String mealSource, String mealComplexity) {
+        return recognizeMealFromFile(file, mealType, mealSource, mealComplexity, null);
+    }
+
+    @Override
+    public MealRecognitionResult recognizeMealFromFile(
+            MultipartFile file, String mealType, String mealSource, String mealComplexity,
+            ResNetAnalyzeResponse cachedResNet) {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("Image file is required");
         }
@@ -57,7 +64,7 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
             throw new BadRequestException("File must be an image");
         }
 
-        ResNetAnalyzeResponse response = resNetClient.analyze(file);
+        ResNetAnalyzeResponse response = cachedResNet != null ? cachedResNet : resNetClient.analyze(file);
         if (response == null || !response.isSuccess() || response.getData() == null) {
             String msg = response != null && response.getMessage() != null
                     ? response.getMessage()

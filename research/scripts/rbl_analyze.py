@@ -125,6 +125,19 @@ def analyze(df: pd.DataFrame) -> str:
         )
         lines.append(cohort_delta.to_markdown())
 
+    cohort_key_col = "experiment_cohort_key" if "experiment_cohort_key" in lab.columns else None
+    if cohort_key_col:
+        lines.append("\n## H3b — ΔA by experiment_cohort_key (diet pref dimension)\n")
+        key_delta = lab.groupby(cohort_key_col).apply(
+            lambda g: g["delta_ai_cal"].mean() - g["delta_db_cal"].mean(),
+            include_groups=False,
+        )
+        lines.append(key_delta.to_markdown())
+    if "diet_preference" in lab.columns:
+        lines.append("\n## Diet preference breakdown\n")
+        pref_delta = lab.groupby("diet_preference")["delta_ai_cal"].mean()
+        lines.append(pref_delta.to_markdown())
+
     if "model_version" in lab.columns:
         models = lab["model_version"].dropna().unique().tolist()
         lines.append(f"\n## Model versions in export\n")

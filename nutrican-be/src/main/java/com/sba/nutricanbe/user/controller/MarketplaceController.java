@@ -30,22 +30,31 @@ public class MarketplaceController {
             @RequestParam(required = false) Integer minExperience,
             @RequestParam(required = false) Boolean verifiedOnly,
             @RequestParam(required = false) String tier,
+            @RequestParam(required = false) String goalFilter,
+            @RequestParam(required = false) String dietFilter,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sort,
             @RequestParam(defaultValue = "tier") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal User user) {
 
         PtSearchRequest request = new PtSearchRequest();
         request.setSpecialization(specialization);
         request.setMinExperience(minExperience);
         request.setVerifiedOnly(verifiedOnly);
         request.setTier(tier);
+        request.setGoalFilter(goalFilter);
+        request.setDietFilter(dietFilter);
+        request.setSearch(search);
+        request.setSort(sort);
         request.setSortBy(sortBy);
         request.setSortDir(sortDir);
         request.setPage(page);
         request.setSize(size);
 
-        return ResponseEntity.ok(marketplaceService.searchPts(request));
+        return ResponseEntity.ok(marketplaceService.searchPts(request, user));
     }
 
     @GetMapping("/pts/{ptId}")

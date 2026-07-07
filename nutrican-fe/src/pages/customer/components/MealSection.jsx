@@ -39,25 +39,31 @@ const SafeImage = ({ src, alt, className }) => {
     );
 };
 
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status, reviewStatus }) => {
+    const displayKey = reviewStatus === 'PENDING' ? 'REVIEW_PENDING'
+        : reviewStatus === 'APPROVED' ? 'REVIEW_APPROVED'
+        : reviewStatus === 'REJECTED' ? 'REVIEW_REJECTED'
+        : status;
     const map = {
-        'APPROVED': { color: 'bg-secondary/10 text-secondary border-secondary/20', icon: CheckCircle2 },
+        'REVIEW_APPROVED': { color: 'bg-secondary/10 text-secondary border-secondary/20', icon: CheckCircle2 },
+        'REVIEW_PENDING': { color: 'bg-warning/10 text-warning border-warning/20', icon: Clock },
+        'REVIEW_REJECTED': { color: 'bg-danger/10 text-danger border-danger/20', icon: XCircle },
         'PENDING_AI': { color: 'bg-primary/10 text-primary border-primary/20', icon: Activity },
-        'PT_REVIEWING': { color: 'bg-warning/10 text-warning border-warning/20', icon: Clock },
-        'REJECTED': { color: 'bg-danger/10 text-danger border-danger/20', icon: XCircle },
         'DRAFT': { color: 'bg-slate-100 text-slate-650 border-slate-200', icon: FileText },
-        'LOGGED': { color: 'bg-secondary/10 text-secondary border-secondary/20', icon: CheckCircle2 },
+        'MANUAL_REQUIRED': { color: 'bg-orange-50 text-orange-700 border-orange-200', icon: Edit },
+        'LOGGED': { color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
     };
-    const config = map[status] || { color: 'bg-slate-100 text-slate-650 border-slate-200', icon: Activity };
+    const config = map[displayKey] || { color: 'bg-slate-100 text-slate-650 border-slate-200', icon: Activity };
     const Icon = config.icon;
     const statusVi = {
-        'APPROVED': 'Đã duyệt',
+        'REVIEW_APPROVED': 'PT đã duyệt',
+        'REVIEW_PENDING': 'Chờ PT duyệt',
+        'REVIEW_REJECTED': 'PT từ chối',
         'PENDING_AI': 'AI đang xử lý',
-        'PT_REVIEWING': 'PT đang xem xét',
-        'REJECTED': 'Từ chối',
         'DRAFT': 'Nháp',
+        'MANUAL_REQUIRED': 'Cần nhập tay',
         'LOGGED': 'Đã ghi nhận',
-    }[status] || status || 'Chưa rõ';
+    }[displayKey] || displayKey || 'Chưa rõ';
 
     return (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${config.color}`}>
@@ -165,7 +171,7 @@ export default function MealSection({
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2 mb-2">
                                         <span className="text-xs font-extrabold tracking-widest text-slate-450 uppercase">{log.mealType}</span>
-                                        <StatusBadge status={log.status} />
+                                        <StatusBadge status={log.status} reviewStatus={log.reviewStatus} />
                                         {log.mealSource && (
                                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-650 border border-slate-200">
                                                 {log.mealSource === 'HOME_COOKED' ? 'Tự nấu' : 'Ăn ngoài'}
@@ -212,7 +218,7 @@ export default function MealSection({
                                     </div>
 
                                     {/* PHẢN HỒI VÀ LÝ DO TỪ PT */}
-                                    {(log.ptNote || log.ptCorrectionReason) && log.status !== 'DRAFT' && (
+                                    {(log.ptNote || log.ptCorrectionReason) && log.status !== 'DRAFT' && log.status !== 'MANUAL_REQUIRED' && (
                                         <div className={`mt-4 p-4 rounded-xl border text-sm ${log.status === 'REJECTED' ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-secondary/10 border-secondary/20 text-secondary-foreground'}`}>
                                             <p className="font-extrabold mb-1.5 flex items-center gap-2">
                                                 {log.status === 'REJECTED' ? <XCircle className="w-4 h-4"/> : <CheckCircle2 className="w-4 h-4"/>}
@@ -231,7 +237,23 @@ export default function MealSection({
                                         </div>
                                     )}
 
-                                    {log.status === 'DRAFT' && (
+                                    {log.status === 'LOGGED' && log.reviewStatus === 'NOT_REQUIRED' && (
+                                        <div className="flex items-center gap-2 mt-4">
+                                            <Button
+                                                size="sm"
+                                                onClick={async () => {
+                                                    await dietService.submitForReview(log.id);
+                                                    toast.success('Đã gửi cho PT duyệt');
+                                                    fetchData();
+                                                }}
+                                                className="bg-warning hover:bg-warning/90 text-white rounded-lg text-xs font-bold h-9"
+                                            >
+                                                Gửi PT kiểm tra
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {(log.status === 'DRAFT' || log.status === 'MANUAL_REQUIRED') && (
                                         <div className="flex items-center gap-2 mt-4 flex-wrap">
                                             <Button 
                                                 size="sm" 

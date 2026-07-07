@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.chat.dto;
 
+import com.sba.nutricanbe.chat.enums.ChatContextType;
 import com.sba.nutricanbe.chat.enums.ChatMessageType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,6 +26,9 @@ public class ChatMessageResponse {
     private String content;
     private ChatMessageType messageType;
     private String imageUrl;
+    private ChatContextType contextType;
+    private UUID contextRefId;
+    private String attachmentUrl;
     private LocalDateTime readAt;
     private LocalDateTime createdAt;
 }

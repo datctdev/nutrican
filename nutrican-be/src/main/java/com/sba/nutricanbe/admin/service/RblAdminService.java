@@ -15,7 +15,8 @@ public interface RblAdminService {
     ApiResponse<List<RblExportRowDto>> exportPreview(LocalDate from, LocalDate to, boolean cvOnly, boolean includeRejected);
 
     ApiResponse<byte[]> exportCsv(LocalDate from, LocalDate to, MealSource mealSource,
-                                   RecognitionSource recognitionSource, boolean cvOnly, boolean includeRejected);
+                                   RecognitionSource recognitionSource, String experimentCohortKey,
+                                   boolean cvOnly, boolean includeRejected);
 
     ApiResponse<RblStatsResponse> getStats(LocalDate from, LocalDate to);
 

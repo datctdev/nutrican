@@ -1,10 +1,14 @@
 package com.sba.nutricanbe.workspace.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import com.sba.nutricanbe.common.dto.PageResponse;
+import com.sba.nutricanbe.user.dto.BodyMetricDto;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.service.MarketplaceService;
+import com.sba.nutricanbe.user.service.ClientGoalService;
 import com.sba.nutricanbe.workspace.dto.*;
 import com.sba.nutricanbe.workspace.service.PtWorkspaceService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +29,9 @@ public class PtWorkspaceController {
 
     private final PtWorkspaceService ptWorkspaceService;
     private final MarketplaceService marketplaceService;
+    private final ClientGoalService clientGoalService;
+    private final com.sba.nutricanbe.user.service.BodyMetricService bodyMetricService;
+    private final com.sba.nutricanbe.user.service.CoachingLifecycleService coachingLifecycleService;
 
     @GetMapping("/clients")
     public ResponseEntity<ApiResponse<PageResponse<ClientStatusDto>>> getClients(
@@ -60,6 +67,17 @@ public class PtWorkspaceController {
         return ResponseEntity.ok(ptWorkspaceService.getClientProgress(user.getId(), clientId, startDate, endDate));
     }
 
+    @GetMapping("/clients/{clientId}/body-metrics")
+    public ResponseEntity<ApiResponse<PageResponse<BodyMetricDto>>> getClientBodyMetrics(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        var result = bodyMetricService.listMetricsForClient(user.getId(), clientId,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "recordDate")));
+        return ResponseEntity.ok(ApiResponse.success(PageResponse.from(result)));
+    }
+
     @PostMapping("/clients/{clientId}/assign")
     public ResponseEntity<ApiResponse<Void>> assignClient(
             @PathVariable UUID clientId,
@@ -73,6 +91,22 @@ public class PtWorkspaceController {
             @AuthenticationPrincipal User user,
             @RequestParam String action) {
         return ResponseEntity.ok(marketplaceService.updateHireRequest(clientId, user.getId(), action));
+    }
+
+    @GetMapping("/alerts")
+    public ResponseEntity<ApiResponse<java.util.List<PtClientAlertDto>>> getAlerts(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientAlerts(user.getId()));
+    }
+
+    @PostMapping("/clients/{clientId}/milestones")
+    public ResponseEntity<ApiResponse<MilestoneDto>> addClientMilestone(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestBody java.util.Map<String, String> body) {
+        return ResponseEntity.ok(ApiResponse.success(
+                clientGoalService.addManualMilestone(clientId, body.get("title"), body.get("note")),
+                "Milestone added"));
     }
 
     @GetMapping("/stats")
@@ -91,7 +125,8 @@ public class PtWorkspaceController {
             @PathVariable UUID ticketId,
             @AuthenticationPrincipal User user,
             @RequestBody(required = false) java.util.Map<String, String> body) {
-        String note = body != null ? body.get("note") : null;
+        String note = body != null ? body.get("resolutionNote") : null;
+        if (note == null && body != null) note = body.get("note");
         return ResponseEntity.ok(ptWorkspaceService.resolveSosTicket(ticketId, user.getId(), note));
     }
 
@@ -106,5 +141,58 @@ public class PtWorkspaceController {
     @GetMapping("/rbl/stats")
     public ResponseEntity<ApiResponse<PtRblStatsDto>> getRblStats(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ptWorkspaceService.getRblStats(user.getId()));
+    }
+
+    @PutMapping("/clients/{clientId}/macro-target")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.user.dto.MacroTargetResponse>> setClientMacroTarget(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestBody com.sba.nutricanbe.user.dto.MacroTargetRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.setClientMacroTarget(user.getId(), clientId, request));
+    }
+
+    @PutMapping("/meal-plan-suggestions/{id}")
+    public ResponseEntity<ApiResponse<MealPlanSuggestionDto>> reviewMealPlanSuggestion(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
+            @RequestBody MealPlanSuggestionReviewRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.reviewMealPlanSuggestion(user.getId(), id, request));
+    }
+
+    @GetMapping("/clients/{clientId}/meal-plan-suggestions")
+    public ResponseEntity<ApiResponse<java.util.List<MealPlanSuggestionDto>>> getPendingSuggestions(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.getPendingMealPlanSuggestions(user.getId(), clientId));
+    }
+
+    @PostMapping("/weekly-summary")
+    public ResponseEntity<ApiResponse<WeeklySummaryDto>> createWeeklySummary(
+            @AuthenticationPrincipal User user,
+            @RequestBody WeeklySummaryRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.createWeeklySummary(user.getId(), request));
+    }
+
+    @PostMapping("/clients/{clientId}/end-coaching")
+    public ResponseEntity<ApiResponse<PtClientMappingResponse>> requestEndCoaching(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.success(
+                coachingLifecycleService.requestEndCoaching(user.getId(), clientId, true)));
+    }
+
+    @PutMapping("/clients/{clientId}/end-coaching/confirm")
+    public ResponseEntity<ApiResponse<PtClientMappingResponse>> confirmEndCoaching(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.success(
+                coachingLifecycleService.confirmEndCoaching(user.getId(), clientId, true)));
+    }
+
+    @GetMapping("/clients/{clientId}/chat-context")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.chat.dto.ChatContextSummaryDto>> getChatContext(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.getChatContext(user.getId(), clientId));
     }
 }

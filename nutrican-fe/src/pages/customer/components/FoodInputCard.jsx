@@ -1,6 +1,6 @@
 // src/pages/customer/components/FoodInputCard.jsx
 import { 
-    Sparkles, Keyboard, Camera, Upload, RefreshCw, X
+    Sparkles, Keyboard, Camera, Upload, RefreshCw, X, ChefHat
 } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
@@ -31,6 +31,16 @@ export default function FoodInputCard({
     ingredientTotals,
     handleManualSubmit,
     uploading,
+    dietFilterOn,
+    setDietFilterOn,
+    manualSendToPt,
+    setManualSendToPt,
+    savedRecipes,
+    recipeName,
+    setRecipeName,
+    handleSaveRecipe,
+    handleLogFromRecipe,
+    handleLogFromSavedRecipe,
 }) {
     return (
         <Card className="overflow-hidden border-slate-200 shadow-sm bg-white">
@@ -40,16 +50,23 @@ export default function FoodInputCard({
                     <button 
                         type="button"
                         onClick={() => setInputMode('ai')} 
-                        className={`flex-1 sm:w-40 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'ai' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 sm:w-36 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'ai' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <Sparkles className="w-4 h-4" /> Phân tích AI
                     </button>
                     <button 
                         type="button"
                         onClick={() => setInputMode('manual')} 
-                        className={`flex-1 sm:w-40 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'manual' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex-1 sm:w-36 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'manual' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <Keyboard className="w-4 h-4" /> Nhập thủ công
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setInputMode('recipe')} 
+                        className={`flex-1 sm:w-36 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'recipe' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <ChefHat className="w-4 h-4" /> Công thức
                     </button>
                 </div>
 
@@ -94,8 +111,8 @@ export default function FoodInputCard({
                             <Button type="button" variant="outline" className="bg-white border-slate-300 text-slate-700 pointer-events-none rounded-xl">Chọn hình ảnh</Button>
                         )}
                     </div>
-                ) : (
-                    <form onSubmit={handleManualSubmit} className="space-y-5 animate-fade-in bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
+                ) : (inputMode === 'manual' || inputMode === 'recipe') ? (
+                    <form onSubmit={inputMode === 'recipe' ? handleLogFromRecipe : handleManualSubmit} className="space-y-5 animate-fade-in bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1.5">Bữa ăn</label>
                             <select 
@@ -109,6 +126,29 @@ export default function FoodInputCard({
                                 <option value="SNACK">Bữa phụ</option>
                             </select>
                         </div>
+
+                        {inputMode === 'recipe' && (
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Tên công thức</label>
+                                <input
+                                    type="text"
+                                    value={recipeName || ''}
+                                    onChange={(e) => setRecipeName?.(e.target.value)}
+                                    placeholder="Ví dụ: Cơm gà xào"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                />
+                            </div>
+                        )}
+
+                        <label className="flex items-center gap-2 text-sm text-slate-600 mb-2">
+                            <input
+                                type="checkbox"
+                                checked={dietFilterOn ?? true}
+                                onChange={(e) => setDietFilterOn?.(e.target.checked)}
+                                className="rounded border-slate-300"
+                            />
+                            Lọc theo chế độ ăn của tôi
+                        </label>
 
                         <div className="relative">
                             <label className="block text-sm font-bold text-slate-700 mb-1.5">Tìm thực phẩm</label>
@@ -128,7 +168,12 @@ export default function FoodInputCard({
                                             onClick={() => addIngredientFromSearch(food)}
                                             className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/5 text-slate-700 flex items-center justify-between gap-3 border-none outline-none"
                                         >
-                                            <span className="font-semibold">{food.nameVi}</span>
+                                            <span className="font-semibold flex items-center gap-2">
+                                                {food.nameVi}
+                                                {food.prefMismatch && (
+                                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">!PREF</span>
+                                                )}
+                                            </span>
                                             <span className="text-slate-400 text-xs">
                                                 {parseFloat(food.calories || 0).toFixed(0)} kcal / {parseFloat(food.servingSizeG || 100).toFixed(0)}g
                                             </span>
@@ -190,15 +235,52 @@ export default function FoodInputCard({
                             </div>
                         )}
 
-                        <Button 
-                            type="submit" 
-                            disabled={uploading || ingredientItems.length === 0} 
-                            className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md px-8 h-12"
-                        >
-                            {uploading ? 'Đang lưu...' : 'Lưu bữa ăn'}
-                        </Button>
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                            <input
+                                type="checkbox"
+                                checked={manualSendToPt ?? false}
+                                onChange={(e) => setManualSendToPt?.(e.target.checked)}
+                                className="rounded border-slate-300"
+                            />
+                            Gửi PT kiểm tra
+                        </label>
+
+                        {inputMode === 'recipe' && savedRecipes?.length > 0 && (
+                            <div className="space-y-2">
+                                <label className="block text-sm font-bold text-slate-700">Công thức đã lưu</label>
+                                <div className="space-y-2 max-h-40 overflow-auto">
+                                    {savedRecipes.map((r) => (
+                                        <div key={r.id} className="flex items-center justify-between gap-2 p-3 bg-white rounded-xl border border-slate-200">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-semibold text-slate-800 truncate">{r.name}</p>
+                                                <p className="text-xs text-slate-500">{Math.round(r.totalCalories || 0)} kcal</p>
+                                            </div>
+                                            <Button type="button" size="sm" variant="outline" onClick={() => handleLogFromSavedRecipe?.(r.id)}>
+                                                Dùng lại
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-2">
+                            {inputMode === 'recipe' && (
+                                <Button type="button" variant="outline" disabled={uploading || !recipeName || ingredientItems.length === 0}
+                                    onClick={handleSaveRecipe} className="rounded-xl">
+                                    Lưu công thức
+                                </Button>
+                            )}
+                            <Button 
+                                type="submit" 
+                                disabled={uploading || ingredientItems.length === 0} 
+                                className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md px-8 h-12"
+                            >
+                                {uploading ? 'Đang lưu...' : (inputMode === 'recipe' ? 'Ghi nhật ký từ công thức' : 'Lưu bữa ăn')}
+                            </Button>
+                        </div>
                     </form>
-                )}
+                ) : null}
 
             </CardContent>
         </Card>

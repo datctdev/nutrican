@@ -37,9 +37,15 @@ export default function MacroTargetsPage() {
     goal: 'maintain',
   });
   const [analyzedData, setAnalyzedData] = useState(null);
+  const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
+  const [loadingGoalSuggestion, setLoadingGoalSuggestion] = useState(false);
 
   useEffect(() => {
     fetchMacros();
+    userService.getProfile().then((res) => {
+      const g = res.data?.data?.nutritionGoal;
+      if (g) setNutritionGoal(g);
+    }).catch(() => {});
   }, []);
 
   const fetchMacros = async () => {
@@ -71,6 +77,28 @@ export default function MacroTargetsPage() {
       toast.error('Không thể cập nhật mục tiêu');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleGoalSuggestion = async () => {
+    setLoadingGoalSuggestion(true);
+    try {
+      const res = await userService.getMacroSuggestion();
+      const m = res.data.data;
+      if (m) {
+        setMacros({
+          dailyCalories: m.dailyCalories || 2000,
+          protein: m.protein || 120,
+          carb: m.carb || m.carbs || 200,
+          fat: m.fat || 65,
+        });
+        setActiveTab('current');
+        toast.success(`Đã áp dụng gợi ý theo mục tiêu ${nutritionGoal}`);
+      }
+    } catch {
+      toast.error('Không thể lấy gợi ý macro — cập nhật hồ sơ sức khỏe trước');
+    } finally {
+      setLoadingGoalSuggestion(false);
     }
   };
 
@@ -221,13 +249,24 @@ export default function MacroTargetsPage() {
             <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Mục Tiêu Dinh Dưỡng</h1>
             <p className="text-slate-500 mt-1">Thiết lập và theo dõi mục tiêu ăn uống hàng ngày của bạn</p>
           </div>
-          <Button 
-            onClick={() => { setIsInBodyModalOpen(true); setActiveTab('calculator'); }}
-            className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl shadow-lg flex items-center gap-2 px-5 py-3"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span className="font-semibold">Tính Thông Minh</span>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={handleGoalSuggestion}
+              disabled={loadingGoalSuggestion}
+              variant="outline"
+              className="rounded-xl border-violet-200 text-violet-700 hover:bg-violet-50 flex items-center gap-2 px-5 py-3"
+            >
+              {loadingGoalSuggestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
+              <span className="font-semibold">Gợi ý theo mục tiêu</span>
+            </Button>
+            <Button 
+              onClick={() => { setIsInBodyModalOpen(true); setActiveTab('calculator'); }}
+              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl shadow-lg flex items-center gap-2 px-5 py-3"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span className="font-semibold">Tính Thông Minh</span>
+            </Button>
+          </div>
         </div>
       </div>
 

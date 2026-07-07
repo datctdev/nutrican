@@ -19,6 +19,7 @@ public class SosTicketResponse {
     private UUID id;
     private UUID dietLogId;
     private String note;
+    private String resolutionNote;
     private String priority;
     private SosTicketStatus status;
     private SosReasonCode reasonCode;
@@ -27,4 +28,9 @@ public class SosTicketResponse {
     private String customerName;
     private String ptName;
     private LocalDateTime createdAt;
+    private LocalDateTime assignedAt;
+    private LocalDateTime firstResponseAt;
+    private LocalDateTime resolvedAt;
+    private Boolean slaBreached;
+    private Integer escalationCount;
 }

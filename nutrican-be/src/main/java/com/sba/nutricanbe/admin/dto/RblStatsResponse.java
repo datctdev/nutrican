@@ -31,4 +31,6 @@ public class RblStatsResponse {
     private int compositeMealCount;
     private double avgTimeToReviewHours;
     private Map<String, Integer> cohortCounts;
+    private Map<String, BigDecimal> maeByCohortKey;
+    private Map<String, Integer> cohortKeyCounts;
 }

@@ -30,6 +30,20 @@ const MacroRing = ({ label, current, target, colorClass }) => {
 };
 
 export default function NutritionProgress({ summary }) {
+    const intakeStatus = summary?.intakeStatus || 'OK';
+    const statusStyles = {
+        OK: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+        OVER_MACRO: 'bg-red-50 border-red-200 text-red-800',
+        UNDER_INTAKE: 'bg-amber-50 border-amber-200 text-amber-800',
+        AT_RISK: 'bg-red-100 border-red-300 text-red-900',
+    };
+    const statusLabels = {
+        OK: 'Trong mục tiêu',
+        OVER_MACRO: 'Vượt macro',
+        UNDER_INTAKE: 'Ăn thiếu',
+        AT_RISK: 'Cần chú ý (AT_RISK)',
+    };
+
     return (
         <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
             <div className="h-2 bg-gradient-to-r from-blue-500 to-emerald-400 w-full" />
@@ -49,6 +63,13 @@ export default function NutritionProgress({ summary }) {
                     <div className="h-3.5 bg-slate-100 rounded-full overflow-hidden">
                         <div className="h-full bg-blue-500 rounded-full transition-all duration-1000 relative" style={{ width: `${calculateProgress(summary?.totalCalories, summary?.targetCalories)}%` }} />
                     </div>
+                </div>
+
+                <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${statusStyles[intakeStatus] || statusStyles.OK}`}>
+                    <p className="font-bold">{statusLabels[intakeStatus] || intakeStatus}</p>
+                    {summary?.controlLoopMessage && (
+                        <p className="text-xs mt-1 opacity-90">{summary.controlLoopMessage}</p>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

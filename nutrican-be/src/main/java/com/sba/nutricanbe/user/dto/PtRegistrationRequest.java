@@ -2,11 +2,12 @@ package com.sba.nutricanbe.user.dto;
 
 import com.sba.nutricanbe.user.enums.TrainingMode;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import com.sba.nutricanbe.user.enums.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -49,8 +50,11 @@ public class PtRegistrationRequest {
     private String location;
 
     @NotNull(message = "Phí dịch vụ là bắt buộc")
-    @Positive(message = "Phí dịch vụ phải lớn hơn 0")
+    @DecimalMin(value = "0", message = "Phí dịch vụ không được âm")
     private BigDecimal hourlyRate;
+
+    @NotNull(message = "Giới tính là bắt buộc")
+    private Gender gender;
 
     @NotBlank(message = "Đơn vị tính phí là bắt buộc")
     private String rateUnit; // "HOUR" | "SESSION_60" | "SESSION_90" | "MONTH"
@@ -61,4 +65,6 @@ public class PtRegistrationRequest {
     private String cvUrl;
     private String instagramUrl;
     private String linkedinUrl;
+    private List<String> preferredGoals;
+    private List<String> preferredDietTypes;
 }

@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -17,10 +18,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class WebSocketSessionService {
 
     private final ObjectMapper objectMapper;
+    private final com.sba.nutricanbe.user.service.NotificationService notificationService;
+
+    public WebSocketSessionService(
+            ObjectMapper objectMapper,
+            @Lazy com.sba.nutricanbe.user.service.NotificationService notificationService) {
+        this.objectMapper = objectMapper;
+        this.notificationService = notificationService;
+    }
     // Map lưu trữ Session, Value là List để hỗ trợ 1 PT đăng nhập trên nhiều thiết bị (Web, Mobile)
     private final Map<UUID, CopyOnWriteArrayList<WebSocketSession>> sessions = new ConcurrentHashMap<>();
 
@@ -41,6 +49,15 @@ public class WebSocketSessionService {
     }
 
     public void sendToUser(UUID userId, String event, Object data) {
+        sendToUserOnly(userId, event, data);
+        try {
+            notificationService.recordFromWebSocketEvent(userId, event, data);
+        } catch (Exception e) {
+            log.warn("Failed to persist notification for user {} event {}", userId, event, e);
+        }
+    }
+
+    public void sendToUserOnly(UUID userId, String event, Object data) {
         CopyOnWriteArrayList<WebSocketSession> userSessions = sessions.get(userId);
         if (userSessions == null || userSessions.isEmpty()) {
             return; // PT đang không online

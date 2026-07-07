@@ -34,5 +34,14 @@ export const chatService = {
      */
     markRead: (mappingId) => {
         return api.put(`/chat/threads/${mappingId}/read`);
-    }
+    },
+
+    sendAttachment: (mappingId, file, content, contextType, contextRefId) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (content?.trim()) formData.append('content', content.trim());
+        if (contextType) formData.append('contextType', contextType);
+        if (contextRefId) formData.append('contextRefId', contextRefId);
+        return api.post(`/chat/threads/${mappingId}/attachments`, formData);
+    },
 };

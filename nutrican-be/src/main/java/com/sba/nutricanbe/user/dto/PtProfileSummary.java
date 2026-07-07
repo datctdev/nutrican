@@ -36,6 +36,8 @@ public class PtProfileSummary {
     private String cvUrl;
     private String instagramUrl;
     private String linkedinUrl;
+    private String gender;
+    private String adminRejectNote;
     private String ptRequestStatus;
     private String verificationStatus;
 }

@@ -2,6 +2,7 @@ package com.sba.nutricanbe.user.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
 import com.sba.nutricanbe.user.dto.CertificationData;
+import com.sba.nutricanbe.user.enums.Gender;
 import com.sba.nutricanbe.user.enums.Tier;
 import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.common.enums.UserStatus;
@@ -113,6 +114,13 @@ public class PtProfile extends BaseEntity {
     private String linkedinUrl;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private Gender gender;
+
+    @Column(name = "admin_reject_note", columnDefinition = "TEXT")
+    private String adminRejectNote;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "pt_request_status", length = 50)
     @Builder.Default
     private UserStatus ptRequestStatus = UserStatus.PENDING_APPROVAL;
@@ -121,4 +129,16 @@ public class PtProfile extends BaseEntity {
     @Column(name = "verification_status", length = 50)
     @Builder.Default
     private UserStatus verificationStatus = UserStatus.PENDING_APPROVAL;
+
+    @Column(name = "max_clients")
+    @Builder.Default
+    private Integer maxClients = 10;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "preferred_goals", columnDefinition = "jsonb")
+    private List<String> preferredGoals;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "preferred_diet_types", columnDefinition = "jsonb")
+    private List<String> preferredDietTypes;
 }

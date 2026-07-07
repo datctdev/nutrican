@@ -59,8 +59,16 @@ export default function PtVerificationPage() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [trackFilter, setTrackFilter] = useState('ALL');
+  const [docTab, setDocTab] = useState({});
+  const [rejectModal, setRejectModal] = useState(null);
+  const [rejectNote, setRejectNote] = useState('');
+
+  const GENDER_LABEL = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' };
 
   useEffect(() => { fetchPendingPts(); }, [page]);
+
+  const filteredPts = pts.filter((pt) => trackFilter === 'ALL' || pt.preferredTrack === trackFilter);
 
   const fetchPendingPts = async () => {
     try {
@@ -88,11 +96,13 @@ export default function PtVerificationPage() {
     }
   };
 
-  const handleReject = async (userId) => {
+  const handleReject = async (userId, adminNote) => {
     try {
       setActionLoading(userId + '_reject');
-      await adminService.verifyPt(userId, { action: 'REJECT' });
+      await adminService.verifyPt(userId, { action: 'REJECT', adminNote: adminNote || undefined });
       toast.success('Đã từ chối hồ sơ PT');
+      setRejectModal(null);
+      setRejectNote('');
       fetchPendingPts();
     } catch (err) {
       toast.error('Không thể từ chối hồ sơ PT');
@@ -119,22 +129,30 @@ export default function PtVerificationPage() {
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Xét Duyệt PT</h1>
           <p className="text-slate-500 mt-1 font-medium">Xem xét hồ sơ và chứng chỉ của các ứng viên Huấn Luyện Viên.</p>
         </div>
+        <div className="flex gap-2">
+          {['ALL', 'CERTIFIED', 'FREELANCE'].map((t) => (
+            <button key={t} type="button" onClick={() => setTrackFilter(t)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold border ${trackFilter === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'}`}>
+              {t === 'ALL' ? 'Tất cả' : t === 'CERTIFIED' ? 'Certified' : 'Freelance'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
         <div className="space-y-6">{[1, 2].map(i => <Skeleton key={i} className="h-96 w-full rounded-3xl bg-slate-200" />)}</div>
-      ) : pts.length === 0 ? (
+      ) : filteredPts.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
           <ShieldCheck className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-slate-800">Không có hồ sơ nào đang chờ duyệt!</h3>
-          <p className="text-slate-500 mt-2">Tất cả hồ sơ đã được xử lý.</p>
+          <h3 className="text-xl font-bold text-slate-800">Không có hồ sơ phù hợp bộ lọc</h3>
         </div>
       ) : (
         <div className="space-y-6">
-          {pts.map((pt) => {
+          {filteredPts.map((pt) => {
             const uid = pt.userId || pt.id;
             const ModeIcon = TRAINING_MODE_ICON[pt.trainingMode] || Globe;
             const isActing = actionLoading === uid + '_approve' || actionLoading === uid + '_reject';
+            const activeDocTab = docTab[uid] || 'CV';
             return (
               <Card key={uid} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
                 <CardContent className="p-0">
@@ -185,6 +203,11 @@ export default function PtVerificationPage() {
                                 <MapPin className="w-3 h-3" />{pt.location}
                               </span>
                             )}
+                            {pt.gender && (
+                              <span className="text-xs font-semibold bg-sky-100 text-sky-700 px-2.5 py-1 rounded-full">
+                                {GENDER_LABEL[pt.gender] || pt.gender}
+                              </span>
+                            )}
                             {pt.hourlyRate && (
                               <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full">
                                 {parseInt(pt.hourlyRate).toLocaleString('vi-VN')}đ{RATE_UNIT_LABEL[pt.rateUnit] || ''}
@@ -221,12 +244,6 @@ export default function PtVerificationPage() {
                           )}
                           {/* Social links */}
                           <div className="flex gap-3">
-                            {pt.cvUrl && (
-                              <a href={pt.cvUrl} target="_blank" rel="noopener noreferrer"
-                                className="inline-flex items-center text-xs font-bold text-blue-600 hover:underline bg-blue-50 px-3 py-1.5 rounded-lg gap-1">
-                                <BookOpen className="w-3.5 h-3.5" />Xem CV
-                              </a>
-                            )}
                             {pt.instagramUrl && (
                               <a href={pt.instagramUrl} target="_blank" rel="noopener noreferrer"
                                 className="inline-flex items-center text-xs font-bold text-pink-600 hover:underline bg-pink-50 px-3 py-1.5 rounded-lg gap-1">
@@ -242,16 +259,43 @@ export default function PtVerificationPage() {
                           </div>
                         </div>
 
-                        {/* Right col — Certifications */}
+                        {/* Right col — CV / Cert tabs */}
                         <div>
-                          <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                            <Award className="w-3.5 h-3.5 text-amber-500" />
-                            Chứng Chỉ ({pt.certifications?.length || 0})
-                          </p>
-                          {pt.certifications?.length > 0 ? (
-                            <div className="space-y-3">
-                              {pt.certifications.map((cert, i) => (
-                                <div key={i} className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                          <div className="flex gap-2 mb-3">
+                            {['CV', 'CERT'].map((tab) => (
+                              <button key={tab} type="button"
+                                onClick={() => setDocTab((prev) => ({ ...prev, [uid]: tab }))}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                                  activeDocTab === tab
+                                    ? 'bg-slate-900 text-white border-slate-900'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                                }`}>
+                                {tab === 'CV' ? 'CV' : 'Chứng chỉ'}
+                              </button>
+                            ))}
+                          </div>
+
+                          {activeDocTab === 'CV' ? (
+                            <div className="min-h-[120px]">
+                              {pt.cvUrl ? (
+                                <a href={pt.cvUrl} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center text-sm font-bold text-blue-600 hover:underline bg-blue-50 px-4 py-3 rounded-xl gap-2">
+                                  <BookOpen className="w-4 h-4" /> Mở CV (tab mới)
+                                </a>
+                              ) : (
+                                <p className="text-sm text-slate-400 italic">Chưa có CV</p>
+                              )}
+                            </div>
+                          ) : (
+                            <div>
+                              <p className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                                <Award className="w-3.5 h-3.5 text-amber-500" />
+                                Chứng Chỉ ({pt.certifications?.length || 0})
+                              </p>
+                              {pt.certifications?.length > 0 ? (
+                                <div className="space-y-3">
+                                  {pt.certifications.map((cert, i) => (
+                                    <div key={i} className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl">
                                   <div className="flex-1 min-w-0">
                                     <p className="font-bold text-slate-800 text-sm truncate">{cert.name}</p>
                                     <p className="text-xs text-slate-500 mt-0.5">{cert.issuingOrganization}</p>
@@ -285,6 +329,8 @@ export default function PtVerificationPage() {
                           ) : (
                             <p className="text-sm text-slate-400 italic">Không có chứng chỉ</p>
                           )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -313,7 +359,7 @@ export default function PtVerificationPage() {
                       </Button>
                       <div className="border-t border-slate-200 my-1" />
                       <Button
-                        onClick={() => handleReject(uid)}
+                        onClick={() => setRejectModal(uid)}
                         disabled={isActing}
                         variant="ghost"
                         className="text-red-500 hover:bg-red-50 hover:text-red-600 rounded-xl h-11 font-bold text-sm"
@@ -340,6 +386,25 @@ export default function PtVerificationPage() {
           <Button variant="outline" disabled={page === 0} onClick={() => setPage(p => p - 1)} className="rounded-xl">Trước</Button>
           <span className="flex items-center px-4 text-sm font-semibold text-slate-600">Trang {page + 1} / {totalPages}</span>
           <Button variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="rounded-xl">Sau</Button>
+        </div>
+      )}
+
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setRejectModal(null)}>
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-lg mb-2">Từ chối hồ sơ PT</h3>
+            <p className="text-sm text-slate-500 mb-4">Ghi chú gửi cho PT (tùy chọn):</p>
+            <textarea
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              className="w-full border border-slate-200 rounded-xl p-3 text-sm min-h-[100px] mb-4"
+              placeholder="Lý do từ chối, hướng dẫn bổ sung..."
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setRejectModal(null); setRejectNote(''); }}>Hủy</Button>
+              <Button className="bg-red-600 hover:bg-red-700" onClick={() => handleReject(rejectModal, rejectNote)}>Xác nhận từ chối</Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

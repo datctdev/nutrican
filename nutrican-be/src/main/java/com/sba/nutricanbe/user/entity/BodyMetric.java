@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.user.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.sba.nutricanbe.common.entity.BaseEntity;
 
 import jakarta.persistence.*;
@@ -22,6 +23,7 @@ public class BodyMetric extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     private User user;
 
     @Column(name = "record_date", nullable = false)
@@ -38,5 +40,8 @@ public class BodyMetric extends BaseEntity {
 
     @Column(precision = 5, scale = 2)
     private BigDecimal muscleMass;
+
+    @Column(columnDefinition = "TEXT")
+    private String note;
 }
 

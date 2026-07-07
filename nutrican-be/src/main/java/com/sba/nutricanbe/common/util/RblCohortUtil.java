@@ -4,6 +4,7 @@ import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.RecognitionSource;
+import com.sba.nutricanbe.user.enums.DietPreference;
 
 public final class RblCohortUtil {
 
@@ -11,7 +12,8 @@ public final class RblCohortUtil {
 
     public static ExperimentCohort resolve(MealSource mealSource, MealComplexity mealComplexity,
                                            RecognitionSource recognitionSource) {
-        if (recognitionSource == RecognitionSource.MANUAL) {
+        if (recognitionSource == RecognitionSource.MANUAL
+                || recognitionSource == RecognitionSource.MANUAL_RECIPE) {
             return ExperimentCohort.MANUAL_ENTRY;
         }
         if (mealComplexity == MealComplexity.HOTPOT) {
@@ -34,5 +36,12 @@ public final class RblCohortUtil {
             return ExperimentCohort.AI_ONLY_BASELINE;
         }
         return ExperimentCohort.OTHER;
+    }
+
+    public static String resolveKey(MealSource mealSource, MealComplexity mealComplexity,
+                                    RecognitionSource recognitionSource, DietPreference preference) {
+        String base = resolve(mealSource, mealComplexity, recognitionSource).name();
+        String pref = preference != null ? preference.name() : DietPreference.NORMAL.name();
+        return base + "_" + pref;
     }
 }

@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.chat.dto;
 
+import com.sba.nutricanbe.chat.enums.ChatContextType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -20,4 +21,7 @@ public class ChatMessageRequest {
 
     @Size(max = 1000)
     private String imageUrl;
+
+    private ChatContextType contextType;
+    private UUID contextRefId;
 }

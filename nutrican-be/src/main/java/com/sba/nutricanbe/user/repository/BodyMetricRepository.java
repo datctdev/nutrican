@@ -24,4 +24,6 @@ public interface BodyMetricRepository extends JpaRepository<BodyMetric, UUID> {
             @Param("end") LocalDate end);
 
     Optional<BodyMetric> findTopByUserIdOrderByRecordDateDesc(UUID userId);
+
+    Optional<BodyMetric> findByUser_IdAndRecordDate(UUID userId, LocalDate recordDate);
 }
