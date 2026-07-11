@@ -101,13 +101,19 @@ public class OnboardingServiceImpl implements OnboardingService {
         if (request.getDietPreference() != null) {
             user.setDietPreference(request.getDietPreference());
         }
+        if (request.getPregnancyTrimester() != null) {
+            user.setPregnancyTrimester(request.getPregnancyTrimester());
+        }
+        BigDecimal activityFactor = request.getActivityFactor() != null ? request.getActivityFactor() : BigDecimal.valueOf(1.55);
         MacroSuggestionResponse suggestion = MacroSuggestionCalculator.calculate(
                 user,
                 request.getWeightKg(),
                 user.getHeightCm() != null ? BigDecimal.valueOf(user.getHeightCm()) : null,
                 null,
                 user.getGender(),
-                BigDecimal.valueOf(1.55));
+                activityFactor,
+                request.getNutritionGoal(),
+                request.getPregnancyTrimester());
         MacroTargetRequest macroReq = new MacroTargetRequest();
         macroReq.setDailyCalories(suggestion.getDailyCalories());
         macroReq.setProtein(suggestion.getProtein());

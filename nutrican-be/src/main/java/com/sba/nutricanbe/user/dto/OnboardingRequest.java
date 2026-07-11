@@ -17,4 +17,6 @@ public class OnboardingRequest {
     private NutritionGoal nutritionGoal;
     private DietPreference dietPreference;
     private Boolean wantsPt;
+    private BigDecimal activityFactor;
+    private Integer pregnancyTrimester;
 }

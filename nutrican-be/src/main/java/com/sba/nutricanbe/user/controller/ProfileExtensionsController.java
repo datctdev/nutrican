@@ -19,6 +19,7 @@ import com.sba.nutricanbe.user.dto.OnboardingStatusDto;
 import com.sba.nutricanbe.user.dto.MacroSuggestionResponse;
 import com.sba.nutricanbe.user.dto.UserPreferencesRequest;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.NutritionGoal;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +77,9 @@ public class ProfileExtensionsController {
             @RequestParam(required = false) BigDecimal heightCm,
             @RequestParam(required = false) Integer age,
             @RequestParam(required = false) String gender,
-            @RequestParam(required = false) BigDecimal activityFactor) {
+            @RequestParam(required = false) BigDecimal activityFactor,
+            @RequestParam(required = false) NutritionGoal nutritionGoal,
+            @RequestParam(required = false) Integer pregnancyTrimester) {
         BigDecimal resolvedWeight = weightKg;
         if (resolvedWeight == null) {
             resolvedWeight = bodyMetricRepository.findTopByUserIdOrderByRecordDateDesc(user.getId())
@@ -94,7 +97,9 @@ public class ProfileExtensionsController {
                 resolvedHeight != null ? BigDecimal.valueOf(resolvedHeight) : null,
                 age,
                 resolvedGender,
-                activityFactor != null ? activityFactor : BigDecimal.valueOf(1.55));
+                activityFactor != null ? activityFactor : BigDecimal.valueOf(1.55),
+                nutritionGoal,
+                pregnancyTrimester);
         return ResponseEntity.ok(ApiResponse.success(suggestion));
     }
 

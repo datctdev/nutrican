@@ -65,7 +65,8 @@ export default function MacroTargetsPage() {
     gender: 'male',
     bodyFat: '',
     activityLevel: 'moderate',
-    goal: 'maintain',
+    goal: 'MAINTAIN',
+    pregnancyTrimester: 1,
   });
   const [analyzedData, setAnalyzedData] = useState(null);
   const [loadingGoalSuggestion, setLoadingGoalSuggestion] = useState(false);
@@ -175,7 +176,10 @@ export default function MacroTargetsPage() {
   const handleGoalSuggestion = async () => {
     setLoadingGoalSuggestion(true);
     try {
-      const res = await userService.getMacroSuggestion();
+      const res = await userService.getMacroSuggestion({
+        nutritionGoal,
+        pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+      });
       const m = res.data.data;
       if (m) {
         setMacros({
@@ -207,7 +211,7 @@ export default function MacroTargetsPage() {
   };
 
   const calculateMacrosFromInBody = () => {
-    const { weight, height, age, gender, bodyFat, activityLevel, goal } = inBodyForm;
+    const { weight, height, age, gender, bodyFat, activityLevel, goal, pregnancyTrimester } = inBodyForm;
     
     if (!weight || !height || !age) {
       toast.error('Vui lòng nhập cân nặng, chiều cao và tuổi');
@@ -240,21 +244,26 @@ export default function MacroTargetsPage() {
       const tdee = bmr * activityMultipliers[activityLevel];
       
       let targetCalories;
-      if (goal === 'cut') {
-        targetCalories = Math.round(tdee * 0.8);
-      } else if (goal === 'bulk') {
-        targetCalories = Math.round(tdee * 1.15);
+      if (goal === 'WEIGHT_LOSS') {
+        targetCalories = Math.round(tdee - 400);
+      } else if (goal === 'WEIGHT_GAIN') {
+        targetCalories = Math.round(tdee + 300);
+      } else if (goal === 'PREGNANT') {
+        targetCalories = Math.round(tdee + (pregnancyTrimester === 3 ? 450 : 300));
+      } else if (goal === 'RECOVERY') {
+        targetCalories = Math.round(tdee + 200);
       } else {
         targetCalories = Math.round(tdee);
       }
       
+      targetCalories = Math.max(1200, targetCalories);
+      
       const leanMass = w * (1 - bf / 100);
-      const proteinPerKg = goal === 'cut' ? 2.2 : goal === 'bulk' ? 1.8 : 1.6;
-      const protein = Math.round(leanMass * proteinPerKg);
+      const protein = Math.round(w * (goal === 'WEIGHT_GAIN' ? 2.0 : 1.6));
       
       const fat = Math.round((targetCalories * 0.25) / 9);
       const carbCalories = targetCalories - (protein * 4) - (fat * 9);
-      const carb = Math.round(carbCalories / 4);
+      const carb = Math.max(0, Math.round(carbCalories / 4));
       
       const calculated = {
         dailyCalories: targetCalories,
@@ -702,7 +711,22 @@ export default function MacroTargetsPage() {
                             { value: 'veryActive', label: 'Rất năng động' },
                           ]} />
                         </div>
-                        <SelectField label="Mục tiêu của bạn" value={inBodyForm.goal} onChange={(e) => setInBodyForm(f => ({...f, goal: e.target.value}))} options={[{ value: 'cut', label: 'Giảm Mỡ' }, { value: 'maintain', label: 'Giữ Cân' }, { value: 'bulk', label: 'Tăng Cơ' }]} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                          <SelectField label="Mục tiêu của bạn" value={inBodyForm.goal} 
+                            onChange={(e) => setInBodyForm(f => ({...f, goal: e.target.value}))} 
+                            options={GOAL_OPTIONS} />
+                          {inBodyForm.goal === 'PREGNANT' ? (
+                            <SelectField label="Giai đoạn thai kỳ (Tam cá nguyệt)" value={inBodyForm.pregnancyTrimester} 
+                              onChange={(e) => setInBodyForm(f => ({...f, pregnancyTrimester: Number(e.target.value)}))} 
+                              options={[
+                                { value: 1, label: 'Tam cá nguyệt 1' },
+                                { value: 2, label: 'Tam cá nguyệt 2' },
+                                { value: 3, label: 'Tam cá nguyệt 3' }
+                              ]} />
+                          ) : (
+                            <div className="hidden sm:block" />
+                          )}
+                        </div>
 
                         <Button 
                           onClick={calculateMacrosFromInBody}

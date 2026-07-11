@@ -34,10 +34,40 @@ export default function OnboardingPage() {
     dateOfBirth: '',
     gender: 'male',
   });
+  const [dobDisplay, setDobDisplay] = useState('');
+
+  const handleDobChange = (e) => {
+    let val = e.target.value.replace(/\D/g, '').slice(0, 8);
+    let formatted = val;
+    if (val.length > 4) {
+      formatted = `${val.slice(0, 2)}/${val.slice(2, 4)}/${val.slice(4)}`;
+    } else if (val.length > 2) {
+      formatted = `${val.slice(0, 2)}/${val.slice(2)}`;
+    }
+    setDobDisplay(formatted);
+    if (val.length === 8) {
+      const day = val.slice(0, 2);
+      const month = val.slice(2, 4);
+      const year = val.slice(4);
+      setStep1((s) => ({ ...s, dateOfBirth: `${year}-${month}-${day}` }));
+    } else {
+      setStep1((s) => ({ ...s, dateOfBirth: '' }));
+    }
+  };
   const [step2, setStep2] = useState({
     nutritionGoal: 'MAINTAIN',
     dietPreference: 'NORMAL',
+    activityLevel: 'moderate',
+    pregnancyTrimester: 1,
   });
+
+  const activityMultipliers = {
+    sedentary: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    active: 1.725,
+    veryActive: 1.9,
+  };
 
   useEffect(() => {
     profileExtensionsService.getOnboardingStatus()
@@ -67,6 +97,20 @@ export default function OnboardingPage() {
       toast.error('Nhập chiều cao và cân nặng');
       return;
     }
+    if (dobDisplay && dobDisplay.replace(/\D/g, '').length < 8) {
+      toast.error('Vui lòng nhập ngày sinh đầy đủ dạng DD/MM/YYYY (8 chữ số)');
+      return;
+    }
+    if (dobDisplay) {
+      const digits = dobDisplay.replace(/\D/g, '');
+      const d = parseInt(digits.slice(0, 2));
+      const m = parseInt(digits.slice(2, 4));
+      const y = parseInt(digits.slice(4));
+      if (d < 1 || d > 31 || m < 1 || m > 12 || y < 1900 || y > new Date().getFullYear()) {
+        toast.error('Ngày sinh không hợp lệ');
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const res = await profileExtensionsService.submitOnboarding({
@@ -91,6 +135,8 @@ export default function OnboardingPage() {
         step: 2,
         nutritionGoal: step2.nutritionGoal,
         dietPreference: step2.dietPreference,
+        activityFactor: activityMultipliers[step2.activityLevel],
+        pregnancyTrimester: step2.nutritionGoal === 'PREGNANT' ? step2.pregnancyTrimester : null,
         weightKg: Number(step1.weightKg) || undefined,
       });
       setStep(res.data.data?.step || 3);
@@ -139,8 +185,8 @@ export default function OnboardingPage() {
                 onChange={(e) => setStep1((s) => ({ ...s, heightCm: e.target.value }))} className="rounded-xl" />
               <Input placeholder="Cân nặng hiện tại (kg)" type="number" value={step1.weightKg}
                 onChange={(e) => setStep1((s) => ({ ...s, weightKg: e.target.value }))} className="rounded-xl" />
-              <Input type="date" value={step1.dateOfBirth}
-                onChange={(e) => setStep1((s) => ({ ...s, dateOfBirth: e.target.value }))} className="rounded-xl" />
+              <Input placeholder="Ngày sinh (DD/MM/YYYY) ví dụ: 13022004" type="text" value={dobDisplay}
+                onChange={handleDobChange} className="rounded-xl" />
               <select value={step1.gender} onChange={(e) => setStep1((s) => ({ ...s, gender: e.target.value }))}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
                 <option value="male">Nam</option>
@@ -157,17 +203,50 @@ export default function OnboardingPage() {
               <h2 className="font-bold text-slate-800 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-violet-500" /> Mục tiêu dinh dưỡng
               </h2>
-              <select value={step2.nutritionGoal}
-                onChange={(e) => setStep2((s) => ({ ...s, nutritionGoal: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                {GOALS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
-              </select>
-              <select value={step2.dietPreference}
-                onChange={(e) => setStep2((s) => ({ ...s, dietPreference: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
-                {DIET_PREFS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-              </select>
-              <Button onClick={submitStep2} disabled={submitting} className="w-full rounded-xl gap-2">
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Mục tiêu cân nặng/sức khoẻ</label>
+                <select value={step2.nutritionGoal}
+                  onChange={(e) => setStep2((s) => ({ ...s, nutritionGoal: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                  {GOALS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                </select>
+              </div>
+
+              {step2.nutritionGoal === 'PREGNANT' && (
+                <div className="space-y-1.5 animate-fade-in">
+                  <label className="text-xs font-bold text-slate-500">Giai đoạn thai kỳ (Tam cá nguyệt)</label>
+                  <select value={step2.pregnancyTrimester}
+                    onChange={(e) => setStep2((s) => ({ ...s, pregnancyTrimester: Number(e.target.value) }))}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                    {[1, 2, 3].map((t) => <option key={t} value={t}>Tam cá nguyệt {t}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Chế độ ăn ưa thích</label>
+                <select value={step2.dietPreference}
+                  onChange={(e) => setStep2((s) => ({ ...s, dietPreference: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                  {DIET_PREFS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Mức độ vận động hàng ngày</label>
+                <select value={step2.activityLevel}
+                  onChange={(e) => setStep2((s) => ({ ...s, activityLevel: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
+                  <option value="sedentary">Ít vận động (1.2)</option>
+                  <option value="light">Vận động nhẹ (1.375)</option>
+                  <option value="moderate">Vận động vừa (1.55)</option>
+                  <option value="active">Vận động nhiều (1.725)</option>
+                  <option value="veryActive">Vận động rất nặng (1.9)</option>
+                </select>
+              </div>
+
+              <Button onClick={submitStep2} disabled={submitting} className="w-full rounded-xl gap-2 mt-2">
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Tạo macro & tiếp tục <ChevronRight className="w-4 h-4" /></>}
               </Button>
             </div>

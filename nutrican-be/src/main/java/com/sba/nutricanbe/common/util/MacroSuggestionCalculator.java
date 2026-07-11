@@ -24,7 +24,9 @@ public final class MacroSuggestionCalculator {
             BigDecimal heightCm,
             Integer age,
             String gender,
-            BigDecimal activityFactor) {
+            BigDecimal activityFactor,
+            NutritionGoal nutritionGoal,
+            Integer pregnancyTrimester) {
         BigDecimal w = weightKg != null && weightKg.compareTo(BigDecimal.ZERO) > 0 ? weightKg : DEFAULT_WEIGHT;
         BigDecimal h = heightCm != null && heightCm.compareTo(BigDecimal.ZERO) > 0 ? heightCm : DEFAULT_HEIGHT;
         int a = age != null && age > 0 ? age : resolveAge(user);
@@ -44,14 +46,14 @@ public final class MacroSuggestionCalculator {
                     .add(BigDecimal.valueOf(5));
         }
         BigDecimal tdee = bmr.multiply(factor).setScale(0, RoundingMode.HALF_UP);
-        NutritionGoal goal = user != null && user.getNutritionGoal() != null
-                ? user.getNutritionGoal() : NutritionGoal.MAINTAIN;
+        NutritionGoal goal = nutritionGoal != null ? nutritionGoal
+                : (user != null && user.getNutritionGoal() != null ? user.getNutritionGoal() : NutritionGoal.MAINTAIN);
+        int trimester = pregnancyTrimester != null ? pregnancyTrimester
+                : (user != null && user.getPregnancyTrimester() != null ? user.getPregnancyTrimester() : 1);
         BigDecimal calories = switch (goal) {
             case WEIGHT_LOSS -> tdee.subtract(BigDecimal.valueOf(400));
             case WEIGHT_GAIN -> tdee.add(BigDecimal.valueOf(300));
-            case PREGNANT -> tdee.add(BigDecimal.valueOf(
-                    user != null && user.getPregnancyTrimester() != null && user.getPregnancyTrimester() == 3
-                            ? 450 : 300));
+            case PREGNANT -> tdee.add(BigDecimal.valueOf(trimester == 3 ? 450 : 300));
             case RECOVERY -> tdee.add(BigDecimal.valueOf(200));
             default -> tdee;
         };
