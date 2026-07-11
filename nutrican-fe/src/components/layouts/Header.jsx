@@ -1,5 +1,5 @@
 // src/components/layouts/Header.jsx
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, href } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { notificationService } from '../../services/notificationService';
@@ -23,10 +23,10 @@ export default function Header() {
         if (!isAuthenticated) return;
         notificationService.unreadCount()
             .then((res) => useNotificationStore.setState({ unreadCount: res.data?.data ?? 0 }))
-            .catch(() => {});
+            .catch(() => { });
         notificationService.list({ page: 0, size: 10 })
             .then((res) => setNotifications(res.data?.data?.content || []))
-            .catch(() => {});
+            .catch(() => { });
     }, [isAuthenticated, setNotifications]);
 
     useEffect(() => {
@@ -122,11 +122,9 @@ export default function Header() {
     const navItems = {
         CUSTOMER: [
             { label: 'Nhật ký ăn uống', href: '/diet' },
-            { label: 'Tìm PT', href: '/marketplace' },
-            { label: 'Tin nhắn', href: '/chat' },
-            { label: 'Trang cá nhân', href: '/profile' },
             { label: 'Mục tiêu dinh dưỡng', href: '/macro-targets' },
-            { label: 'Trở Thành Huấn Luyện Viên', href: '/kyc' },
+            { label: 'Tìm PT', href: '/marketplace' },
+            { label: "Coaching Của Tôi", href: '/coaching' },
         ],
         PT_CERTIFIED: [
             { label: 'Bảng điều khiển', href: '/pt' },
@@ -195,43 +193,43 @@ export default function Header() {
                         {isAuthenticated ? (
                             <>
                                 <div className="relative">
-                                <button
-                                    type="button"
-                                    aria-label="Thông báo"
-                                    onClick={() => setNotifOpen(!notifOpen)}
-                                    className="relative p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
-                                >
-                                    <Bell className="w-5 h-5" />
-                                    {unreadCount > 0 && (
-                                        <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center">
-                                            {unreadCount > 9 ? '9+' : unreadCount}
-                                        </span>
-                                    )}
-                                </button>
-                                {notifOpen && (
-                                    <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
-                                        <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-xl shadow-lg border border-slate-200 z-50">
-                                            <div className="flex items-center justify-between px-4 py-3 border-b">
-                                                <span className="font-semibold text-sm">Thông báo</span>
-                                                <button type="button" className="text-xs text-blue-600" onClick={() => { markAllAsRead(); notificationService.markAllRead(); }}>Đọc tất cả</button>
+                                    <button
+                                        type="button"
+                                        aria-label="Thông báo"
+                                        onClick={() => setNotifOpen(!notifOpen)}
+                                        className="relative p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
+                                    >
+                                        <Bell className="w-5 h-5" />
+                                        {unreadCount > 0 && (
+                                            <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center">
+                                                {unreadCount > 9 ? '9+' : unreadCount}
+                                            </span>
+                                        )}
+                                    </button>
+                                    {notifOpen && (
+                                        <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                                            <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-xl shadow-lg border border-slate-200 z-50">
+                                                <div className="flex items-center justify-between px-4 py-3 border-b">
+                                                    <span className="font-semibold text-sm">Thông báo</span>
+                                                    <button type="button" className="text-xs text-blue-600" onClick={() => { markAllAsRead(); notificationService.markAllRead(); }}>Đọc tất cả</button>
+                                                </div>
+                                                {notifications?.length ? notifications.map((n) => (
+                                                    <button
+                                                        key={n.id}
+                                                        type="button"
+                                                        className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${!n.isRead ? 'bg-blue-50/50' : ''}`}
+                                                        onClick={() => handleNotificationClick(n)}
+                                                    >
+                                                        <p className="text-sm font-medium text-slate-900">{n.title || n.type}</p>
+                                                        <p className="text-xs text-slate-500 line-clamp-2">{n.body || n.message}</p>
+                                                    </button>
+                                                )) : (
+                                                    <p className="px-4 py-6 text-sm text-slate-500 text-center">Chưa có thông báo</p>
+                                                )}
                                             </div>
-                                            {notifications?.length ? notifications.map((n) => (
-                                                <button
-                                                    key={n.id}
-                                                    type="button"
-                                                    className={`w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 ${!n.isRead ? 'bg-blue-50/50' : ''}`}
-                                                    onClick={() => handleNotificationClick(n)}
-                                                >
-                                                    <p className="text-sm font-medium text-slate-900">{n.title || n.type}</p>
-                                                    <p className="text-xs text-slate-500 line-clamp-2">{n.body || n.message}</p>
-                                                </button>
-                                            )) : (
-                                                <p className="px-4 py-6 text-sm text-slate-500 text-center">Chưa có thông báo</p>
-                                            )}
-                                        </div>
-                                    </>
-                                )}
+                                        </>
+                                    )}
                                 </div>
 
                                 <div className="relative">
@@ -267,6 +265,9 @@ export default function Header() {
                                                     </Link>
                                                     <Link to="/profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
                                                         <User className="w-4 h-4 text-slate-400" /> Trang cá nhân
+                                                    </Link>
+                                                    <Link to="/kyc" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
+                                                        <User className="w-4 h-4 text-slate-400" /> Trở thành huấn luyện viên
                                                     </Link>
                                                     <Link to="/settings" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
                                                         <Settings className="w-4 h-4 text-slate-400" /> Cài đặt

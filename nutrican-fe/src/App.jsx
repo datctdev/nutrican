@@ -15,6 +15,7 @@ import PtDetailPage from './pages/customer/PtDetailPage';
 import DietTrackerPage from './pages/customer/DietTrackerPage';
 import ProfilePage from './pages/customer/ProfilePage';
 import MacroTargetsPage from './pages/customer/MacroTargetsPage';
+import CoachingPage from './pages/customer/CoachingPage';
 import KycPage from './pages/customer/KycPage';
 import PtDashboardPage from './pages/pt/PtDashboardPage';
 import ClientListPage from './pages/pt/ClientListPage';
@@ -68,6 +69,10 @@ function App() {
                 {
                     path: '/profile',
                     element: <ProtectedRoute><ProfilePage /></ProtectedRoute>,
+                },
+                {
+                    path: '/coaching',
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><CoachingPage /></ProtectedRoute>,
                 },
                 {
                     path: '/macro-targets',

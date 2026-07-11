@@ -10,7 +10,8 @@ test.describe('AC-9 Appointments', () => {
 
     await uiLogin(page, USERS.customer.email, USERS.customer.password);
 
-    await page.goto('/profile');
+    await page.goto('/coaching');
+    await page.getByRole('button', { name: /Lịch hẹn PT/i }).click();
 
     await expect(page.getByText(/lịch hẹn|đặt lịch/i).first()).toBeVisible({ timeout: 10_000 });
 

@@ -23,13 +23,15 @@ test.describe('AC-LIFE Coaching lifecycle', () => {
   test.describe('FE-only', () => {
     test('customer profile shows coaching section', async ({ page }) => {
       await uiLogin(page, 'customer1@gmail.com', '123456');
-      await page.goto('/profile');
+      await page.goto('/coaching');
+      await page.getByRole('button', { name: /Hợp đồng & Hoàn tiền/i }).click();
       await expect(page.getByText(/coaching với pt/i)).toBeVisible({ timeout: 10_000 });
     });
 
     test('end coaching opens confirm modal', async ({ page }) => {
       await uiLogin(page, 'customer1@gmail.com', '123456');
-      await page.goto('/profile');
+      await page.goto('/coaching');
+      await page.getByRole('button', { name: /Hợp đồng & Hoàn tiền/i }).click();
       const endBtn = page.getByRole('button', { name: /yêu cầu kết thúc coaching|xác nhận kết thúc coaching/i });
       if (await endBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await endBtn.click();
@@ -42,7 +44,8 @@ test.describe('AC-LIFE Coaching lifecycle', () => {
   test.describe('Hybrid', () => {
     test('coaching history section visible when completed mappings exist', async ({ page }) => {
       await uiLogin(page, 'customer1@gmail.com', '123456');
-      await page.goto('/profile');
+      await page.goto('/coaching');
+      await page.getByRole('button', { name: /Hợp đồng & Hoàn tiền/i }).click();
       const history = page.getByText(/lịch sử coaching/i);
       const coaching = page.getByText(/coaching với pt/i);
       await expect(history.or(coaching)).toBeVisible({ timeout: 10_000 });

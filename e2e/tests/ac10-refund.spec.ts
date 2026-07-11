@@ -10,7 +10,8 @@ test.describe('AC-10 Refund', () => {
 
   test('customer profile has refund section', async ({ page }) => {
     await uiLogin(page, USERS.customer.email, USERS.customer.password);
-    await page.goto('/profile');
+    await page.goto('/coaching');
+    await page.getByRole('button', { name: /Hợp đồng & Hoàn tiền/i }).click();
     await expect(page.getByText(/hoàn tiền|lịch hẹn|hồ sơ/i).first()).toBeVisible();
   });
 });

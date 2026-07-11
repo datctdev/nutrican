@@ -10,7 +10,7 @@ test.describe('AC-8 Meal plan', () => {
 
     await uiLogin(page, USERS.customer.email, USERS.customer.password);
 
-    await page.goto('/profile');
+    await page.goto('/coaching');
 
     const skipBtn = page.getByRole('button', { name: /bỏ qua/i }).first();
 

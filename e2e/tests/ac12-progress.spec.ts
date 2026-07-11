@@ -30,6 +30,6 @@ test.describe('AC-12 Progress timeline', () => {
     await page.getByRole('button', { name: /Mục tiêu & tiến độ/i }).click();
     const banner = page.getByText(/chưa ghi cân nặng hơn 7 ngày/i);
     const weight = page.getByPlaceholder(/cân hôm nay/i);
-    await expect(banner.or(weight)).toBeVisible({ timeout: 10_000 });
+    await expect(banner.or(weight).first()).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -884,7 +884,7 @@ export default function MacroTargetsPage() {
                       { checked: hireResultEmail, set: setHireResultEmail, title: 'Kết quả thuê PT', desc: 'Nhận email thông báo khi PT chấp nhận/từ chối.' },
                       { checked: sosResultEmail, set: setSosResultEmail, title: 'Yêu cầu khẩn cấp (SOS)', desc: 'Nhận email khi ticket SOS được xử lý/phân công.' },
                       { checked: weeklySummaryEmail, set: setWeeklySummaryEmail, title: 'Báo cáo tổng kết tuần', desc: 'Nhận email chứa đánh giá chi tiết hàng tuần từ PT.' },
-                      { checked: bodyMetricReminder, set: setBodyMetricReminder, title: 'Nhắc cập nhật cân nặng', desc: 'Thông báo nhắc nếu bạn chưa ghi cân nặng quá 7 ngày.' },
+                      { checked: bodyMetricReminder, set: setBodyMetricReminder, title: 'Nhắc ghi cân hàng tuần', desc: 'Thông báo nhắc nếu bạn chưa ghi cân nặng quá 7 ngày.' },
                     ].map((item) => (
                       <label key={item.title} className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-100 bg-white hover:bg-slate-50/50 cursor-pointer transition-colors">
                         <input
@@ -939,13 +939,13 @@ export default function MacroTargetsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <InputField 
                       label="Cân nặng gốc (baseline) (kg)" 
-                      placeholder="VD: 75" 
+                      placeholder="Cân baseline (kg)" 
                       value={goalForm.baselineWeight}
                       onChange={(e) => setGoalForm((f) => ({ ...f, baselineWeight: e.target.value }))}
                     />
                     <InputField 
                       label="Cân nặng mục tiêu (kg)" 
-                      placeholder="VD: 68" 
+                      placeholder="Cân mục tiêu (kg)" 
                       value={goalForm.targetWeight}
                       onChange={(e) => setGoalForm((f) => ({ ...f, targetWeight: e.target.value }))}
                     />
@@ -962,7 +962,7 @@ export default function MacroTargetsPage() {
                     disabled={savingGoals} 
                     className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold py-5"
                   >
-                    {savingGoals ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cập nhật kế hoạch mục tiêu'}
+                    {savingGoals ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu mục tiêu'}
                   </Button>
                 </div>
 
@@ -970,7 +970,7 @@ export default function MacroTargetsPage() {
                   <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Ghi nhận cân nặng hôm nay</p>
                   <div className="flex gap-3">
                     <InputField 
-                      placeholder="Nhập số cân nặng (kg)..." 
+                      placeholder="Cân hôm nay (kg)" 
                       value={bodyWeight} 
                       onChange={(e) => setBodyWeight(e.target.value)}
                       className="flex-1"
