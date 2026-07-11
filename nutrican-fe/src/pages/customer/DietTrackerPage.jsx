@@ -97,7 +97,7 @@ export default function DietTrackerPage() {
             };
             setSummary(summaryData);
             setSosTickets(sosRes.data.data || []);
-            setHasActivePt((threadsRes.data?.data || []).some(t => t.status === 'ACTIVE'));
+            setHasActivePt((threadsRes.data?.data || []).some(t => t.status === 'ACTIVE' || t.status === 'END_REQUESTED'));
         } catch (err) {
             console.error('Error fetching diet data:', err);
         } finally {

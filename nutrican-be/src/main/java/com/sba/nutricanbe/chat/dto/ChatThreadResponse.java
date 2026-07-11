@@ -22,4 +22,5 @@ public class ChatThreadResponse {
     private ChatMessageResponse lastMessage;
     private long unreadCount;
     private LocalDateTime linkedAt;
+    private String endRequestedBy;
 }

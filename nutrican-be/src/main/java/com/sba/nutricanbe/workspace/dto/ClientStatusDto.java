@@ -20,4 +20,5 @@ public class ClientStatusDto {
     private String mappingStatus;
     private String lastLogTime;
     private java.math.BigDecimal avgCalories;
+    private String endRequestedBy;
 }

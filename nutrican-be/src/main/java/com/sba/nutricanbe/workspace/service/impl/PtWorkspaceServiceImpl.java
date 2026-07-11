@@ -424,6 +424,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .statusLabel(statusLabel)
                 .statusColor(statusColor)
                 .mappingStatus(mapping.getStatus() != null ? mapping.getStatus().name() : null)
+                .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
                 .lastLogTime("N/A")
                 .avgCalories(BigDecimal.valueOf(1800.0))
                 .build();

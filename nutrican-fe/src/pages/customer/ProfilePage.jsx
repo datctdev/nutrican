@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import {
   Loader2, Camera, User, Mail, Phone, MapPin, Edit3,
   Heart, Utensils, Calendar, RefreshCw, Sparkles, Check,
+  ChevronRight, Target,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import useWebSocket from '../../hooks/useWebSocket';
@@ -115,6 +116,7 @@ export default function ProfilePage() {
   const [coachingHistory, setCoachingHistory] = useState([]);
   const [endCoachingLoading, setEndCoachingLoading] = useState(false);
   const [mappingStatus, setMappingStatus] = useState(null);
+  const [endRequestedBy, setEndRequestedBy] = useState(null);
   const [endCoachingModalOpen, setEndCoachingModalOpen] = useState(false);
 
   useWebSocket();
@@ -168,9 +170,10 @@ export default function ProfilePage() {
       } catch { /* ignore */ }
 
       const activeThreads = (threadsRes.data.data || []).filter((t) => t.status === 'ACTIVE' || t.status === 'END_REQUESTED');
-      setPtThreads(activeThreads.filter((t) => t.status === 'ACTIVE'));
+      setPtThreads(activeThreads);
       const endReq = activeThreads.find((t) => t.status === 'END_REQUESTED');
-      setMappingStatus(endReq ? 'END_REQUESTED' : activeThreads.some((t) => t.status === 'ACTIVE') ? 'ACTIVE' : null);
+      setMappingStatus(endReq ? 'END_REQUESTED' : activeThreads.length > 0 ? 'ACTIVE' : null);
+      setEndRequestedBy(endReq ? endReq.endRequestedBy : null);
       profileExtensionsService.getCoachingHistory().then((r) => setCoachingHistory(r.data?.data || [])).catch(() => {});
       if (activeThreads.length && !apptForm.ptId) {
         setApptForm((f) => ({ ...f, ptId: activeThreads[0].participantId }));
@@ -549,140 +552,19 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Health & nutrition */}
-      <Card className="border-slate-200 shadow-sm">
-        <CardContent className="p-6 space-y-5">
-          <div className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-rose-500" />
-            <h3 className="text-lg font-bold text-slate-900">Sức khỏe & dinh dưỡng</h3>
-          </div>
-
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase mb-2">Dị ứng</p>
-            <div className="flex flex-wrap gap-2">
-              {ALLERGEN_OPTIONS.map((opt) => (
-                <button key={opt.value} type="button" onClick={() => toggleAllergen(opt.value)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    allergens.includes(opt.value)
-                      ? 'bg-rose-100 border-rose-300 text-rose-700'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                  }`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Chế độ ăn</label>
-              <select value={dietPreference} onChange={(e) => setDietPreference(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-                {DIET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+      {/* Target Settings, Health & Progress Quick Link */}
+      <Card className="border-slate-200 bg-slate-50/50 shadow-sm border-dashed rounded-2xl cursor-pointer hover:border-slate-350 hover:bg-slate-50 transition-all" onClick={() => navigate('/macro-targets')}>
+        <CardContent className="p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+              <Target className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Mục tiêu</label>
-              <select value={nutritionGoal} onChange={(e) => setNutritionGoal(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-                {GOAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              <p className="font-extrabold text-sm text-slate-800">Mục tiêu, Sức khỏe & Tiến độ</p>
+              <p className="text-xs text-slate-500 mt-0.5">Quản lý dị ứng, TDEE, Calories, và biểu đồ theo dõi cân nặng</p>
             </div>
           </div>
-
-          {nutritionGoal === 'PREGNANT' && (
-            <div>
-              <label className="text-xs font-bold text-slate-500 uppercase">Tam cá nguyệt</label>
-              <select value={pregnancyTrimester} onChange={(e) => setPregnancyTrimester(Number(e.target.value))}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-                {[1, 2, 3].map((t) => <option key={t} value={t}>Tam cá nguyệt {t}</option>)}
-              </select>
-            </div>
-          )}
-
-          <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/50 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={postMealRatingOptIn}
-              onChange={(e) => setPostMealRatingOptIn(e.target.checked)}
-              className="rounded border-slate-300"
-            />
-            <div>
-              <p className="text-sm font-semibold text-slate-800">Nhắc đánh giá sau bữa ăn</p>
-              <p className="text-xs text-slate-500">Tắt nếu bạn không muốn nhận nhắc ~30 phút sau khi ghi nhận bữa.</p>
-            </div>
-          </label>
-
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <p className="text-xs font-bold text-slate-500 uppercase">Email thông báo</p>
-            {[
-              { checked: hireResultEmail, set: setHireResultEmail, title: 'Kết quả thuê PT', desc: 'Email khi PT chấp nhận/từ chối yêu cầu thuê.' },
-              { checked: sosResultEmail, set: setSosResultEmail, title: 'Kết quả SOS', desc: 'Email khi ticket SOS được xử lý hoặc quá hạn.' },
-              { checked: weeklySummaryEmail, set: setWeeklySummaryEmail, title: 'Tổng kết tuần', desc: 'Email tổng kết dinh dưỡng từ PT.' },
-              { checked: bodyMetricReminder, set: setBodyMetricReminder, title: 'Nhắc ghi cân hàng tuần', desc: 'Thông báo nếu bạn chưa ghi cân hơn 7 ngày.' },
-            ].map((item) => (
-              <label key={item.title} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-white cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={item.checked}
-                  onChange={(e) => item.set(e.target.checked)}
-                  className="rounded border-slate-300"
-                />
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-                  <p className="text-xs text-slate-500">{item.desc}</p>
-                </div>
-              </label>
-            ))}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button onClick={handleSaveHealth} disabled={savingHealth} className="flex-1 rounded-xl">
-              {savingHealth ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu sức khỏe'}
-            </Button>
-            <Button variant="outline" onClick={handleMacroSuggestion} disabled={loadingMacro} className="flex-1 rounded-xl gap-2">
-              <Sparkles className="w-4 h-4" /> Gợi ý macro
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-slate-200 shadow-sm">
-        <CardContent className="p-6 space-y-4">
-          <h3 className="text-lg font-bold text-slate-900">Mục tiêu & tiến độ</h3>
-          {showBodyMetricReminder && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Bạn chưa ghi cân nặng hơn 7 ngày. Hãy cập nhật để theo dõi tiến độ chính xác hơn.
-            </div>
-          )}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input placeholder="Cân baseline (kg)" value={goalForm.baselineWeight}
-              onChange={(e) => setGoalForm((f) => ({ ...f, baselineWeight: e.target.value }))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <input placeholder="Cân mục tiêu (kg)" value={goalForm.targetWeight}
-              onChange={(e) => setGoalForm((f) => ({ ...f, targetWeight: e.target.value }))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <input type="date" value={goalForm.targetDate}
-              onChange={(e) => setGoalForm((f) => ({ ...f, targetDate: e.target.value }))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button onClick={handleSaveGoals} disabled={savingGoals} className="rounded-xl">Lưu mục tiêu</Button>
-            <div className="flex gap-2 flex-1">
-              <input placeholder="Cân hôm nay (kg)" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)}
-                className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-              <Button variant="outline" onClick={handleLogWeight} className="rounded-xl shrink-0">Ghi cân hôm nay</Button>
-            </div>
-          </div>
-          {bodyMetricHistory.length > 0 && (
-            <div className="text-xs text-slate-500 space-y-1">
-              <p className="font-semibold text-slate-600">Lịch sử gần đây</p>
-              {bodyMetricHistory.slice(0, 5).map((m) => (
-                <p key={m.id || m.recordDate}>{m.recordDate}: {m.weight} kg</p>
-              ))}
-            </div>
-          )}
-          <ProgressTimelineCard goals={progressGoals} milestones={milestones} bodyMetrics={bodyMetricHistory} compact />
+          <ChevronRight className="w-5 h-5 text-slate-400" />
         </CardContent>
       </Card>
 
@@ -850,11 +732,17 @@ export default function ProfilePage() {
           {ptThreads.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {mappingStatus === 'END_REQUESTED' ? (
-                <Button onClick={() => setEndCoachingModalOpen(true)} disabled={endCoachingLoading} className="rounded-xl">
-                  Xác nhận kết thúc coaching
-                </Button>
+                endRequestedBy === 'CUSTOMER' ? (
+                  <Button disabled className="rounded-xl bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
+                    Đang chờ Huấn luyện viên xác nhận kết thúc
+                  </Button>
+                ) : (
+                  <Button onClick={() => setEndCoachingModalOpen(true)} disabled={endCoachingLoading} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20">
+                    Xác nhận kết thúc coaching
+                  </Button>
+                )
               ) : (
-                <Button variant="outline" onClick={() => setEndCoachingModalOpen(true)} disabled={endCoachingLoading} className="rounded-xl border-amber-200 text-amber-800">
+                <Button variant="outline" onClick={() => setEndCoachingModalOpen(true)} disabled={endCoachingLoading} className="rounded-xl border-amber-200 text-amber-800 hover:bg-amber-50">
                   Yêu cầu kết thúc coaching
                 </Button>
               )}

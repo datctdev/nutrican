@@ -59,7 +59,7 @@ public class ChatServiceImpl implements ChatService {
     @Transactional(readOnly = true)
     public ApiResponse<List<ChatThreadResponse>> getThreads(UUID userId) {
         List<ChatThreadResponse> threads = mappingRepository.findThreadsByUserId(userId).stream()
-                .filter(mapping -> mapping.getStatus() == ClientMappingStatus.ACTIVE)
+                .filter(mapping -> mapping.getStatus() == ClientMappingStatus.ACTIVE || mapping.getStatus() == ClientMappingStatus.END_REQUESTED)
                 .map(mapping -> toThreadResponse(mapping, userId))
                 .sorted(Comparator.comparing(
                         thread -> thread.getLastMessage() != null
@@ -210,7 +210,7 @@ public class ChatServiceImpl implements ChatService {
     private PtClientMapping getActiveMappingForUser(UUID mappingId, UUID userId) {
         PtClientMapping mapping = mappingRepository.findByIdWithUsers(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", mappingId));
-        if (mapping.getStatus() != ClientMappingStatus.ACTIVE) {
+        if (mapping.getStatus() != ClientMappingStatus.ACTIVE && mapping.getStatus() != ClientMappingStatus.END_REQUESTED) {
             throw new BadRequestException("Chat is available only after the hiring request is accepted");
         }
         if (!mapping.getPt().getId().equals(userId) && !mapping.getClient().getId().equals(userId)) {
@@ -233,6 +233,7 @@ public class ChatServiceImpl implements ChatService {
                 .lastMessage(lastMessage)
                 .unreadCount(chatMessageRepository.countByMapping_IdAndRecipient_IdAndReadAtIsNull(mapping.getId(), userId))
                 .linkedAt(mapping.getAssignedAt())
+                .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
                 .build();
     }
 

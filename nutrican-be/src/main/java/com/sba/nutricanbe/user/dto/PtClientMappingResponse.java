@@ -25,6 +25,7 @@ public class PtClientMappingResponse {
     private String clientAvatarUrl;
     private ClientMappingStatus status;
     private LocalDateTime assignedAt;
+    private String endRequestedBy;
 
 
     public static PtClientMappingResponse toMappingResponse(PtClientMapping mapping) {
@@ -40,6 +41,7 @@ public class PtClientMappingResponse {
                 .clientAvatarUrl(client.getAvatarUrl())
                 .status(mapping.getStatus())
                 .assignedAt(mapping.getAssignedAt())
+                .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
                 .build();
     }
 }

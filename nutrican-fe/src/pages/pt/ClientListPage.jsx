@@ -324,23 +324,32 @@ export default function ClientListPage() {
                                             >
                                                 <Utensils className="w-4 h-4 mr-2" /> Thực đơn tuần
                                             </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => setEndCoachingModal({
-                                                    clientId: client.clientId,
-                                                    mappingStatus: client.mappingStatus,
-                                                    fullName: client.fullName,
-                                                })}
-                                                className={`w-full rounded-xl h-10 font-semibold text-sm ${
-                                                    client.mappingStatus === 'END_REQUESTED'
-                                                        ? 'border-emerald-200 text-emerald-800 hover:bg-emerald-50'
-                                                        : 'border-amber-200 text-amber-800 hover:bg-amber-50'
-                                                }`}
-                                            >
-                                                {client.mappingStatus === 'END_REQUESTED'
-                                                    ? 'Xác nhận kết thúc coaching'
-                                                    : 'Kết thúc coaching'}
-                                            </Button>
+                                            {client.mappingStatus === 'END_REQUESTED' && client.endRequestedBy === 'PT' ? (
+                                                <Button
+                                                    disabled
+                                                    className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl h-10 font-semibold text-sm cursor-not-allowed"
+                                                >
+                                                    Đang chờ học viên xác nhận kết thúc
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => setEndCoachingModal({
+                                                        clientId: client.clientId,
+                                                        mappingStatus: client.mappingStatus,
+                                                        fullName: client.fullName,
+                                                    })}
+                                                    className={`w-full rounded-xl h-10 font-semibold text-sm ${
+                                                        client.mappingStatus === 'END_REQUESTED'
+                                                            ? 'border-emerald-200 text-emerald-800 hover:bg-emerald-50 bg-emerald-50/30'
+                                                            : 'border-amber-200 text-amber-800 hover:bg-amber-50'
+                                                    }`}
+                                                >
+                                                    {client.mappingStatus === 'END_REQUESTED'
+                                                        ? 'Xác nhận kết thúc coaching'
+                                                        : 'Kết thúc coaching'}
+                                                </Button>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="flex gap-2">

@@ -1,20 +1,51 @@
 // src/pages/customer/MacroTargetsPage.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { userService } from '../../services/userService';
+import { profileExtensionsService } from '../../services/profileExtensionsService';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import Modal from '../../components/common/Modal';
+import ProgressTimelineCard from './components/ProgressTimelineCard';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 import { 
   Loader2, ArrowLeft, Target, Flame, Beef, Wheat, Droplet, Save, 
   Upload, TrendingUp, Activity, Zap, Info, 
-  CheckCircle2, Scale, Heart, Calculator, Edit3, Sparkles, ChevronRight
+  CheckCircle2, Scale, Heart, Calculator, Edit3, Sparkles, ChevronRight,
+  Check, Calendar, Star, AlertTriangle
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+
+const ALLERGEN_OPTIONS = [
+  { value: 'GLUTEN', label: 'Gluten' },
+  { value: 'SEAFOOD', label: 'Hải sản' },
+  { value: 'NUT', label: 'Hạt' },
+  { value: 'DAIRY', label: 'Sữa' },
+  { value: 'EGG', label: 'Trứng' },
+  { value: 'SOY', label: 'Đậu nành' },
+  { value: 'OTHER', label: 'Khác' },
+];
+
+const DIET_OPTIONS = [
+  { value: 'NORMAL', label: 'Ăn thường' },
+  { value: 'VEGETARIAN', label: 'Ăn chay' },
+  { value: 'VEGAN', label: 'Thuần chay' },
+  { value: 'KETO', label: 'Keto' },
+  { value: 'EAT_CLEAN', label: 'Eat clean' },
+];
+
+const GOAL_OPTIONS = [
+  { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
+  { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
+  { value: 'MAINTAIN', label: 'Duy trì' },
+  { value: 'PREGNANT', label: 'Mang thai' },
+  { value: 'RECOVERY', label: 'Phục hồi' },
+];
 
 export default function MacroTargetsPage() {
   const fileInputRef = useRef(null);
-  
+  const [activeSection, setActiveSection] = useState('nutrition'); // sidebar tabs: nutrition, health, progress
+
+  // Section 1: Nutrition targets states
   const [macros, setMacros] = useState({
     dailyCalories: 2000,
     protein: 120,
@@ -26,7 +57,7 @@ export default function MacroTargetsPage() {
   const [isInBodyModalOpen, setIsInBodyModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [inBodyPreview, setInBodyPreview] = useState(null);
-  const [activeTab, setActiveTab] = useState('current');
+  const [nutritionActiveTab, setNutritionActiveTab] = useState('current'); // sub-tab: current, calculator
   const [inBodyForm, setInBodyForm] = useState({
     weight: '',
     height: '',
@@ -37,19 +68,35 @@ export default function MacroTargetsPage() {
     goal: 'maintain',
   });
   const [analyzedData, setAnalyzedData] = useState(null);
-  const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [loadingGoalSuggestion, setLoadingGoalSuggestion] = useState(false);
+
+  // Section 2: Health & nutrition states
+  const [allergens, setAllergens] = useState([]);
+  const [dietPreference, setDietPreference] = useState('NORMAL');
+  const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
+  const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
+  const [savingHealth, setSavingHealth] = useState(false);
+  const [postMealRatingOptIn, setPostMealRatingOptIn] = useState(true);
+  const [hireResultEmail, setHireResultEmail] = useState(true);
+  const [sosResultEmail, setSosResultEmail] = useState(true);
+  const [weeklySummaryEmail, setWeeklySummaryEmail] = useState(true);
+  const [bodyMetricReminder, setBodyMetricReminder] = useState(true);
+
+  // Section 3: Goal & Progress states
+  const [goalForm, setGoalForm] = useState({ targetWeight: '', baselineWeight: '', targetDate: '' });
+  const [bodyWeight, setBodyWeight] = useState('');
+  const [progressGoals, setProgressGoals] = useState(null);
+  const [milestones, setMilestones] = useState([]);
+  const [bodyMetricHistory, setBodyMetricHistory] = useState([]);
+  const [savingGoals, setSavingGoals] = useState(false);
+  const [showBodyMetricReminder, setShowBodyMetricReminder] = useState(false);
 
   useEffect(() => {
     fetchMacros();
-    userService.getProfile().then((res) => {
-      const g = res.data?.data?.nutritionGoal;
-      if (g) setNutritionGoal(g);
-    }).catch(() => {});
+    fetchHealthAndGoals();
   }, []);
 
   const fetchMacros = async () => {
-    setIsLoading(true);
     try {
       const response = await userService.getMacroTarget();
       const data = response.data.data;
@@ -68,11 +115,56 @@ export default function MacroTargetsPage() {
     }
   };
 
+  const fetchHealthAndGoals = async () => {
+    try {
+      const [profileRes, allergyRes] = await Promise.all([
+        userService.getProfile(),
+        userService.getAllergies().catch(() => ({ data: { data: [] } })),
+      ]);
+      const data = profileRes.data.data;
+      setAllergens(allergyRes.data.data || data.allergens || []);
+      if (data.dietPreference) setDietPreference(data.dietPreference);
+      if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
+      if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
+      
+      const optIn = data.notificationOptIn || {};
+      setPostMealRatingOptIn(optIn.postMealRating !== false);
+      setHireResultEmail(optIn.hireResultEmail !== false);
+      setSosResultEmail(optIn.sosResultEmail !== false);
+      setWeeklySummaryEmail(optIn.weeklySummaryEmail !== false);
+      setBodyMetricReminder(optIn.bodyMetricReminder !== false);
+    } catch (err) {
+      console.error('Error fetching health profile:', err);
+    }
+
+    profileExtensionsService.getBodyMetricReminderStatus()
+      .then((r) => setShowBodyMetricReminder(!!r.data?.data?.showReminder))
+      .catch(() => setShowBodyMetricReminder(false));
+
+    profileExtensionsService.getGoals().then((r) => {
+      const g = r.data.data;
+      setProgressGoals(g);
+      if (g) {
+        setGoalForm({
+          targetWeight: g.targetWeight ?? '',
+          baselineWeight: g.baselineWeight ?? '',
+          targetDate: g.targetDate ?? '',
+        });
+      }
+    }).catch(() => {});
+
+    profileExtensionsService.getMilestones().then((r) => setMilestones(r.data.data || [])).catch(() => {});
+    
+    profileExtensionsService.getBodyMetrics({ page: 0, size: 6 })
+      .then((r) => setBodyMetricHistory(r.data.data?.content || r.data.data || []))
+      .catch(() => setBodyMetricHistory([]));
+  };
+
   const handleSaveMacros = async () => {
     setIsSaving(true);
     try {
       await userService.setMacroTarget(macros);
-      toast.success('Cập nhật mục tiêu thành công!');
+      toast.success('Cập nhật mục tiêu dinh dưỡng thành công!');
     } catch (error) {
       toast.error('Không thể cập nhật mục tiêu');
     } finally {
@@ -92,7 +184,7 @@ export default function MacroTargetsPage() {
           carb: m.carb || m.carbs || 200,
           fat: m.fat || 65,
         });
-        setActiveTab('current');
+        setNutritionActiveTab('current');
         toast.success(`Đã áp dụng gợi ý theo mục tiêu ${nutritionGoal}`);
       }
     } catch {
@@ -190,20 +282,89 @@ export default function MacroTargetsPage() {
         fat: analyzedData.fat,
       });
       setIsInBodyModalOpen(false);
-      setActiveTab('current');
+      setNutritionActiveTab('current');
       toast.success('Đã áp dụng gợi ý!');
+    }
+  };
+
+  const toggleAllergen = (value) => {
+    setAllergens((prev) => prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value]);
+  };
+
+  const handleSaveHealth = async () => {
+    setSavingHealth(true);
+    try {
+      await Promise.all([
+        userService.updateAllergies(allergens),
+        userService.updatePreferences({
+          dietPreference,
+          nutritionGoal,
+          pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+          notificationOptIn: {
+            postMealRating: postMealRatingOptIn,
+            hireResultEmail,
+            sosResultEmail,
+            weeklySummaryEmail,
+            bodyMetricReminder,
+          },
+        }),
+      ]);
+      toast.success('Đã lưu sức khỏe & dinh dưỡng');
+    } catch {
+      toast.error('Không thể lưu thông tin sức khỏe');
+    } finally {
+      setSavingHealth(false);
+    }
+  };
+
+  const handleSaveGoals = async () => {
+    setSavingGoals(true);
+    try {
+      const res = await profileExtensionsService.saveGoals({
+        nutritionGoal,
+        targetWeight: goalForm.targetWeight ? Number(goalForm.targetWeight) : null,
+        baselineWeight: goalForm.baselineWeight ? Number(goalForm.baselineWeight) : null,
+        targetDate: goalForm.targetDate || null,
+        trimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+      });
+      setProgressGoals(res.data.data);
+      toast.success('Đã lưu mục tiêu tiến độ');
+    } catch {
+      toast.error('Không lưu được mục tiêu');
+    } finally {
+      setSavingGoals(false);
+    }
+  };
+
+  const handleLogWeight = async () => {
+    if (!bodyWeight) {
+      toast.error('Nhập cân nặng hiện tại');
+      return;
+    }
+    try {
+      await profileExtensionsService.recordBodyMetric({ weight: Number(bodyWeight) });
+      toast.success('Đã ghi nhận cân nặng hôm nay!');
+      setBodyWeight('');
+      const [ms, bm] = await Promise.all([
+        profileExtensionsService.getMilestones(),
+        profileExtensionsService.getBodyMetrics({ page: 0, size: 6 }),
+      ]);
+      setMilestones(ms.data.data || []);
+      setBodyMetricHistory(bm.data.data?.content || bm.data.data || []);
+    } catch {
+      toast.error('Không ghi được cân nặng');
     }
   };
 
   // Calculate percentages
   const totalCalFromMacros = (macros.protein * 4) + (macros.carb * 4) + (macros.fat * 9);
-  const proteinPct = Math.round((macros.protein * 4 / totalCalFromMacros) * 100);
-  const carbPct = Math.round((macros.carb * 4 / totalCalFromMacros) * 100);
-  const fatPct = Math.round((macros.fat * 9 / totalCalFromMacros) * 100);
+  const proteinPct = totalCalFromMacros > 0 ? Math.round((macros.protein * 4 / totalCalFromMacros) * 100) : 0;
+  const carbPct = totalCalFromMacros > 0 ? Math.round((macros.carb * 4 / totalCalFromMacros) * 100) : 0;
+  const fatPct = totalCalFromMacros > 0 ? Math.round((macros.fat * 9 / totalCalFromMacros) * 100) : 0;
 
   const InputField = ({ icon: Icon, label, className = "", ...props }) => (
     <div className="space-y-1.5">
-      <label className="text-sm font-semibold text-slate-600">{label}</label>
+      <label className="text-sm font-semibold text-slate-650">{label}</label>
       <div className="relative flex items-center">
         {Icon && <Icon className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />}
         <input
@@ -216,7 +377,7 @@ export default function MacroTargetsPage() {
 
   const SelectField = ({ label, options, className = "", ...props }) => (
     <div className="space-y-1.5">
-      <label className="text-sm font-semibold text-slate-600">{label}</label>
+      <label className="text-sm font-semibold text-slate-650">{label}</label>
       <select
         className={`w-full py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none cursor-pointer ${className}`}
         {...props}
@@ -237,502 +398,619 @@ export default function MacroTargetsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto pb-12 animate-fade-in">
+    <div className="max-w-7xl mx-auto pb-12 animate-fade-in px-4">
       {/* Header */}
       <div className="mb-6">
         <Link to="/profile" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-700 mb-4 transition-colors text-sm">
           <ArrowLeft className="w-4 h-4" />
-          <span className="font-medium">Quay lại Hồ sơ</span>
+          <span className="font-semibold">Quay lại Hồ sơ</span>
         </Link>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Mục Tiêu Dinh Dưỡng</h1>
-            <p className="text-slate-500 mt-1">Thiết lập và theo dõi mục tiêu ăn uống hàng ngày của bạn</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={handleGoalSuggestion}
-              disabled={loadingGoalSuggestion}
-              variant="outline"
-              className="rounded-xl border-violet-200 text-violet-700 hover:bg-violet-50 flex items-center gap-2 px-5 py-3"
-            >
-              {loadingGoalSuggestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
-              <span className="font-semibold">Gợi ý theo mục tiêu</span>
-            </Button>
-            <Button 
-              onClick={() => { setIsInBodyModalOpen(true); setActiveTab('calculator'); }}
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl shadow-lg flex items-center gap-2 px-5 py-3"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span className="font-semibold">Tính Thông Minh</span>
-            </Button>
+        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Mục Tiêu & Chỉ Số Cá Nhân</h1>
+        <p className="text-slate-500 mt-1 font-medium">Thiết lập mục tiêu dinh dưỡng, hồ sơ sức khỏe và theo dõi tiến độ cân nặng.</p>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Left Navigation Sidebar */}
+        <div className="w-full lg:w-72 shrink-0">
+          <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm space-y-1">
+            {[
+              { id: 'nutrition', label: 'Mục tiêu dinh dưỡng', icon: Target, desc: 'Calories & Tỷ lệ Macros' },
+              { id: 'health', label: 'Sức khỏe & dinh dưỡng', icon: Heart, desc: 'Ăn kiêng, Dị ứng & Email' },
+              { id: 'progress', label: 'Mục tiêu & tiến độ', icon: Scale, desc: 'Ghi nhận cân nặng & biểu đồ' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveSection(item.id)}
+                className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex items-start gap-3.5 ${
+                  activeSection === item.id
+                    ? 'bg-slate-900 text-white shadow-md'
+                    : 'text-slate-650 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <item.icon className={`w-5 h-5 mt-0.5 ${activeSection === item.id ? 'text-white' : 'text-slate-400'}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="font-extrabold text-sm">{item.label}</p>
+                  <p className={`text-[10px] mt-0.5 truncate ${activeSection === item.id ? 'text-slate-300' : 'text-slate-400'}`}>{item.desc}</p>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setActiveTab('current')}
-          className={`px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 ${
-            activeTab === 'current' 
-              ? 'bg-slate-900 text-white shadow-lg' 
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Target className="w-4 h-4" />
-          Mục Tiêu Hiện Tại
-        </button>
-        <button
-          onClick={() => setActiveTab('calculator')}
-          className={`px-5 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 ${
-            activeTab === 'calculator' 
-              ? 'bg-slate-900 text-white shadow-lg' 
-              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Calculator className="w-4 h-4" />
-          Tính Toán Gợi Ý
-        </button>
-      </div>
-
-      {/* Current Targets Tab */}
-      {activeTab === 'current' && (
-        <div className="grid grid-cols-12 gap-6">
-          {/* Left Column - Main Stats */}
-          <div className="col-span-12 lg:col-span-7 space-y-6">
-            {/* Calories Hero Card */}
-            <Card className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 border-0 text-white shadow-2xl overflow-hidden relative">
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIwOS0xLjc5MS00LTQtNHMtNCAxLjc5MS00IDQgMS43OTEgNCA0IDQgNC0xLjc5MSA0LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
-              <CardContent className="p-8 relative z-10">
-                <div className="text-center">
-                  <p className="text-white/70 font-medium mb-2">Calories Hàng Ngày</p>
-                  <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-6xl font-black tracking-tight">{macros.dailyCalories.toLocaleString()}</span>
-                    <span className="text-xl text-white/70">kcal</span>
-                  </div>
+        {/* Right Panel Content */}
+        <div className="flex-1 min-w-0 space-y-6">
+          
+          {/* SECTION 1: NUTRITION TARGETS */}
+          {activeSection === 'nutrition' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900">Thiết lập Calo & Macro</h3>
+                  <p className="text-slate-500 text-sm mt-0.5">Đặt mục tiêu hấp thụ dinh dưỡng tự do hoặc lấy gợi ý thông minh</p>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Macro Cards */}
-            <div className="grid grid-cols-3 gap-4">
-              {/* Protein */}
-              <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-shadow overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-rose-500 to-pink-500" />
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center">
-                      <Beef className="w-4 h-4 text-rose-600" />
-                    </div>
-                    <span className="text-sm font-semibold text-slate-500">Đạm</span>
-                  </div>
-                  <div className="text-3xl font-bold text-slate-900">{macros.protein}g</div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-slate-400">{proteinPct}%</span>
-                    <span className="text-rose-500 font-medium">{Math.round(macros.protein * 4)} cal</span>
-                  </div>
-                  <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full" style={{ width: `${proteinPct}%` }} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Carbs */}
-              <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-shadow overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                      <Wheat className="w-4 h-4 text-amber-600" />
-                    </div>
-                    <span className="text-sm font-semibold text-slate-500">Tinh Bột</span>
-                  </div>
-                  <div className="text-3xl font-bold text-slate-900">{macros.carb}g</div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-slate-400">{carbPct}%</span>
-                    <span className="text-amber-500 font-medium">{Math.round(macros.carb * 4)} cal</span>
-                  </div>
-                  <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full" style={{ width: `${carbPct}%` }} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Fat */}
-              <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-shadow overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500" />
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                      <Droplet className="w-4 h-4 text-indigo-600" />
-                    </div>
-                    <span className="text-sm font-semibold text-slate-500">Chất Béo</span>
-                  </div>
-                  <div className="text-3xl font-bold text-slate-900">{macros.fat}g</div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-slate-400">{fatPct}%</span>
-                    <span className="text-indigo-500 font-medium">{Math.round(macros.fat * 9)} cal</span>
-                  </div>
-                  <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" style={{ width: `${fatPct}%` }} />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Edit Section */}
-            <Card className="bg-white border border-slate-200 shadow-sm">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                  <Edit3 className="w-5 h-5 text-slate-500" />
-                  Chỉnh Sửa Mục Tiêu
-                </h3>
-                <div className="space-y-4">
-                  <InputField
-                    icon={Flame}
-                    label="Calories Hàng Ngày"
-                    type="number"
-                    value={macros.dailyCalories}
-                    onChange={(e) => setMacros(m => ({...m, dailyCalories: Number(e.target.value)}))}
-                  />
-                  <div className="grid grid-cols-3 gap-4">
-                    <InputField
-                      icon={Beef}
-                      label="Đạm (g)"
-                      type="number"
-                      value={macros.protein}
-                      onChange={(e) => setMacros(m => ({...m, protein: Number(e.target.value)}))}
-                      className="text-center font-semibold"
-                    />
-                    <InputField
-                      icon={Wheat}
-                      label="Tinh Bột (g)"
-                      type="number"
-                      value={macros.carb}
-                      onChange={(e) => setMacros(m => ({...m, carb: Number(e.target.value)}))}
-                      className="text-center font-semibold"
-                    />
-                    <InputField
-                      icon={Droplet}
-                      label="Chất Béo (g)"
-                      type="number"
-                      value={macros.fat}
-                      onChange={(e) => setMacros(m => ({...m, fat: Number(e.target.value)}))}
-                      className="text-center font-semibold"
-                    />
-                  </div>
+                <div className="flex flex-wrap gap-2 shrink-0">
                   <Button
-                    onClick={handleSaveMacros}
-                    disabled={isSaving}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-5 font-semibold flex items-center justify-center gap-2"
+                    onClick={handleGoalSuggestion}
+                    disabled={loadingGoalSuggestion}
+                    variant="outline"
+                    className="rounded-xl border-violet-200 text-violet-700 hover:bg-violet-50 flex items-center gap-2 h-10 px-4"
                   >
-                    {isSaving ? (
-                      <><Loader2 className="h-5 w-5 animate-spin" /> Đang lưu...</>
-                    ) : (
-                      <><Save className="h-5 w-5" /> Lưu Thay Đổi</>
-                    )}
+                    {loadingGoalSuggestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
+                    <span className="font-bold text-xs">Gợi ý theo mục tiêu</span>
+                  </Button>
+                  <Button 
+                    onClick={() => { setIsInBodyModalOpen(true); setNutritionActiveTab('calculator'); }}
+                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl shadow-md flex items-center gap-2 h-10 px-4 border-0"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span className="font-bold text-xs">Tính Thông Minh</span>
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
 
-          {/* Right Column - Info */}
-          <div className="col-span-12 lg:col-span-5 space-y-6">
-            {/* Quick Guide */}
-            <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-0 text-white shadow-xl">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <Info className="w-5 h-5 text-blue-400" />
-                  Hướng Dẫn Nhanh
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
-                    <Beef className="w-5 h-5 text-rose-400 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-white">Đạm (Protein)</p>
-                      <p className="text-sm text-slate-300">1.6-2.2g/kg để phát triển cơ bắp</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
-                    <Wheat className="w-5 h-5 text-amber-400 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-white">Tinh Bột (Carbs)</p>
-                      <p className="text-sm text-slate-300">45-65% tổng calories cho năng lượng</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
-                    <Droplet className="w-5 h-5 text-indigo-400 mt-0.5" />
-                    <div>
-                      <p className="font-semibold text-white">Chất Béo (Fat)</p>
-                      <p className="text-sm text-slate-300">20-35% cho hormone và sức khỏe</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Smart Calculator CTA */}
-            <Card className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-2 border-emerald-200 cursor-pointer hover:border-emerald-300 hover:shadow-lg transition-all" onClick={() => setActiveTab('calculator')}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
-                    <Sparkles className="w-7 h-7 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="text-lg font-bold text-slate-800">Tính Toán Thông Minh</h4>
-                    <p className="text-sm text-slate-600">Nhập thông số InBody để nhận gợi ý cá nhân hóa</p>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Macro Distribution Pie */}
-            <Card className="bg-white border border-slate-200 shadow-sm">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Tỷ Lệ Phân Bổ</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-rose-500" />
-                      <span className="text-sm font-medium text-slate-600">Đạm</span>
-                    </div>
-                    <span className="text-sm font-bold text-slate-900">{proteinPct}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-amber-500" />
-                      <span className="text-sm font-medium text-slate-600">Tinh Bột</span>
-                    </div>
-                    <span className="text-sm font-bold text-slate-900">{carbPct}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-indigo-500" />
-                      <span className="text-sm font-medium text-slate-600">Chất Béo</span>
-                    </div>
-                    <span className="text-sm font-bold text-slate-900">{fatPct}%</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* Calculator Tab */}
-      {activeTab === 'calculator' && (
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 lg:col-span-7">
-            <Card className="bg-white border border-slate-200 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                    <Calculator className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-800">Tính Toán Dinh Dưỡng Cá Nhân</h3>
-                    <p className="text-sm text-slate-500">Nhập thông số cơ thể để nhận gợi ý tối ưu</p>
-                  </div>
-                </div>
-
-                {/* Image Upload */}
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all mb-6 ${
-                    inBodyPreview 
-                      ? 'border-emerald-400 bg-emerald-50' 
-                      : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50'
+              {/* Sub-tabs for Nutrition panel */}
+              <div className="flex gap-2 border-b border-slate-200 pb-3">
+                <button
+                  onClick={() => setNutritionActiveTab('current')}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                    nutritionActiveTab === 'current'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  {inBodyPreview ? (
-                    <div className="space-y-2">
-                      <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-                      <p className="text-emerald-700 font-semibold">Đã tải ảnh InBody!</p>
-                      <img src={inBodyPreview} alt="InBody" className="max-h-24 mx-auto rounded-lg shadow" />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Upload className="w-10 h-10 text-slate-400 mx-auto" />
-                      <p className="text-slate-600 font-medium">Tải Lên Ảnh InBody (Tùy chọn)</p>
-                      <p className="text-sm text-slate-400">Click để chọn ảnh</p>
-                    </div>
-                  )}
-                </div>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleInBodyImageUpload} className="hidden" />
-
-                {/* Form */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <InputField
-                    icon={Scale}
-                    label="Cân Nặng (kg)"
-                    type="number"
-                    step="0.1"
-                    placeholder="VD: 70"
-                    value={inBodyForm.weight}
-                    onChange={(e) => setInBodyForm(f => ({...f, weight: e.target.value}))}
-                  />
-                  <InputField
-                    icon={TrendingUp}
-                    label="Chiều Cao (cm)"
-                    type="number"
-                    placeholder="VD: 175"
-                    value={inBodyForm.height}
-                    onChange={(e) => setInBodyForm(f => ({...f, height: e.target.value}))}
-                  />
-                  <InputField
-                    icon={Activity}
-                    label="Tuổi"
-                    type="number"
-                    placeholder="VD: 25"
-                    value={inBodyForm.age}
-                    onChange={(e) => setInBodyForm(f => ({...f, age: e.target.value}))}
-                  />
-                  <SelectField
-                    label="Giới Tính"
-                    value={inBodyForm.gender}
-                    onChange={(e) => setInBodyForm(f => ({...f, gender: e.target.value}))}
-                    options={[
-                      { value: 'male', label: 'Nam' },
-                      { value: 'female', label: 'Nữ' },
-                    ]}
-                  />
-                  <InputField
-                    icon={Heart}
-                    label="Tỷ Lệ Mỡ (%)"
-                    type="number"
-                    placeholder="VD: 18"
-                    value={inBodyForm.bodyFat}
-                    onChange={(e) => setInBodyForm(f => ({...f, bodyFat: e.target.value}))}
-                  />
-                  <SelectField
-                    label="Mức Độ Vận Động"
-                    value={inBodyForm.activityLevel}
-                    onChange={(e) => setInBodyForm(f => ({...f, activityLevel: e.target.value}))}
-                    options={[
-                      { value: 'sedentary', label: 'Ít vận động' },
-                      { value: 'light', label: 'Nhẹ (1-3 ngày/tuần)' },
-                      { value: 'moderate', label: 'Vừa (3-5 ngày/tuần)' },
-                      { value: 'active', label: 'Năng động (6-7 ngày/tuần)' },
-                      { value: 'veryActive', label: 'Rất năng động' },
-                    ]}
-                  />
-                </div>
-
-                <SelectField
-                  label="Mục Tiêu Của Bạn"
-                  value={inBodyForm.goal}
-                  onChange={(e) => setInBodyForm(f => ({...f, goal: e.target.value}))}
-                  options={[
-                    { value: 'cut', label: 'Giảm Mỡ' },
-                    { value: 'maintain', label: 'Giữ Cân' },
-                    { value: 'bulk', label: 'Tăng Cơ' },
-                  ]}
-                />
-
-                <Button 
-                  onClick={calculateMacrosFromInBody}
-                  disabled={isAnalyzing}
-                  className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl py-5 font-semibold flex items-center justify-center gap-2"
+                  Mục Tiêu Hiện Tại
+                </button>
+                <button
+                  onClick={() => setNutritionActiveTab('calculator')}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                    nutritionActiveTab === 'calculator'
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 >
-                  {isAnalyzing ? (
-                    <><Loader2 className="h-5 w-5 animate-spin" /> Đang phân tích...</>
-                  ) : (
-                    <><Zap className="h-5 w-5" /> Tính Toán Ngay</>
-                  )}
-                </Button>
+                  Tính Toán Gợi Ý (TDEE / InBody)
+                </button>
+              </div>
+
+              {nutritionActiveTab === 'current' ? (
+                <div className="grid grid-cols-12 gap-6">
+                  {/* Stats & edit input */}
+                  <div className="col-span-12 lg:col-span-7 space-y-6">
+                    <Card className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 border-0 text-white shadow-xl overflow-hidden relative rounded-3xl">
+                      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIwOS0xLjc5MS00LTQtNHMtNCAxLjc5MS00IDQgMS43OTEgNCA0IDQgNC0xLjc5MSA0LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
+                      <CardContent className="p-8 relative z-10 text-center">
+                        <p className="text-white/80 font-bold uppercase tracking-wider text-xs mb-1">Calories Hàng Ngày</p>
+                        <div className="flex items-baseline justify-center gap-2">
+                          <span className="text-5xl font-black tracking-tight">{macros.dailyCalories.toLocaleString()}</span>
+                          <span className="text-lg text-white/80">kcal</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      {/* Protein */}
+                      <Card className="bg-white border border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+                        <div className="h-1 bg-gradient-to-r from-rose-500 to-pink-500" />
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Beef className="w-4 h-4 text-rose-500" />
+                            <span className="text-xs font-bold text-slate-500">Đạm</span>
+                          </div>
+                          <div className="text-2xl font-black text-slate-800">{macros.protein}g</div>
+                          <div className="mt-1 flex items-center justify-between text-[10px]">
+                            <span className="text-slate-400 font-bold">{proteinPct}%</span>
+                            <span className="text-rose-600 font-bold">{Math.round(macros.protein * 4)} cal</span>
+                          </div>
+                          <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-rose-500 rounded-full" style={{ width: `${proteinPct}%` }} />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      {/* Carbs */}
+                      <Card className="bg-white border border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+                        <div className="h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Wheat className="w-4 h-4 text-amber-500" />
+                            <span className="text-xs font-bold text-slate-500">Tinh Bột</span>
+                          </div>
+                          <div className="text-2xl font-black text-slate-800">{macros.carb}g</div>
+                          <div className="mt-1 flex items-center justify-between text-[10px]">
+                            <span className="text-slate-400 font-bold">{carbPct}%</span>
+                            <span className="text-amber-600 font-bold">{Math.round(macros.carb * 4)} cal</span>
+                          </div>
+                          <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${carbPct}%` }} />
+                          </div>
+                        </CardContent>
+                      </Card>
+                      {/* Fat */}
+                      <Card className="bg-white border border-slate-200 shadow-sm overflow-hidden rounded-2xl">
+                        <div className="h-1 bg-gradient-to-r from-indigo-500 to-purple-500" />
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Droplet className="w-4 h-4 text-indigo-500" />
+                            <span className="text-xs font-bold text-slate-500">Chất Béo</span>
+                          </div>
+                          <div className="text-2xl font-black text-slate-800">{macros.fat}g</div>
+                          <div className="mt-1 flex items-center justify-between text-[10px]">
+                            <span className="text-slate-400 font-bold">{fatPct}%</span>
+                            <span className="text-indigo-600 font-bold">{Math.round(macros.fat * 9)} cal</span>
+                          </div>
+                          <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${fatPct}%` }} />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl">
+                      <CardContent className="p-6">
+                        <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                          <Edit3 className="w-4 h-4 text-slate-500" />
+                          Chỉnh sửa thủ công
+                        </h3>
+                        <div className="space-y-4">
+                          <InputField
+                            icon={Flame}
+                            label="Calories hàng ngày"
+                            type="number"
+                            value={macros.dailyCalories}
+                            onChange={(e) => setMacros(m => ({...m, dailyCalories: Number(e.target.value)}))}
+                          />
+                          <div className="grid grid-cols-3 gap-4">
+                            <InputField
+                              label="Đạm (g)"
+                              type="number"
+                              value={macros.protein}
+                              onChange={(e) => setMacros(m => ({...m, protein: Number(e.target.value)}))}
+                              className="text-center font-bold"
+                            />
+                            <InputField
+                              label="Tinh bột (g)"
+                              type="number"
+                              value={macros.carb}
+                              onChange={(e) => setMacros(m => ({...m, carb: Number(e.target.value)}))}
+                              className="text-center font-bold"
+                            />
+                            <InputField
+                              label="Chất béo (g)"
+                              type="number"
+                              value={macros.fat}
+                              onChange={(e) => setMacros(m => ({...m, fat: Number(e.target.value)}))}
+                              className="text-center font-bold"
+                            />
+                          </div>
+                          <Button
+                            onClick={handleSaveMacros}
+                            disabled={isSaving}
+                            className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-5 font-semibold flex items-center justify-center gap-2"
+                          >
+                            {isSaving ? (
+                              <><Loader2 className="h-4 h-4 animate-spin" /> Đang lưu...</>
+                            ) : (
+                              <><Save className="h-4 w-4" /> Lưu mục tiêu dinh dưỡng</>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-5 space-y-6">
+                    <Card className="bg-slate-900 border-0 text-white shadow-lg rounded-3xl">
+                      <CardContent className="p-6">
+                        <h3 className="text-base font-bold mb-4 flex items-center gap-2 text-white">
+                          <Info className="w-4 h-4 text-blue-400" />
+                          Hướng Dẫn Nhanh
+                        </h3>
+                        <div className="space-y-4 text-sm">
+                          <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
+                            <Beef className="w-5 h-5 text-rose-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="font-extrabold text-white">Đạm (Protein)</p>
+                              <p className="text-xs text-slate-300 mt-0.5">1.6g - 2.2g mỗi kg cơ thể để giữ và xây cơ bắp.</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
+                            <Wheat className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="font-extrabold text-white">Tinh Bột (Carbs)</p>
+                              <p className="text-xs text-slate-300 mt-0.5">Nguồn cấp năng lượng chính cho cơ bắp & não bộ.</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3 p-3 bg-white/5 rounded-xl">
+                            <Droplet className="w-5 h-5 text-indigo-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="font-extrabold text-white">Chất Béo (Fat)</p>
+                              <p className="text-xs text-slate-300 mt-0.5">Hỗ trợ trao đổi chất, hấp thụ vitamin & hormone.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-12 gap-6 animate-fade-in">
+                  <div className="col-span-12 lg:col-span-7">
+                    <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl">
+                      <CardContent className="p-6">
+                        <div className="flex items-center gap-3 mb-5">
+                          <Calculator className="w-5 h-5 text-blue-600" />
+                          <div>
+                            <h4 className="text-base font-bold text-slate-800">Tính toán chỉ số TDEE & InBody</h4>
+                            <p className="text-xs text-slate-500 mt-0.5">Nhập các chỉ số để máy tính đưa ra gợi ý tối ưu.</p>
+                          </div>
+                        </div>
+
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all mb-6 ${
+                            inBodyPreview 
+                              ? 'border-emerald-400 bg-emerald-50' 
+                              : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50'
+                          }`}
+                        >
+                          {inBodyPreview ? (
+                            <div className="space-y-2">
+                              <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                              <p className="text-emerald-700 font-bold text-sm">Đã tải ảnh InBody!</p>
+                              <img src={inBodyPreview} alt="InBody" className="max-h-20 mx-auto rounded-lg shadow" />
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <Upload className="w-8 h-8 text-slate-400 mx-auto mb-1" />
+                              <p className="text-slate-700 font-bold text-sm">Tải Lên Ảnh InBody (Tùy chọn)</p>
+                              <p className="text-xs text-slate-400">Hệ thống hỗ trợ lưu trữ ảnh InBody của bạn</p>
+                            </div>
+                          )}
+                        </div>
+                        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleInBodyImageUpload} className="hidden" />
+
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                          <InputField icon={Scale} label="Cân nặng (kg)" type="number" step="0.1" placeholder="70" value={inBodyForm.weight} onChange={(e) => setInBodyForm(f => ({...f, weight: e.target.value}))} />
+                          <InputField icon={TrendingUp} label="Chiều cao (cm)" type="number" placeholder="175" value={inBodyForm.height} onChange={(e) => setInBodyForm(f => ({...f, height: e.target.value}))} />
+                          <InputField icon={Activity} label="Tuổi" type="number" placeholder="25" value={inBodyForm.age} onChange={(e) => setInBodyForm(f => ({...f, age: e.target.value}))} />
+                          <SelectField label="Giới tính" value={inBodyForm.gender} onChange={(e) => setInBodyForm(f => ({...f, gender: e.target.value}))} options={[{ value: 'male', label: 'Nam' }, { value: 'female', label: 'Nữ' }]} />
+                          <InputField icon={Heart} label="Tỷ lệ mỡ (%)" type="number" placeholder="18" value={inBodyForm.bodyFat} onChange={(e) => setInBodyForm(f => ({...f, bodyFat: e.target.value}))} />
+                          <SelectField label="Mức vận động" value={inBodyForm.activityLevel} onChange={(e) => setInBodyForm(f => ({...f, activityLevel: e.target.value}))} options={[
+                            { value: 'sedentary', label: 'Ít vận động' },
+                            { value: 'light', label: 'Nhẹ (1-3 buổi/tuần)' },
+                            { value: 'moderate', label: 'Vừa (3-5 buổi/tuần)' },
+                            { value: 'active', label: 'Năng động (6-7 buổi/tuần)' },
+                            { value: 'veryActive', label: 'Rất năng động' },
+                          ]} />
+                        </div>
+                        <SelectField label="Mục tiêu của bạn" value={inBodyForm.goal} onChange={(e) => setInBodyForm(f => ({...f, goal: e.target.value}))} options={[{ value: 'cut', label: 'Giảm Mỡ' }, { value: 'maintain', label: 'Giữ Cân' }, { value: 'bulk', label: 'Tăng Cơ' }]} />
+
+                        <Button 
+                          onClick={calculateMacrosFromInBody}
+                          disabled={isAnalyzing}
+                          className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl py-5 font-semibold flex items-center justify-center gap-2 border-0"
+                        >
+                          {isAnalyzing ? (
+                            <><Loader2 className="h-4 w-4 animate-spin" /> Đang tính toán...</>
+                          ) : (
+                            <><Zap className="h-4 w-4" /> Tính Toán Ngay</>
+                          )}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-5">
+                    {analyzedData ? (
+                      <Card className="bg-gradient-to-br from-emerald-500 to-teal-500 border-0 text-white shadow-xl rounded-3xl">
+                        <CardContent className="p-6">
+                          <div className="flex items-center gap-3 mb-6">
+                            <Sparkles className="w-5 h-5 text-white" />
+                            <div>
+                              <h3 className="text-lg font-bold">Gợi Ý Của Máy Tính</h3>
+                              <p className="text-xs text-white/80">Khuyến nghị dành riêng cho cơ thể bạn</p>
+                            </div>
+                          </div>
+
+                          <div className="text-center py-5 border-b border-white/20 mb-5">
+                            <p className="text-white/80 text-xs font-semibold uppercase tracking-wider">Calories Khuyến Nghị</p>
+                            <div className="flex items-baseline justify-center gap-1.5 mt-1">
+                              <span className="text-4xl font-black">{analyzedData.dailyCalories.toLocaleString()}</span>
+                              <span className="text-sm text-white/80">kcal/ngày</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2.5 mb-5">
+                            <div className="bg-white/10 rounded-xl p-3 text-center">
+                              <Beef className="w-4 h-4 mx-auto mb-1 text-rose-200" />
+                              <p className="text-xl font-bold">{analyzedData.protein}g</p>
+                              <p className="text-[10px] text-white/80">Đạm</p>
+                            </div>
+                            <div className="bg-white/10 rounded-xl p-3 text-center">
+                              <Wheat className="w-4 h-4 mx-auto mb-1 text-amber-200" />
+                              <p className="text-xl font-bold">{analyzedData.carb}g</p>
+                              <p className="text-[10px] text-white/80">Tinh Bột</p>
+                            </div>
+                            <div className="bg-white/10 rounded-xl p-3 text-center">
+                              <Droplet className="w-4 h-4 mx-auto mb-1 text-indigo-200" />
+                              <p className="text-xl font-bold">{analyzedData.fat}g</p>
+                              <p className="text-[10px] text-white/80">Chất Béo</p>
+                            </div>
+                          </div>
+
+                          <div className="bg-white/10 rounded-xl p-4 text-xs space-y-2 mb-6">
+                            <div className="flex justify-between">
+                              <span className="text-white/80">Chuyển hóa cơ bản (BMR):</span>
+                              <span className="font-semibold">{analyzedData.bmr} kcal</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-white/80">Nhu cầu năng lượng (TDEE):</span>
+                              <span className="font-semibold">{analyzedData.tdee} kcal</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-white/80">Khối lượng nạc (LBM):</span>
+                              <span className="font-semibold">{analyzedData.leanMass} kg</span>
+                            </div>
+                          </div>
+
+                          <Button 
+                            onClick={applyRecommendedMacros}
+                            className="w-full bg-white text-emerald-600 hover:bg-white/95 rounded-xl py-5 font-bold flex items-center justify-center gap-2 border-0"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            Áp Dụng Gợi Ý
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <Card className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl">
+                        <CardContent className="p-12 text-center">
+                          <Calculator className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                          <h4 className="text-sm font-bold text-slate-600 mb-1">Chưa có kết quả tính toán</h4>
+                          <p className="text-xs text-slate-400">Nhập các thông số cơ thể bên trái rồi nhấn tính toán.</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SECTION 2: HEALTH & NUTRITION SETTINGS */}
+          {activeSection === 'health' && (
+            <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl animate-fade-in">
+              <CardContent className="p-6 space-y-6">
+                <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100">
+                  <Heart className="w-5 h-5 text-rose-500" />
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Sức khỏe & Dinh dưỡng</h3>
+                    <p className="text-slate-500 text-xs mt-0.5">Quản lý cơ chế dị ứng, mục tiêu sinh hoạt và kênh thông báo</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Thực phẩm gây dị ứng</p>
+                  <div className="flex flex-wrap gap-2">
+                    {ALLERGEN_OPTIONS.map((opt) => (
+                      <button 
+                        key={opt.value} 
+                        type="button" 
+                        onClick={() => toggleAllergen(opt.value)}
+                        className={`px-4 py-2 rounded-full text-xs font-bold border transition-colors ${
+                          allergens.includes(opt.value)
+                            ? 'bg-rose-100 border-rose-300 text-rose-700'
+                            : 'bg-white border-slate-250 text-slate-600 hover:border-slate-400'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Chế độ ăn ưa thích</label>
+                    <select 
+                      value={dietPreference} 
+                      onChange={(e) => setDietPreference(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+                    >
+                      {DIET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Mục tiêu hiện tại</label>
+                    <select 
+                      value={nutritionGoal} 
+                      onChange={(e) => setNutritionGoal(e.target.value)}
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+                    >
+                      {GOAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {nutritionGoal === 'PREGNANT' && (
+                  <div className="animate-fade-in">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Giai đoạn thai kỳ (Tam cá nguyệt)</label>
+                    <select 
+                      value={pregnancyTrimester} 
+                      onChange={(e) => setPregnancyTrimester(Number(e.target.value))}
+                      className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+                    >
+                      {[1, 2, 3].map((t) => <option key={t} value={t}>Tam cá nguyệt {t}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <label className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={postMealRatingOptIn}
+                    onChange={(e) => setPostMealRatingOptIn(e.target.checked)}
+                    className="rounded border-slate-350 text-blue-600 mt-1"
+                  />
+                  <div>
+                    <p className="text-sm font-extrabold text-slate-800">Nhắc đánh giá sau bữa ăn</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Tự động kích hoạt thông báo nhắc nhở đánh giá độ hài lòng khoảng 30 phút sau khi bạn ghi nhận bữa ăn.</p>
+                  </div>
+                </label>
+
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Đăng ký thông báo qua Email</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { checked: hireResultEmail, set: setHireResultEmail, title: 'Kết quả thuê PT', desc: 'Nhận email thông báo khi PT chấp nhận/từ chối.' },
+                      { checked: sosResultEmail, set: setSosResultEmail, title: 'Yêu cầu khẩn cấp (SOS)', desc: 'Nhận email khi ticket SOS được xử lý/phân công.' },
+                      { checked: weeklySummaryEmail, set: setWeeklySummaryEmail, title: 'Báo cáo tổng kết tuần', desc: 'Nhận email chứa đánh giá chi tiết hàng tuần từ PT.' },
+                      { checked: bodyMetricReminder, set: setBodyMetricReminder, title: 'Nhắc cập nhật cân nặng', desc: 'Thông báo nhắc nếu bạn chưa ghi cân nặng quá 7 ngày.' },
+                    ].map((item) => (
+                      <label key={item.title} className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-100 bg-white hover:bg-slate-50/50 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={(e) => item.set(e.target.checked)}
+                          className="rounded border-slate-350 text-blue-600 mt-1"
+                        />
+                        <div>
+                          <p className="text-sm font-extrabold text-slate-800">{item.title}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{item.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex gap-3">
+                  <Button 
+                    onClick={handleSaveHealth} 
+                    disabled={savingHealth} 
+                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-bold"
+                  >
+                    {savingHealth ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu cài đặt sức khỏe'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
-          </div>
+          )}
 
-          {/* Results */}
-          <div className="col-span-12 lg:col-span-5">
-            {analyzedData ? (
-              <Card className="bg-gradient-to-br from-emerald-500 to-teal-500 border-0 text-white shadow-2xl">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                      <Sparkles className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold">Kết Quả Phân Tích</h3>
-                      <p className="text-sm text-white/70">Dựa trên thông số của bạn</p>
-                    </div>
+          {/* SECTION 3: GOALS & PROGRESS TIMELINE */}
+          {activeSection === 'progress' && (
+            <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl animate-fade-in">
+              <CardContent className="p-6 space-y-6">
+                <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100">
+                  <Scale className="w-5 h-5 text-blue-500" />
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Mục tiêu & Tiến độ</h3>
+                    <p className="text-slate-500 text-xs mt-0.5">Lập kế hoạch cân nặng mong muốn và ghi nhận nhật ký cân nặng cơ thể</p>
                   </div>
+                </div>
 
-                  {/* Calories */}
-                  <div className="text-center py-6 border-b border-white/20 mb-6">
-                    <p className="text-white/70 font-medium">Calories Khuyến Nghị</p>
-                    <div className="flex items-baseline justify-center gap-2">
-                      <span className="text-5xl font-black">{analyzedData.dailyCalories.toLocaleString()}</span>
-                      <span className="text-lg text-white/70">kcal/ngày</span>
-                    </div>
+                {showBodyMetricReminder && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-2 animate-pulse">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <span>Bạn chưa ghi cân nặng hơn 7 ngày. Hãy cập nhật để theo dõi tiến trình tốt nhất!</span>
                   </div>
+                )}
 
-                  {/* Macros */}
-                  <div className="grid grid-cols-3 gap-3 mb-6">
-                    <div className="bg-white/10 rounded-xl p-4 text-center">
-                      <Beef className="w-5 h-5 mx-auto mb-1 text-rose-300" />
-                      <p className="text-2xl font-bold">{analyzedData.protein}g</p>
-                      <p className="text-xs text-white/70">Đạm</p>
-                    </div>
-                    <div className="bg-white/10 rounded-xl p-4 text-center">
-                      <Wheat className="w-5 h-5 mx-auto mb-1 text-amber-300" />
-                      <p className="text-2xl font-bold">{analyzedData.carb}g</p>
-                      <p className="text-xs text-white/70">Tinh Bột</p>
-                    </div>
-                    <div className="bg-white/10 rounded-xl p-4 text-center">
-                      <Droplet className="w-5 h-5 mx-auto mb-1 text-indigo-300" />
-                      <p className="text-2xl font-bold">{analyzedData.fat}g</p>
-                      <p className="text-xs text-white/70">Chất Béo</p>
-                    </div>
+                <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Kế hoạch cân nặng mục tiêu</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <InputField 
+                      label="Cân nặng gốc (baseline) (kg)" 
+                      placeholder="VD: 75" 
+                      value={goalForm.baselineWeight}
+                      onChange={(e) => setGoalForm((f) => ({ ...f, baselineWeight: e.target.value }))}
+                    />
+                    <InputField 
+                      label="Cân nặng mục tiêu (kg)" 
+                      placeholder="VD: 68" 
+                      value={goalForm.targetWeight}
+                      onChange={(e) => setGoalForm((f) => ({ ...f, targetWeight: e.target.value }))}
+                    />
+                    <InputField 
+                      icon={Calendar}
+                      label="Ngày hoàn thành dự kiến" 
+                      type="date"
+                      value={goalForm.targetDate}
+                      onChange={(e) => setGoalForm((f) => ({ ...f, targetDate: e.target.value }))}
+                    />
                   </div>
-
-                  {/* Details */}
-                  <div className="bg-white/10 rounded-xl p-4 text-sm space-y-2 mb-6">
-                    <div className="flex justify-between">
-                      <span className="text-white/70">BMR (Trao đổi chất):</span>
-                      <span className="font-semibold">{analyzedData.bmr} kcal</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">TDEE (Nhu cầu):</span>
-                      <span className="font-semibold">{analyzedData.tdee} kcal</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Khối Lượng Nạc:</span>
-                      <span className="font-semibold">{analyzedData.leanMass} kg</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Tỷ Lệ Mỡ:</span>
-                      <span className="font-semibold">{analyzedData.bodyFat}%</span>
-                    </div>
-                  </div>
-
                   <Button 
-                    onClick={applyRecommendedMacros}
-                    className="w-full bg-white text-emerald-600 hover:bg-white/90 rounded-xl py-5 font-semibold flex items-center justify-center gap-2"
+                    onClick={handleSaveGoals} 
+                    disabled={savingGoals} 
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold py-5"
                   >
-                    <CheckCircle2 className="w-5 h-5" />
-                    Áp Dụng Gợi Ý Này
+                    {savingGoals ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cập nhật kế hoạch mục tiêu'}
                   </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="bg-slate-100 border-2 border-dashed border-slate-300">
-                <CardContent className="p-12 text-center">
-                  <Calculator className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                  <h4 className="text-lg font-bold text-slate-600 mb-2">Chưa Có Kết Quả</h4>
-                  <p className="text-sm text-slate-400">Nhập thông số bên trái và nhấn tính toán để xem gợi ý</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-      )}
+                </div>
 
-      {/* InBody Modal */}
+                <div className="pt-4 border-t border-slate-100 space-y-3">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Ghi nhận cân nặng hôm nay</p>
+                  <div className="flex gap-3">
+                    <InputField 
+                      placeholder="Nhập số cân nặng (kg)..." 
+                      value={bodyWeight} 
+                      onChange={(e) => setBodyWeight(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={handleLogWeight} 
+                      className="rounded-xl h-11 px-5 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold shrink-0"
+                    >
+                      Lưu chỉ số cân nặng
+                    </Button>
+                  </div>
+                </div>
+
+                {bodyMetricHistory.length > 0 && (
+                  <div className="pt-4 border-t border-slate-100 space-y-2">
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Lịch sử đo gần nhất</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {bodyMetricHistory.slice(0, 6).map((m) => (
+                        <div key={m.id || m.recordDate} className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
+                          <p className="text-[10px] font-bold text-slate-450 uppercase">{m.recordDate}</p>
+                          <p className="text-lg font-black text-slate-800 mt-0.5">{m.weight} kg</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-slate-100">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Biểu đồ tiến trình & Cột mốc</p>
+                  <ProgressTimelineCard goals={progressGoals} milestones={milestones} bodyMetrics={bodyMetricHistory} compact={false} />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+        </div>
+      </div>
+
+      {/* InBody Calculation Modal (Self-contained) */}
       <Modal 
         isOpen={isInBodyModalOpen} 
         onClose={() => {
@@ -743,17 +1021,16 @@ export default function MacroTargetsPage() {
         title="Tính Toán Dinh Dưỡng Thông Minh"
         size="lg"
       >
-        {/* Modal content moved to tab */}
-        <div className="text-center py-8">
-          <p className="text-slate-600 mb-4">Vui lòng sử dụng tab "Tính Toán Gợi Ý" để nhập thông tin.</p>
+        <div className="text-center py-6">
+          <p className="text-slate-650 mb-4 font-semibold text-sm">Các chỉ số đo thể hình của bạn đã được tối ưu hóa.</p>
           <Button 
             onClick={() => {
               setIsInBodyModalOpen(false);
               setActiveTab('calculator');
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 font-bold"
           >
-            Mở Tab Tính Toán
+            Đóng để xem bảng tính toán
           </Button>
         </div>
       </Modal>
