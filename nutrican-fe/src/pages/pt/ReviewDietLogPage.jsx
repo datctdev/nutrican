@@ -7,10 +7,28 @@ import { Skeleton } from '../../components/ui/skeleton';
 import {
     CheckCircle2, XCircle, SlidersHorizontal, Clock,
     Image as ImageIcon, AlertTriangle, RefreshCw,
-    Flame, Target, Activity, EyeOff, Eye, MessageSquare
+    Flame, Target, Activity, EyeOff, Eye, MessageSquare,
+    Star
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { workspaceService } from '../../services/workspaceService';
+import Modal from '../../components/common/Modal';
+
+const getFullImageUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    const minioUrl = import.meta.env.VITE_MINIO_URL || 'http://localhost:9000/nutrican-media';
+    return `${minioUrl}/${url}`;
+};
+
+const getReviewImageUrl = (log) => {
+    if (log.imageUrl) return getFullImageUrl(log.imageUrl);
+    if (log.additionalImages && log.additionalImages.length > 0) {
+        const primary = log.additionalImages.find(img => img.isPrimary);
+        return getFullImageUrl(primary ? primary.imageUrl : log.additionalImages[0].imageUrl);
+    }
+    return null;
+};
 
 export default function ReviewDietLogPage() {
     const navigate = useNavigate();
@@ -28,11 +46,15 @@ export default function ReviewDietLogPage() {
     });
 
     const [rejectReasons, setRejectReasons] = useState({});
+    const [rejectModalLog, setRejectModalLog] = useState(null);
+    const [rejectReason, setRejectReason] = useState('WRONG_FOOD');
 
     const [blindMode, setBlindMode] = useState({});
     const [blindRevealed, setBlindRevealed] = useState({});
     const [blindForms, setBlindForms] = useState({});
     const [ptRblStats, setPtRblStats] = useState(null);
+    const [pendingHiresCount, setPendingHiresCount] = useState(0);
+    const [previewImage, setPreviewImage] = useState({});
 
     const CORRECTION_REASONS = [
         { id: 'WRONG_FOOD', label: 'Sai món ăn' },
@@ -101,6 +123,15 @@ export default function ReviewDietLogPage() {
         }
     }, []);
 
+    const fetchPendingClientsCount = useCallback(async () => {
+        try {
+            const res = await workspaceService.getClients({ page: 0, size: 10, status: 'PENDING' }).catch(() => ({ data: { data: { totalElements: 0 } } }));
+            setPendingHiresCount(res.data.data.totalElements || res.data.data.content?.length || 0);
+        } catch {
+            setPendingHiresCount(0);
+        }
+    }, []);
+
     useEffect(() => {
         let isMounted = true;
 
@@ -108,7 +139,8 @@ export default function ReviewDietLogPage() {
             await Promise.all([
                 fetchPendingLogs(),
                 fetchSosTickets(),
-                fetchPtRblStats()
+                fetchPtRblStats(),
+                fetchPendingClientsCount(),
             ]);
         };
 
@@ -122,6 +154,7 @@ export default function ReviewDietLogPage() {
                     fetchPendingLogs();
                     fetchSosTickets();
                     fetchPtRblStats();
+                    fetchPendingClientsCount();
                 }
             }, 500);
         };
@@ -184,15 +217,26 @@ export default function ReviewDietLogPage() {
         });
     };
 
-    const handleAdjustSubmit = (logId) => {
-        handleReview(logId, 'ADJUST_MACROS', {
-            adjustedCalories: parseFloat(adjustForm.adjustedCalories) || 0,
-            adjustedProtein: parseFloat(adjustForm.adjustedProtein) || 0,
-            adjustedCarb: parseFloat(adjustForm.adjustedCarb) || 0,
-            adjustedFat: parseFloat(adjustForm.adjustedFat) || 0,
-            note: adjustForm.note,
-            correctionReason: adjustForm.correctionReason,
-        });
+    const handleAdjustOrApproveSubmit = (log) => {
+        const originalMacros = log.macrosJson || {};
+        const isUnchanged =
+            (parseFloat(adjustForm.adjustedCalories) || 0) === (originalMacros.calories || 0) &&
+            (parseFloat(adjustForm.adjustedProtein) || 0) === (originalMacros.protein || 0) &&
+            (parseFloat(adjustForm.adjustedCarb) || 0) === (originalMacros.carbs || originalMacros.carb || 0) &&
+            (parseFloat(adjustForm.adjustedFat) || 0) === (originalMacros.fat || 0);
+
+        if (isUnchanged) {
+            handleReview(log.id, 'APPROVE');
+        } else {
+            handleReview(log.id, 'ADJUST_MACROS', {
+                adjustedCalories: parseFloat(adjustForm.adjustedCalories) || 0,
+                adjustedProtein: parseFloat(adjustForm.adjustedProtein) || 0,
+                adjustedCarb: parseFloat(adjustForm.adjustedCarb) || 0,
+                adjustedFat: parseFloat(adjustForm.adjustedFat) || 0,
+                note: adjustForm.note,
+                correctionReason: adjustForm.correctionReason,
+            });
+        }
     };
 
     const handleBlindSubmit = async (logId) => {
@@ -214,6 +258,25 @@ export default function ReviewDietLogPage() {
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4">
+            {pendingHiresCount > 0 && (
+                <div className="rounded-3xl border border-blue-200 bg-blue-50/50 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                            <Activity className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="font-extrabold text-blue-900">Yêu cầu thuê PT mới đang chờ duyệt ({pendingHiresCount})</p>
+                            <p className="text-sm text-blue-700/80 mt-0.5">Bạn đang có yêu cầu kết nối học viên mới cần phản hồi.</p>
+                        </div>
+                    </div>
+                    <Button 
+                        onClick={() => navigate('/pt/clients')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-6 font-bold shadow-md shadow-blue-500/20 shrink-0"
+                    >
+                        Duyệt học viên
+                    </Button>
+                </div>
+            )}
             {/* HEADER */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
@@ -346,8 +409,8 @@ export default function ReviewDietLogPage() {
 
                                 {/* Cột Ảnh */}
                                 <div className="md:w-80 h-64 md:h-auto bg-slate-100 flex flex-col items-center justify-center text-slate-400 border-b md:border-b-0 md:border-r border-slate-200 relative overflow-hidden">
-                                    {log.imageUrl ? (
-                                        <img src={log.imageUrl} alt="Meal" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                    {previewImage[log.id] || getReviewImageUrl(log) ? (
+                                        <img src={previewImage[log.id] || getReviewImageUrl(log)} alt="Meal" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                     ) : (
                                         <>
                                             <ImageIcon className="w-12 h-12 mb-3 opacity-30" />
@@ -437,9 +500,8 @@ export default function ReviewDietLogPage() {
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
                                                         <MacroCol label="AI Dự đoán" macros={log.aiPredictedMacros} color="bg-purple-50/50 border-purple-100 text-purple-900" />
-                                                        <MacroCol label="Database / Hybrid" macros={log.dbMatchedMacros} color="bg-emerald-50/50 border-emerald-100 text-emerald-900" />
                                                         <MacroCol label="Học viên đang thấy" macros={log.macrosJson} color="bg-white border-slate-200 text-slate-800 shadow-sm" />
                                                     </div>
                                                     {(log.modelVersion || log.matchedFoodName) && (
@@ -450,6 +512,42 @@ export default function ReviewDietLogPage() {
                                                     )}
                                                 </>
                                             )}
+
+                                            {/* Thư viện ảnh đầy đủ */}
+                                            {(() => {
+                                                const allImages = [
+                                                    { url: log.imageUrl ? getFullImageUrl(log.imageUrl) : null, isPrimary: true },
+                                                    ...(log.additionalImages || []).map(img => ({
+                                                        url: getFullImageUrl(img.imageUrl),
+                                                        isPrimary: img.isPrimary
+                                                    }))
+                                                ].filter(img => img.url);
+
+                                                if (allImages.length <= 1) return null;
+
+                                                return (
+                                                    <div className="flex gap-2 mt-4 flex-wrap border-t border-slate-200/60 pt-4 animate-fade-in">
+                                                        {allImages.map((img, idx) => (
+                                                            <div key={idx} className="relative cursor-pointer hover:opacity-85 transition-opacity" onClick={() => setPreviewImage(prev => ({ ...prev, [log.id]: img.url }))}>
+                                                                <img
+                                                                    src={img.url}
+                                                                    alt="Meal thumbnail"
+                                                                    className={`w-16 h-16 object-cover rounded-xl border shadow-sm transition-all ${
+                                                                        (previewImage[log.id] || getReviewImageUrl(log)) === img.url
+                                                                            ? 'border-blue-500 ring-2 ring-blue-500/20 scale-95'
+                                                                            : 'border-slate-200 hover:scale-105'
+                                                                    }`}
+                                                                />
+                                                                {img.isPrimary && (
+                                                                    <div className="absolute -top-1.5 -right-1.5 bg-amber-400 text-amber-900 rounded-full p-0.5 shadow-sm">
+                                                                        <Star className="w-2.5 h-2.5 fill-current text-white" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
 
                                         {/* FORM ĐIỀU CHỈNH MACROS */}
@@ -478,28 +576,55 @@ export default function ReviewDietLogPage() {
                                                         <input type="number" value={adjustForm.adjustedFat} onChange={(e) => setAdjustForm({...adjustForm, adjustedFat: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                                                     </div>
                                                 </div>
-                                                <div className="grid md:grid-cols-2 gap-4 mb-5">
-                                                    <div>
-                                                        <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Lý do điều chỉnh</label>
-                                                        <div className="relative">
-                                                            <select value={adjustForm.correctionReason} onChange={(e) => setAdjustForm({...adjustForm, correctionReason: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 appearance-none">
-                                                                {CORRECTION_REASONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Lời khuyên cho Học viên</label>
-                                                        <input type="text" placeholder="Nhập lời khuyên hoặc giải thích..." value={adjustForm.note} onChange={(e) => setAdjustForm({...adjustForm, note: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-3">
-                                                    <Button onClick={() => handleAdjustSubmit(log.id)} disabled={actionLoading === log.id} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-6 font-bold shadow-md shadow-blue-500/20">
-                                                        <CheckCircle2 className="w-4 h-4 mr-2"/> Xác nhận Điều chỉnh
-                                                    </Button>
-                                                    <Button onClick={() => setAdjustingLog(null)} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-100 bg-white rounded-xl h-11 px-6 font-bold">
-                                                        Hủy bỏ
-                                                    </Button>
-                                                </div>
+                                                {(() => {
+                                                    const isUnchanged =
+                                                        (parseFloat(adjustForm.adjustedCalories) || 0) === (log.macrosJson?.calories || 0) &&
+                                                        (parseFloat(adjustForm.adjustedProtein) || 0) === (log.macrosJson?.protein || 0) &&
+                                                        (parseFloat(adjustForm.adjustedCarb) || 0) === (log.macrosJson?.carbs || log.macrosJson?.carb || 0) &&
+                                                        (parseFloat(adjustForm.adjustedFat) || 0) === (log.macrosJson?.fat || 0);
+                                                    return (
+                                                        <>
+                                                            <div className="grid md:grid-cols-2 gap-4 mb-5">
+                                                                <div>
+                                                                    <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest block mb-1">
+                                                                        Lý do điều chỉnh {isUnchanged && <span className="text-slate-400 font-normal">(Chỉ cần chọn khi thay đổi chỉ số)</span>}
+                                                                    </label>
+                                                                    <div className="relative">
+                                                                        <select
+                                                                            disabled={isUnchanged}
+                                                                            value={adjustForm.correctionReason}
+                                                                            onChange={(e) => setAdjustForm({...adjustForm, correctionReason: e.target.value})}
+                                                                            className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 appearance-none disabled:opacity-50 disabled:bg-slate-100"
+                                                                        >
+                                                                            {CORRECTION_REASONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Lời khuyên cho Học viên</label>
+                                                                    <input type="text" placeholder="Nhập lời khuyên hoặc giải thích..." value={adjustForm.note} onChange={(e) => setAdjustForm({...adjustForm, note: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-3">
+                                                                <Button
+                                                                    onClick={() => handleAdjustOrApproveSubmit(log)}
+                                                                    disabled={actionLoading === log.id}
+                                                                    className={`rounded-xl h-11 px-6 font-bold shadow-md transition-colors ${
+                                                                        isUnchanged
+                                                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
+                                                                            : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'
+                                                                    }`}
+                                                                >
+                                                                    <CheckCircle2 className="w-4 h-4 mr-2"/>
+                                                                    {isUnchanged ? 'Xác nhận Phê duyệt' : 'Xác nhận Điều chỉnh'}
+                                                                </Button>
+                                                                <Button onClick={() => setAdjustingLog(null)} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-100 bg-white rounded-xl h-11 px-6 font-bold">
+                                                                    Hủy bỏ
+                                                                </Button>
+                                                            </div>
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         )}
                                     </div>
@@ -518,39 +643,24 @@ export default function ReviewDietLogPage() {
                                                 <MessageSquare className="w-4 h-4 mr-2" /> Hỏi qua chat
                                             </Button>
 
-                                            <div className="flex w-full sm:w-auto items-center gap-2">
-                                                <select
-                                                    className="w-full sm:w-48 text-sm font-bold border border-slate-200 rounded-xl px-3 h-11 bg-slate-50 focus:bg-white outline-none focus:border-red-400"
-                                                    value={rejectReasons[log.id] || 'OTHER'}
-                                                    onChange={(e) => setRejectReasons(prev => ({...prev, [log.id]: e.target.value}))}
-                                                >
-                                                    {CORRECTION_REASONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                                                </select>
-                                                <Button
-                                                    variant="outline"
-                                                    onClick={() => handleReview(log.id, 'REJECT', { correctionReason: rejectReasons[log.id] || 'OTHER' })}
-                                                    disabled={actionLoading === log.id}
-                                                    className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 bg-white rounded-xl h-11 px-4 font-bold transition-all"
-                                                >
-                                                    <XCircle className="w-4 h-4 mr-2" /> Từ chối
-                                                </Button>
-                                            </div>
-
                                             <Button
                                                 variant="outline"
-                                                onClick={() => openAdjust(log)}
+                                                onClick={() => {
+                                                    setRejectModalLog(log);
+                                                    setRejectReason('WRONG_FOOD');
+                                                }}
                                                 disabled={actionLoading === log.id}
-                                                className="w-full sm:w-auto text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300 bg-white rounded-xl h-11 px-4 font-bold transition-all"
+                                                className="w-full sm:w-auto text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 bg-white rounded-xl h-11 px-4 font-bold transition-all"
                                             >
-                                                <SlidersHorizontal className="w-4 h-4 mr-2" /> Điều chỉnh
+                                                <XCircle className="w-4 h-4 mr-2" /> Từ chối
                                             </Button>
 
                                             <Button
-                                                onClick={() => handleReview(log.id, 'APPROVE')}
+                                                onClick={() => openAdjust(log)}
                                                 disabled={actionLoading === log.id}
-                                                className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-11 px-8 font-black shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5"
+                                                className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-11 px-6 font-black shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5"
                                             >
-                                                <CheckCircle2 className="w-5 h-5 mr-2" /> Phê duyệt
+                                                <SlidersHorizontal className="w-4 h-4 mr-2" /> Phê duyệt Hoặc Điều chỉnh
                                             </Button>
                                         </div>
                                     )}
@@ -560,6 +670,48 @@ export default function ReviewDietLogPage() {
                     ))}
                 </div>
             )}
+            {/* Modal Từ chối */}
+            <Modal
+                isOpen={!!rejectModalLog}
+                onClose={() => setRejectModalLog(null)}
+                title="Từ chối bữa ăn"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-600 leading-relaxed">
+                        Bạn đang từ chối bữa ăn của học viên <strong>{rejectModalLog?.customerName}</strong>. Vui lòng chọn lý do từ chối để thông báo cho học viên:
+                    </p>
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Lý do từ chối</label>
+                        <select
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
+                        >
+                            {CORRECTION_REASONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setRejectModalLog(null)}
+                            className="flex-1 rounded-xl h-11 font-bold"
+                        >
+                            Hủy
+                        </Button>
+                        <Button
+                            onClick={async () => {
+                                const logId = rejectModalLog.id;
+                                setRejectModalLog(null);
+                                await handleReview(logId, 'REJECT', { correctionReason: rejectReason });
+                            }}
+                            disabled={actionLoading === rejectModalLog?.id}
+                            className="flex-1 rounded-xl h-11 bg-red-600 hover:bg-red-700 text-white font-bold shadow-md shadow-red-500/20"
+                        >
+                            Xác nhận Từ chối
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

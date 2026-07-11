@@ -9,6 +9,7 @@ import { RefreshCw, AlertTriangle, X, Send, Clock, CheckCircle2 } from 'lucide-r
 import { Link } from 'react-router-dom';
 import useWebSocket from '../../hooks/useWebSocket';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
+import { chatService } from '../../services/chatService';
 
 // Import subcomponents
 import NutritionProgress from './components/NutritionProgress';
@@ -62,6 +63,7 @@ export default function DietTrackerPage() {
     const [confirmModal, setConfirmModal] = useState(null);
     const [confirmingFood, setConfirmingFood] = useState(false);
     const [resnetDishes, setResnetDishes] = useState([]);
+    const [hasActivePt, setHasActivePt] = useState(false);
 
     const fetchData = useCallback(async () => {
         try {
@@ -72,10 +74,11 @@ export default function DietTrackerPage() {
             const day = String(today.getDate()).padStart(2, '0');
             const todayStr = `${year}-${month}-${day}`;
 
-            const [logsRes, summaryRes, sosRes] = await Promise.all([
+            const [logsRes, summaryRes, sosRes, threadsRes] = await Promise.all([
                 dietService.getLogs({ page: 0, size: 10, startDate: todayStr, endDate: todayStr }),
                 dietService.getSummary({ date: todayStr }),
                 dietService.getSosTickets().catch(() => ({ data: { data: [] } })),
+                chatService.getThreads().catch(() => ({ data: { data: [] } })),
             ]);
             setLogs(logsRes.data.data.content || []);
             const rawData = summaryRes.data.data || {};
@@ -94,6 +97,7 @@ export default function DietTrackerPage() {
             };
             setSummary(summaryData);
             setSosTickets(sosRes.data.data || []);
+            setHasActivePt((threadsRes.data?.data || []).some(t => t.status === 'ACTIVE'));
         } catch (err) {
             console.error('Error fetching diet data:', err);
         } finally {
@@ -441,7 +445,7 @@ export default function DietTrackerPage() {
             toast.success(manualSendToPt ? 'Đã lưu và gửi PT kiểm tra!' : 'Đã lưu bữa ăn!');
             const logsRes = await dietService.getLogs({ page: 0, size: 1 });
             const newLogId = logsRes.data.data?.content?.[0]?.id;
-            if (newLogId) schedulePostMealPrompt(newLogId);
+            if (newLogId && hasActivePt) schedulePostMealPrompt(newLogId);
             setManualSendToPt(false);
             setIngredientItems([]);
             fetchData();
@@ -508,7 +512,7 @@ export default function DietTrackerPage() {
             });
             toast.success('Đã ghi nhật ký từ công thức!');
             const logId = res.data.data?.id;
-            if (logId) schedulePostMealPrompt(logId);
+            if (logId && hasActivePt) schedulePostMealPrompt(logId);
             setManualSendToPt(false);
             setIngredientItems([]);
             setRecipeName('');
@@ -531,7 +535,7 @@ export default function DietTrackerPage() {
             });
             toast.success('Đã ghi nhật ký từ công thức đã lưu!');
             const logId = res.data.data?.id;
-            if (logId) schedulePostMealPrompt(logId);
+            if (logId && hasActivePt) schedulePostMealPrompt(logId);
             setManualSendToPt(false);
             fetchData();
         } catch (err) {
@@ -584,7 +588,7 @@ export default function DietTrackerPage() {
             const data = res.data?.data;
             const warnings = data?.allergyWarnings;
             toast.success('Xác nhận & lưu thành công');
-            if (confirmModal.logId) schedulePostMealPrompt(confirmModal.logId);
+            if (confirmModal.logId && hasActivePt) schedulePostMealPrompt(confirmModal.logId);
             if (data?.dietPrefWarning) {
                 toast.warning(data.dietPrefWarning);
                 setConfirmModal((prev) => prev ? { ...prev, dietPrefWarning: data.dietPrefWarning } : prev);
@@ -751,7 +755,7 @@ export default function DietTrackerPage() {
                         handleLogFromSavedRecipe={handleLogFromSavedRecipe}
                     />
 
-                    {pendingSubmitPrompt && (
+                    {pendingSubmitPrompt && hasActivePt && (
                         <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
                                 <p className="font-semibold text-violet-900">Gửi PT kiểm tra?</p>
@@ -789,6 +793,7 @@ export default function DietTrackerPage() {
                             setSosDietLogId={setSosDietLogId}
                             setSosMessage={setSosMessage}
                             setIsSosModalOpen={setIsSosModalOpen}
+                            hasActivePt={hasActivePt}
                         />
                     </div>
                 </div>

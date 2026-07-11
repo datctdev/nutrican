@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
 import { Menu, X, ChevronDown, Bell, LogOut, User, Settings, LayoutDashboard, Sparkles, Target } from 'lucide-react';
 import logo from '../../assets/nutrican_logo.png';
+import { workspaceService } from '../../services/workspaceService';
 
 export default function Header() {
     const { user, logout, isAuthenticated } = useAuthStore();
@@ -16,6 +17,7 @@ export default function Header() {
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
     const { unreadCount, notifications, setNotifications, markAsRead, markAllAsRead } = useNotificationStore();
+    const [pendingHiresCount, setPendingHiresCount] = useState(0);
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -26,6 +28,24 @@ export default function Header() {
             .then((res) => setNotifications(res.data?.data?.content || []))
             .catch(() => {});
     }, [isAuthenticated, setNotifications]);
+
+    useEffect(() => {
+        if (!isAuthenticated || !user?.role?.startsWith('PT')) return;
+        const fetchPendingCount = async () => {
+            try {
+                const res = await workspaceService.getClients({ page: 0, size: 10, status: 'PENDING' });
+                setPendingHiresCount(res.data.data.totalElements || res.data.data.content?.length || 0);
+            } catch { /* ignore */ }
+        };
+        fetchPendingCount();
+        const handleAlert = () => fetchPendingCount();
+        window.addEventListener('pt_client_alert', handleAlert);
+        window.addEventListener('realtime_update', handleAlert);
+        return () => {
+            window.removeEventListener('pt_client_alert', handleAlert);
+            window.removeEventListener('realtime_update', handleAlert);
+        };
+    }, [isAuthenticated, user]);
 
     const handleLogout = () => {
         logout();
@@ -148,16 +168,22 @@ export default function Header() {
                             <nav className="hidden md:flex items-center gap-1">
                                 {currentNavItems.map((item) => {
                                     const isActive = location.pathname.startsWith(item.href) && item.href !== '/' || location.pathname === item.href;
+                                    const showBadge = item.href === '/pt/clients' && pendingHiresCount > 0;
                                     return (
                                         <Link
                                             key={item.href}
                                             to={item.href}
-                                            className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${isActive
+                                            className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${isActive
                                                 ? 'bg-slate-100 text-blue-600'
                                                 : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
                                                 }`}
                                         >
-                                            {item.label}
+                                            <span>{item.label}</span>
+                                            {showBadge && (
+                                                <span className="h-5 min-w-[20px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse">
+                                                    {pendingHiresCount}
+                                                </span>
+                                            )}
                                         </Link>
                                     );
                                 })}
@@ -272,11 +298,24 @@ export default function Header() {
                 {mobileMenuOpen && isAuthenticated && user && (
                     <div className="md:hidden border-t border-slate-100 py-4 animate-slide-in">
                         <nav className="flex flex-col gap-1">
-                            {currentNavItems.map((item) => (
-                                <Link key={item.href} to={item.href} onClick={() => setMobileMenuOpen(false)} className="px-4 py-3 text-sm font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
-                                    {item.label}
-                                </Link>
-                            ))}
+                            {currentNavItems.map((item) => {
+                                const showBadge = item.href === '/pt/clients' && pendingHiresCount > 0;
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        to={item.href}
+                                        onClick={() => setMobileMenuOpen(false)}
+                                        className="px-4 py-3 text-sm font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors flex items-center justify-between"
+                                    >
+                                        <span>{item.label}</span>
+                                        {showBadge && (
+                                            <span className="h-5 min-w-[20px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse">
+                                                {pendingHiresCount}
+                                            </span>
+                                        )}
+                                    </Link>
+                                );
+                            })}
                         </nav>
                     </div>
                 )}

@@ -22,6 +22,7 @@ export default function ClientListPage() {
     const [activeTab, setActiveTab] = useState('ACTIVE'); // Tab API: ACTIVE hoặc PENDING
     const [processingId, setProcessingId] = useState(null); // Trạng thái loading khi bấm Duyệt
     const [endCoachingModal, setEndCoachingModal] = useState(null); // { clientId, mappingStatus, fullName }
+    const [pendingCount, setPendingCount] = useState(0);
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -67,9 +68,19 @@ export default function ClientListPage() {
         }
     }, [activeTab]);
 
+    const fetchPendingCount = useCallback(async () => {
+        try {
+            const res = await workspaceService.getClients({ page: 0, size: 10, status: 'PENDING' }).catch(() => ({ data: { data: { totalElements: 0 } } }));
+            setPendingCount(res.data.data.totalElements || res.data.data.content?.length || 0);
+        } catch {
+            setPendingCount(0);
+        }
+    }, []);
+
     useEffect(() => {
         fetchClients();
-    }, [fetchClients]);
+        fetchPendingCount();
+    }, [fetchClients, fetchPendingCount]);
 
     const handleAction = async (clientId, action) => {
         try {
@@ -78,6 +89,7 @@ export default function ClientListPage() {
 
             toast.success(action === 'ACCEPT' ? 'Đã chấp nhận học viên thành công!' : 'Đã từ chối yêu cầu.');
             fetchClients();
+            fetchPendingCount();
         } catch (error) {
             console.error(error);
             toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi xử lý yêu cầu.');
@@ -155,6 +167,11 @@ export default function ClientListPage() {
                     onClick={() => { setActiveTab('PENDING'); setStatusFilter(''); }}
                 >
                     <Clock className="w-4 h-4" /> Yêu cầu chờ duyệt
+                    {pendingCount > 0 && (
+                        <span className="h-5 min-w-[20px] px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-pulse">
+                            {pendingCount}
+                        </span>
+                    )}
                     {activeTab === 'PENDING' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-amber-600 rounded-t-full"></span>}
                 </button>
             </div>

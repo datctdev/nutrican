@@ -85,6 +85,7 @@ export default function MealSection({
     setSosDietLogId,
     setSosMessage,
     setIsSosModalOpen,
+    hasActivePt = false,
 }) {
     const renderLogImages = (log) => {
         const images = [
@@ -180,7 +181,7 @@ export default function MealSection({
                                         {log.recognitionSource === 'HYBRID' && (
                                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">DB match</span>
                                         )}
-                                        {log.suggestSos && (
+                                        {log.suggestSos && hasActivePt && (
                                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-warning/10 text-warning border border-warning/20">Cần SOS?</span>
                                         )}
                                     </div>
@@ -276,7 +277,7 @@ export default function MealSection({
                                                 <Edit className="w-3.5 h-3.5 mr-1.5" /> Sửa thông số
                                             </Button>
 
-                                            {!log.sosTicketFlag && (
+                                            {!log.sosTicketFlag && hasActivePt && (
                                                 <Button 
                                                     size="sm" 
                                                     variant="outline" 

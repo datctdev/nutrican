@@ -1,6 +1,6 @@
 // src/pages/customer/ProfilePage.jsx
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { userService } from '../../services/userService';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 import ProgressTimelineCard from './components/ProgressTimelineCard';
@@ -712,6 +712,15 @@ export default function ProfilePage() {
           )}
           {loadingMealPlan ? (
             <Loader2 className="w-6 h-6 animate-spin text-slate-400 mx-auto" />
+          ) : ptThreads.length === 0 ? (
+            <div className="text-center py-8 px-4 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+              <Utensils className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-500 font-medium">Bạn chưa thuê Huấn luyện viên (PT).</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Hãy kết nối với một Huấn luyện viên trên chợ để nhận được thực đơn ăn uống và hướng dẫn tập luyện thiết kế riêng.</p>
+              <Link to="/marketplace" className="inline-flex items-center mt-3 text-xs font-bold text-blue-600 hover:underline">
+                Tìm kiếm PT ngay →
+              </Link>
+            </div>
           ) : !mealPlanItems.length ? (
             <p className="text-sm text-slate-500 text-center py-6">PT chưa lên thực đơn cho bạn.</p>
           ) : (
@@ -769,6 +778,14 @@ export default function ProfilePage() {
 
           {loadingAppts ? (
             <Loader2 className="w-6 h-6 animate-spin text-slate-400 mx-auto" />
+          ) : ptThreads.length === 0 && appointments.length === 0 ? (
+            <div className="text-center py-6 px-4 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+              <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-500 font-medium">Vui lòng kết nối với PT để đặt lịch tư vấn.</p>
+              <Link to="/marketplace" className="inline-flex items-center mt-2 text-xs font-bold text-blue-600 hover:underline">
+                Tìm kiếm PT ngay →
+              </Link>
+            </div>
           ) : appointments.length === 0 ? (
             <p className="text-sm text-slate-500">Chưa có lịch hẹn sắp tới.</p>
           ) : (
