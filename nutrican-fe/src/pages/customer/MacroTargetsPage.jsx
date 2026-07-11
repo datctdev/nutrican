@@ -33,13 +33,21 @@ const DIET_OPTIONS = [
   { value: 'EAT_CLEAN', label: 'Eat clean' },
 ];
 
-const GOAL_OPTIONS = [
-  { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
-  { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
-  { value: 'MAINTAIN', label: 'Duy trì' },
-  { value: 'PREGNANT', label: 'Mang thai' },
-  { value: 'RECOVERY', label: 'Phục hồi' },
-];
+const getGoalsByGender = (gender) => {
+  const base = [
+    { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
+    { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
+    { value: 'MAINTAIN', label: 'Duy trì' },
+  ];
+  if (gender === 'female') {
+    return [
+      ...base,
+      { value: 'PREGNANT', label: 'Mang thai' },
+      { value: 'RECOVERY', label: 'Phục hồi sau mang thai' },
+    ];
+  }
+  return base;
+};
 
 export default function MacroTargetsPage() {
   const fileInputRef = useRef(null);
@@ -77,6 +85,7 @@ export default function MacroTargetsPage() {
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
   const [savingHealth, setSavingHealth] = useState(false);
+  const [userGender, setUserGender] = useState('male');
   const [postMealRatingOptIn, setPostMealRatingOptIn] = useState(true);
   const [hireResultEmail, setHireResultEmail] = useState(true);
   const [sosResultEmail, setSosResultEmail] = useState(true);
@@ -127,6 +136,12 @@ export default function MacroTargetsPage() {
       if (data.dietPreference) setDietPreference(data.dietPreference);
       if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
       if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
+      if (data.gender) {
+        setUserGender(data.gender);
+        if (data.gender === 'male' && (data.nutritionGoal === 'PREGNANT' || data.nutritionGoal === 'RECOVERY')) {
+          setNutritionGoal('MAINTAIN');
+        }
+      }
       
       const optIn = data.notificationOptIn || {};
       setPostMealRatingOptIn(optIn.postMealRating !== false);
@@ -371,32 +386,7 @@ export default function MacroTargetsPage() {
   const carbPct = totalCalFromMacros > 0 ? Math.round((macros.carb * 4 / totalCalFromMacros) * 100) : 0;
   const fatPct = totalCalFromMacros > 0 ? Math.round((macros.fat * 9 / totalCalFromMacros) * 100) : 0;
 
-  const InputField = ({ icon: Icon, label, className = "", ...props }) => (
-    <div className="space-y-1.5">
-      <label className="text-sm font-semibold text-slate-650">{label}</label>
-      <div className="relative flex items-center">
-        {Icon && <Icon className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />}
-        <input
-          className={`w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all ${Icon ? 'pl-9 pr-3' : 'px-4'} ${className}`}
-          {...props}
-        />
-      </div>
-    </div>
-  );
-
-  const SelectField = ({ label, options, className = "", ...props }) => (
-    <div className="space-y-1.5">
-      <label className="text-sm font-semibold text-slate-650">{label}</label>
-      <select
-        className={`w-full py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none cursor-pointer ${className}`}
-        {...props}
-      >
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
-  );
+  // Helper components moved outside the page component to prevent focus loss on re-render
 
   if (isLoading) {
     return (
@@ -698,11 +688,19 @@ export default function MacroTargetsPage() {
                         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleInBodyImageUpload} className="hidden" />
 
                         <div className="grid grid-cols-2 gap-4 mb-6">
-                          <InputField icon={Scale} label="Cân nặng (kg)" type="number" step="0.1" placeholder="70" value={inBodyForm.weight} onChange={(e) => setInBodyForm(f => ({...f, weight: e.target.value}))} />
-                          <InputField icon={TrendingUp} label="Chiều cao (cm)" type="number" placeholder="175" value={inBodyForm.height} onChange={(e) => setInBodyForm(f => ({...f, height: e.target.value}))} />
-                          <InputField icon={Activity} label="Tuổi" type="number" placeholder="25" value={inBodyForm.age} onChange={(e) => setInBodyForm(f => ({...f, age: e.target.value}))} />
-                          <SelectField label="Giới tính" value={inBodyForm.gender} onChange={(e) => setInBodyForm(f => ({...f, gender: e.target.value}))} options={[{ value: 'male', label: 'Nam' }, { value: 'female', label: 'Nữ' }]} />
-                          <InputField icon={Heart} label="Tỷ lệ mỡ (%)" type="number" placeholder="18" value={inBodyForm.bodyFat} onChange={(e) => setInBodyForm(f => ({...f, bodyFat: e.target.value}))} />
+                          <InputField icon={Scale} label="Cân nặng (kg)" type="text" inputMode="decimal" placeholder="70" value={inBodyForm.weight} onChange={(e) => setInBodyForm(f => ({...f, weight: e.target.value.replace(/[^0-9.]/g, '')}))} />
+                          <InputField icon={TrendingUp} label="Chiều cao (cm)" type="text" inputMode="numeric" placeholder="175" value={inBodyForm.height} onChange={(e) => setInBodyForm(f => ({...f, height: e.target.value.replace(/[^0-9]/g, '')}))} />
+                          <InputField icon={Activity} label="Tuổi" type="text" inputMode="numeric" placeholder="25" value={inBodyForm.age} onChange={(e) => setInBodyForm(f => ({...f, age: e.target.value.replace(/[^0-9]/g, '')}))} />
+                          <SelectField label="Giới tính" value={inBodyForm.gender} 
+                            onChange={(e) => {
+                              const nextGender = e.target.value;
+                              setInBodyForm(f => {
+                                const nextGoal = (nextGender === 'male' && (f.goal === 'PREGNANT' || f.goal === 'RECOVERY')) ? 'MAINTAIN' : f.goal;
+                                return { ...f, gender: nextGender, goal: nextGoal };
+                              });
+                            }} 
+                            options={[{ value: 'male', label: 'Nam' }, { value: 'female', label: 'Nữ' }]} />
+                          <InputField icon={Heart} label="Tỷ lệ mỡ (%)" type="text" inputMode="decimal" placeholder="18" value={inBodyForm.bodyFat} onChange={(e) => setInBodyForm(f => ({...f, bodyFat: e.target.value.replace(/[^0-9.]/g, '')}))} />
                           <SelectField label="Mức vận động" value={inBodyForm.activityLevel} onChange={(e) => setInBodyForm(f => ({...f, activityLevel: e.target.value}))} options={[
                             { value: 'sedentary', label: 'Ít vận động' },
                             { value: 'light', label: 'Nhẹ (1-3 buổi/tuần)' },
@@ -714,7 +712,7 @@ export default function MacroTargetsPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                           <SelectField label="Mục tiêu của bạn" value={inBodyForm.goal} 
                             onChange={(e) => setInBodyForm(f => ({...f, goal: e.target.value}))} 
-                            options={GOAL_OPTIONS} />
+                            options={getGoalsByGender(inBodyForm.gender)} />
                           {inBodyForm.goal === 'PREGNANT' ? (
                             <SelectField label="Giai đoạn thai kỳ (Tam cá nguyệt)" value={inBodyForm.pregnancyTrimester} 
                               onChange={(e) => setInBodyForm(f => ({...f, pregnancyTrimester: Number(e.target.value)}))} 
@@ -870,7 +868,7 @@ export default function MacroTargetsPage() {
                       onChange={(e) => setNutritionGoal(e.target.value)}
                       className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
                     >
-                      {GOAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {getGoalsByGender(userGender).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
                 </div>
@@ -964,14 +962,18 @@ export default function MacroTargetsPage() {
                     <InputField 
                       label="Cân nặng gốc (baseline) (kg)" 
                       placeholder="Cân baseline (kg)" 
+                      type="text"
+                      inputMode="decimal"
                       value={goalForm.baselineWeight}
-                      onChange={(e) => setGoalForm((f) => ({ ...f, baselineWeight: e.target.value }))}
+                      onChange={(e) => setGoalForm((f) => ({ ...f, baselineWeight: e.target.value.replace(/[^0-9.]/g, '') }))}
                     />
                     <InputField 
                       label="Cân nặng mục tiêu (kg)" 
                       placeholder="Cân mục tiêu (kg)" 
+                      type="text"
+                      inputMode="decimal"
                       value={goalForm.targetWeight}
-                      onChange={(e) => setGoalForm((f) => ({ ...f, targetWeight: e.target.value }))}
+                      onChange={(e) => setGoalForm((f) => ({ ...f, targetWeight: e.target.value.replace(/[^0-9.]/g, '') }))}
                     />
                     <InputField 
                       icon={Calendar}
@@ -995,8 +997,10 @@ export default function MacroTargetsPage() {
                   <div className="flex gap-3">
                     <InputField 
                       placeholder="Cân hôm nay (kg)" 
+                      type="text"
+                      inputMode="decimal"
                       value={bodyWeight} 
-                      onChange={(e) => setBodyWeight(e.target.value)}
+                      onChange={(e) => setBodyWeight(e.target.value.replace(/[^0-9.]/g, ''))}
                       className="flex-1"
                     />
                     <Button 
@@ -1061,3 +1065,30 @@ export default function MacroTargetsPage() {
     </div>
   );
 }
+
+const InputField = ({ icon: Icon, label, className = "", ...props }) => (
+  <div className="space-y-1.5">
+    <label className="text-sm font-semibold text-slate-650">{label}</label>
+    <div className="relative flex items-center">
+      {Icon && <Icon className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />}
+      <input
+        className={`w-full py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all ${Icon ? 'pl-9 pr-3' : 'px-4'} ${className}`}
+        {...props}
+      />
+    </div>
+  </div>
+);
+
+const SelectField = ({ label, options, className = "", ...props }) => (
+  <div className="space-y-1.5">
+    <label className="text-sm font-semibold text-slate-650">{label}</label>
+    <select
+      className={`w-full py-2.5 px-4 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none cursor-pointer ${className}`}
+      {...props}
+    >
+      {options.map(opt => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+  </div>
+);

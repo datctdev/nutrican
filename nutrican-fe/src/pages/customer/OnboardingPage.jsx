@@ -7,13 +7,21 @@ import { profileExtensionsService } from '../../services/profileExtensionsServic
 import { toast } from 'sonner';
 import { Loader2, ChevronRight, Sparkles } from 'lucide-react';
 
-const GOALS = [
-  { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
-  { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
-  { value: 'MAINTAIN', label: 'Duy trì' },
-  { value: 'PREGNANT', label: 'Bà bầu' },
-  { value: 'RECOVERY', label: 'Phục hồi' },
-];
+const getGoalsByGender = (gender) => {
+  const base = [
+    { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
+    { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
+    { value: 'MAINTAIN', label: 'Duy trì' },
+  ];
+  if (gender === 'female') {
+    return [
+      ...base,
+      { value: 'PREGNANT', label: 'Mang thai' },
+      { value: 'RECOVERY', label: 'Phục hồi sau mang thai' },
+    ];
+  }
+  return base;
+};
 
 const DIET_PREFS = [
   { value: 'NORMAL', label: 'Ăn bình thường' },
@@ -187,8 +195,14 @@ export default function OnboardingPage() {
                 onChange={(e) => setStep1((s) => ({ ...s, weightKg: e.target.value }))} className="rounded-xl" />
               <Input placeholder="Ngày sinh (DD/MM/YYYY) ví dụ: 13022004" type="text" value={dobDisplay}
                 onChange={handleDobChange} className="rounded-xl" />
-              <select value={step1.gender} onChange={(e) => setStep1((s) => ({ ...s, gender: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+              <select value={step1.gender} onChange={(e) => {
+                const nextGender = e.target.value;
+                setStep1((s) => ({ ...s, gender: nextGender }));
+                if (nextGender === 'male' && (step2.nutritionGoal === 'PREGNANT' || step2.nutritionGoal === 'RECOVERY')) {
+                  setStep2((s) => ({ ...s, nutritionGoal: 'MAINTAIN' }));
+                }
+              }}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
                 <option value="male">Nam</option>
                 <option value="female">Nữ</option>
               </select>
@@ -209,7 +223,7 @@ export default function OnboardingPage() {
                 <select value={step2.nutritionGoal}
                   onChange={(e) => setStep2((s) => ({ ...s, nutritionGoal: e.target.value }))}
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
-                  {GOALS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                  {getGoalsByGender(step1.gender).map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
                 </select>
               </div>
 
