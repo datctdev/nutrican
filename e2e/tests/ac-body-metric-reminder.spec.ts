@@ -33,7 +33,8 @@ test.describe('AC-BM-04 Body metric reminder', () => {
   test.describe('FE-only', () => {
     test('weekly reminder opt-out toggle on profile', async ({ page }) => {
       await uiLogin(page, USERS.customer.email, USERS.customer.password);
-      await page.goto('/profile');
+      await page.goto('/macro-targets');
+      await page.getByRole('button', { name: /Sức khỏe & dinh dưỡng/i }).click();
       await expect(page.getByText(/nhắc ghi cân hàng tuần/i)).toBeVisible({ timeout: 10_000 });
     });
   });
@@ -46,7 +47,8 @@ test.describe('AC-BM-04 Body metric reminder', () => {
       test.skip(!status.data?.showReminder, 'Reminder not triggered in this seed state');
 
       await uiLogin(page, USERS.customer.email, USERS.customer.password);
-      await page.goto('/profile');
+      await page.goto('/macro-targets');
+      await page.getByRole('button', { name: /Mục tiêu & tiến độ/i }).click();
       await expect(page.getByText(/chưa ghi cân nặng hơn 7 ngày/i)).toBeVisible({ timeout: 10_000 });
     });
   });
