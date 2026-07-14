@@ -14,6 +14,8 @@ import java.util.List;
 @AllArgsConstructor
 public class LlavaMealAnalysisResult {
     private boolean success;
+    @Builder.Default
+    private boolean isFood = true;
     private String foodNameVi;
     private String portionDescription;
     private BigDecimal estimatedTotalGrams;

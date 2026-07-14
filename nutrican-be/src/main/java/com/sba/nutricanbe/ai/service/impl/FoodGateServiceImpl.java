@@ -53,7 +53,10 @@ public class FoodGateServiceImpl implements FoodGateService {
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new BadRequestException("File must be an image");
         }
-        ResNetAnalyzeResponse response = resNetClient.analyze(file);
+        ResNetAnalyzeResponse response = resNetClient.analyze(file);
+        if (response != null && !response.isSuccess() && response.getMessage() != null && response.getMessage().contains("GATE_FAIL_NOT_FOOD")) {
+            return new FoodGatePreCheckResult(FoodGateResult.NOT_FOOD, response);
+        }
         MealRecognitionResult preview = toPreview(response);
         return new FoodGatePreCheckResult(check(preview), response);
     }

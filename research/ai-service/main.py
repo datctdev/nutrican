@@ -150,6 +150,16 @@ async def analyze_food(file: UploadFile = File(...)):
     try:
         contents = await file.read()
         image = Image.open(io.BytesIO(contents)).convert("RGB")
+        
+        # Fast non-food check: standard deviation & extreme lighting
+        img_np = np.array(image)
+        std_dev = float(np.std(img_np))
+        mean_val = float(np.mean(img_np))
+        if std_dev < 12.0:
+            return {"success": False, "message": "GATE_FAIL_NOT_FOOD: Solid color or uniform image detected. Please capture a real meal image."}
+        if mean_val < 8.0 or mean_val > 248.0:
+            return {"success": False, "message": "GATE_FAIL_NOT_FOOD: Overly dark or bright image. Please capture a real meal image."}
+            
         portion_meta = estimate_portion_ratio(image)
 
         image_resized = image.resize((224, 224))

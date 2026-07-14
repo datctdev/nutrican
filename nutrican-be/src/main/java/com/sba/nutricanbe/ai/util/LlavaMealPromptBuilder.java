@@ -39,6 +39,7 @@ public final class LlavaMealPromptBuilder {
 
                 Return ONLY valid JSON, no markdown:
                 {
+                  "is_food": true,
                   "food_name_vi": "exact dish name in Vietnamese or English",
                   "food_code_guess": "one code from schema below",
                   "items": [{"name":"component","estimated_grams":150,"role":"main|side|rice|protein|broth"}],
@@ -52,7 +53,8 @@ public final class LlavaMealPromptBuilder {
                 }
 
                 Rules:
-                - food_code_guess MUST be one exact code from schema (not a Vietnamese generic name).
+                - is_food MUST be false if the image is NOT food (e.g. objects, people, background, plain colors, documents, text, etc.), else true.
+                - food_code_guess MUST be one exact code from schema (not a Vietnamese generic name). If is_food is false, set food_code_guess to "unknown".
                 - Use NutriHome reference kcal for ONE standard serving, then scale by estimated grams.
                 - Estimate total_estimated_grams from visible meat/rice volume on the plate (small=0.7x, large=1.3x standard).
                 - confidence < 0.5 if blurry; 0.7+ only when dish type is unambiguous.

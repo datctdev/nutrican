@@ -1,0 +1,10 @@
+{
+  "val_loss": 0.5860981941223145,
+  "top1_accuracy": 0.8654974102973938,
+  "top3_accuracy": 0.9426873922348022,
+  "num_classes": 200,
+  "s1_best": 0.5575042963027954,
+  "s2_best": 0.8709220290184021,
+  "s2_epochs_done": 40,
+  "target_met": true
+}

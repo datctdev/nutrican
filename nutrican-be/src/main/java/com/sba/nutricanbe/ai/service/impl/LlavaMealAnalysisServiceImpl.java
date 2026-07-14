@@ -73,7 +73,17 @@ public class LlavaMealAnalysisServiceImpl implements LlavaMealAnalysisService {
             Map<String, Object> parsed = objectMapper.readValue(json, new TypeReference<>() {});
 
             List<LlavaMealAnalysisResult.LlavaFoodItem> items = parseItems(parsed.get("items"));
+            boolean isFoodVal = true;
+            if (parsed.containsKey("is_food")) {
+                Object rawIsFood = parsed.get("is_food");
+                if (rawIsFood instanceof Boolean) {
+                    isFoodVal = (Boolean) rawIsFood;
+                } else if (rawIsFood != null) {
+                    isFoodVal = Boolean.parseBoolean(rawIsFood.toString());
+                }
+            }
             return LlavaMealAnalysisResult.builder()
+                    .isFood(isFoodVal)
                     .success(true)
                     .foodNameVi(stringVal(parsed.get("food_name_vi")))
                     .portionDescription(stringVal(parsed.get("portion_description")))
