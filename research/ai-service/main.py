@@ -158,7 +158,7 @@ async def analyze_food(file: UploadFile = File(...)):
         img_array = safe_preprocess(img_array)
 
         predictions = model.predict(img_array, verbose=0)
-        scores = tf.nn.softmax(predictions[0]).numpy()
+        scores = predictions[0]
 
         class_index = int(np.argmax(scores))
         predicted_class = CLASS_NAMES[class_index]
