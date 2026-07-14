@@ -323,6 +323,8 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .dietPreference(user.getDietPreference())
                 .nutritionGoal(user.getNutritionGoal())
                 .pregnancyTrimester(user.getPregnancyTrimester())
+                .heightCm(user.getHeightCm())
+                .gender(user.getGender())
                 .notificationOptIn(user.getNotificationOptIn())
                 .createdAt(user.getCreatedAt())
                 .build();

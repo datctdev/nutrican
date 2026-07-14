@@ -15,6 +15,8 @@ public class BodyMetricDto {
     private LocalDate recordDate;
     private BigDecimal weight;
     private BigDecimal bodyFatPercent;
+    private BigDecimal muscleMass;
+    private BigDecimal lbm;
     private String note;
 
     public static BodyMetricDto from(BodyMetric m) {
@@ -23,6 +25,8 @@ public class BodyMetricDto {
                 .recordDate(m.getRecordDate())
                 .weight(m.getWeight())
                 .bodyFatPercent(m.getBodyFatPercent())
+                .muscleMass(m.getMuscleMass())
+                .lbm(m.getLbm())
                 .note(m.getNote())
                 .build();
     }

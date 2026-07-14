@@ -4,7 +4,6 @@ import { userService } from '../../services/userService';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import Modal from '../../components/common/Modal';
 import ProgressTimelineCard from './components/ProgressTimelineCard';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -62,7 +61,6 @@ export default function MacroTargetsPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isInBodyModalOpen, setIsInBodyModalOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [inBodyPreview, setInBodyPreview] = useState(null);
   const [nutritionActiveTab, setNutritionActiveTab] = useState('current'); // sub-tab: current, calculator
@@ -95,6 +93,10 @@ export default function MacroTargetsPage() {
   // Section 3: Goal & Progress states
   const [goalForm, setGoalForm] = useState({ targetWeight: '', baselineWeight: '', targetDate: '' });
   const [bodyWeight, setBodyWeight] = useState('');
+  const [bodyFatPercent, setBodyFatPercent] = useState('');
+  const [muscleMass, setMuscleMass] = useState('');
+  const [lbm, setLbm] = useState('');
+  const [isAnalyzingInbody, setIsAnalyzingInbody] = useState(false);
   const [progressGoals, setProgressGoals] = useState(null);
   const [milestones, setMilestones] = useState([]);
   const [bodyMetricHistory, setBodyMetricHistory] = useState([]);
@@ -127,10 +129,13 @@ export default function MacroTargetsPage() {
 
   const fetchHealthAndGoals = async () => {
     try {
-      const [profileRes, allergyRes] = await Promise.all([
+      const [profileRes, allergyRes, goalsRes, bodyMetricsRes] = await Promise.all([
         userService.getProfile(),
         userService.getAllergies().catch(() => ({ data: { data: [] } })),
+        profileExtensionsService.getGoals().catch(() => ({ data: { data: null } })),
+        profileExtensionsService.getBodyMetrics({ page: 0, size: 6 }).catch(() => ({ data: { data: [] } })),
       ]);
+
       const data = profileRes.data.data;
       setAllergens(allergyRes.data.data || data.allergens || []);
       if (data.dietPreference) setDietPreference(data.dietPreference);
@@ -138,27 +143,16 @@ export default function MacroTargetsPage() {
       if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
       if (data.gender) {
         setUserGender(data.gender);
-        if (data.gender === 'male' && (data.nutritionGoal === 'PREGNANT' || data.nutritionGoal === 'RECOVERY')) {
-          setNutritionGoal('MAINTAIN');
-        }
       }
-      
+
       const optIn = data.notificationOptIn || {};
       setPostMealRatingOptIn(optIn.postMealRating !== false);
       setHireResultEmail(optIn.hireResultEmail !== false);
       setSosResultEmail(optIn.sosResultEmail !== false);
       setWeeklySummaryEmail(optIn.weeklySummaryEmail !== false);
       setBodyMetricReminder(optIn.bodyMetricReminder !== false);
-    } catch (err) {
-      console.error('Error fetching health profile:', err);
-    }
 
-    profileExtensionsService.getBodyMetricReminderStatus()
-      .then((r) => setShowBodyMetricReminder(!!r.data?.data?.showReminder))
-      .catch(() => setShowBodyMetricReminder(false));
-
-    profileExtensionsService.getGoals().then((r) => {
-      const g = r.data.data;
+      const g = goalsRes.data.data;
       setProgressGoals(g);
       if (g) {
         setGoalForm({
@@ -167,13 +161,38 @@ export default function MacroTargetsPage() {
           targetDate: g.targetDate ?? '',
         });
       }
-    }).catch(() => {});
+
+      const metrics = bodyMetricsRes.data.data?.content || bodyMetricsRes.data.data || [];
+      setBodyMetricHistory(metrics);
+
+      // Pre-fill TDEE Suggestion Calculator
+      let calculatedAge = '';
+      if (data.dateOfBirth) {
+        calculatedAge = (new Date().getFullYear() - new Date(data.dateOfBirth).getFullYear()).toString();
+      }
+      const latestWeight = metrics[0]?.weight || '';
+      const latestFat = metrics[0]?.bodyFatPercent || '';
+
+      setInBodyForm({
+        weight: latestWeight ? latestWeight.toString() : '',
+        height: data.heightCm ? data.heightCm.toString() : '',
+        age: calculatedAge ? calculatedAge.toString() : '',
+        gender: data.gender || 'male',
+        bodyFat: latestFat ? latestFat.toString() : '',
+        activityLevel: 'moderate',
+        goal: data.nutritionGoal || 'MAINTAIN',
+        pregnancyTrimester: data.pregnancyTrimester || 1,
+      });
+
+    } catch (err) {
+      console.error('Error fetching health profile:', err);
+    }
+
+    profileExtensionsService.getBodyMetricReminderStatus()
+      .then((r) => setShowBodyMetricReminder(!!r.data?.data?.showReminder))
+      .catch(() => setShowBodyMetricReminder(false));
 
     profileExtensionsService.getMilestones().then((r) => setMilestones(r.data.data || [])).catch(() => {});
-    
-    profileExtensionsService.getBodyMetrics({ page: 0, size: 6 })
-      .then((r) => setBodyMetricHistory(r.data.data?.content || r.data.data || []))
-      .catch(() => setBodyMetricHistory([]));
   };
 
   const handleSaveMacros = async () => {
@@ -213,16 +232,47 @@ export default function MacroTargetsPage() {
     }
   };
 
-  const handleInBodyImageUpload = (e) => {
+  const handleInBodyImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return toast.error('Vui lòng chọn file hình ảnh');
     if (file.size > 10 * 1024 * 1024) return toast.error('Kích thước ảnh phải nhỏ hơn 10MB');
 
+    // Show preview
     const reader = new FileReader();
     reader.onload = (ev) => setInBodyPreview(ev.target.result);
     reader.readAsDataURL(file);
-    toast.info('Đã tải ảnh InBody! Điền thông tin bên dưới để nhận gợi ý.');
+
+    setIsAnalyzing(true);
+    try {
+      toast.loading('Đang phân tích phiếu InBody bằng AI...', { id: 'inbody-ocr' });
+      const res = await profileExtensionsService.analyzeInbody(file);
+      const data = res.data.data;
+      if (data) {
+        setInBodyForm(f => ({
+          ...f,
+          weight: data.weight ? data.weight.toString() : f.weight,
+          bodyFat: data.bodyFatPercent ? data.bodyFatPercent.toString() : f.bodyFat,
+          height: data.height ? data.height.toString() : f.height,
+          age: data.age ? data.age.toString() : f.age,
+          gender: data.gender ? data.gender : f.gender,
+        }));
+        
+        let unitText = '';
+        if (data.rawUnit === 'lb') {
+          unitText = ` (Đã tự quy đổi từ ${data.rawWeight} lb sang kg)`;
+        }
+        toast.success('Phân tích phiếu InBody thành công!' + unitText, { id: 'inbody-ocr' });
+      } else {
+        toast.dismiss('inbody-ocr');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Không thể phân tích ảnh InBody. Vui lòng thử lại.', { id: 'inbody-ocr' });
+    } finally {
+      setIsAnalyzing(false);
+      e.target.value = '';
+    }
   };
 
   const calculateMacrosFromInBody = () => {
@@ -305,7 +355,6 @@ export default function MacroTargetsPage() {
         carb: analyzedData.carb,
         fat: analyzedData.fat,
       });
-      setIsInBodyModalOpen(false);
       setNutritionActiveTab('current');
       toast.success('Đã áp dụng gợi ý!');
     }
@@ -366,9 +415,17 @@ export default function MacroTargetsPage() {
       return;
     }
     try {
-      await profileExtensionsService.recordBodyMetric({ weight: Number(bodyWeight) });
-      toast.success('Đã ghi nhận cân nặng hôm nay!');
+      await profileExtensionsService.recordBodyMetric({
+        weight: Number(bodyWeight),
+        bodyFatPercent: bodyFatPercent ? Number(bodyFatPercent) : null,
+        muscleMass: muscleMass ? Number(muscleMass) : null,
+        lbm: lbm ? Number(lbm) : null,
+      });
+      toast.success('Đã ghi nhận chỉ số cơ thể hôm nay!');
       setBodyWeight('');
+      setBodyFatPercent('');
+      setMuscleMass('');
+      setLbm('');
       const [ms, bm] = await Promise.all([
         profileExtensionsService.getMilestones(),
         profileExtensionsService.getBodyMetrics({ page: 0, size: 6 }),
@@ -376,7 +433,44 @@ export default function MacroTargetsPage() {
       setMilestones(ms.data.data || []);
       setBodyMetricHistory(bm.data.data?.content || bm.data.data || []);
     } catch {
-      toast.error('Không ghi được cân nặng');
+      toast.error('Không ghi được chỉ số cơ thể');
+    }
+  };
+
+  const handleInbodyUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsAnalyzingInbody(true);
+    try {
+      const res = await profileExtensionsService.analyzeInbody(file);
+      const data = res.data.data;
+      if (data) {
+        if (data.weight) setBodyWeight(data.weight.toString());
+        if (data.bodyFatPercent) setBodyFatPercent(data.bodyFatPercent.toString());
+        if (data.muscleMass) setMuscleMass(data.muscleMass.toString());
+        if (data.lbm) setLbm(data.lbm.toString());
+
+        setInBodyForm(f => ({
+          ...f,
+          weight: data.weight ? data.weight.toString() : f.weight,
+          bodyFat: data.bodyFatPercent ? data.bodyFatPercent.toString() : f.bodyFat,
+          height: data.height ? data.height.toString() : f.height,
+          age: data.age ? data.age.toString() : f.age,
+          gender: data.gender ? data.gender : f.gender,
+        }));
+        
+        let unitText = '';
+        if (data.rawUnit === 'lb') {
+          unitText = ` (Đã tự quy đổi từ ${data.rawWeight} lb, ${data.rawMuscleMass} lb cơ, ${data.rawLbm} lb nạc sang kg)`;
+        }
+        toast.success('Phân tích phiếu InBody thành công!' + unitText);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Không thể phân tích ảnh InBody. Vui lòng thử lại.');
+    } finally {
+      setIsAnalyzingInbody(false);
+      e.target.value = '';
     }
   };
 
@@ -457,8 +551,8 @@ export default function MacroTargetsPage() {
                     {loadingGoalSuggestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
                     <span className="font-bold text-xs">Gợi ý theo mục tiêu</span>
                   </Button>
-                  <Button 
-                    onClick={() => { setIsInBodyModalOpen(true); setNutritionActiveTab('calculator'); }}
+                   <Button 
+                    onClick={() => setNutritionActiveTab('calculator')}
                     className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl shadow-md flex items-center gap-2 h-10 px-4 border-0"
                   >
                     <Sparkles className="w-4 h-4" />
@@ -992,35 +1086,102 @@ export default function MacroTargetsPage() {
                   </Button>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 space-y-3">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Ghi nhận cân nặng hôm nay</p>
-                  <div className="flex gap-3">
-                    <InputField 
-                      placeholder="Cân hôm nay (kg)" 
-                      type="text"
-                      inputMode="decimal"
-                      value={bodyWeight} 
-                      onChange={(e) => setBodyWeight(e.target.value.replace(/[^0-9.]/g, ''))}
-                      className="flex-1"
-                    />
-                    <Button 
-                      variant="outline" 
-                      onClick={handleLogWeight} 
-                      className="rounded-xl h-11 px-5 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold shrink-0"
-                    >
-                      Lưu chỉ số cân nặng
-                    </Button>
+                <div className="pt-4 border-t border-slate-100 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Ghi nhận chỉ số cơ thể</p>
+                    <label className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer flex items-center gap-1">
+                      {isAnalyzingInbody ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="w-3.5 h-3.5" />
+                      )}
+                      {isAnalyzingInbody ? 'Đang phân tích...' : 'Tải phiếu InBody'}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleInbodyUpload} 
+                        disabled={isAnalyzingInbody} 
+                        className="hidden" 
+                      />
+                    </label>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-slate-450 tracking-wider">Cân nặng (kg)</label>
+                      <InputField 
+                        placeholder="Cân nặng (kg)" 
+                        type="text"
+                        inputMode="decimal"
+                        value={bodyWeight} 
+                        onChange={(e) => setBodyWeight(e.target.value.replace(/[^0-9.]/g, ''))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-slate-450 tracking-wider">Tỷ lệ mỡ (%)</label>
+                      <InputField 
+                        placeholder="Tỷ lệ mỡ (%)" 
+                        type="text"
+                        inputMode="decimal"
+                        value={bodyFatPercent} 
+                        onChange={(e) => setBodyFatPercent(e.target.value.replace(/[^0-9.]/g, ''))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-slate-450 tracking-wider">Khối lượng cơ (kg)</label>
+                      <InputField 
+                        placeholder="Khối lượng cơ (kg)" 
+                        type="text"
+                        inputMode="decimal"
+                        value={muscleMass} 
+                        onChange={(e) => setMuscleMass(e.target.value.replace(/[^0-9.]/g, ''))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase text-slate-450 tracking-wider">Khối lượng nạc (kg)</label>
+                      <InputField 
+                        placeholder="Khối lượng nạc (kg)" 
+                        type="text"
+                        inputMode="decimal"
+                        value={lbm} 
+                        onChange={(e) => setLbm(e.target.value.replace(/[^0-9.]/g, ''))}
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    variant="outline" 
+                    onClick={handleLogWeight} 
+                    className="w-full rounded-xl py-5 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
+                  >
+                    Lưu chỉ số cơ thể
+                  </Button>
                 </div>
 
                 {bodyMetricHistory.length > 0 && (
                   <div className="pt-4 border-t border-slate-100 space-y-2">
                     <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Lịch sử đo gần nhất</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {bodyMetricHistory.slice(0, 6).map((m) => (
-                        <div key={m.id || m.recordDate} className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
-                          <p className="text-[10px] font-bold text-slate-450 uppercase">{m.recordDate}</p>
-                          <p className="text-lg font-black text-slate-800 mt-0.5">{m.weight} kg</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {bodyMetricHistory.slice(0, 4).map((m) => (
+                        <div key={m.id || m.recordDate} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                          <div className="flex justify-between items-center border-b border-slate-200/60 pb-1.5 mb-1.5">
+                            <p className="text-[10px] font-bold text-slate-450 uppercase">{m.recordDate}</p>
+                            <p className="text-sm font-black text-slate-800">{m.weight} kg</p>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1 text-[11px] text-slate-500">
+                            <div>
+                              <span className="block text-[9px] font-bold uppercase text-slate-400">Tỷ lệ mỡ</span>
+                              <span className="font-semibold text-slate-700">{m.bodyFatPercent ? `${m.bodyFatPercent}%` : '—'}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] font-bold uppercase text-slate-400">Cơ xương</span>
+                              <span className="font-semibold text-slate-700">{m.muscleMass ? `${m.muscleMass} kg` : '—'}</span>
+                            </div>
+                            <div>
+                              <span className="block text-[9px] font-bold uppercase text-slate-400">Khối nạc</span>
+                              <span className="font-semibold text-slate-700">{m.lbm ? `${m.lbm} kg` : '—'}</span>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1037,31 +1198,6 @@ export default function MacroTargetsPage() {
 
         </div>
       </div>
-
-      {/* InBody Calculation Modal (Self-contained) */}
-      <Modal 
-        isOpen={isInBodyModalOpen} 
-        onClose={() => {
-          setIsInBodyModalOpen(false);
-          setInBodyPreview(null);
-          setAnalyzedData(null);
-        }} 
-        title="Tính Toán Dinh Dưỡng Thông Minh"
-        size="lg"
-      >
-        <div className="text-center py-6">
-          <p className="text-slate-650 mb-4 font-semibold text-sm">Các chỉ số đo thể hình của bạn đã được tối ưu hóa.</p>
-          <Button 
-            onClick={() => {
-              setIsInBodyModalOpen(false);
-              setActiveTab('calculator');
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 font-bold"
-          >
-            Đóng để xem bảng tính toán
-          </Button>
-        </div>
-      </Modal>
     </div>
   );
 }

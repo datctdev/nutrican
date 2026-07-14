@@ -6,6 +6,15 @@ export const profileExtensionsService = {
   getMilestones: () => api.get('/profile/milestones'),
   getBodyMetricReminderStatus: () => api.get('/profile/body-metric-reminder-status'),
   recordBodyMetric: (data) => api.post('/profile/body-metrics', data),
+  analyzeInbody: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/profile/body-metrics/analyze-inbody', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
   getBodyMetrics: (params) => api.get('/profile/body-metrics', { params }),
   getOnboardingStatus: () => api.get('/profile/onboarding-status'),
   submitOnboarding: (data) => api.post('/profile/onboarding', data),

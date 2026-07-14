@@ -10,11 +10,15 @@ import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.ProgressTimelineService;
+import com.sba.nutricanbe.ai.service.OllamaService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import java.util.List;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -34,6 +38,8 @@ class BodyMetricServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PtClientMappingRepository mappingRepository;
     @Mock private ProgressTimelineService progressTimelineService;
+    @Mock private OllamaService ollamaService;
+    @Mock private ObjectMapper objectMapper;
 
     @InjectMocks
     private BodyMetricServiceImpl service;
@@ -118,5 +124,59 @@ class BodyMetricServiceTest {
         var status = service.getReminderStatus(userId);
         assertTrue(status.isShowReminder());
         assertEquals(10, status.getDaysSinceLastLog());
+    }
+
+    @Test
+    void analyzeInbody_throwsWhenFileEmpty() {
+        org.springframework.web.multipart.MultipartFile mockFile = mock(org.springframework.web.multipart.MultipartFile.class);
+        when(mockFile.isEmpty()).thenReturn(true);
+        assertThrows(BadRequestException.class, () -> service.analyzeInbody(mockFile));
+    }
+
+    @Disabled
+    @Test
+    void testRealOllamaCall() throws Exception {
+        com.sba.nutricanbe.ai.service.impl.OllamaServiceImpl realService = 
+            new com.sba.nutricanbe.ai.service.impl.OllamaServiceImpl("http://localhost:11434", "qwen2.5vl:7b");
+        
+        java.io.File file = new java.io.File("C:/Users/anh01/.gemini/antigravity-ide/brain/8b1d1d4c-0d04-470d-a387-9aae7e8d4827/media__1784053780915.png");
+        byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
+        String base64 = java.util.Base64.getEncoder().encodeToString(bytes);
+
+        String prompt = """
+                You are an expert medical OCR assistant. Analyze the InBody sheet carefully.
+                Extract the following measurements:
+                1. Weight (Cân nặng)
+                2. SMM (Skeletal Muscle Mass / Khối lượng cơ xương)
+                3. PBF (Percent Body Fat / Tỷ lệ phần trăm mỡ cơ thể)
+                4. Fat Free Mass / FFM / LBM (Lean Body Mass / Fat Free Mass)
+                5. The unit of measurement (either "kg" or "lb" as shown on the sheet, e.g. next to SMM or Weight)
+
+                Return ONLY a valid JSON object matching this schema, no markdown or extra text:
+                {
+                  "weight": 130.3,
+                  "muscle_mass": 43.4,
+                  "body_fat_percent": 36.7,
+                  "lbm": 82.5,
+                  "unit": "lb"
+                }
+                """;
+        Map<String, Object> body = Map.of(
+                "model", "qwen2.5vl:7b",
+                "messages", List.of(Map.of(
+                        "role", "user",
+                        "content", prompt,
+                        "images", List.of(base64))),
+                "stream", false,
+                "format", "json");
+
+        try {
+            System.out.println("Calling real Ollama from test...");
+            Map response = realService.post("/api/chat", body, Map.class);
+            System.out.println("Ollama response: " + response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 }

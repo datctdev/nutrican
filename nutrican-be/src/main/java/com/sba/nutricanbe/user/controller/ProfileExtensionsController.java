@@ -18,11 +18,14 @@ import com.sba.nutricanbe.user.dto.OnboardingRequest;
 import com.sba.nutricanbe.user.dto.OnboardingStatusDto;
 import com.sba.nutricanbe.user.dto.MacroSuggestionResponse;
 import com.sba.nutricanbe.user.dto.UserPreferencesRequest;
+import com.sba.nutricanbe.user.dto.InbodyAnalysisResponse;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
@@ -137,6 +140,14 @@ public class ProfileExtensionsController {
         BodyMetric saved = bodyMetricService.recordMetric(user.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(
                 BodyMetricDto.from(saved), "Body metric recorded"));
+    }
+
+    @PostMapping(value = "/body-metrics/analyze-inbody", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<InbodyAnalysisResponse>> analyzeInbody(
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file) {
+        InbodyAnalysisResponse result = bodyMetricService.analyzeInbody(file);
+        return ResponseEntity.ok(ApiResponse.success(result, "Inbody sheet analyzed successfully"));
     }
 
     @GetMapping("/body-metric-reminder-status")

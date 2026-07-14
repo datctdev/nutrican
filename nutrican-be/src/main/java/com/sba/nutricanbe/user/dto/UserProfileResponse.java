@@ -34,5 +34,7 @@ public class UserProfileResponse {
     private DietPreference dietPreference;
     private NutritionGoal nutritionGoal;
     private Integer pregnancyTrimester;
+    private Integer heightCm;
+    private String gender;
     private Map<String, Boolean> notificationOptIn;
 }

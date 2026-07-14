@@ -10,5 +10,7 @@ public class BodyMetricRequest {
     private LocalDate recordDate;
     private BigDecimal weight;
     private BigDecimal bodyFatPercent;
+    private BigDecimal muscleMass;
+    private BigDecimal lbm;
     private String note;
 }
