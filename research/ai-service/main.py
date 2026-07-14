@@ -95,10 +95,40 @@ def load_model() -> None:
     if not MODEL_PATH.exists():
         raise FileNotFoundError(f"Model not found: {MODEL_PATH}")
     print(f"Loading model from {MODEL_PATH}...")
-    model = tf.keras.models.load_model(
-        str(MODEL_PATH),
-        custom_objects=model_custom_objects(),
-    )
+    try:
+        model = tf.keras.models.load_model(
+            str(MODEL_PATH),
+            custom_objects=model_custom_objects(),
+        )
+    except Exception as e:
+        print(f"Standard load_model failed: {e}")
+        print("Rebuilding ResNet50 Bohlol architecture and loading weights instead...")
+        
+        from tensorflow.keras import layers, models
+        from tensorflow.keras.applications import ResNet50
+        
+        inputs = layers.Input(shape=(224, 224, 3), name="input_3")
+        backbone = ResNet50(
+            include_top=False,
+            weights=None,
+            input_shape=(224, 224, 3),
+            name="backbone",
+        )
+        x = backbone(inputs)
+        x = layers.GlobalAveragePooling2D(name="gap")(x)
+        x = layers.Dense(512, activation="relu", name="dense")(x)
+        x = layers.Dropout(0.2, name="dropout")(x)
+        x = layers.Dense(256, activation="relu", name="dense_1")(x)
+        x = layers.Dense(128, activation="relu", name="dense_2")(x)
+        x = layers.Dense(64, activation="relu", name="dense_3")(x)
+        x = layers.Dense(32, activation="relu", name="dense_4")(x)
+        x = layers.BatchNormalization(name="batch_normalization")(x)
+        outputs = layers.Dense(len(CLASS_NAMES), activation="softmax", name="dense_5")(x)
+        
+        model = models.Model(inputs=inputs, outputs=outputs, name="resnet50_bohlol")
+        model.backbone = backbone
+        model.load_weights(str(MODEL_PATH))
+        
     print("ResNet50 model ready.")
 
 
