@@ -18,8 +18,9 @@ import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
 import {
   Loader2, Utensils, Calendar, Sparkles, Check, ChevronRight, User, AlertCircle, RefreshCw, X, ShieldAlert, BookOpen,
-  MessageSquare, Send, ImagePlus, UploadCloud, Clock
+  MessageSquare, Send, ImagePlus, UploadCloud, Clock, ShoppingCart
 } from 'lucide-react';
+import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
 import useWebSocket from '../../hooks/useWebSocket';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -83,6 +84,7 @@ export default function CoachingPage() {
   const [newWeeklySummary, setNewWeeklySummary] = useState(false);
   const [skipModalItemId, setSkipModalItemId] = useState(null);
   const [skippingMeal, setSkippingMeal] = useState(false);
+  const [groceryModalOpen, setGroceryModalOpen] = useState(false);
 
   // Appointment states
   const [appointments, setAppointments] = useState([]);
@@ -741,9 +743,21 @@ export default function CoachingPage() {
 
                 <Card className="border-slate-200 shadow-sm rounded-3xl bg-white">
                   <CardContent className="p-6">
-                    <h3 className="text-lg font-bold text-slate-900 mb-5 flex items-center gap-2">
-                      <Utensils className="w-5 h-5 text-emerald-600" /> Thực đơn tuần này
-                    </h3>
+                    <div className="flex items-center justify-between mb-5">
+                      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <Utensils className="w-5 h-5 text-emerald-600" /> Thực đơn tuần này
+                      </h3>
+                      {mealPlanItems.length > 0 && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setGroceryModalOpen(true)} 
+                          className="gap-2 rounded-xl text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 font-bold"
+                        >
+                          <ShoppingCart className="w-4 h-4" /> Danh sách đi chợ
+                        </Button>
+                      )}
+                    </div>
                     
                     {loadingMealPlan ? (
                       <div className="flex justify-center py-12">
@@ -799,6 +813,13 @@ export default function CoachingPage() {
                     )}
                   </CardContent>
                 </Card>
+
+                <GroceryListModal
+                  isOpen={groceryModalOpen}
+                  onClose={() => setGroceryModalOpen(false)}
+                  items={mealPlanItems}
+                  weekStart={mealPlan?.weekStart ? new Date(mealPlan.weekStart) : new Date()}
+                />
               </div>
             )}
 

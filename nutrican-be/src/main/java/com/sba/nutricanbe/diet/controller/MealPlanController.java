@@ -155,7 +155,7 @@ public class MealPlanController {
 
     public ResponseEntity<ApiResponse<MealPlanDetail>> getCurrentPlan(@AuthenticationPrincipal User user) {
 
-        MealPlan plan = mealPlanRepository.findByClientIdOrderByWeekStartDesc(user.getId()).stream().findFirst()
+        MealPlan plan = mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(user.getId()).stream().findFirst()
 
                 .orElseThrow(() -> new ResourceNotFoundException("MealPlan", user.getId()));
 
