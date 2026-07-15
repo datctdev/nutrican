@@ -13,4 +13,5 @@ public interface MealPlanService {
     MealPlanSaveResult createPlan(UUID ptId, MealPlanRequest request);
     MealPlanSaveResult updatePlan(UUID ptId, UUID clientId, MealPlanRequest request);
     List<MealPlanItem> saveItems(UUID mealPlanId, List<MealPlanItemRequest> itemRequests);
+    void publishPlan(UUID ptId, UUID planId);
 }

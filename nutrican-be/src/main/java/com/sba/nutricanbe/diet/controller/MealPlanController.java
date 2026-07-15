@@ -140,6 +140,15 @@ public class MealPlanController {
 
 
 
+    @PostMapping("/api/v1/workspace/meal-plans/{planId}/publish")
+    @PreAuthorize("hasAnyRole('PT_CERTIFIED', 'PT_FREELANCE')")
+    public ResponseEntity<ApiResponse<Void>> publishPlan(
+            @AuthenticationPrincipal User pt,
+            @PathVariable UUID planId) {
+        mealPlanService.publishPlan(pt.getId(), planId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Meal plan published"));
+    }
+
     @GetMapping("/api/v1/meal-plans/current")
 
     @PreAuthorize("hasRole('CUSTOMER')")

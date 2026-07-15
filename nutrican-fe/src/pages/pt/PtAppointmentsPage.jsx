@@ -30,7 +30,10 @@ export default function PtAppointmentsPage() {
     }
   };
 
-  useEffect(() => { fetchAppts(); }, []);
+  useEffect(() => { 
+    const t = setTimeout(() => fetchAppts(), 0); 
+    return () => clearTimeout(t); 
+  }, []);
 
   const handleAction = async (id, action) => {
     setActing(id + action);

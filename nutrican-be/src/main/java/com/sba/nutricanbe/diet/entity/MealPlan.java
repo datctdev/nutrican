@@ -27,4 +27,8 @@ public class MealPlan extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String notes;
+
+    @Column(name = "is_published")
+    @Builder.Default
+    private Boolean isPublished = false;
 }

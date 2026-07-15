@@ -17,7 +17,8 @@ const SafeImage = ({ src, alt, className }) => {
     const [hasError, setHasError] = useState(false);
 
     useEffect(() => {
-        setHasError(false);
+        const t = setTimeout(() => setHasError(false), 0);
+        return () => clearTimeout(t);
     }, [src]);
 
     if (hasError || !src) {

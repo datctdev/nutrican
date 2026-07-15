@@ -23,6 +23,7 @@ import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,7 @@ public class MealPlanServiceImpl implements MealPlanService {
     private final FoodItemRepository foodItemRepository;
     private final DietLogHelper dietLogHelper;
     private final MacroTargetRepository macroTargetRepository;
+    private final WebSocketSessionService webSocketSessionService;
 
     @Override
     @Transactional
@@ -103,6 +105,21 @@ public class MealPlanServiceImpl implements MealPlanService {
                     .build()));
         }
         return saved;
+    }
+
+    @Override
+    @Transactional
+    public void publishPlan(UUID ptId, UUID planId) {
+        MealPlan plan = mealPlanRepository.findById(planId)
+                .orElseThrow(() -> new com.sba.nutricanbe.common.exception.ResourceNotFoundException("MealPlan", planId));
+        if (!plan.getPtId().equals(ptId)) {
+            throw new BadRequestException("You can only publish meal plans that you created.");
+        }
+        plan.setIsPublished(true);
+        mealPlanRepository.save(plan);
+
+        webSocketSessionService.sendToUser(plan.getClientId(), "MEAL_PLAN_PUBLISHED", 
+            Map.of("message", "Thực đơn tuần mới của bạn đã sẵn sàng!", "planId", planId.toString()));
     }
 
     private MealPlanSaveResult finalizeSave(MealPlan plan, UUID clientId, List<MealPlanItemRequest> items) {

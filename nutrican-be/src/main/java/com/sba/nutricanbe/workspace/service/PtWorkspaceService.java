@@ -14,6 +14,7 @@ import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionDto;
 import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionReviewRequest;
 import com.sba.nutricanbe.workspace.dto.WeeklySummaryDto;
 import com.sba.nutricanbe.workspace.dto.WeeklySummaryRequest;
+import com.sba.nutricanbe.workspace.dto.*;
 
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
@@ -56,4 +57,16 @@ public interface PtWorkspaceService {
     ApiResponse<List<MealPlanSuggestionDto>> getPendingMealPlanSuggestions(UUID ptId, UUID clientId);
 
     ApiResponse<com.sba.nutricanbe.chat.dto.ChatContextSummaryDto> getChatContext(UUID ptId, UUID clientId);
+
+    ApiResponse<PtClientProfileDto> getClientProfile(UUID ptId, UUID clientId);
+
+    ApiResponse<PtClientProfileDto> updateClientProfile(UUID ptId, UUID clientId, PtClientProfileDto request);
+
+    ApiResponse<PtClientProfileDto> createClient(UUID ptId, CreateClientRequest request);
+
+    ApiResponse<TemplateResponse> saveAsTemplate(UUID ptId, CreateTemplateRequest request);
+
+    ApiResponse<List<TemplateResponse>> getTemplatesByPt(UUID ptId);
+
+    ApiResponse<Void> applyTemplateToClient(UUID ptId, UUID templateId, UUID clientId, ApplyTemplateRequest request);
 }

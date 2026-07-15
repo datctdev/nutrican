@@ -295,6 +295,11 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (request.getCarb() != null) target.setCarb(request.getCarb());
         if (request.getFat() != null) target.setFat(request.getFat());
 
+        if (request.getNutritionGoal() != null) {
+            user.setNutritionGoal(request.getNutritionGoal());
+            userRepository.save(user);
+        }
+
         target = macroTargetRepository.save(target);
         log.info("Macro target updated for user: {}", userId);
         return ApiResponse.success(toMacroResponse(target), "Macro target updated");

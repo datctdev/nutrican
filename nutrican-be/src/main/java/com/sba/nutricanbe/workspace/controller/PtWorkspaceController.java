@@ -189,10 +189,54 @@ public class PtWorkspaceController {
                 coachingLifecycleService.confirmEndCoaching(user.getId(), clientId, true)));
     }
 
+    @GetMapping("/clients/{clientId}/profile")
+    public ResponseEntity<ApiResponse<PtClientProfileDto>> getClientProfile(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientProfile(user.getId(), clientId));
+    }
+
+    @PutMapping("/clients/{clientId}/profile")
+    public ResponseEntity<ApiResponse<PtClientProfileDto>> updateClientProfile(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestBody PtClientProfileDto request) {
+        return ResponseEntity.ok(ptWorkspaceService.updateClientProfile(user.getId(), clientId, request));
+    }
+
+    @PostMapping("/clients")
+    public ResponseEntity<ApiResponse<PtClientProfileDto>> createClient(
+            @AuthenticationPrincipal User user,
+            @RequestBody CreateClientRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.createClient(user.getId(), request));
+    }
+
     @GetMapping("/clients/{clientId}/chat-context")
     public ResponseEntity<ApiResponse<com.sba.nutricanbe.chat.dto.ChatContextSummaryDto>> getChatContext(
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ptWorkspaceService.getChatContext(user.getId(), clientId));
+    }
+
+    @PostMapping("/templates")
+    public ResponseEntity<ApiResponse<TemplateResponse>> saveAsTemplate(
+            @AuthenticationPrincipal User user,
+            @RequestBody CreateTemplateRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.saveAsTemplate(user.getId(), request));
+    }
+
+    @GetMapping("/templates")
+    public ResponseEntity<ApiResponse<java.util.List<TemplateResponse>>> getTemplates(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.getTemplatesByPt(user.getId()));
+    }
+
+    @PostMapping("/clients/{clientId}/apply-template/{templateId}")
+    public ResponseEntity<ApiResponse<Void>> applyTemplateToClient(
+            @PathVariable UUID clientId,
+            @PathVariable UUID templateId,
+            @AuthenticationPrincipal User user,
+            @RequestBody ApplyTemplateRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.applyTemplateToClient(user.getId(), templateId, clientId, request));
     }
 }

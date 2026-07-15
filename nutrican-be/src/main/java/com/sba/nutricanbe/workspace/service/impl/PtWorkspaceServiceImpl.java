@@ -46,6 +46,10 @@ import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.RblDatasetFilter;
 import com.sba.nutricanbe.common.util.RblMetricsUtil;
 import com.sba.nutricanbe.workspace.dto.*;
+import com.sba.nutricanbe.workspace.entity.MealPlanTemplate;
+import com.sba.nutricanbe.workspace.entity.MealPlanTemplateItem;
+import com.sba.nutricanbe.workspace.repository.MealPlanTemplateItemRepository;
+import com.sba.nutricanbe.workspace.repository.MealPlanTemplateRepository;
 import com.sba.nutricanbe.workspace.service.PtWorkspaceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -90,6 +94,9 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final UserProfileService userProfileService;
     private final com.sba.nutricanbe.diet.service.IntakeControlLoopService intakeControlLoopService;
     private final com.sba.nutricanbe.diet.service.DietLogService dietLogService;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final MealPlanTemplateRepository mealPlanTemplateRepository;
+    private final MealPlanTemplateItemRepository mealPlanTemplateItemRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -631,7 +638,62 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<List<PtClientAlertDto>> getClientAlerts(UUID ptId) {
-        return ApiResponse.success(intakeControlLoopService.getActiveAlertsForPt(ptId));
+        // 1. Get existing diet violations
+        List<PtClientAlertDto> alerts = new java.util.ArrayList<>(
+                intakeControlLoopService.getActiveAlertsForPt(ptId)
+        );
+
+        // 2. Get active clients mapped to this PT
+        List<com.sba.nutricanbe.user.entity.PtClientMapping> activeMappings = mappingRepository.findByPtIdWithClients(ptId).stream()
+                .filter(m -> m.getStatus() == com.sba.nutricanbe.user.enums.ClientMappingStatus.ACTIVE)
+                .toList();
+
+        LocalDate today = LocalDate.now();
+        LocalDate thisMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+
+        for (com.sba.nutricanbe.user.entity.PtClientMapping mapping : activeMappings) {
+            User client = mapping.getClient();
+
+            // 3. Check Plan Expired (đến hạn đổi thực đơn)
+            List<MealPlan> plans = mealPlanRepository.findByClientIdOrderByWeekStartDesc(client.getId());
+            if (plans.isEmpty()) {
+                alerts.add(PtClientAlertDto.builder()
+                        .clientId(client.getId())
+                        .clientName(client.getFullName())
+                        .reason("Chưa có thực đơn tuần nào được thiết lập")
+                        .logDate(today)
+                        .alertType("PLAN_EXPIRED")
+                        .build());
+            } else {
+                MealPlan latestPlan = plans.get(0);
+                if (latestPlan.getWeekStart().isBefore(thisMonday)) {
+                    alerts.add(PtClientAlertDto.builder()
+                            .clientId(client.getId())
+                            .clientName(client.getFullName())
+                            .reason("Đến hạn đổi thực đơn tuần mới (Thực đơn hiện tại từ ngày " + latestPlan.getWeekStart() + ")")
+                            .logDate(today)
+                            .alertType("PLAN_EXPIRED")
+                            .build());
+                }
+            }
+
+            // 4. Check Weight Changed today (vừa cập nhật cân nặng)
+            java.util.Optional<com.sba.nutricanbe.user.entity.BodyMetric> metricTodayOpt = 
+                    bodyMetricRepository.findByUser_IdAndRecordDate(client.getId(), today);
+            if (metricTodayOpt.isPresent()) {
+                com.sba.nutricanbe.user.entity.BodyMetric metric = metricTodayOpt.get();
+                alerts.add(PtClientAlertDto.builder()
+                        .clientId(client.getId())
+                        .clientName(client.getFullName())
+                        .reason("Vừa cập nhật cân nặng mới: " + metric.getWeight() + " kg" 
+                                + (metric.getBodyFatPercent() != null ? " (Tỷ lệ mỡ: " + metric.getBodyFatPercent() + "%)" : ""))
+                        .logDate(today)
+                        .alertType("WEIGHT_CHANGED")
+                        .build());
+            }
+        }
+
+        return ApiResponse.success(alerts);
     }
 
     @Override
@@ -727,5 +789,233 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 || mapping.getStatus() == ClientMappingStatus.PENDING) {
             throw new UnauthorizedException("No access to this client data");
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<PtClientProfileDto> getClientProfile(UUID ptId, UUID clientId) {
+        assertActiveMapping(ptId, clientId);
+        User client = userRepository.findById(clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
+
+        java.util.Optional<BodyMetric> metricOpt = bodyMetricRepository.findTopByUserIdOrderByRecordDateDesc(clientId);
+        java.math.BigDecimal weight = metricOpt.map(BodyMetric::getWeight).orElse(null);
+        java.math.BigDecimal bodyFat = metricOpt.map(BodyMetric::getBodyFatPercent).orElse(null);
+
+        java.math.BigDecimal tdee = (client.getMacroTarget() != null) ? client.getMacroTarget().getDailyCalories() : null;
+
+        java.math.BigDecimal protein = (client.getMacroTarget() != null) ? client.getMacroTarget().getProtein() : null;
+        java.math.BigDecimal carb = (client.getMacroTarget() != null) ? client.getMacroTarget().getCarb() : null;
+        java.math.BigDecimal fat = (client.getMacroTarget() != null) ? client.getMacroTarget().getFat() : null;
+
+        return ApiResponse.success(PtClientProfileDto.builder()
+                .clientId(client.getId())
+                .fullName(client.getFullName())
+                .email(client.getEmail())
+                .phoneNumber(client.getPhoneNumber())
+                .heightCm(client.getHeightCm())
+                .gender(client.getGender())
+                .dateOfBirth(client.getDateOfBirth())
+                .weight(weight)
+                .bodyFatPercent(bodyFat)
+                .tdee(tdee)
+                .allergens(client.getAllergens() != null ? client.getAllergens() : List.of())
+                .dietPreference(client.getDietPreference())
+                .specialNotes(client.getAddress())
+                .nutritionGoal(client.getNutritionGoal())
+                .protein(protein)
+                .carb(carb)
+                .fat(fat)
+                .build());
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<PtClientProfileDto> updateClientProfile(UUID ptId, UUID clientId, PtClientProfileDto request) {
+        assertActiveMapping(ptId, clientId);
+        User client = userRepository.findById(clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
+
+        if (request.getFullName() != null) client.setFullName(request.getFullName());
+        if (request.getPhoneNumber() != null) client.setPhoneNumber(request.getPhoneNumber());
+        if (request.getHeightCm() != null) client.setHeightCm(request.getHeightCm());
+        if (request.getGender() != null) client.setGender(request.getGender());
+        if (request.getDateOfBirth() != null) client.setDateOfBirth(request.getDateOfBirth());
+        if (request.getAllergens() != null) client.setAllergens(request.getAllergens());
+        if (request.getDietPreference() != null) client.setDietPreference(request.getDietPreference());
+        if (request.getSpecialNotes() != null) client.setAddress(request.getSpecialNotes());
+
+        userRepository.save(client);
+
+        LocalDate today = LocalDate.now();
+        if (request.getWeight() != null) {
+            BodyMetric metric = bodyMetricRepository
+                    .findByUser_IdAndRecordDate(client.getId(), today)
+                    .orElseGet(() -> BodyMetric.builder()
+                            .user(client)
+                            .recordDate(today)
+                            .build());
+            metric.setWeight(request.getWeight());
+            if (request.getBodyFatPercent() != null) {
+                metric.setBodyFatPercent(request.getBodyFatPercent());
+            }
+            bodyMetricRepository.save(metric);
+        }
+
+        if (request.getTdee() != null) {
+            MacroTargetRequest macroReq = new MacroTargetRequest();
+            macroReq.setDailyCalories(request.getTdee());
+            java.math.BigDecimal t = request.getTdee();
+            macroReq.setProtein(t.multiply(new java.math.BigDecimal("0.30")).divide(new java.math.BigDecimal("4.0"), 2, java.math.RoundingMode.HALF_UP));
+            macroReq.setCarb(t.multiply(new java.math.BigDecimal("0.40")).divide(new java.math.BigDecimal("4.0"), 2, java.math.RoundingMode.HALF_UP));
+            macroReq.setFat(t.multiply(new java.math.BigDecimal("0.30")).divide(new java.math.BigDecimal("9.0"), 2, java.math.RoundingMode.HALF_UP));
+            userProfileService.setMacroTarget(client.getId(), macroReq);
+        }
+
+        return getClientProfile(ptId, clientId);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<PtClientProfileDto> createClient(UUID ptId, CreateClientRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email này đã được đăng ký trong hệ thống");
+        }
+
+        User client = User.builder()
+                .email(request.getEmail())
+                .passwordHash(passwordEncoder.encode("NutriCan123@")) // Default password for PT-created clients
+                .fullName(request.getFullName())
+                .phoneNumber(request.getPhoneNumber())
+                .heightCm(request.getHeightCm())
+                .gender(request.getGender())
+                .dateOfBirth(request.getDateOfBirth())
+                .allergens(request.getAllergens())
+                .dietPreference(request.getDietPreference() != null ? request.getDietPreference() : com.sba.nutricanbe.user.enums.DietPreference.NORMAL)
+                .address(request.getSpecialNotes())
+                .role(com.sba.nutricanbe.common.enums.UserRole.CUSTOMER)
+                .status(com.sba.nutricanbe.common.enums.UserStatus.ACTIVE)
+                .passwordSetRequired(true)
+                .onboardingStep(1)
+                .build();
+
+        client = userRepository.save(client);
+
+        User pt = userRepository.findById(ptId)
+                .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
+
+        PtClientMapping mapping = PtClientMapping.builder()
+                .pt(pt)
+                .client(client)
+                .status(ClientMappingStatus.ACTIVE)
+                .build();
+        mappingRepository.save(mapping);
+
+        if (request.getTdee() != null) {
+            MacroTargetRequest macroReq = new MacroTargetRequest();
+            macroReq.setDailyCalories(request.getTdee());
+            java.math.BigDecimal t = request.getTdee();
+            macroReq.setProtein(t.multiply(new java.math.BigDecimal("0.30")).divide(new java.math.BigDecimal("4.0"), 2, java.math.RoundingMode.HALF_UP));
+            macroReq.setCarb(t.multiply(new java.math.BigDecimal("0.40")).divide(new java.math.BigDecimal("4.0"), 2, java.math.RoundingMode.HALF_UP));
+            macroReq.setFat(t.multiply(new java.math.BigDecimal("0.30")).divide(new java.math.BigDecimal("9.0"), 2, java.math.RoundingMode.HALF_UP));
+            userProfileService.setMacroTarget(client.getId(), macroReq);
+        }
+
+        if (request.getWeight() != null) {
+            BodyMetric metric = BodyMetric.builder()
+                    .user(client)
+                    .recordDate(LocalDate.now())
+                    .weight(request.getWeight())
+                    .bodyFatPercent(request.getBodyFatPercent())
+                    .build();
+            bodyMetricRepository.save(metric);
+        }
+
+        return getClientProfile(ptId, client.getId());
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<TemplateResponse> saveAsTemplate(UUID ptId, CreateTemplateRequest request) {
+        MealPlanTemplate template = MealPlanTemplate.builder()
+                .ptId(ptId)
+                .name(request.getName())
+                .description(request.getDescription())
+                .build();
+        template = mealPlanTemplateRepository.save(template);
+
+        if (request.getItems() != null) {
+            for (CreateTemplateRequest.TemplateItemDto dto : request.getItems()) {
+                MealPlanTemplateItem item = MealPlanTemplateItem.builder()
+                        .templateId(template.getId())
+                        .dayOffset(dto.getDayOffset())
+                        .mealType(com.sba.nutricanbe.diet.enums.MealType.valueOf(dto.getMealType()))
+                        .foodCode(dto.getFoodCode())
+                        .freeText(dto.getFreeText())
+                        .portionGrams(dto.getPortionGrams())
+                        .build();
+                mealPlanTemplateItemRepository.save(item);
+            }
+        }
+        
+        return ApiResponse.success(TemplateResponse.builder()
+                .id(template.getId())
+                .name(template.getName())
+                .description(template.getDescription())
+                .createdAt(template.getCreatedAt() != null ? template.getCreatedAt().toString() : java.time.LocalDateTime.now().toString())
+                .build());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<List<TemplateResponse>> getTemplatesByPt(UUID ptId) {
+        List<TemplateResponse> list = mealPlanTemplateRepository.findByPtIdOrderByCreatedAtDesc(ptId).stream()
+                .map(t -> TemplateResponse.builder()
+                        .id(t.getId())
+                        .name(t.getName())
+                        .description(t.getDescription())
+                        .createdAt(t.getCreatedAt() != null ? t.getCreatedAt().toString() : null)
+                        .build())
+                .toList();
+        return ApiResponse.success(list);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Void> applyTemplateToClient(UUID ptId, UUID templateId, UUID clientId, ApplyTemplateRequest request) {
+        assertActiveMapping(ptId, clientId);
+        LocalDate weekStart = LocalDate.parse(request.getWeekStart());
+        
+        List<MealPlanTemplateItem> templateItems = mealPlanTemplateItemRepository.findByTemplateIdOrderByDayOffsetAscMealTypeAsc(templateId);
+        
+        // Find or create MealPlan for the given week
+        MealPlan plan = mealPlanRepository.findByClientIdOrderByWeekStartDesc(clientId).stream()
+                .filter(p -> p.getWeekStart().equals(weekStart))
+                .findFirst()
+                .orElseGet(() -> {
+                    MealPlan newPlan = MealPlan.builder()
+                            .clientId(clientId)
+                            .weekStart(weekStart)
+                            .build();
+                    return mealPlanRepository.save(newPlan);
+                });
+                
+        // OVERRIDE: Delete existing items for that plan
+        mealPlanItemRepository.deleteByMealPlanId(plan.getId());
+        
+        for (MealPlanTemplateItem tItem : templateItems) {
+            LocalDate planDate = weekStart.plusDays(tItem.getDayOffset());
+            MealPlanItem item = MealPlanItem.builder()
+                    .mealPlanId(plan.getId())
+                    .planDate(planDate)
+                    .mealType(tItem.getMealType())
+                    .foodCode(tItem.getFoodCode())
+                    .freeText(tItem.getFreeText())
+                    .portionGrams(tItem.getPortionGrams())
+                    .build();
+            mealPlanItemRepository.save(item);
+        }
+        
+        return ApiResponse.success(null, "Template applied successfully");
     }
 }

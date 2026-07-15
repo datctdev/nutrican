@@ -123,6 +123,7 @@ public class IntakeControlLoopServiceImpl implements IntakeControlLoopService {
                                     .logDate(s.getLogDate())
                                     .consecutiveAtRiskDays(s.getConsecutiveAtRiskDays() != null
                                             ? s.getConsecutiveAtRiskDays() : 0)
+                                    .alertType("DIET_VIOLATION")
                                     .build())
                             .orElse(null);
                 })

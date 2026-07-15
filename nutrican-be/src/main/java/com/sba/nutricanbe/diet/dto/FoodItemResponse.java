@@ -26,5 +26,6 @@ public class FoodItemResponse {
     private BigDecimal fat;
     private Integer matchScore;
     private List<String> dietTags;
+    private List<String> allergens;
     private Boolean prefMismatch;
 }

@@ -241,6 +241,7 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
                 .fat(item.getFat())
                 .matchScore(matchScore)
                 .dietTags(item.getDietTags())
+                .allergens(item.getAllergens())
                 .build();
     }
 }

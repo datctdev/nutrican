@@ -86,8 +86,8 @@ export default function ChatPage() {
 
     useEffect(() => {
         if (!activeThread?.participantId) {
-            setChatContext(null);
-            return;
+            const t = setTimeout(() => setChatContext(null), 0);
+            return () => clearTimeout(t);
         }
         workspaceService.getChatContext(activeThread.participantId)
             .then((res) => setChatContext(res.data?.data || null))

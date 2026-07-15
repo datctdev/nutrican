@@ -62,4 +62,8 @@ public class FoodItem extends BaseEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "diet_tags", columnDefinition = "jsonb")
     private List<String> dietTags;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private List<String> allergens;
 }

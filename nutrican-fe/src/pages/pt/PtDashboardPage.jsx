@@ -16,15 +16,18 @@ export default function PtDashboardPage() {
     const [maxClients, setMaxClients] = useState(10);
     const [savingMax, setSavingMax] = useState(false);
     const [pendingHiresCount, setPendingHiresCount] = useState(0);
+    const [alerts, setAlerts] = useState([]);
 
     const fetchData = useCallback(async () => {
         try {
-            const [sRes, cRes] = await Promise.all([
+            const [sRes, cRes, aRes] = await Promise.all([
                 workspaceService.getStats(),
                 workspaceService.getClients({ page: 0, size: 10, status: 'PENDING' }).catch(() => ({ data: { data: { totalElements: 0 } } })),
+                workspaceService.getAlerts().catch(() => ({ data: { data: [] } })),
             ]);
             setStats(sRes.data.data);
             setPendingHiresCount(cRes.data.data.totalElements || cRes.data.data.content?.length || 0);
+            setAlerts(aRes.data?.data || []);
         } catch (error) {
             console.error("Failed to fetch dashboard stats", error);
         }
@@ -113,6 +116,66 @@ export default function PtDashboardPage() {
                         </CardContent>
                     </Card>
                 ))}
+            </div>
+
+            {/* Attention list */}
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    Học viên cần chú ý trong ngày
+                </h2>
+                {alerts.length === 0 ? (
+                    <Card className="bg-slate-50 border border-slate-200/60 shadow-sm rounded-3xl">
+                        <CardContent className="p-6 text-center text-slate-500 text-sm">
+                            Hôm nay không có cảnh báo nào cần xử lý. Tất cả học viên đang đi đúng hướng!
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {alerts.map((alert, idx) => {
+                            let cardColor = "bg-amber-50 border-amber-200 text-amber-900";
+                            let iconColor = "text-amber-600";
+                            let typeText = "Chú ý";
+                            if (alert.alertType === "DIET_VIOLATION") {
+                                cardColor = "bg-red-50 border-red-200 text-red-900";
+                                iconColor = "text-red-600";
+                                typeText = "Ăn sai mục tiêu";
+                            } else if (alert.alertType === "PLAN_EXPIRED") {
+                                cardColor = "bg-orange-50 border-orange-200 text-orange-950";
+                                iconColor = "text-orange-600";
+                                typeText = "Đến hạn đổi thực đơn";
+                            } else if (alert.alertType === "WEIGHT_CHANGED") {
+                                cardColor = "bg-blue-50 border-blue-200 text-blue-900";
+                                iconColor = "text-blue-600";
+                                typeText = "Cập nhật cân nặng";
+                            }
+                            return (
+                                <Card key={idx} className={`${cardColor} border rounded-3xl shadow-sm hover:shadow transition-all`}>
+                                    <CardContent className="p-5 flex items-start gap-4">
+                                        <div className={`w-10 h-10 bg-white/80 rounded-2xl flex items-center justify-center shadow-sm flex-shrink-0`}>
+                                            <AlertTriangle className={`w-5 h-5 ${iconColor}`} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] font-black uppercase tracking-wider opacity-75">{typeText}</span>
+                                                <span className="text-[10px] font-bold opacity-60">{alert.logDate}</span>
+                                            </div>
+                                            <h4 className="font-extrabold text-sm mt-1">{alert.clientName}</h4>
+                                            <p className="text-xs mt-1 leading-relaxed opacity-90">{alert.reason}</p>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => navigate(`/pt/progress/${alert.clientId}`)}
+                                            className="bg-white hover:bg-slate-100 text-slate-800 rounded-xl font-bold shadow-sm self-center text-xs shrink-0 px-3 py-1.5 h-auto border border-slate-200/50"
+                                        >
+                                            Xem tiến độ
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             <Card className="bg-white border-slate-200 shadow-sm rounded-3xl max-w-md">

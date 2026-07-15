@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -118,6 +118,37 @@ export default function ClientProgressPage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const [isEditingMacros, setIsEditingMacros] = useState(false);
+  const [savingMacros, setSavingMacros] = useState(false);
+  const [macroForm, setMacroForm] = useState({
+    nutritionGoal: 'MAINTAIN',
+    dailyCalories: '',
+    protein: '',
+    carb: '',
+    fat: '',
+  });
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const res = await workspaceService.getClientProfile(clientId);
+      setProfile(res.data.data);
+      setEditForm(res.data.data);
+      setMacroForm({
+        nutritionGoal: res.data.data.nutritionGoal || 'MAINTAIN',
+        dailyCalories: res.data.data.tdee || '',
+        protein: res.data.data.protein || '',
+        carb: res.data.data.carb || '',
+        fat: res.data.data.fat || '',
+      });
+    } catch (e) {
+      console.error('Failed to load client profile', e);
+    }
+  }, [clientId]);
 
   useEffect(() => {
     const load = async () => {
@@ -130,8 +161,96 @@ export default function ClientProgressPage() {
         setLoading(false);
       }
     };
-    if (clientId) load();
-  }, [clientId]);
+    if (clientId) {
+      setTimeout(() => {
+        load();
+        loadProfile();
+      }, 0);
+    }
+  }, [clientId, loadProfile]);
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const payload = {
+        ...editForm,
+        heightCm: editForm.heightCm ? Number(editForm.heightCm) : null,
+        weight: editForm.weight ? Number(editForm.weight) : null,
+        bodyFatPercent: editForm.bodyFatPercent ? Number(editForm.bodyFatPercent) : null,
+        tdee: editForm.tdee ? Number(editForm.tdee) : null,
+        dateOfBirth: editForm.dateOfBirth || null,
+      };
+      const res = await workspaceService.updateClientProfile(clientId, payload);
+      setProfile(res.data.data);
+      setEditForm(res.data.data);
+      setIsEditing(false);
+      toast.success('Cập nhật hồ sơ sức khỏe thành công!');
+      const resProg = await workspaceService.getClientProgress(clientId);
+      setData(resProg.data.data);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Không thể cập nhật hồ sơ.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleSuggestMacros = () => {
+    const calories = Number(macroForm.dailyCalories);
+    if (!calories || isNaN(calories) || calories <= 0) {
+      toast.error('Vui lòng nhập tổng Calo tiêu thụ trước để gợi ý phân bổ');
+      return;
+    }
+    let pPct = 0.30;
+    let cPct = 0.40;
+    let fPct = 0.30;
+
+    if (macroForm.nutritionGoal === 'WEIGHT_LOSS') {
+      pPct = 0.40;
+      cPct = 0.30;
+      fPct = 0.30;
+    } else if (macroForm.nutritionGoal === 'WEIGHT_GAIN') {
+      pPct = 0.30;
+      cPct = 0.50;
+      fPct = 0.20;
+    }
+
+    const pGrams = Math.round((calories * pPct) / 4);
+    const cGrams = Math.round((calories * cPct) / 4);
+    const fGrams = Math.round((calories * fPct) / 9);
+
+    setMacroForm({
+      ...macroForm,
+      protein: pGrams,
+      carb: cGrams,
+      fat: fGrams
+    });
+    toast.success(`Đã gợi ý tỷ lệ dựa trên mục tiêu (${Math.round(pPct*100)}% P / ${Math.round(cPct*100)}% C / ${Math.round(fPct*100)}% F)`);
+  };
+
+  const handleUpdateMacros = async (e) => {
+    e.preventDefault();
+    setSavingMacros(true);
+    try {
+      const payload = {
+        dailyCalories: Number(macroForm.dailyCalories),
+        protein: Number(macroForm.protein),
+        carb: Number(macroForm.carb),
+        fat: Number(macroForm.fat),
+        nutritionGoal: macroForm.nutritionGoal
+      };
+      await workspaceService.setClientMacroTarget(clientId, payload);
+      toast.success('Thiết lập mục tiêu dinh dưỡng và Macro thành công!');
+      setIsEditingMacros(false);
+      await loadProfile();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Không thể thiết lập mục tiêu.');
+    } finally {
+      setSavingMacros(false);
+    }
+  };
 
   const summary = data?.macroSummary;
   const weights = data?.bodyMetrics || [];
@@ -166,6 +285,432 @@ export default function ClientProgressPage() {
               <p className="text-2xl font-bold">{summary?.adherenceRate != null ? `${summary.adherenceRate}%` : '—'}</p>
             </CardContent></Card>
           </div>
+
+          {/* Hồ sơ sức khỏe & Mục tiêu */}
+          {profile && (
+            <Card className="bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <div>
+                  <h3 className="font-extrabold text-slate-800">Hồ sơ sức khỏe & Mục tiêu</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Thông tin nhân trắc học và các lưu ý ăn uống của học viên.</p>
+                </div>
+                {!isEditing && (
+                  <Button size="sm" onClick={() => setIsEditing(true)} className="rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white">
+                    Chỉnh sửa hồ sơ
+                  </Button>
+                )}
+              </div>
+              <CardContent className="p-6">
+                {isEditing ? (
+                  <form onSubmit={handleUpdateProfile} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Họ và tên</label>
+                        <input
+                          type="text"
+                          required
+                          value={editForm.fullName || ''}
+                          onChange={(e) => setEditForm({...editForm, fullName: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Số điện thoại</label>
+                        <input
+                          type="text"
+                          value={editForm.phoneNumber || ''}
+                          onChange={(e) => setEditForm({...editForm, phoneNumber: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ngày sinh</label>
+                        <input
+                          type="date"
+                          value={editForm.dateOfBirth || ''}
+                          onChange={(e) => setEditForm({...editForm, dateOfBirth: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Giới tính</label>
+                        <select
+                          value={editForm.gender || 'male'}
+                          onChange={(e) => setEditForm({...editForm, gender: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        >
+                          <option value="male">Nam</option>
+                          <option value="female">Nữ</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chiều cao (cm)</label>
+                        <input
+                          type="number"
+                          value={editForm.heightCm || ''}
+                          onChange={(e) => setEditForm({...editForm, heightCm: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cân nặng (kg)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={editForm.weight || ''}
+                          onChange={(e) => setEditForm({...editForm, weight: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tỷ lệ mỡ (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={editForm.bodyFatPercent || ''}
+                          onChange={(e) => setEditForm({...editForm, bodyFatPercent: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mục tiêu Calo / TDEE</label>
+                        <input
+                          type="number"
+                          value={editForm.tdee || ''}
+                          onChange={(e) => setEditForm({...editForm, tdee: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chế độ ăn</label>
+                        <select
+                          value={editForm.dietPreference || 'NORMAL'}
+                          onChange={(e) => setEditForm({...editForm, dietPreference: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        >
+                          <option value="NORMAL">Bình thường</option>
+                          <option value="VEGETARIAN">Ăn chay (Vegetarian)</option>
+                          <option value="VEGAN">Ăn thuần chay (Vegan)</option>
+                          <option value="KETO">Chế độ Keto</option>
+                          <option value="EAT_CLEAN">Ăn Eat Clean</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dị ứng</label>
+                        <div className="flex gap-4 mt-2">
+                          <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={editForm.allergens?.includes('NUT')}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setEditForm({
+                                  ...editForm,
+                                  allergens: checked ? [...(editForm.allergens || []), 'NUT'] : (editForm.allergens || []).filter(a => a !== 'NUT')
+                                });
+                              }}
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                            />
+                            Dị ứng hạt/đậu phộng
+                          </label>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lưu ý đặc biệt (v.d. không ăn cay, dị ứng khác)</label>
+                        <input
+                          type="text"
+                          value={editForm.specialNotes || ''}
+                          placeholder="v.d. Không ăn cay, dị ứng hải sản nhẹ"
+                          onChange={(e) => setEditForm({...editForm, specialNotes: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
+                      <Button type="button" variant="outline" onClick={() => { setIsEditing(false); setEditForm(profile); }}>Hủy</Button>
+                      <Button type="submit" disabled={savingProfile} className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-5">
+                        {savingProfile ? 'Đang lưu...' : 'Lưu lại'}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Thông tin cá nhân</h4>
+                        <div className="mt-2 grid grid-cols-2 gap-3 text-sm font-semibold text-slate-700">
+                          <div><span className="text-slate-450 font-normal">Họ tên:</span> {profile.fullName}</div>
+                          <div><span className="text-slate-450 font-normal">Giới tính:</span> {profile.gender === 'male' ? 'Nam' : 'Nữ'}</div>
+                          <div><span className="text-slate-450 font-normal">Chiều cao:</span> {profile.heightCm ? `${profile.heightCm} cm` : '—'}</div>
+                          <div><span className="text-slate-450 font-normal">Cân nặng:</span> {profile.weight ? `${profile.weight} kg` : '—'}</div>
+                          <div><span className="text-slate-450 font-normal">Tỷ lệ mỡ:</span> {profile.bodyFatPercent ? `${profile.bodyFatPercent}%` : '—'}</div>
+                          <div><span className="text-slate-450 font-normal">Ngày sinh:</span> {profile.dateOfBirth || '—'}</div>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Liên hệ</h4>
+                        <div className="mt-2 text-sm font-semibold text-slate-700 space-y-1">
+                          <div><span className="text-slate-450 font-normal">Email:</span> {profile.email}</div>
+                          <div><span className="text-slate-450 font-normal">Điện thoại:</span> {profile.phoneNumber || '—'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Mục tiêu & Chế độ ăn</h4>
+                        <div className="mt-2 grid grid-cols-2 gap-3 text-sm font-semibold text-slate-700">
+                          <div><span className="text-slate-450 font-normal">TDEE / Calo:</span> {profile.tdee ? `${profile.tdee} kcal` : '—'}</div>
+                          <div><span className="text-slate-450 font-normal">Chế độ ăn:</span> {profile.dietPreference === 'NORMAL' ? 'Bình thường' : profile.dietPreference || '—'}</div>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Lưu ý đặc biệt & Dị ứng</h4>
+                        <div className="mt-2 text-sm font-semibold space-y-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            <span className="text-slate-450 font-normal mr-1">Dị ứng:</span>
+                            {profile.allergens && profile.allergens.length > 0 ? (
+                              profile.allergens.map((a, idx) => (
+                                <span key={idx} className="bg-red-50 text-red-700 border border-red-100 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                                  {a === 'NUT' ? 'Đậu phộng/Hạt' : a}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-emerald-650 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 text-[11px]">Không có dị ứng</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-slate-450 font-normal">Lưu ý:</span>{' '}
+                            {profile.specialNotes ? (
+                              <span className="text-amber-800 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg text-xs font-bold inline-block mt-1">
+                                {profile.specialNotes}
+                              </span>
+                            ) : (
+                              <span className="text-slate-450 italic">Không có lưu ý đặc biệt</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Thiết Lập Mục Tiêu Dinh Dưỡng & Macro */}
+          {profile && (
+            <Card className="bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden mt-6">
+              <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <div>
+                  <h3 className="font-extrabold text-slate-800">Thiết lập Mục tiêu Dinh dưỡng & Macro</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Xác định giai đoạn tập luyện và phân bổ năng lượng hàng ngày.</p>
+                </div>
+                {!isEditingMacros && (
+                  <Button size="sm" onClick={() => setIsEditingMacros(true)} className="rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Cấu hình Mục tiêu & Macro
+                  </Button>
+                )}
+              </div>
+              <CardContent className="p-6">
+                {isEditingMacros ? (
+                  <form onSubmit={handleUpdateMacros} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mục tiêu giai đoạn</label>
+                        <select
+                          value={macroForm.nutritionGoal}
+                          onChange={(e) => setMacroForm({...macroForm, nutritionGoal: e.target.value})}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-semibold"
+                        >
+                          <option value="WEIGHT_LOSS">Giảm mỡ (Lose Fat / Weight Loss)</option>
+                          <option value="WEIGHT_GAIN">Tăng cơ (Gain Muscle / Weight Gain)</option>
+                          <option value="MAINTAIN">Giữ cân (Maintain Weight)</option>
+                          <option value="PREGNANT">Thai kỳ (Pregnancy)</option>
+                          <option value="RECOVERY">Phục hồi (Recovery)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mục tiêu Calo / TDEE (kcal/ngày)</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            required
+                            value={macroForm.dailyCalories}
+                            onChange={(e) => setMacroForm({...macroForm, dailyCalories: e.target.value})}
+                            placeholder="v.d. 2000"
+                            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-semibold"
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleSuggestMacros}
+                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl px-4 text-xs font-bold border border-emerald-200"
+                          >
+                            Tự động chia Macro
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Protein (g)</label>
+                        <input
+                          type="number"
+                          required
+                          value={macroForm.protein}
+                          onChange={(e) => setMacroForm({...macroForm, protein: e.target.value})}
+                          placeholder="g"
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-semibold"
+                        />
+                        <span className="text-[10px] text-slate-400 font-medium mt-1 block">
+                          = {Number(macroForm.protein || 0) * 4} kcal
+                        </span>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Carb (g)</label>
+                        <input
+                          type="number"
+                          required
+                          value={macroForm.carb}
+                          onChange={(e) => setMacroForm({...macroForm, carb: e.target.value})}
+                          placeholder="g"
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-semibold"
+                        />
+                        <span className="text-[10px] text-slate-400 font-medium mt-1 block">
+                          = {Number(macroForm.carb || 0) * 4} kcal
+                        </span>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fat (g)</label>
+                        <input
+                          type="number"
+                          required
+                          value={macroForm.fat}
+                          onChange={(e) => setMacroForm({...macroForm, fat: e.target.value})}
+                          placeholder="g"
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all font-semibold"
+                        />
+                        <span className="text-[10px] text-slate-400 font-medium mt-1 block">
+                          = {Number(macroForm.fat || 0) * 9} kcal
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between text-xs font-bold">
+                      <span className="text-slate-500">Tổng Calo quy đổi từ Macro:</span>
+                      <span className={`text-sm ${
+                        Math.abs((Number(macroForm.protein || 0) * 4 + Number(macroForm.carb || 0) * 4 + Number(macroForm.fat || 0) * 9) - Number(macroForm.dailyCalories || 0)) > 20
+                          ? 'text-amber-600'
+                          : 'text-emerald-600'
+                      }`}>
+                        {Number(macroForm.protein || 0) * 4 + Number(macroForm.carb || 0) * 4 + Number(macroForm.fat || 0) * 9} kcal / {macroForm.dailyCalories || 0} kcal
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
+                      <Button type="button" variant="outline" onClick={() => { setIsEditingMacros(false); setMacroForm({
+                        nutritionGoal: profile.nutritionGoal || 'MAINTAIN',
+                        dailyCalories: profile.tdee || '',
+                        protein: profile.protein || '',
+                        carb: profile.carb || '',
+                        fat: profile.fat || '',
+                      }); }}>Hủy</Button>
+                      <Button type="submit" disabled={savingMacros} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl px-5">
+                        {savingMacros ? 'Đang lưu...' : 'Lưu chốt mục tiêu'}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Giai đoạn hiện tại</h4>
+                        <div className="mt-2.5">
+                          {profile.nutritionGoal === 'WEIGHT_LOSS' && (
+                            <span className="bg-red-50 text-red-700 border border-red-200 text-xs font-black px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 shadow-sm">
+                              <span className="h-2 w-2 rounded-full bg-red-500 animate-ping"></span>
+                              Giảm mỡ (Lose Fat)
+                            </span>
+                          )}
+                          {profile.nutritionGoal === 'WEIGHT_GAIN' && (
+                            <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-black px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 shadow-sm">
+                              <span className="h-2 w-2 rounded-full bg-blue-500 animate-ping"></span>
+                              Tăng cơ (Gain Muscle)
+                            </span>
+                          )}
+                          {profile.nutritionGoal === 'MAINTAIN' && (
+                            <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 shadow-sm">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
+                              Giữ cân (Maintain Weight)
+                            </span>
+                          )}
+                          {profile.nutritionGoal === 'PREGNANT' && (
+                            <span className="bg-purple-50 text-purple-700 border border-purple-200 text-xs font-black px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 shadow-sm">
+                              Thai kỳ (Pregnancy)
+                            </span>
+                          )}
+                          {profile.nutritionGoal === 'RECOVERY' && (
+                            <span className="bg-amber-50 text-amber-700 border border-amber-200 text-xs font-black px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 shadow-sm">
+                              Phục hồi (Recovery)
+                            </span>
+                          )}
+                          {!profile.nutritionGoal && (
+                            <span className="text-slate-500 italic text-sm">Chưa thiết lập mục tiêu</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2 font-medium">
+                          {profile.nutritionGoal === 'WEIGHT_LOSS' && 'PT khuyến nghị thâm hụt năng lượng lành mạnh kết hợp protein cao để bảo vệ khối cơ.'}
+                          {profile.nutritionGoal === 'WEIGHT_GAIN' && 'PT khuyến nghị thặng dư năng lượng nhẹ kèm lượng tinh bột cao để tối ưu hóa năng lượng buổi tập.'}
+                          {profile.nutritionGoal === 'MAINTAIN' && 'PT khuyến nghị giữ mức Calo thăng bằng theo TDEE gợi ý để duy trì vóc dáng lý tưởng.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Phân bổ Macro hàng ngày</h4>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          <div className="bg-blue-50/50 rounded-2xl p-3 border border-blue-100 text-center">
+                            <p className="text-[10px] font-bold text-blue-600 uppercase">Protein</p>
+                            <p className="text-xl font-extrabold text-blue-900 mt-1">{profile.protein || '—'}g</p>
+                            <p className="text-[9px] text-slate-400 font-semibold mt-0.5">{profile.protein ? `${profile.protein * 4} kcal` : ''}</p>
+                          </div>
+                          <div className="bg-amber-50/50 rounded-2xl p-3 border border-amber-100 text-center">
+                            <p className="text-[10px] font-bold text-amber-600 uppercase">Carb</p>
+                            <p className="text-xl font-extrabold text-amber-900 mt-1">{profile.carb || '—'}g</p>
+                            <p className="text-[9px] text-slate-400 font-semibold mt-0.5">{profile.carb ? `${profile.carb * 4} kcal` : ''}</p>
+                          </div>
+                          <div className="bg-rose-50/50 rounded-2xl p-3 border border-rose-100 text-center">
+                            <p className="text-[10px] font-bold text-rose-600 uppercase">Fat</p>
+                            <p className="text-xl font-extrabold text-rose-900 mt-1">{profile.fat || '—'}g</p>
+                            <p className="text-[9px] text-slate-400 font-semibold mt-0.5">{profile.fat ? `${profile.fat * 9} kcal` : ''}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2 bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
+                          <span>Tổng Năng Lượng / Ngày:</span>
+                          <span className="text-sm font-black text-slate-900">{profile.tdee || '—'} kcal</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <ProgressTimelineCard
             goals={data?.goals}

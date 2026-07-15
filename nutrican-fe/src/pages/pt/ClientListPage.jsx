@@ -24,6 +24,63 @@ export default function ClientListPage() {
     const [endCoachingModal, setEndCoachingModal] = useState(null); // { clientId, mappingStatus, fullName }
     const [pendingCount, setPendingCount] = useState(0);
 
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [creatingClient, setCreatingClient] = useState(false);
+    const [createForm, setCreateForm] = useState({
+        email: '',
+        fullName: '',
+        phoneNumber: '',
+        heightCm: '',
+        gender: 'male',
+        dateOfBirth: '',
+        weight: '',
+        bodyFatPercent: '',
+        tdee: '',
+        allergens: [],
+        dietPreference: 'NORMAL',
+    });
+
+    const handleCreateClient = async (e) => {
+        e.preventDefault();
+        if (!createForm.email || !createForm.fullName) {
+            toast.error('Email và Họ tên là bắt buộc');
+            return;
+        }
+        setCreatingClient(true);
+        try {
+            const payload = {
+                ...createForm,
+                heightCm: createForm.heightCm ? Number(createForm.heightCm) : null,
+                weight: createForm.weight ? Number(createForm.weight) : null,
+                bodyFatPercent: createForm.bodyFatPercent ? Number(createForm.bodyFatPercent) : null,
+                tdee: createForm.tdee ? Number(createForm.tdee) : null,
+                dateOfBirth: createForm.dateOfBirth || null,
+            };
+            await workspaceService.createClient(payload);
+            toast.success('Thêm học viên mới thành công!');
+            setIsCreateModalOpen(false);
+            setCreateForm({
+                email: '',
+                fullName: '',
+                phoneNumber: '',
+                heightCm: '',
+                gender: 'male',
+                dateOfBirth: '',
+                weight: '',
+                bodyFatPercent: '',
+                tdee: '',
+                allergens: [],
+                dietPreference: 'NORMAL',
+            });
+            fetchClients();
+        } catch (error) {
+            console.error(error);
+            toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi tạo học viên.');
+        } finally {
+            setCreatingClient(false);
+        }
+    };
+
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -49,7 +106,9 @@ export default function ClientListPage() {
     }, []);
 
     useEffect(() => {
-        fetchAlerts();
+        setTimeout(() => {
+            fetchAlerts();
+        }, 0);
         const onAlert = () => fetchAlerts();
         window.addEventListener('pt_client_alert', onAlert);
         return () => window.removeEventListener('pt_client_alert', onAlert);
@@ -78,8 +137,10 @@ export default function ClientListPage() {
     }, []);
 
     useEffect(() => {
-        fetchClients();
-        fetchPendingCount();
+        setTimeout(() => {
+            fetchClients();
+            fetchPendingCount();
+        }, 0);
     }, [fetchClients, fetchPendingCount]);
 
     const handleAction = async (clientId, action) => {
@@ -151,6 +212,12 @@ export default function ClientListPage() {
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Danh sách Học viên</h1>
                     <p className="text-slate-500 mt-1 font-medium">Quản lý tiến độ và tương tác với các học viên của bạn.</p>
                 </div>
+                <Button 
+                    onClick={() => setIsCreateModalOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-11 px-6 shadow-md shadow-blue-500/10 self-start md:self-end"
+                >
+                    + Thêm học viên mới
+                </Button>
             </div>
 
             {/* HỆ THỐNG TAB */}
@@ -402,6 +469,160 @@ export default function ClientListPage() {
                     } catch (e) { toast.error(e.response?.data?.message || 'Lỗi'); }
                 }}>Xác nhận</Button>
             </div>
+        </Modal>
+
+        <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Thêm học viên mới">
+            <form onSubmit={handleCreateClient} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email *</label>
+                        <input
+                            type="email"
+                            required
+                            value={createForm.email}
+                            onChange={(e) => setCreateForm({...createForm, email: e.target.value})}
+                            placeholder="client@gmail.com"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Họ và tên *</label>
+                        <input
+                            type="text"
+                            required
+                            value={createForm.fullName}
+                            onChange={(e) => setCreateForm({...createForm, fullName: e.target.value})}
+                            placeholder="Jane Doe"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Số điện thoại</label>
+                        <input
+                            type="text"
+                            value={createForm.phoneNumber}
+                            onChange={(e) => setCreateForm({...createForm, phoneNumber: e.target.value})}
+                            placeholder="09xxxxxxxx"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ngày sinh</label>
+                        <input
+                            type="date"
+                            value={createForm.dateOfBirth}
+                            onChange={(e) => setCreateForm({...createForm, dateOfBirth: e.target.value})}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chiều cao (cm)</label>
+                        <input
+                            type="number"
+                            value={createForm.heightCm}
+                            onChange={(e) => setCreateForm({...createForm, heightCm: e.target.value})}
+                            placeholder="170"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Giới tính</label>
+                        <select
+                            value={createForm.gender}
+                            onChange={(e) => setCreateForm({...createForm, gender: e.target.value})}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        >
+                            <option value="male">Nam</option>
+                            <option value="female">Nữ</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cân nặng (kg)</label>
+                        <input
+                            type="number"
+                            step="0.1"
+                            value={createForm.weight}
+                            onChange={(e) => setCreateForm({...createForm, weight: e.target.value})}
+                            placeholder="60"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tỷ lệ mỡ (%)</label>
+                        <input
+                            type="number"
+                            step="0.1"
+                            value={createForm.bodyFatPercent}
+                            onChange={(e) => setCreateForm({...createForm, bodyFatPercent: e.target.value})}
+                            placeholder="20"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mục tiêu Calo/TDEE</label>
+                        <input
+                            type="number"
+                            value={createForm.tdee}
+                            onChange={(e) => setCreateForm({...createForm, tdee: e.target.value})}
+                            placeholder="2000"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chế độ ăn</label>
+                        <select
+                            value={createForm.dietPreference}
+                            onChange={(e) => setCreateForm({...createForm, dietPreference: e.target.value})}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
+                        >
+                            <option value="NORMAL">Bình thường</option>
+                            <option value="VEGETARIAN">Ăn chay (Vegetarian)</option>
+                            <option value="VEGAN">Ăn thuần chay (Vegan)</option>
+                            <option value="KETO">Chế độ Keto</option>
+                            <option value="EAT_CLEAN">Ăn Eat Clean</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dị ứng</label>
+                        <div className="flex gap-4 mt-2">
+                            <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={createForm.allergens.includes('NUT')}
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setCreateForm({
+                                            ...createForm,
+                                            allergens: checked ? [...createForm.allergens, 'NUT'] : createForm.allergens.filter(a => a !== 'NUT')
+                                        });
+                                    }}
+                                    className="rounded text-blue-600 focus:ring-blue-500"
+                                />
+                                Dị ứng hạt/đậu phộng
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
+                    <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>Hủy</Button>
+                    <Button type="submit" disabled={creatingClient} className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-5">
+                        {creatingClient ? 'Đang lưu...' : 'Lưu lại'}
+                    </Button>
+                </div>
+            </form>
         </Modal>
         </>
     );
