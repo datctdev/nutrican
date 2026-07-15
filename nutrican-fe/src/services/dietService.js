@@ -26,6 +26,7 @@ export const dietService = {
     saveFeedback: (logId, data) => api.put(`/diet/logs/${logId}/feedback`, data),
     getResNetDishes: () => api.get('/foods/resnet-dishes'),
     searchFoods: (q, params = {}) => api.get('/foods/search', { params: { q, dietFilter: true, ...params } }),
+    getFoodsByCodes: (codes) => api.get('/foods/by-codes', { params: { codes: codes.join(',') } }),
     getHotpotBroths: () => api.get('/foods/hotpot/broths'),
     getHotpotItems: () => api.get('/foods/hotpot/items'),
 

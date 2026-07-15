@@ -1,6 +1,5 @@
 package com.sba.nutricanbe.diet.dto;
 
-import com.sba.nutricanbe.diet.enums.AllergenType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,5 +14,5 @@ import java.util.List;
 public class PlanAllergyWarning {
     private int itemIndex;
     private String foodCode;
-    private List<AllergenType> matchedAllergens;
+    private List<String> matchedFoodCodes;
 }

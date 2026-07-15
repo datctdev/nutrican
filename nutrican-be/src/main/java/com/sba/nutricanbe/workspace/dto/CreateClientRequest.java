@@ -1,6 +1,5 @@
 package com.sba.nutricanbe.workspace.dto;
 
-import com.sba.nutricanbe.diet.enums.AllergenType;
 import com.sba.nutricanbe.user.enums.DietPreference;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -24,7 +23,7 @@ public class CreateClientRequest {
     private java.math.BigDecimal weight;
     private java.math.BigDecimal bodyFatPercent;
     private java.math.BigDecimal tdee;
-    private List<AllergenType> allergens;
+    private List<String> allergicFoodCodes;
     private DietPreference dietPreference;
     private String specialNotes;
 }

@@ -1,6 +1,7 @@
 // src/pages/pt/ClientListPage.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -36,7 +37,7 @@ export default function ClientListPage() {
         weight: '',
         bodyFatPercent: '',
         tdee: '',
-        allergens: [],
+        allergicFoodCodes: [],
         dietPreference: 'NORMAL',
     });
 
@@ -55,6 +56,7 @@ export default function ClientListPage() {
                 bodyFatPercent: createForm.bodyFatPercent ? Number(createForm.bodyFatPercent) : null,
                 tdee: createForm.tdee ? Number(createForm.tdee) : null,
                 dateOfBirth: createForm.dateOfBirth || null,
+                allergicFoodCodes: createForm.allergicFoodCodes,
             };
             await workspaceService.createClient(payload);
             toast.success('Thêm học viên mới thành công!');
@@ -69,7 +71,7 @@ export default function ClientListPage() {
                 weight: '',
                 bodyFatPercent: '',
                 tdee: '',
-                allergens: [],
+                allergicFoodCodes: [],
                 dietPreference: 'NORMAL',
             });
             fetchClients();
@@ -596,22 +598,11 @@ export default function ClientListPage() {
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dị ứng</label>
-                        <div className="flex gap-4 mt-2">
-                            <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                                <input
-                                    type="checkbox"
-                                    checked={createForm.allergens.includes('NUT')}
-                                    onChange={(e) => {
-                                        const checked = e.target.checked;
-                                        setCreateForm({
-                                            ...createForm,
-                                            allergens: checked ? [...createForm.allergens, 'NUT'] : createForm.allergens.filter(a => a !== 'NUT')
-                                        });
-                                    }}
-                                    className="rounded text-blue-600 focus:ring-blue-500"
-                                />
-                                Dị ứng hạt/đậu phộng
-                            </label>
+                        <div className="mt-2">
+                            <FoodAllergySelector 
+                                selectedFoodCodes={createForm.allergicFoodCodes} 
+                                onChange={(codes) => setCreateForm({ ...createForm, allergicFoodCodes: codes })} 
+                            />
                         </div>
                     </div>
                 </div>

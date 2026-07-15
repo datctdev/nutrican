@@ -7,5 +7,5 @@ import java.util.List;
 
 @Data
 public class AllergyProfileRequest {
-    private List<AllergenType> allergens;
+    private List<String> foodCodes;
 }

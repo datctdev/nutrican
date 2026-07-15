@@ -16,6 +16,8 @@ public interface FoodCatalogService {
 
     List<FoodItemResponse> getHotpotItems();
 
+    List<FoodItemResponse> getByCodes(List<String> codes);
+
     Optional<FoodItemResponse> findBestMatch(String foodName);
 
     Optional<FoodItemResponse> findByResNetFoodCode(String foodCode);

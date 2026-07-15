@@ -98,8 +98,8 @@ public class User extends BaseEntity {
     private Integer pregnancyTrimester;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "allergens", columnDefinition = "jsonb")
-    private List<AllergenType> allergens;
+    @Column(name = "allergic_food_codes", columnDefinition = "jsonb")
+    private List<String> allergicFoodCodes;
 
     /** NFR-14: e.g. {"postMealRating": true} */
     @JdbcTypeCode(SqlTypes.JSON)

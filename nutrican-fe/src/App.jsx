@@ -28,7 +28,6 @@ import PtVerificationPage from './pages/admin/PtVerificationPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import SosTicketsPage from './pages/admin/SosTicketsPage';
 import RefundReviewPage from './pages/admin/RefundReviewPage';
-import AllergenMappingPage from './pages/admin/AllergenMappingPage';
 import FoodTagsPage from './pages/admin/FoodTagsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import OnboardingGuard from './components/common/OnboardingGuard';
@@ -105,10 +104,6 @@ function App() {
                 {
                     path: '/admin/refunds',
                     element: <ProtectedRoute allowedRoles={['ADMIN']}><RefundReviewPage /></ProtectedRoute>,
-                },
-                {
-                    path: '/admin/allergens',
-                    element: <ProtectedRoute allowedRoles={['ADMIN']}><AllergenMappingPage /></ProtectedRoute>,
                 },
                 {
                     path: '/admin/food-tags',

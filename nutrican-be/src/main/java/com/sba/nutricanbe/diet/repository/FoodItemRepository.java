@@ -26,4 +26,6 @@ public interface FoodItemRepository extends JpaRepository<FoodItem, UUID> {
     boolean existsBySource(String source);
 
     List<FoodItem> findBySource(String source);
+
+    List<FoodItem> findByFoodCodeIn(List<String> foodCodes);
 }

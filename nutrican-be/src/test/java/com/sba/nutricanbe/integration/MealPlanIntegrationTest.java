@@ -1,6 +1,5 @@
 package com.sba.nutricanbe.integration;
 
-import com.sba.nutricanbe.diet.enums.AllergenType;
 import com.sba.nutricanbe.user.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +21,7 @@ class MealPlanIntegrationTest extends IntegrationTestBase {
     void setUp() {
         stubAiAndStorage();
         User customer = userRepository.findByEmail("customer1@gmail.com").orElseThrow();
-        customer.setAllergens(List.of(AllergenType.SEAFOOD));
+        customer.setAllergicFoodCodes(List.of("ca_kho_to"));
         userRepository.save(customer);
     }
 

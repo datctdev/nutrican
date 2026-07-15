@@ -1,6 +1,5 @@
 package com.sba.nutricanbe.diet.dto;
 
-import com.sba.nutricanbe.diet.enums.AllergenType;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.IntakeStatus;
@@ -51,7 +50,7 @@ public class DietLogResponse {
     private Boolean suggestSos;
     private java.util.List<FoodItemResponse> suggestedFoodMatches;
     private java.util.List<DietLogItemResponse> items;
-    private java.util.List<AllergenType> allergyWarnings;
+    private java.util.List<String> allergyWarnings;
     private String dietPrefWarning;
     private IntakeStatus intakeStatus;
     private String controlLoopMessage;

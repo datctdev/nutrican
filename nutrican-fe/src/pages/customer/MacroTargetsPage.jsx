@@ -8,11 +8,12 @@ import ProgressTimelineCard from './components/ProgressTimelineCard';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { 
-  Loader2, ArrowLeft, Target, Flame, Beef, Wheat, Droplet, Save, 
+  Loader2, Camera, User, Mail, Phone, MapPin, 
   Upload, TrendingUp, Activity, Zap, Info, 
   CheckCircle2, Scale, Heart, Calculator, Edit3, Sparkles, ChevronRight,
   Check, Calendar, Star, AlertTriangle
 } from 'lucide-react';
+import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 
 const ALLERGEN_OPTIONS = [
   { value: 'GLUTEN', label: 'Gluten' },
@@ -926,22 +927,7 @@ export default function MacroTargetsPage() {
 
                 <div>
                   <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Thực phẩm gây dị ứng</p>
-                  <div className="flex flex-wrap gap-2">
-                    {ALLERGEN_OPTIONS.map((opt) => (
-                      <button 
-                        key={opt.value} 
-                        type="button" 
-                        onClick={() => toggleAllergen(opt.value)}
-                        className={`px-4 py-2 rounded-full text-xs font-bold border transition-colors ${
-                          allergens.includes(opt.value)
-                            ? 'bg-rose-100 border-rose-300 text-rose-700'
-                            : 'bg-white border-slate-250 text-slate-600 hover:border-slate-400'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
+                  <FoodAllergySelector selectedFoodCodes={allergens} onChange={setAllergens} />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

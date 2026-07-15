@@ -109,6 +109,14 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<FoodItemResponse> getByCodes(List<String> codes) {
+        if (codes == null || codes.isEmpty()) return List.of();
+        return foodItemRepository.findByFoodCodeIn(codes).stream()
+                .map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<FoodItemResponse> findBestMatch(String foodName) {
         if (foodName == null || foodName.isBlank()) {
             return Optional.empty();

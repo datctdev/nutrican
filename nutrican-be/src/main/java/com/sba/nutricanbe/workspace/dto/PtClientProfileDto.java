@@ -1,6 +1,5 @@
 package com.sba.nutricanbe.workspace.dto;
 
-import com.sba.nutricanbe.diet.enums.AllergenType;
 import com.sba.nutricanbe.user.enums.DietPreference;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 
@@ -28,7 +27,7 @@ public class PtClientProfileDto {
     private BigDecimal weight;
     private BigDecimal bodyFatPercent;
     private BigDecimal tdee;
-    private List<AllergenType> allergens;
+    private List<String> allergicFoodCodes;
     private DietPreference dietPreference;
     private String specialNotes;
 

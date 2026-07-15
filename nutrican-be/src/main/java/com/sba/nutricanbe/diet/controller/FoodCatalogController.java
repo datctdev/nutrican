@@ -48,4 +48,9 @@ public class FoodCatalogController {
     public ResponseEntity<ApiResponse<List<FoodItemResponse>>> getHotpotItems() {
         return ResponseEntity.ok(ApiResponse.success(foodCatalogService.getHotpotItems()));
     }
+
+    @GetMapping("/by-codes")
+    public ResponseEntity<ApiResponse<List<FoodItemResponse>>> getByCodes(@RequestParam List<String> codes) {
+        return ResponseEntity.ok(ApiResponse.success(foodCatalogService.getByCodes(codes)));
+    }
 }
