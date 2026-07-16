@@ -119,23 +119,25 @@ public class MealPlanController {
 
 
     @GetMapping("/api/v1/workspace/meal-plans/{clientId}")
-
     @PreAuthorize("hasAnyRole('PT_CERTIFIED', 'PT_FREELANCE')")
-
     public ResponseEntity<ApiResponse<MealPlanDetail>> getClientPlan(
-
             @AuthenticationPrincipal User pt,
+            @PathVariable UUID clientId,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate weekStart) {
 
-            @PathVariable UUID clientId) {
+        MealPlan plan;
+        if (weekStart != null) {
+            plan = mealPlanRepository.findFirstByClientIdAndWeekStartOrderByCreatedAtDesc(clientId, weekStart).orElse(null);
+        } else {
+            plan = mealPlanRepository.findByClientIdOrderByWeekStartDesc(clientId).stream().findFirst().orElse(null);
+        }
 
-        MealPlan plan = mealPlanRepository.findByClientIdOrderByWeekStartDesc(clientId).stream().findFirst()
-
-                .orElseThrow(() -> new ResourceNotFoundException("MealPlan", clientId));
+        if (plan == null) {
+            return ResponseEntity.ok(ApiResponse.success(new MealPlanDetail(null, List.of(), List.of())));
+        }
 
         List<MealPlanItem> items = mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId());
-
         return ResponseEntity.ok(ApiResponse.success(buildDetail(plan, clientId, items)));
-
     }
 
 

@@ -8,7 +8,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import com.sba.nutricanbe.user.enums.DietPreference;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
-import com.sba.nutricanbe.diet.enums.AllergenType;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 

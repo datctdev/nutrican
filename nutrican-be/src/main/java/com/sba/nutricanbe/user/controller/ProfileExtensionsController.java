@@ -3,7 +3,6 @@ package com.sba.nutricanbe.user.controller;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.util.MacroSuggestionCalculator;
-import com.sba.nutricanbe.diet.enums.AllergenType;
 import com.sba.nutricanbe.user.dto.AllergyProfileRequest;
 import com.sba.nutricanbe.user.dto.BodyMetricDto;
 import com.sba.nutricanbe.user.dto.BodyMetricReminderStatusDto;

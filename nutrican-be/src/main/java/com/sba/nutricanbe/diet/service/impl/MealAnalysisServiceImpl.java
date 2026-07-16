@@ -38,7 +38,6 @@ import com.sba.nutricanbe.diet.dto.FoodItemResponse;
 import com.sba.nutricanbe.diet.dto.FoodPredictionResponse;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
-import com.sba.nutricanbe.diet.enums.AllergenType;
 import com.sba.nutricanbe.diet.dto.IntakeControlResult;
 import com.sba.nutricanbe.diet.service.AllergyCheckService;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;

@@ -28,7 +28,10 @@ function getStartOfWeek(d) {
 }
 
 function formatDate(dateObj) {
-  return dateObj.toISOString().split('T')[0];
+  const yyyy = dateObj.getFullYear();
+  const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const dd = String(dateObj.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export default function PtMealPlanPage() {
@@ -57,6 +60,20 @@ export default function PtMealPlanPage() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [groceryModalOpen, setGroceryModalOpen] = useState(false);
 
+  const [prevClientId, setPrevClientId] = useState(clientId);
+  const [prevWeekStart, setPrevWeekStart] = useState(weekStart);
+
+  if (clientId !== prevClientId || weekStart !== prevWeekStart) {
+    setPrevClientId(clientId);
+    setPrevWeekStart(weekStart);
+    setItems([]);
+    setProfile(null);
+    setPlanId(null);
+    setIsPublished(false);
+    setPrefWarnCodes(new Set());
+    setNotes('');
+  }
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -64,12 +81,11 @@ export default function PtMealPlanPage() {
       setProfile(profileRes.data.data);
 
       try {
-        const planRes = await workspaceService.getClientMealPlan(clientId);
+        const planRes = await workspaceService.getClientMealPlan(clientId, formatDate(weekStart));
         const data = planRes.data.data;
         if (data?.plan) {
           setPlanId(data.plan.id);
           setIsPublished(data.plan.isPublished || false);
-          setWeekStart(new Date(data.plan.weekStart));
           setNotes(data.plan.notes || '');
           
           if (data.items?.length) {
@@ -95,22 +111,23 @@ export default function PtMealPlanPage() {
           } else {
             setItems([]);
           }
+        } else {
+          setPlanId(null);
+          setIsPublished(false);
+          setItems([]);
+          setNotes('');
         }
         if (data?.dietPrefWarnings?.length) {
           setPrefWarnCodes(new Set(data.dietPrefWarnings.map((w) => w.foodCode).filter(Boolean)));
         } else {
           setPrefWarnCodes(new Set());
         }
-      } catch (err) {
-        if (err.response?.status === 404) {
-          setPlanId(null);
-          setIsPublished(false);
-          setItems([]);
-          setNotes('');
-          setPrefWarnCodes(new Set());
-        } else {
-          toast.error('Lỗi khi tải thực đơn');
-        }
+      } catch {
+        setPlanId(null);
+        setIsPublished(false);
+        setItems([]);
+        setNotes('');
+        setPrefWarnCodes(new Set());
       }
 
       // Suggestions
@@ -123,14 +140,14 @@ export default function PtMealPlanPage() {
     } finally {
       setLoading(false);
     }
-  }, [clientId]);
+  }, [clientId, weekStart]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       loadData();
     }, 0);
     return () => clearTimeout(timer);
-  }, [loadData]);
+  }, [clientId, weekStart, loadData]);
 
   const refreshSuggestions = async () => {
     try {
@@ -194,7 +211,7 @@ export default function PtMealPlanPage() {
     toast.success(`Đã thêm ${food.nameVi}`);
   };
 
-  const handleCopyPrevDay = () => {
+  const handleCopyPrevDay = async () => {
     const parts = selectedDate.split('-');
     const curr = new Date(parts[0], parts[1] - 1, parts[2]);
     curr.setDate(curr.getDate() - 1);
@@ -205,19 +222,54 @@ export default function PtMealPlanPage() {
     const prevDateStr = `${yyyy}-${mm}-${dd}`;
     
     const prevItems = items.filter(i => i.planDate === prevDateStr);
-    if (prevItems.length === 0) {
-      toast.error(`Ngày ${dd}/${mm}/${yyyy} không có thực đơn để sao chép!`);
+    if (prevItems.length > 0) {
+      const newCopied = prevItems.map((item, idx) => ({
+        ...item,
+        tempId: `copy-${Date.now()}-${idx}`,
+        planDate: selectedDate,
+      }));
+      
+      setItems([...items.filter(i => i.planDate !== selectedDate), ...newCopied]);
+      toast.success('Đã sao chép thực đơn hôm qua!');
       return;
     }
-    
-    const newCopied = prevItems.map((item, idx) => ({
-      ...item,
-      tempId: `copy-${Date.now()}-${idx}`,
-      planDate: selectedDate,
-    }));
-    
-    setItems([...items.filter(i => i.planDate !== selectedDate), ...newCopied]);
-    toast.success('Đã sao chép thực đơn hôm qua!');
+
+    // Try to fetch from previous week
+    const prevWeekStartStr = formatDate(getStartOfWeek(curr));
+    try {
+      const planRes = await workspaceService.getClientMealPlan(clientId, prevWeekStartStr);
+      const data = planRes.data.data;
+      if (data?.items?.length) {
+        const fetchedPrevItems = data.items.filter(i => i.planDate === prevDateStr);
+        if (fetchedPrevItems.length > 0) {
+          const newCopied = fetchedPrevItems.map((item, idx) => ({
+            tempId: `copy-api-${item.id || idx}-${Date.now()}`,
+            planDate: selectedDate,
+            mealType: item.mealType,
+            foodCode: item.foodCode || '',
+            nameVi: item.freeText || item.foodCode || 'Món ăn',
+            portionGrams: item.portionGrams || 100,
+            baseServingSizeG: 100,
+            baseCalories: 0,
+            baseProtein: 0,
+            baseCarb: 0,
+            baseFat: 0,
+            calcCalories: 0,
+            calcProtein: 0,
+            calcCarb: 0,
+            calcFat: 0,
+            eaten: false,
+          }));
+          setItems([...items.filter(i => i.planDate !== selectedDate), ...newCopied]);
+          toast.success('Đã sao chép thực đơn hôm qua từ tuần trước!');
+          return;
+        }
+      }
+      toast.error(`Ngày ${dd}/${mm}/${yyyy} không có thực đơn để sao chép!`);
+    } catch (err) {
+      console.error(err);
+      toast.error('Không thể tải thực đơn ngày hôm qua.');
+    }
   };
 
   const handleSave = async () => {
@@ -274,7 +326,7 @@ export default function PtMealPlanPage() {
       await workspaceService.publishMealPlan(planId);
       toast.success('Đã gửi thực đơn cho học viên!');
       setIsPublished(true);
-    } catch (e) {
+    } catch {
       toast.error('Lỗi khi chốt thực đơn');
     } finally {
       setSaving(false);
@@ -499,9 +551,13 @@ export default function PtMealPlanPage() {
             date={selectedDate}
             items={itemsWithWarnings}
             onUpdateItems={(newItems) => {
-               // Strip warning property before saving to state
-               const cleanItems = newItems.map(({ warning, ...rest }) => rest);
-               setItems(cleanItems);
+              // Strip warning property before saving to state
+              const cleanItems = newItems.map((item) => {
+                const clean = { ...item };
+                delete clean.warning;
+                return clean;
+              });
+              setItems(cleanItems);
             }}
             onOpenSearch={handleOpenSearch}
           />

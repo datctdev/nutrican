@@ -3,9 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { workspaceService } from '../../services/workspaceService';
+import { dietService } from '../../services/dietService';
+import { profileExtensionsService } from '../../services/profileExtensionsService';
+import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 import ProgressTimelineCard from '../customer/components/ProgressTimelineCard';
 import { toast } from 'sonner';
-import { ArrowLeft, TrendingUp, Utensils } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Utensils, Camera, Loader2 } from 'lucide-react';
 
 function AdherenceDonut({ percent }) {
   const p = Math.min(100, Math.max(0, Number(percent) || 0));
@@ -122,6 +125,8 @@ export default function ClientProgressPage() {
   const [editForm, setEditForm] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [allergicFoods, setAllergicFoods] = useState([]);
+  const [analyzingInbody, setAnalyzingInbody] = useState(false);
 
   const [isEditingMacros, setIsEditingMacros] = useState(false);
   const [savingMacros, setSavingMacros] = useState(false);
@@ -136,15 +141,23 @@ export default function ClientProgressPage() {
   const loadProfile = useCallback(async () => {
     try {
       const res = await workspaceService.getClientProfile(clientId);
-      setProfile(res.data.data);
-      setEditForm(res.data.data);
+      const profileData = res.data.data;
+      setProfile(profileData);
+      setEditForm(profileData);
       setMacroForm({
-        nutritionGoal: res.data.data.nutritionGoal || 'MAINTAIN',
-        dailyCalories: res.data.data.tdee || '',
-        protein: res.data.data.protein || '',
-        carb: res.data.data.carb || '',
-        fat: res.data.data.fat || '',
+        nutritionGoal: profileData.nutritionGoal || 'MAINTAIN',
+        dailyCalories: profileData.tdee || '',
+        protein: profileData.protein || '',
+        carb: profileData.carb || '',
+        fat: profileData.fat || '',
       });
+      if (profileData.allergicFoodCodes && profileData.allergicFoodCodes.length > 0) {
+        dietService.getFoodsByCodes(profileData.allergicFoodCodes)
+          .then(resFoods => setAllergicFoods(resFoods.data?.data || []))
+          .catch(() => setAllergicFoods([]));
+      } else {
+        setAllergicFoods([]);
+      }
     } catch (e) {
       console.error('Failed to load client profile', e);
     }
@@ -182,17 +195,53 @@ export default function ClientProgressPage() {
         dateOfBirth: editForm.dateOfBirth || null,
       };
       const res = await workspaceService.updateClientProfile(clientId, payload);
-      setProfile(res.data.data);
-      setEditForm(res.data.data);
+      const updatedData = res.data.data;
+      setProfile(updatedData);
+      setEditForm(updatedData);
       setIsEditing(false);
       toast.success('Cập nhật hồ sơ sức khỏe thành công!');
       const resProg = await workspaceService.getClientProgress(clientId);
       setData(resProg.data.data);
+      if (updatedData.allergicFoodCodes && updatedData.allergicFoodCodes.length > 0) {
+        dietService.getFoodsByCodes(updatedData.allergicFoodCodes)
+          .then(resFoods => setAllergicFoods(resFoods.data?.data || []))
+          .catch(() => setAllergicFoods([]));
+      } else {
+        setAllergicFoods([]);
+      }
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || 'Không thể cập nhật hồ sơ.');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleInbodyUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAnalyzingInbody(true);
+    try {
+      const res = await profileExtensionsService.analyzeInbody(file);
+      const inbodyData = res.data?.data;
+      if (inbodyData) {
+        setEditForm((prev) => ({
+          ...prev,
+          weight: inbodyData.weight || prev.weight,
+          bodyFatPercent: inbodyData.body_fat_percent || prev.bodyFatPercent,
+          heightCm: inbodyData.height || prev.heightCm,
+          gender: inbodyData.gender || prev.gender,
+        }));
+        toast.success('Phân tích ảnh InBody thành công! Các số đo đã tự động điền.');
+      } else {
+        toast.error('AI không nhận diện được chỉ số từ ảnh này.');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Không thể phân tích ảnh InBody.');
+    } finally {
+      setAnalyzingInbody(false);
     }
   };
 
@@ -348,6 +397,30 @@ export default function ClientProgressPage() {
                       </div>
                     </div>
 
+                    <div className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                      <span className="text-xs font-black text-slate-600 uppercase tracking-wider">Số đo & Phân tích</span>
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition-all shadow-sm shadow-blue-500/10">
+                        {analyzingInbody ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Đang phân tích...
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="w-3.5 h-3.5" />
+                            Quét ảnh InBody bằng AI
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleInbodyUpload}
+                          className="hidden"
+                          disabled={analyzingInbody}
+                        />
+                      </label>
+                    </div>
+
                     <div className="grid grid-cols-3 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chiều cao (cm)</label>
@@ -398,8 +471,8 @@ export default function ClientProgressPage() {
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                         >
                           <option value="NORMAL">Bình thường</option>
-                          <option value="VEGETARIAN">Ăn chay (Vegetarian)</option>
-                          <option value="VEGAN">Ăn thuần chay (Vegan)</option>
+                          <option value="VEGETARIAN">Ăn chay</option>
+                          <option value="VEGAN">Thuần chay</option>
                           <option value="KETO">Chế độ Keto</option>
                           <option value="EAT_CLEAN">Ăn Eat Clean</option>
                         </select>
@@ -408,24 +481,11 @@ export default function ClientProgressPage() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dị ứng</label>
-                        <div className="flex gap-4 mt-2">
-                          <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={editForm.allergens?.includes('NUT')}
-                              onChange={(e) => {
-                                const checked = e.target.checked;
-                                setEditForm({
-                                  ...editForm,
-                                  allergens: checked ? [...(editForm.allergens || []), 'NUT'] : (editForm.allergens || []).filter(a => a !== 'NUT')
-                                });
-                              }}
-                              className="rounded text-blue-600 focus:ring-blue-500"
-                            />
-                            Dị ứng hạt/đậu phộng
-                          </label>
-                        </div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Thành phần dị ứng</label>
+                        <FoodAllergySelector
+                          selectedFoodCodes={editForm.allergicFoodCodes || []}
+                          onChange={(codes) => setEditForm({ ...editForm, allergicFoodCodes: codes })}
+                        />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lưu ý đặc biệt (v.d. không ăn cay, dị ứng khác)</label>
@@ -482,10 +542,10 @@ export default function ClientProgressPage() {
                         <div className="mt-2 text-sm font-semibold space-y-2">
                           <div className="flex flex-wrap gap-1.5">
                             <span className="text-slate-450 font-normal mr-1">Dị ứng:</span>
-                            {profile.allergens && profile.allergens.length > 0 ? (
-                              profile.allergens.map((a, idx) => (
-                                <span key={idx} className="bg-red-50 text-red-700 border border-red-100 text-[11px] font-bold px-2 py-0.5 rounded-md">
-                                  {a === 'NUT' ? 'Đậu phộng/Hạt' : a}
+                            {allergicFoods && allergicFoods.length > 0 ? (
+                              allergicFoods.map((food, idx) => (
+                                <span key={food.foodCode || idx} className="bg-red-50 text-red-700 border border-red-100 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                                  {food.nameVi}
                                 </span>
                               ))
                             ) : (
