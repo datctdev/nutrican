@@ -6,8 +6,8 @@ import com.sba.nutricanbe.diet.dto.FoodItemResponse;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
-import com.sba.nutricanbe.diet.service.AllergyCheckService;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
+import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
@@ -35,7 +35,7 @@ class MealPlanServiceTest {
     @Mock private MealPlanRepository mealPlanRepository;
     @Mock private MealPlanItemRepository mealPlanItemRepository;
     @Mock private PtClientMappingRepository mappingRepository;
-    @Mock private AllergyCheckService allergyCheckService;
+    @Mock private DietPrefCheckService dietPrefCheckService;
     @Mock private FoodCatalogService foodCatalogService;
     @Mock private FoodItemRepository foodItemRepository;
     @Mock private DietLogHelper dietLogHelper;

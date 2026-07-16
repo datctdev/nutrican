@@ -50,7 +50,6 @@ public class DietLogResponse {
     private Boolean suggestSos;
     private java.util.List<FoodItemResponse> suggestedFoodMatches;
     private java.util.List<DietLogItemResponse> items;
-    private java.util.List<String> allergyWarnings;
     private String dietPrefWarning;
     private IntakeStatus intakeStatus;
     private String controlLoopMessage;

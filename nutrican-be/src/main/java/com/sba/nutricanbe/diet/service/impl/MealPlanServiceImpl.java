@@ -6,7 +6,6 @@ import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.diet.controller.MealPlanController.MealPlanItemRequest;
 import com.sba.nutricanbe.diet.controller.MealPlanController.MealPlanRequest;
 import com.sba.nutricanbe.diet.dto.MealPlanSaveResult;
-import com.sba.nutricanbe.diet.dto.PlanAllergyWarning;
 import com.sba.nutricanbe.diet.dto.PlanDietPrefWarning;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.diet.entity.MealPlan;
@@ -14,7 +13,6 @@ import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
-import com.sba.nutricanbe.diet.service.AllergyCheckService;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
 import com.sba.nutricanbe.diet.service.MealPlanService;
@@ -44,7 +42,6 @@ public class MealPlanServiceImpl implements MealPlanService {
     private final MealPlanRepository mealPlanRepository;
     private final MealPlanItemRepository mealPlanItemRepository;
     private final PtClientMappingRepository mappingRepository;
-    private final AllergyCheckService allergyCheckService;
     private final DietPrefCheckService dietPrefCheckService;
     private final FoodCatalogService foodCatalogService;
     private final FoodItemRepository foodItemRepository;
@@ -126,14 +123,12 @@ public class MealPlanServiceImpl implements MealPlanService {
         List<String> foodCodes = items != null
                 ? items.stream().map(MealPlanItemRequest::getFoodCode).filter(c -> c != null && !c.isBlank()).toList()
                 : List.of();
-        List<PlanAllergyWarning> allergyWarnings = allergyCheckService.checkPlan(clientId, foodCodes);
         List<PlanDietPrefWarning> dietPrefWarnings = dietPrefCheckService.checkPlan(clientId, foodCodes);
         List<MealPlanItem> savedItems = saveItems(plan.getId(), items);
         String macroWarning = computeMacroWarning(clientId, items);
         return MealPlanSaveResult.builder()
                 .plan(plan)
                 .items(savedItems)
-                .allergyWarnings(allergyWarnings)
                 .dietPrefWarnings(dietPrefWarnings)
                 .macroWarning(macroWarning)
                 .build();

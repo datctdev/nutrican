@@ -324,7 +324,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .status(user.getStatus().name())
                 .isKycVerified(user.getIsKycVerified())
                 .ptProfile(ptProfileSummary)
-                .allergicFoodCodes(user.getAllergicFoodCodes())
+                .allergyNotes(user.getAllergyNotes())
                 .dietPreference(user.getDietPreference())
                 .nutritionGoal(user.getNutritionGoal())
                 .pregnancyTrimester(user.getPregnancyTrimester())

@@ -29,7 +29,7 @@ public class UserProfileResponse {
     private LocalDateTime createdAt;
     private Boolean isKycVerified;
     private PtProfileSummary ptProfile;
-    private List<String> allergicFoodCodes;
+    private String allergyNotes;
     private DietPreference dietPreference;
     private NutritionGoal nutritionGoal;
     private Integer pregnancyTrimester;

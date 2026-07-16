@@ -21,15 +21,7 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 import useWebSocket from '../../hooks/useWebSocket';
 
-const ALLERGEN_OPTIONS = [
-  { value: 'GLUTEN', label: 'Gluten' },
-  { value: 'SEAFOOD', label: 'Hải sản' },
-  { value: 'NUT', label: 'Hạt' },
-  { value: 'DAIRY', label: 'Sữa' },
-  { value: 'EGG', label: 'Trứng' },
-  { value: 'SOY', label: 'Đậu nành' },
-  { value: 'OTHER', label: 'Khác' },
-];
+
 
 const DIET_OPTIONS = [
   { value: 'NORMAL', label: 'Ăn thường' },
@@ -77,7 +69,7 @@ export default function ProfilePage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  const [allergens, setAllergens] = useState([]);
+  const [allergyNotes, setAllergyNotes] = useState('');
   const [dietPreference, setDietPreference] = useState('NORMAL');
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
@@ -155,7 +147,7 @@ export default function ProfilePage() {
       };
       setProfile(p);
       setEditForm({ fullName: p.fullName, phoneNumber: p.phoneNumber, address: p.address });
-      setAllergens(allergyRes.data.data || data.allergens || []);
+      setAllergyNotes(allergyRes.data.data || data.allergyNotes || '');
       if (data.dietPreference) setDietPreference(data.dietPreference);
       if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
       if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
@@ -241,7 +233,6 @@ export default function ProfilePage() {
       toast.error(e.response?.data?.message || 'Không hủy được lịch hẹn');
     }
   };
-
   const fetchAppointments = async () => {
     setLoadingAppts(true);
     try {
@@ -254,88 +245,9 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSaveHealth = async () => {
-    setSavingHealth(true);
-    try {
-      await Promise.all([
-        userService.updateAllergies(allergens),
-        userService.updatePreferences({
-          dietPreference,
-          nutritionGoal,
-          pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
-          notificationOptIn: {
-            postMealRating: postMealRatingOptIn,
-            hireResultEmail,
-            sosResultEmail,
-            weeklySummaryEmail,
-            bodyMetricReminder,
-          },
-        }),
-      ]);
-      toast.success('Đã lưu sức khỏe & dinh dưỡng');
-    } catch {
-      toast.error('Không thể lưu thông tin');
-    } finally {
-      setSavingHealth(false);
-    }
-  };
 
-  const handleSaveGoals = async () => {
-    setSavingGoals(true);
-    try {
-      const res = await profileExtensionsService.saveGoals({
-        nutritionGoal,
-        targetWeight: goalForm.targetWeight ? Number(goalForm.targetWeight) : null,
-        baselineWeight: goalForm.baselineWeight ? Number(goalForm.baselineWeight) : null,
-        targetDate: goalForm.targetDate || null,
-        trimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
-      });
-      setProgressGoals(res.data.data);
-      toast.success('Đã lưu mục tiêu');
-    } catch {
-      toast.error('Không lưu được mục tiêu');
-    } finally {
-      setSavingGoals(false);
-    }
-  };
 
-  const handleLogWeight = async () => {
-    if (!bodyWeight) {
-      toast.error('Nhập cân nặng');
-      return;
-    }
-    try {
-      await profileExtensionsService.recordBodyMetric({ weight: Number(bodyWeight) });
-      toast.success('Đã ghi nhận cân nặng');
-      setBodyWeight('');
-      const [ms, bm] = await Promise.all([
-        profileExtensionsService.getMilestones(),
-        profileExtensionsService.getBodyMetrics({ page: 0, size: 6 }),
-      ]);
-      setMilestones(ms.data.data || []);
-      setBodyMetricHistory(bm.data.data?.content || bm.data.data || []);
-    } catch {
-      toast.error('Không ghi được cân nặng');
-    }
-  };
 
-  const handleMacroSuggestion = async () => {
-    setLoadingMacro(true);
-    try {
-      const res = await userService.getMacroSuggestion();
-      const m = res.data.data;
-      toast.success(`Gợi ý: ${m.dailyCalories} kcal · P${m.protein}g C${m.carb}g F${m.fat}g`, { duration: 5000 });
-      navigate('/macro-targets');
-    } catch {
-      toast.error('Không thể lấy gợi ý macro');
-    } finally {
-      setLoadingMacro(false);
-    }
-  };
-
-  const toggleAllergen = (value) => {
-    setAllergens((prev) => prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value]);
-  };
 
   const handleMarkEaten = async (itemId, eaten) => {
     try {

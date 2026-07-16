@@ -10,6 +10,7 @@ import com.sba.nutricanbe.diet.enums.IntakeStatus;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
+import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.service.UserQueryService;
@@ -41,8 +42,7 @@ class DietLogManualSendToPtTest {
     @Mock private com.sba.nutricanbe.diet.repository.SosTicketRepository sosTicketRepository;
     @Mock private IntakeControlLoopService intakeControlLoopService;
     @Mock private com.sba.nutricanbe.diet.service.UserRecipeService userRecipeService;
-    @Mock private com.sba.nutricanbe.diet.service.AllergyCheckService allergyCheckService;
-    @Mock private com.sba.nutricanbe.diet.service.DietPrefCheckService dietPrefCheckService;
+    @Mock private DietPrefCheckService dietPrefCheckService;
 
     @InjectMocks
     private DietLogServiceImpl dietLogService;

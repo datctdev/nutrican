@@ -21,12 +21,12 @@ class MealPlanIntegrationTest extends IntegrationTestBase {
     void setUp() {
         stubAiAndStorage();
         User customer = userRepository.findByEmail("customer1@gmail.com").orElseThrow();
-        customer.setAllergicFoodCodes(List.of("ca_kho_to"));
+        customer.setAllergyNotes("ca_kho_to");
         userRepository.save(customer);
     }
 
     @Test
-    void ptCreatePlan_returnsAllergyWarnings() throws Exception {
+    void ptCreatePlan_success() throws Exception {
         UUID clientId = userRepository.findByEmail("customer1@gmail.com").map(User::getId).orElseThrow();
 
         String payload = String.format("""
@@ -48,9 +48,7 @@ class MealPlanIntegrationTest extends IntegrationTestBase {
                         .with(asUser("pt.certified@gmail.com"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.allergyWarnings").isArray())
-                .andExpect(jsonPath("$.data.allergyWarnings[0].foodCode").value("ca_kho_to"));
+                .andExpect(status().isOk());
     }
 
     @Test

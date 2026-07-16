@@ -47,17 +47,17 @@ public class ProfileExtensionsController {
     private final com.sba.nutricanbe.user.service.CoachingLifecycleService coachingLifecycleService;
 
     @GetMapping("/allergies")
-    public ResponseEntity<ApiResponse<List<String>>> getAllergies(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ApiResponse.success(user.getAllergicFoodCodes() != null ? user.getAllergicFoodCodes() : List.of()));
+    public ResponseEntity<ApiResponse<String>> getAllergies(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.success(user.getAllergyNotes() != null ? user.getAllergyNotes() : ""));
     }
 
     @PutMapping("/allergies")
-    public ResponseEntity<ApiResponse<List<String>>> updateAllergies(
+    public ResponseEntity<ApiResponse<String>> updateAllergies(
             @AuthenticationPrincipal User user,
             @RequestBody AllergyProfileRequest request) {
-        user.setAllergicFoodCodes(request.getFoodCodes());
+        user.setAllergyNotes(request.getAllergyNotes());
         userRepository.save(user);
-        return ResponseEntity.ok(ApiResponse.success(user.getAllergicFoodCodes(), "Allergies updated"));
+        return ResponseEntity.ok(ApiResponse.success(user.getAllergyNotes(), "Allergies updated"));
     }
 
     @PutMapping("/preferences")

@@ -586,7 +586,6 @@ export default function DietTrackerPage() {
             );
 
             const data = res.data?.data;
-            const warnings = data?.allergyWarnings;
             toast.success('Xác nhận & lưu thành công');
             if (confirmModal.logId && hasActivePt) schedulePostMealPrompt(confirmModal.logId);
             if (data?.dietPrefWarning) {
@@ -599,16 +598,8 @@ export default function DietTrackerPage() {
             if (data?.suggestSubmitToPt) {
                 setPendingSubmitPrompt({ logId: confirmModal.logId, message: data.controlLoopMessage });
             }
-            if (warnings?.length) {
-                setConfirmModal((prev) => ({ ...prev, allergyWarnings: warnings }));
-                setTimeout(() => {
-                    setConfirmModal(null);
-                    fetchData();
-                }, 2500);
-            } else {
-                setConfirmModal(null);
-                fetchData();
-            }
+            setConfirmModal(null);
+            fetchData();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Không thể xác nhận món ăn');
         } finally {

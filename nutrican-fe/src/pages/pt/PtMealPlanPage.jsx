@@ -297,9 +297,7 @@ export default function PtMealPlanPage() {
       }
       
       const result = res.data.data;
-      if (result?.allergyWarnings?.length) {
-        toast.warning(`Cảnh báo dị ứng: ${result.allergyWarnings.length} món`);
-      }
+
       if (result?.dietPrefWarnings?.length) {
         setPrefWarnCodes(new Set(result.dietPrefWarnings.map((w) => w.foodCode).filter(Boolean)));
         toast.warning(`Lưu ý: Có món không khớp chế độ ăn của học viên.`);
@@ -408,6 +406,12 @@ export default function PtMealPlanPage() {
             )}
           </div>
           <p className="text-sm font-medium text-slate-500 mt-1">Học viên: <span className="text-blue-600 font-bold">{profile?.fullName}</span></p>
+          {profile?.allergyNotes && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg max-w-lg">
+              <p className="text-xs font-bold text-red-800 uppercase tracking-widest mb-1">Cảnh báo dị ứng</p>
+              <p className="text-sm text-red-700">{profile.allergyNotes}</p>
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setTemplateModalOpen(true)} className="rounded-xl border-slate-200 text-slate-700 bg-white shadow-sm hover:bg-slate-50 gap-2">

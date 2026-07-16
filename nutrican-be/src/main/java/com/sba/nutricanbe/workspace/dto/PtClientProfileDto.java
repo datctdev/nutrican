@@ -27,7 +27,7 @@ public class PtClientProfileDto {
     private BigDecimal weight;
     private BigDecimal bodyFatPercent;
     private BigDecimal tdee;
-    private List<String> allergicFoodCodes;
+    private String allergyNotes;
     private DietPreference dietPreference;
     private String specialNotes;
 

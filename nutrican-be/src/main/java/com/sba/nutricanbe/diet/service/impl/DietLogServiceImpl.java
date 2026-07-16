@@ -32,7 +32,6 @@ import com.sba.nutricanbe.diet.dto.IntakeControlResult;
 import com.sba.nutricanbe.diet.enums.IntakeStatus;
 import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
-import com.sba.nutricanbe.diet.service.AllergyCheckService;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +69,6 @@ public class DietLogServiceImpl implements DietLogService {
     private final SosTicketRepository sosTicketRepository;
     private final IntakeControlLoopService intakeControlLoopService;
     private final com.sba.nutricanbe.diet.service.UserRecipeService userRecipeService;
-    private final AllergyCheckService allergyCheckService;
     private final DietPrefCheckService dietPrefCheckService;
 
     @Override
@@ -163,10 +161,7 @@ public class DietLogServiceImpl implements DietLogService {
             }
         }
         if (!foodItemIds.isEmpty()) {
-            var allergies = allergyCheckService.checkFoodItems(customerId, foodItemIds);
-            if (!allergies.isEmpty()) {
-                response.setAllergyWarnings(allergies);
-            }
+
         }
         if (!foods.isEmpty()) {
             var prefWarnings = dietPrefCheckService.checkFoodItems(customerId, foods);

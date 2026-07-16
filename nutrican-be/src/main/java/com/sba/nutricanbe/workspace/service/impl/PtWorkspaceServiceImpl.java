@@ -819,7 +819,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .weight(weight)
                 .bodyFatPercent(bodyFat)
                 .tdee(tdee)
-                .allergicFoodCodes(client.getAllergicFoodCodes() != null ? client.getAllergicFoodCodes() : List.of())
+                .allergyNotes(client.getAllergyNotes())
                 .dietPreference(client.getDietPreference())
                 .specialNotes(client.getAddress())
                 .nutritionGoal(client.getNutritionGoal())
@@ -841,7 +841,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         if (request.getHeightCm() != null) client.setHeightCm(request.getHeightCm());
         if (request.getGender() != null) client.setGender(request.getGender());
         if (request.getDateOfBirth() != null) client.setDateOfBirth(request.getDateOfBirth());
-        if (request.getAllergicFoodCodes() != null) client.setAllergicFoodCodes(request.getAllergicFoodCodes());
+        if (request.getAllergyNotes() != null) client.setAllergyNotes(request.getAllergyNotes());
         if (request.getDietPreference() != null) client.setDietPreference(request.getDietPreference());
         if (request.getSpecialNotes() != null) client.setAddress(request.getSpecialNotes());
 
@@ -890,7 +890,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .heightCm(request.getHeightCm())
                 .gender(request.getGender())
                 .dateOfBirth(request.getDateOfBirth())
-                .allergicFoodCodes(request.getAllergicFoodCodes())
+                .allergyNotes(request.getAllergyNotes())
                 .dietPreference(request.getDietPreference() != null ? request.getDietPreference() : com.sba.nutricanbe.user.enums.DietPreference.NORMAL)
                 .address(request.getSpecialNotes())
                 .role(com.sba.nutricanbe.common.enums.UserRole.CUSTOMER)

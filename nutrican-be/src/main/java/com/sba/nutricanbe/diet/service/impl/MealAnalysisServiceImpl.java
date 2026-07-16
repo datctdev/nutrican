@@ -39,7 +39,6 @@ import com.sba.nutricanbe.diet.dto.FoodPredictionResponse;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
 import com.sba.nutricanbe.diet.dto.IntakeControlResult;
-import com.sba.nutricanbe.diet.service.AllergyCheckService;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
 import com.sba.nutricanbe.diet.service.MealAnalysisService;
@@ -79,7 +78,6 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
     private final FoodCatalogService foodCatalogService;
     private final DietLogHelper dietLogHelper;
     private final FoodGateService foodGateService;
-    private final AllergyCheckService allergyCheckService;
     private final DietPrefCheckService dietPrefCheckService;
     private final IntakeControlLoopService intakeControlLoopService;
 
@@ -411,7 +409,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             dietLogHelper.notifyPtOfNewLog(dietLog);
         }
         DietLogResponse response = dietLogHelper.toResponse(dietLog);
-        response.setAllergyWarnings(allergyCheckService.checkFoodCode(customerId, foodCode));
+
         User customer = userQueryService.findUserById(customerId).orElse(null);
         if (customer != null && dietPrefCheckService.hasMismatch(customerId, foodCode)) {
             response.setDietPrefWarning(dietPrefCheckService.buildWarningMessage(

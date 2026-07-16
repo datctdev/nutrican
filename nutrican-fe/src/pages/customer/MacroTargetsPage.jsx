@@ -19,31 +19,8 @@ import {
   Flame,
   Save
 } from 'lucide-react';
-import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 
-const DIET_OPTIONS = [
-  { value: 'NORMAL', label: 'Ăn thường' },
-  { value: 'VEGETARIAN', label: 'Ăn chay' },
-  { value: 'VEGAN', label: 'Thuần chay' },
-  { value: 'KETO', label: 'Keto' },
-  { value: 'EAT_CLEAN', label: 'Eat clean' },
-];
 
-const getGoalsByGender = (gender) => {
-  const base = [
-    { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
-    { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
-    { value: 'MAINTAIN', label: 'Duy trì' },
-  ];
-  if (gender === 'female') {
-    return [
-      ...base,
-      { value: 'PREGNANT', label: 'Mang thai' },
-      { value: 'RECOVERY', label: 'Phục hồi sau mang thai' },
-    ];
-  }
-  return base;
-};
 
 export default function MacroTargetsPage() {
   const fileInputRef = useRef(null);
@@ -75,7 +52,7 @@ export default function MacroTargetsPage() {
   const [loadingGoalSuggestion, setLoadingGoalSuggestion] = useState(false);
 
   // Section 2: Health & nutrition states
-  const [allergens, setAllergens] = useState([]);
+  const [allergyNotes, setAllergyNotes] = useState('');
   const [dietPreference, setDietPreference] = useState('NORMAL');
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
@@ -134,7 +111,7 @@ export default function MacroTargetsPage() {
       ]);
 
       const data = profileRes.data.data;
-      setAllergens(allergyRes.data.data || data.allergens || []);
+      setAllergyNotes(allergyRes.data.data || data.allergyNotes || '');
       if (data.dietPreference) setDietPreference(data.dietPreference);
       if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
       if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
@@ -357,15 +334,13 @@ export default function MacroTargetsPage() {
     }
   };
 
-  const toggleAllergen = (value) => {
-    setAllergens((prev) => prev.includes(value) ? prev.filter((a) => a !== value) : [...prev, value]);
-  };
+
 
   const handleSaveHealth = async () => {
     setSavingHealth(true);
     try {
       await Promise.all([
-        userService.updateAllergies(allergens),
+        userService.updateAllergies(allergyNotes),
         userService.updatePreferences({
           dietPreference,
           nutritionGoal,
@@ -918,8 +893,13 @@ export default function MacroTargetsPage() {
                 </div>
 
                 <div>
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Thực phẩm gây dị ứng</p>
-                  <FoodAllergySelector selectedFoodCodes={allergens} onChange={setAllergens} />
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Ghi chú dị ứng</p>
+                  <textarea
+                    value={allergyNotes}
+                    onChange={(e) => setAllergyNotes(e.target.value)}
+                    placeholder="Nhập các thực phẩm bạn bị dị ứng..."
+                    className="w-full min-h-[80px] p-3 text-sm border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50 transition-all placeholder:text-slate-400 resize-y"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -80,11 +80,6 @@ export default function ConfirmFoodModal({
                             {confirmModal.dietPrefWarning}
                         </p>
                     )}
-                    {confirmModal.allergyWarnings?.length > 0 && (
-                        <p className="mt-2 text-[11px] text-amber-900 bg-amber-100 border border-amber-300 rounded-lg px-2.5 py-1.5">
-                            Cảnh báo dị ứng: {confirmModal.allergyWarnings.join(', ')}
-                        </p>
-                    )}
                 </div>
 
                 {/* Body */}

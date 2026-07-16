@@ -23,7 +23,7 @@ public class CreateClientRequest {
     private java.math.BigDecimal weight;
     private java.math.BigDecimal bodyFatPercent;
     private java.math.BigDecimal tdee;
-    private List<String> allergicFoodCodes;
+    private String allergyNotes;
     private DietPreference dietPreference;
     private String specialNotes;
 }

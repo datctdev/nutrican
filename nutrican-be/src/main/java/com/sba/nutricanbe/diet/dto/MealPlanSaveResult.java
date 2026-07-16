@@ -16,7 +16,6 @@ import java.util.List;
 public class MealPlanSaveResult {
     private MealPlan plan;
     private List<MealPlanItem> items;
-    private List<PlanAllergyWarning> allergyWarnings;
     private List<PlanDietPrefWarning> dietPrefWarnings;
     private String macroWarning;
 }
