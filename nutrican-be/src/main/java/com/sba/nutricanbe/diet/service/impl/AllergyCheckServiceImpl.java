@@ -4,18 +4,22 @@ import com.sba.nutricanbe.diet.dto.PlanAllergyWarning;
 import com.sba.nutricanbe.diet.service.AllergyCheckService;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.diet.repository.FoodItemRepository;
+import com.sba.nutricanbe.diet.entity.FoodItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class AllergyCheckServiceImpl implements AllergyCheckService {
 
     private final UserRepository userRepository;
+    private final FoodItemRepository foodItemRepository;
 
     @Override
     public List<String> checkFoodCode(UUID userId, String foodCode) {
@@ -27,7 +31,8 @@ public class AllergyCheckServiceImpl implements AllergyCheckService {
             return List.of();
         }
         if (user.getAllergicFoodCodes().contains(foodCode.toLowerCase()) || 
-            user.getAllergicFoodCodes().contains(foodCode)) {
+            user.getAllergicFoodCodes().contains(foodCode) ||
+            user.getAllergicFoodCodes().contains(foodCode.toUpperCase())) {
             return List.of(foodCode);
         }
         return List.of();
@@ -38,9 +43,12 @@ public class AllergyCheckServiceImpl implements AllergyCheckService {
         if (foodItemIds == null || foodItemIds.isEmpty()) {
             return List.of();
         }
+        List<FoodItem> items = foodItemRepository.findAllById(foodItemIds);
         java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>();
-        for (UUID foodItemId : foodItemIds) {
-            merged.addAll(checkFoodCode(userId, foodItemId != null ? foodItemId.toString() : null));
+        for (FoodItem item : items) {
+            if (item.getFoodCode() != null) {
+                merged.addAll(checkFoodCode(userId, item.getFoodCode()));
+            }
         }
         return new ArrayList<>(merged);
     }

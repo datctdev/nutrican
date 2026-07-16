@@ -21,7 +21,23 @@ export default function FoodAllergySelector({ selectedFoodCodes, onChange }) {
       setLoadingSelected(true);
       try {
         const res = await dietService.getFoodsByCodes(selectedFoodCodes);
-        setSelectedFoods(res.data?.data || []);
+        const fetchedFoods = res.data?.data || [];
+        
+        // Find codes that were not returned by the backend
+        const foundCodes = fetchedFoods.map(f => f.foodCode);
+        const notFoundCodes = selectedFoodCodes.filter(c => !foundCodes.includes(c));
+        
+        const allFoodsToDisplay = [
+          ...fetchedFoods,
+          ...notFoundCodes
+            .filter(code => code && typeof code === 'string' && code.trim() !== '') // filter out null/empty
+            .map(code => ({
+              foodCode: code,
+              nameVi: code
+            }))
+        ];
+
+        setSelectedFoods(allFoodsToDisplay);
       } catch (err) {
         toast.error('Không thể tải danh sách món dị ứng');
       } finally {
@@ -50,8 +66,8 @@ export default function FoodAllergySelector({ selectedFoodCodes, onChange }) {
     const timer = setTimeout(async () => {
       setLoadingSearch(true);
       try {
-        const res = await dietService.searchFoods(query, { page: 0, size: 5 });
-        setResults(res.data?.data?.content || []);
+        const res = await dietService.searchFoods(query, { dietFilter: false });
+        setResults(res.data?.data || []);
         setIsOpen(true);
       } catch (err) {
         // ignore
@@ -116,7 +132,7 @@ export default function FoodAllergySelector({ selectedFoodCodes, onChange }) {
       </div>
 
       {isOpen && results.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
           {results.map((food) => (
             <button
               key={food.foodCode}

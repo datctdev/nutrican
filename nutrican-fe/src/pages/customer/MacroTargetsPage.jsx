@@ -21,16 +21,6 @@ import {
 } from 'lucide-react';
 import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 
-const ALLERGEN_OPTIONS = [
-  { value: 'GLUTEN', label: 'Gluten' },
-  { value: 'SEAFOOD', label: 'Hải sản' },
-  { value: 'NUT', label: 'Hạt' },
-  { value: 'DAIRY', label: 'Sữa' },
-  { value: 'EGG', label: 'Trứng' },
-  { value: 'SOY', label: 'Đậu nành' },
-  { value: 'OTHER', label: 'Khác' },
-];
-
 const DIET_OPTIONS = [
   { value: 'NORMAL', label: 'Ăn thường' },
   { value: 'VEGETARIAN', label: 'Ăn chay' },
