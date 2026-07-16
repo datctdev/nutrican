@@ -7,11 +7,17 @@ import { Button } from '../../components/ui/button';
 import ProgressTimelineCard from './components/ProgressTimelineCard';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { 
-  Loader2, Camera, User, Mail, Phone, MapPin, 
-  Upload, TrendingUp, Activity, Zap, Info, 
+import {
+  Loader2, Camera, User, Mail, Phone, MapPin,
+  Upload, TrendingUp, Activity, Zap, Info,
   CheckCircle2, Scale, Heart, Calculator, Edit3, Sparkles, ChevronRight,
-  Check, Calendar, Star, AlertTriangle
+  Check, Calendar, Star, AlertTriangle, ArrowLeft,
+  Target,
+  Beef,
+  Wheat,
+  Droplet,
+  Flame,
+  Save
 } from 'lucide-react';
 import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 
@@ -193,7 +199,7 @@ export default function MacroTargetsPage() {
       .then((r) => setShowBodyMetricReminder(!!r.data?.data?.showReminder))
       .catch(() => setShowBodyMetricReminder(false));
 
-    profileExtensionsService.getMilestones().then((r) => setMilestones(r.data.data || [])).catch(() => {});
+    profileExtensionsService.getMilestones().then((r) => setMilestones(r.data.data || [])).catch(() => { });
   };
 
   const handleSaveMacros = async () => {
@@ -258,7 +264,7 @@ export default function MacroTargetsPage() {
           age: data.age ? data.age.toString() : f.age,
           gender: data.gender ? data.gender : f.gender,
         }));
-        
+
         let unitText = '';
         if (data.rawUnit === 'lb') {
           unitText = ` (Đã tự quy đổi từ ${data.rawWeight} lb sang kg)`;
@@ -278,27 +284,27 @@ export default function MacroTargetsPage() {
 
   const calculateMacrosFromInBody = () => {
     const { weight, height, age, gender, bodyFat, activityLevel, goal, pregnancyTrimester } = inBodyForm;
-    
+
     if (!weight || !height || !age) {
       toast.error('Vui lòng nhập cân nặng, chiều cao và tuổi');
       return;
     }
 
     setIsAnalyzing(true);
-    
+
     setTimeout(() => {
       const w = parseFloat(weight);
       const h = parseFloat(height);
       const a = parseInt(age);
       const bf = bodyFat ? parseFloat(bodyFat) : (gender === 'male' ? 18 : 25);
-      
+
       let bmr;
       if (gender === 'male') {
         bmr = 10 * w + 6.25 * h - 5 * a + 5;
       } else {
         bmr = 10 * w + 6.25 * h - 5 * a - 161;
       }
-      
+
       const activityMultipliers = {
         sedentary: 1.2,
         light: 1.375,
@@ -306,9 +312,9 @@ export default function MacroTargetsPage() {
         active: 1.725,
         veryActive: 1.9,
       };
-      
+
       const tdee = bmr * activityMultipliers[activityLevel];
-      
+
       let targetCalories;
       if (goal === 'WEIGHT_LOSS') {
         targetCalories = Math.round(tdee - 400);
@@ -321,16 +327,16 @@ export default function MacroTargetsPage() {
       } else {
         targetCalories = Math.round(tdee);
       }
-      
+
       targetCalories = Math.max(1200, targetCalories);
-      
+
       const leanMass = w * (1 - bf / 100);
       const protein = Math.round(w * (goal === 'WEIGHT_GAIN' ? 2.0 : 1.6));
-      
+
       const fat = Math.round((targetCalories * 0.25) / 9);
       const carbCalories = targetCalories - (protein * 4) - (fat * 9);
       const carb = Math.max(0, Math.round(carbCalories / 4));
-      
+
       const calculated = {
         dailyCalories: targetCalories,
         protein,
@@ -341,7 +347,7 @@ export default function MacroTargetsPage() {
         bodyFat: bf,
         leanMass: Math.round(leanMass * 10) / 10,
       };
-      
+
       setAnalyzedData(calculated);
       setIsAnalyzing(false);
       toast.success('Phân tích hoàn tất!');
@@ -459,7 +465,7 @@ export default function MacroTargetsPage() {
           age: data.age ? data.age.toString() : f.age,
           gender: data.gender ? data.gender : f.gender,
         }));
-        
+
         let unitText = '';
         if (data.rawUnit === 'lb') {
           unitText = ` (Đã tự quy đổi từ ${data.rawWeight} lb, ${data.rawMuscleMass} lb cơ, ${data.rawLbm} lb nạc sang kg)`;
@@ -515,11 +521,10 @@ export default function MacroTargetsPage() {
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex items-start gap-3.5 ${
-                  activeSection === item.id
-                    ? 'bg-slate-900 text-white shadow-md'
-                    : 'text-slate-650 hover:bg-slate-50 hover:text-slate-900'
-                }`}
+                className={`w-full text-left px-4 py-3 rounded-2xl transition-all flex items-start gap-3.5 ${activeSection === item.id
+                  ? 'bg-slate-900 text-white shadow-md'
+                  : 'text-slate-650 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
               >
                 <item.icon className={`w-5 h-5 mt-0.5 ${activeSection === item.id ? 'text-white' : 'text-slate-400'}`} />
                 <div className="min-w-0 flex-1">
@@ -533,7 +538,7 @@ export default function MacroTargetsPage() {
 
         {/* Right Panel Content */}
         <div className="flex-1 min-w-0 space-y-6">
-          
+
           {/* SECTION 1: NUTRITION TARGETS */}
           {activeSection === 'nutrition' && (
             <div className="space-y-6 animate-fade-in">
@@ -552,7 +557,7 @@ export default function MacroTargetsPage() {
                     {loadingGoalSuggestion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Target className="w-4 h-4" />}
                     <span className="font-bold text-xs">Gợi ý theo mục tiêu</span>
                   </Button>
-                   <Button 
+                  <Button
                     onClick={() => setNutritionActiveTab('calculator')}
                     className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-xl shadow-md flex items-center gap-2 h-10 px-4 border-0"
                   >
@@ -566,21 +571,19 @@ export default function MacroTargetsPage() {
               <div className="flex gap-2 border-b border-slate-200 pb-3">
                 <button
                   onClick={() => setNutritionActiveTab('current')}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                    nutritionActiveTab === 'current'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${nutritionActiveTab === 'current'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                    }`}
                 >
                   Mục Tiêu Hiện Tại
                 </button>
                 <button
                   onClick={() => setNutritionActiveTab('calculator')}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                    nutritionActiveTab === 'calculator'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${nutritionActiveTab === 'calculator'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                    }`}
                 >
                   Tính Toán Gợi Ý (TDEE / InBody)
                 </button>
@@ -670,28 +673,28 @@ export default function MacroTargetsPage() {
                             label="Calories hàng ngày"
                             type="number"
                             value={macros.dailyCalories}
-                            onChange={(e) => setMacros(m => ({...m, dailyCalories: Number(e.target.value)}))}
+                            onChange={(e) => setMacros(m => ({ ...m, dailyCalories: Number(e.target.value) }))}
                           />
                           <div className="grid grid-cols-3 gap-4">
                             <InputField
                               label="Đạm (g)"
                               type="number"
                               value={macros.protein}
-                              onChange={(e) => setMacros(m => ({...m, protein: Number(e.target.value)}))}
+                              onChange={(e) => setMacros(m => ({ ...m, protein: Number(e.target.value) }))}
                               className="text-center font-bold"
                             />
                             <InputField
                               label="Tinh bột (g)"
                               type="number"
                               value={macros.carb}
-                              onChange={(e) => setMacros(m => ({...m, carb: Number(e.target.value)}))}
+                              onChange={(e) => setMacros(m => ({ ...m, carb: Number(e.target.value) }))}
                               className="text-center font-bold"
                             />
                             <InputField
                               label="Chất béo (g)"
                               type="number"
                               value={macros.fat}
-                              onChange={(e) => setMacros(m => ({...m, fat: Number(e.target.value)}))}
+                              onChange={(e) => setMacros(m => ({ ...m, fat: Number(e.target.value) }))}
                               className="text-center font-bold"
                             />
                           </div>
@@ -758,13 +761,12 @@ export default function MacroTargetsPage() {
                           </div>
                         </div>
 
-                        <div 
+                        <div
                           onClick={() => fileInputRef.current?.click()}
-                          className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all mb-6 ${
-                            inBodyPreview 
-                              ? 'border-emerald-400 bg-emerald-50' 
-                              : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50'
-                          }`}
+                          className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all mb-6 ${inBodyPreview
+                            ? 'border-emerald-400 bg-emerald-50'
+                            : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50'
+                            }`}
                         >
                           {inBodyPreview ? (
                             <div className="space-y-2">
@@ -783,20 +785,20 @@ export default function MacroTargetsPage() {
                         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleInBodyImageUpload} className="hidden" />
 
                         <div className="grid grid-cols-2 gap-4 mb-6">
-                          <InputField icon={Scale} label="Cân nặng (kg)" type="text" inputMode="decimal" placeholder="70" value={inBodyForm.weight} onChange={(e) => setInBodyForm(f => ({...f, weight: e.target.value.replace(/[^0-9.]/g, '')}))} />
-                          <InputField icon={TrendingUp} label="Chiều cao (cm)" type="text" inputMode="numeric" placeholder="175" value={inBodyForm.height} onChange={(e) => setInBodyForm(f => ({...f, height: e.target.value.replace(/[^0-9]/g, '')}))} />
-                          <InputField icon={Activity} label="Tuổi" type="text" inputMode="numeric" placeholder="25" value={inBodyForm.age} onChange={(e) => setInBodyForm(f => ({...f, age: e.target.value.replace(/[^0-9]/g, '')}))} />
-                          <SelectField label="Giới tính" value={inBodyForm.gender} 
+                          <InputField icon={Scale} label="Cân nặng (kg)" type="text" inputMode="decimal" placeholder="70" value={inBodyForm.weight} onChange={(e) => setInBodyForm(f => ({ ...f, weight: e.target.value.replace(/[^0-9.]/g, '') }))} />
+                          <InputField icon={TrendingUp} label="Chiều cao (cm)" type="text" inputMode="numeric" placeholder="175" value={inBodyForm.height} onChange={(e) => setInBodyForm(f => ({ ...f, height: e.target.value.replace(/[^0-9]/g, '') }))} />
+                          <InputField icon={Activity} label="Tuổi" type="text" inputMode="numeric" placeholder="25" value={inBodyForm.age} onChange={(e) => setInBodyForm(f => ({ ...f, age: e.target.value.replace(/[^0-9]/g, '') }))} />
+                          <SelectField label="Giới tính" value={inBodyForm.gender}
                             onChange={(e) => {
                               const nextGender = e.target.value;
                               setInBodyForm(f => {
                                 const nextGoal = (nextGender === 'male' && (f.goal === 'PREGNANT' || f.goal === 'RECOVERY')) ? 'MAINTAIN' : f.goal;
                                 return { ...f, gender: nextGender, goal: nextGoal };
                               });
-                            }} 
+                            }}
                             options={[{ value: 'male', label: 'Nam' }, { value: 'female', label: 'Nữ' }]} />
-                          <InputField icon={Heart} label="Tỷ lệ mỡ (%)" type="text" inputMode="decimal" placeholder="18" value={inBodyForm.bodyFat} onChange={(e) => setInBodyForm(f => ({...f, bodyFat: e.target.value.replace(/[^0-9.]/g, '')}))} />
-                          <SelectField label="Mức vận động" value={inBodyForm.activityLevel} onChange={(e) => setInBodyForm(f => ({...f, activityLevel: e.target.value}))} options={[
+                          <InputField icon={Heart} label="Tỷ lệ mỡ (%)" type="text" inputMode="decimal" placeholder="18" value={inBodyForm.bodyFat} onChange={(e) => setInBodyForm(f => ({ ...f, bodyFat: e.target.value.replace(/[^0-9.]/g, '') }))} />
+                          <SelectField label="Mức vận động" value={inBodyForm.activityLevel} onChange={(e) => setInBodyForm(f => ({ ...f, activityLevel: e.target.value }))} options={[
                             { value: 'sedentary', label: 'Ít vận động' },
                             { value: 'light', label: 'Nhẹ (1-3 buổi/tuần)' },
                             { value: 'moderate', label: 'Vừa (3-5 buổi/tuần)' },
@@ -805,12 +807,12 @@ export default function MacroTargetsPage() {
                           ]} />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                          <SelectField label="Mục tiêu của bạn" value={inBodyForm.goal} 
-                            onChange={(e) => setInBodyForm(f => ({...f, goal: e.target.value}))} 
+                          <SelectField label="Mục tiêu của bạn" value={inBodyForm.goal}
+                            onChange={(e) => setInBodyForm(f => ({ ...f, goal: e.target.value }))}
                             options={getGoalsByGender(inBodyForm.gender)} />
                           {inBodyForm.goal === 'PREGNANT' ? (
-                            <SelectField label="Giai đoạn thai kỳ (Tam cá nguyệt)" value={inBodyForm.pregnancyTrimester} 
-                              onChange={(e) => setInBodyForm(f => ({...f, pregnancyTrimester: Number(e.target.value)}))} 
+                            <SelectField label="Giai đoạn thai kỳ (Tam cá nguyệt)" value={inBodyForm.pregnancyTrimester}
+                              onChange={(e) => setInBodyForm(f => ({ ...f, pregnancyTrimester: Number(e.target.value) }))}
                               options={[
                                 { value: 1, label: 'Tam cá nguyệt 1' },
                                 { value: 2, label: 'Tam cá nguyệt 2' },
@@ -821,7 +823,7 @@ export default function MacroTargetsPage() {
                           )}
                         </div>
 
-                        <Button 
+                        <Button
                           onClick={calculateMacrosFromInBody}
                           disabled={isAnalyzing}
                           className="w-full mt-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl py-5 font-semibold flex items-center justify-center gap-2 border-0"
@@ -889,7 +891,7 @@ export default function MacroTargetsPage() {
                             </div>
                           </div>
 
-                          <Button 
+                          <Button
                             onClick={applyRecommendedMacros}
                             className="w-full bg-white text-emerald-600 hover:bg-white/95 rounded-xl py-5 font-bold flex items-center justify-center gap-2 border-0"
                           >
@@ -933,8 +935,8 @@ export default function MacroTargetsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Chế độ ăn ưa thích</label>
-                    <select 
-                      value={dietPreference} 
+                    <select
+                      value={dietPreference}
                       onChange={(e) => setDietPreference(e.target.value)}
                       className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
                     >
@@ -943,8 +945,8 @@ export default function MacroTargetsPage() {
                   </div>
                   <div>
                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Mục tiêu hiện tại</label>
-                    <select 
-                      value={nutritionGoal} 
+                    <select
+                      value={nutritionGoal}
                       onChange={(e) => setNutritionGoal(e.target.value)}
                       className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
                     >
@@ -956,8 +958,8 @@ export default function MacroTargetsPage() {
                 {nutritionGoal === 'PREGNANT' && (
                   <div className="animate-fade-in">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Giai đoạn thai kỳ (Tam cá nguyệt)</label>
-                    <select 
-                      value={pregnancyTrimester} 
+                    <select
+                      value={pregnancyTrimester}
                       onChange={(e) => setPregnancyTrimester(Number(e.target.value))}
                       className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
                     >
@@ -1005,9 +1007,9 @@ export default function MacroTargetsPage() {
                 </div>
 
                 <div className="pt-4 border-t border-slate-100 flex gap-3">
-                  <Button 
-                    onClick={handleSaveHealth} 
-                    disabled={savingHealth} 
+                  <Button
+                    onClick={handleSaveHealth}
+                    disabled={savingHealth}
                     className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-bold"
                   >
                     {savingHealth ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu cài đặt sức khỏe'}
@@ -1039,33 +1041,33 @@ export default function MacroTargetsPage() {
                 <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4">
                   <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Kế hoạch cân nặng mục tiêu</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <InputField 
-                      label="Cân nặng gốc (baseline) (kg)" 
-                      placeholder="Cân baseline (kg)" 
+                    <InputField
+                      label="Cân nặng gốc (baseline) (kg)"
+                      placeholder="Cân baseline (kg)"
                       type="text"
                       inputMode="decimal"
                       value={goalForm.baselineWeight}
                       onChange={(e) => setGoalForm((f) => ({ ...f, baselineWeight: e.target.value.replace(/[^0-9.]/g, '') }))}
                     />
-                    <InputField 
-                      label="Cân nặng mục tiêu (kg)" 
-                      placeholder="Cân mục tiêu (kg)" 
+                    <InputField
+                      label="Cân nặng mục tiêu (kg)"
+                      placeholder="Cân mục tiêu (kg)"
                       type="text"
                       inputMode="decimal"
                       value={goalForm.targetWeight}
                       onChange={(e) => setGoalForm((f) => ({ ...f, targetWeight: e.target.value.replace(/[^0-9.]/g, '') }))}
                     />
-                    <InputField 
+                    <InputField
                       icon={Calendar}
-                      label="Ngày hoàn thành dự kiến" 
+                      label="Ngày hoàn thành dự kiến"
                       type="date"
                       value={goalForm.targetDate}
                       onChange={(e) => setGoalForm((f) => ({ ...f, targetDate: e.target.value }))}
                     />
                   </div>
-                  <Button 
-                    onClick={handleSaveGoals} 
-                    disabled={savingGoals} 
+                  <Button
+                    onClick={handleSaveGoals}
+                    disabled={savingGoals}
                     className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold py-5"
                   >
                     {savingGoals ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu mục tiêu'}
@@ -1082,12 +1084,12 @@ export default function MacroTargetsPage() {
                         <Upload className="w-3.5 h-3.5" />
                       )}
                       {isAnalyzingInbody ? 'Đang phân tích...' : 'Tải phiếu InBody'}
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleInbodyUpload} 
-                        disabled={isAnalyzingInbody} 
-                        className="hidden" 
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleInbodyUpload}
+                        disabled={isAnalyzingInbody}
+                        className="hidden"
                       />
                     </label>
                   </div>
@@ -1095,49 +1097,49 @@ export default function MacroTargetsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase text-slate-450 tracking-wider">Cân nặng (kg)</label>
-                      <InputField 
-                        placeholder="Cân nặng (kg)" 
+                      <InputField
+                        placeholder="Cân nặng (kg)"
                         type="text"
                         inputMode="decimal"
-                        value={bodyWeight} 
+                        value={bodyWeight}
                         onChange={(e) => setBodyWeight(e.target.value.replace(/[^0-9.]/g, ''))}
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase text-slate-450 tracking-wider">Tỷ lệ mỡ (%)</label>
-                      <InputField 
-                        placeholder="Tỷ lệ mỡ (%)" 
+                      <InputField
+                        placeholder="Tỷ lệ mỡ (%)"
                         type="text"
                         inputMode="decimal"
-                        value={bodyFatPercent} 
+                        value={bodyFatPercent}
                         onChange={(e) => setBodyFatPercent(e.target.value.replace(/[^0-9.]/g, ''))}
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase text-slate-450 tracking-wider">Khối lượng cơ (kg)</label>
-                      <InputField 
-                        placeholder="Khối lượng cơ (kg)" 
+                      <InputField
+                        placeholder="Khối lượng cơ (kg)"
                         type="text"
                         inputMode="decimal"
-                        value={muscleMass} 
+                        value={muscleMass}
                         onChange={(e) => setMuscleMass(e.target.value.replace(/[^0-9.]/g, ''))}
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold uppercase text-slate-450 tracking-wider">Khối lượng nạc (kg)</label>
-                      <InputField 
-                        placeholder="Khối lượng nạc (kg)" 
+                      <InputField
+                        placeholder="Khối lượng nạc (kg)"
                         type="text"
                         inputMode="decimal"
-                        value={lbm} 
+                        value={lbm}
                         onChange={(e) => setLbm(e.target.value.replace(/[^0-9.]/g, ''))}
                       />
                     </div>
                   </div>
 
-                  <Button 
-                    variant="outline" 
-                    onClick={handleLogWeight} 
+                  <Button
+                    variant="outline"
+                    onClick={handleLogWeight}
                     className="w-full rounded-xl py-5 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
                   >
                     Lưu chỉ số cơ thể
