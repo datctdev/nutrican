@@ -21,6 +21,9 @@ export default function GoogleLoginButton({ isLoading, onLoadingChange }) {
     try {
       await googleLogin();
     } catch (error) {
+      if (error.code === 'auth/popup-closed-by-user' || error.message?.includes('popup-closed-by-user')) {
+        return; // User cancelled
+      }
       const message = error.response?.data?.message || error.message || 'Đăng nhập Google thất bại';
       toast.error('Đăng nhập bằng Google thất bại', { description: message });
     } finally {

@@ -29,7 +29,10 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        const skipEndpoints = ['/auth/login', '/auth/refresh', '/auth/register', '/auth/google'];
+        const isAuthEndpoint = skipEndpoints.some(endpoint => originalRequest.url?.includes(endpoint));
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
             originalRequest._retry = true;
             try {
                 const refreshResponse = await api.post('/auth/refresh', {});
@@ -41,7 +44,9 @@ api.interceptors.response.use(
                 return api(originalRequest);
             } catch {
                 useAuthStore.getState().logout();
-                window.location.href = '/login';
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
             }
         }
         return Promise.reject(error);
