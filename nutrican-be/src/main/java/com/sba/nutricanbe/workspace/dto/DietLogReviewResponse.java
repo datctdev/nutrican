@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.workspace.dto;
 
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
 import com.sba.nutricanbe.diet.enums.MealSource;
@@ -35,9 +36,12 @@ public class DietLogReviewResponse {
     private BigDecimal aiConfidenceScore;
     private MacroNutrients macrosJson;
     private DietLogStatus status;
+    private DietLogReviewStatus reviewStatus;
     private Boolean sosTicketFlag;
     private LocalDate logDate;
     private LocalDateTime createdAt;
+    private LocalDateTime ptReviewedAt;
+    private String ptNote;
 
     private List<AdditionalImageInfo> additionalImages;
     private MealSource mealSource;

@@ -46,7 +46,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import com.sba.nutricanbe.common.dto.MacroNutrients;
 import java.util.Optional;
 import java.util.Set;
@@ -225,7 +227,34 @@ public class DietLogServiceImpl implements DietLogService {
             dietLog.setStatus(DietLogStatus.LOGGED);
         }
 
+        if (request.getFoodCode() != null && !request.getFoodCode().isBlank()) {
+            Map<String, Object> aiRaw = dietLog.getAiRawJson() != null
+                    ? new HashMap<>(dietLog.getAiRawJson())
+                    : new HashMap<>();
+            aiRaw.put("foodCode", request.getFoodCode());
+            aiRaw.put("userConfirmed", true);
+            if (request.getPortionGrams() != null) {
+                aiRaw.put("userAdjustedGrams", request.getPortionGrams());
+                aiRaw.put("portionSize", request.getPortionGrams());
+            }
+            dietLog.setAiRawJson(aiRaw);
+            if (request.getFoodDescription() != null) {
+                dietLog.setMatchedFoodName(request.getFoodDescription());
+            }
+        }
+
+        boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
+        if (sendToPt) {
+            dietLog.setStatus(DietLogStatus.LOGGED);
+            dietLog.setReviewStatus(com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING);
+            dietLog.setIsPtNotified(true);
+            dietLogHelper.assignPtReviewerIfNeeded(dietLog, userId);
+        }
+
         dietLog = dietLogRepository.save(dietLog);
+        if (sendToPt) {
+            dietLogHelper.notifyPtOfNewLog(dietLog);
+        }
         return ApiResponse.success(dietLogHelper.toResponse(dietLog), "Diet log updated");
     }
 
@@ -266,13 +295,13 @@ public class DietLogServiceImpl implements DietLogService {
             throw new BadRequestException("You can only delete your own diet logs");
         }
 
-        if (dietLog.getImageObjectName() != null) {
-            minioService.deleteFile(dietLog.getImageObjectName());
-        }
         List<DietLogImage> additionalImages = dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(logId);
-        for (DietLogImage img : additionalImages) {
-            minioService.deleteFile(img.getImageObjectName());
+        Set<String> imageObjectNames = new java.util.LinkedHashSet<>();
+        if (dietLog.getImageObjectName() != null) {
+            imageObjectNames.add(dietLog.getImageObjectName());
         }
+        additionalImages.stream().map(DietLogImage::getImageObjectName).forEach(imageObjectNames::add);
+        imageObjectNames.forEach(minioService::deleteFile);
 
         dietLogImageRepository.deleteAll(additionalImages);
         dietLogItemRepository.deleteByDietLogId(logId);

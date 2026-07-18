@@ -242,7 +242,7 @@ export default function ChatPage() {
             }
             setNewMessage('');
             toast.success('Đã gửi PDF');
-        } catch (err) {
+        } catch {
             toast.error('Không thể gửi PDF');
         } finally {
             setSending(false);
@@ -293,8 +293,12 @@ export default function ChatPage() {
     };
 
     const handleContextNavigate = (path, refId) => {
-        if (path === '/pt/reviews') {
-            navigate('/pt/reviews');
+        if (path === '/pt/clients/dietlog') {
+            const params = new URLSearchParams();
+            if (activeThread?.participantId) params.set('clientId', activeThread.participantId);
+            if (activeThread?.participantName) params.set('clientName', activeThread.participantName);
+            if (refId) params.set('logId', refId);
+            navigate(`${path}?${params.toString()}`);
             return;
         }
         navigate(path);
@@ -368,7 +372,13 @@ export default function ChatPage() {
                 <div className="w-72 flex-shrink-0 hidden xl:block space-y-4">
                     <ChatContextCard
                         context={chatContext}
-                        onViewDiet={() => navigate('/pt/reviews')}
+                        onViewDiet={() => {
+                            const params = new URLSearchParams({
+                                clientId: activeThread.participantId,
+                                clientName: activeThread.participantName || 'Học viên',
+                            });
+                            navigate(`/pt/clients/dietlog?${params.toString()}`);
+                        }}
                     />
                 </div>
             )}

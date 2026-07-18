@@ -19,6 +19,7 @@ import com.sba.nutricanbe.workspace.dto.*;
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
 import com.sba.nutricanbe.diet.dto.SosTicketResponse;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -28,7 +29,10 @@ public interface PtWorkspaceService {
 
     ApiResponse<PageResponse<ClientStatusDto>> getClients(UUID ptId, int page, int size, String statusFilter);
 
-    ApiResponse<PageResponse<DietLogReviewResponse>> getPendingLogs(UUID ptId, int page, int size);
+    ApiResponse<PageResponse<DietLogReviewResponse>> getPendingLogs(UUID ptId, int page, int size, UUID clientId);
+
+    ApiResponse<PageResponse<DietLogReviewResponse>> getClientDietLogs(
+            UUID ptId, UUID clientId, int page, int size, DietLogReviewStatus reviewStatus);
 
     ApiResponse<DietLogReviewResponse> reviewLog(UUID logId, UUID ptId, ReviewActionRequest request);
 

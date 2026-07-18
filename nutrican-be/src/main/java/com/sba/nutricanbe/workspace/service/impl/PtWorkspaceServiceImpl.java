@@ -45,6 +45,7 @@ import com.sba.nutricanbe.diet.dto.SosTicketResponse;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.RblDatasetFilter;
 import com.sba.nutricanbe.common.util.RblMetricsUtil;
+import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import com.sba.nutricanbe.workspace.dto.*;
 import com.sba.nutricanbe.workspace.entity.MealPlanTemplate;
 import com.sba.nutricanbe.workspace.entity.MealPlanTemplateItem;
@@ -97,6 +98,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final MealPlanTemplateRepository mealPlanTemplateRepository;
     private final MealPlanTemplateItemRepository mealPlanTemplateItemRepository;
+    private final StorageService storageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -121,12 +123,25 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse<PageResponse<DietLogReviewResponse>> getPendingLogs(UUID ptId, int page, int size) {
+    public ApiResponse<PageResponse<DietLogReviewResponse>> getPendingLogs(UUID ptId, int page, int size, UUID clientId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        List<UUID> clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
-                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
-                .map(m -> m.getClient().getId())
-                .toList();
+        List<UUID> clientIds;
+
+        if (clientId != null) {
+            boolean isActiveClient = mappingRepository.existsByPt_IdAndClient_IdAndStatus(
+                    ptId,
+                    clientId,
+                    ClientMappingStatus.ACTIVE);
+            if (!isActiveClient) {
+                throw new BadRequestException("You can only view pending logs from your active clients");
+            }
+            clientIds = List.of(clientId);
+        } else {
+            clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
+                    .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                    .map(m -> m.getClient().getId())
+                    .toList();
+        }
 
         if (clientIds.isEmpty()) {
             return ApiResponse.success(PageResponse.from(Page.empty(pageable)));
@@ -150,6 +165,28 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .build();
 
         return ApiResponse.success(customPageResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<PageResponse<DietLogReviewResponse>> getClientDietLogs(
+            UUID ptId,
+            UUID clientId,
+            int page,
+            int size,
+            DietLogReviewStatus reviewStatus) {
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(
+                ptId, clientId, ClientMappingStatus.ACTIVE)) {
+            throw new BadRequestException("You can only view diet logs from your active clients");
+        }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("ptReviewedAt").descending()
+                .and(Sort.by("createdAt").descending()));
+        Page<DietLogReviewResponse> logPage = dietLogRepository
+                .findByCustomerIdInAndReviewStatus(List.of(clientId), reviewStatus, pageable)
+                .map(this::toReviewResponse);
+
+        return ApiResponse.success(PageResponse.from(logPage));
     }
 
     @Override
@@ -445,7 +482,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         List<DietLogReviewResponse.AdditionalImageInfo> additionalImages = log.getAdditionalImages() == null ? null : log.getAdditionalImages().stream()
                 .map(img -> DietLogReviewResponse.AdditionalImageInfo.builder()
                         .id(img.getId())
-                        .imageUrl(img.getImageUrl())
+                        .imageUrl(resolveImageUrl(img.getImageObjectName(), img.getImageUrl()))
                         .isPrimary(img.getIsPrimary())
                         .sortOrder(img.getSortOrder())
                         .build())
@@ -455,15 +492,18 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .customerId(log.getCustomerId())
                 .customerName(customerName)
                 .customerAvatar(customerAvatar)
-                .imageUrl(log.getImageUrl())
+                .imageUrl(resolveImageUrl(log.getImageObjectName(), log.getImageUrl()))
                 .mealType(log.getMealType())
                 .foodDescription(log.getFoodDescription())
                 .aiConfidenceScore(log.getAiConfidenceScore())
                 .macrosJson(log.getMacrosJson())
                 .status(log.getStatus())
+                .reviewStatus(log.getReviewStatus())
                 .sosTicketFlag(log.getSosTicketFlag())
                 .logDate(log.getLogDate())
                 .createdAt(log.getCreatedAt())
+                .ptReviewedAt(log.getPtReviewedAt())
+                .ptNote(log.getPtNote())
                 .additionalImages(additionalImages)
                 .mealSource(log.getMealSource())
                 .mealComplexity(log.getMealComplexity())
@@ -483,6 +523,14 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .ptCorrectionReason(log.getPtCorrectionReason())
                 .blindSubmitted(log.getPtBlindMacros() != null)
                 .build();
+    }
+
+    private String resolveImageUrl(String objectName, String storedUrl) {
+        if (objectName != null && !objectName.isBlank()) {
+            String refreshedUrl = storageService.getPresignedUrl(objectName);
+            return refreshedUrl != null ? refreshedUrl : storedUrl;
+        }
+        return storedUrl;
     }
 
     @Override

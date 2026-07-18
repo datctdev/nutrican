@@ -7,11 +7,24 @@ export default function ImageLightbox({ isOpen, imageUrl, onClose }) {
     const [rotation, setRotation] = useState(0);
 
     useEffect(() => {
-        if (!isOpen) {
-            setScale(1);
-            setRotation(0);
-        }
-    }, [isOpen]);
+        if (!isOpen) return undefined;
+
+        const previousOverflow = document.body.style.overflow;
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setScale(1);
+                setRotation(0);
+                onClose();
+            }
+        };
+
+        document.body.style.overflow = 'hidden';
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOpen, onClose]);
 
     if (!isOpen || !imageUrl) return null;
 
@@ -34,6 +47,12 @@ export default function ImageLightbox({ isOpen, imageUrl, onClose }) {
         e.stopPropagation();
         setScale(1);
         setRotation(0);
+    };
+
+    const handleClose = () => {
+        setScale(1);
+        setRotation(0);
+        onClose();
     };
 
     const handleDownload = async (e) => {
@@ -59,7 +78,10 @@ export default function ImageLightbox({ isOpen, imageUrl, onClose }) {
     return (
         <div 
             className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
-            onClick={onClose}
+            onClick={handleClose}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Xem ảnh lớn"
         >
             {/* Top Toolbar */}
             <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/50 to-transparent flex items-center justify-between px-6 z-10">
@@ -111,7 +133,7 @@ export default function ImageLightbox({ isOpen, imageUrl, onClose }) {
                     <div className="w-[1px] h-6 bg-white/20 mx-1" />
                     <button 
                         type="button"
-                        onClick={onClose} 
+                        onClick={handleClose}
                         className="p-2 text-white/85 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                         title="Đóng (Esc)"
                     >

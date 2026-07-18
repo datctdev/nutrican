@@ -25,4 +25,6 @@ public class CreateDietLogRequest {
     private List<DietLogItemRequest> items;
     private Boolean sendToPt;
     private UUID recipeId;
+    private String foodCode;
+    private BigDecimal portionGrams;
 }

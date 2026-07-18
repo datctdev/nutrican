@@ -2,8 +2,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '../../components/ui/button';
 import { dietService } from '../../services/dietService';
-import { recipeService } from '../../services/recipeService';
 import PostMealRatingSheet from './components/PostMealRatingSheet';
+import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
 import { RefreshCw, AlertTriangle, X, Send, Clock, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -17,7 +17,7 @@ import MealSection from './components/MealSection';
 import FoodInputCard from './components/FoodInputCard';
 import ConfirmFoodModal from './components/ConfirmFoodModal';
 
-import { initialAdjustedGrams } from './components/dietUtils';
+import { getPreviewForSelection, initialAdjustedGrams } from './components/dietUtils';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const POST_MEAL_PROMPT_KEY = 'nutrican_post_meal_prompt';
@@ -49,6 +49,9 @@ export default function DietTrackerPage() {
 
     const [manualMealType, setManualMealType] = useState('LUNCH');
     const [ingredientItems, setIngredientItems] = useState([]);
+    const [mealImages, setMealImages] = useState([]);
+    const mealImageInputRef = useRef(null);
+    const mealImagesRef = useRef([]);
 
     const [aiMealType, setAiMealType] = useState('LUNCH');
     const [foodSearchQuery, setFoodSearchQuery] = useState('');
@@ -64,6 +67,10 @@ export default function DietTrackerPage() {
     const [confirmingFood, setConfirmingFood] = useState(false);
     const [resnetDishes, setResnetDishes] = useState([]);
     const [hasActivePt, setHasActivePt] = useState(false);
+    const [dietFilterOn, setDietFilterOn] = useState(true);
+    const [postMealPrompt, setPostMealPrompt] = useState(null);
+    const [onboardingBanner, setOnboardingBanner] = useState(false);
+    const [lightboxImage, setLightboxImage] = useState('');
 
     const fetchData = useCallback(async () => {
         try {
@@ -162,29 +169,6 @@ export default function DietTrackerPage() {
         };
     }, [fetchData, loadResNetDishes]);
 
-    const [dietFilterOn, setDietFilterOn] = useState(true);
-    const [manualSendToPt, setManualSendToPt] = useState(false);
-    const [pendingSubmitPrompt, setPendingSubmitPrompt] = useState(null);
-    const [savedRecipes, setSavedRecipes] = useState([]);
-    const [recipeName, setRecipeName] = useState('');
-    const [postMealPrompt, setPostMealPrompt] = useState(null);
-    const [onboardingBanner, setOnboardingBanner] = useState(false);
-
-    const loadSavedRecipes = useCallback(async () => {
-        try {
-            const res = await recipeService.list();
-            setSavedRecipes(res.data.data || []);
-        } catch {
-            setSavedRecipes([]);
-        }
-    }, []);
-
-    useEffect(() => {
-        if (inputMode === 'recipe') {
-            loadSavedRecipes();
-        }
-    }, [inputMode, loadSavedRecipes]);
-
     useEffect(() => {
         const checkPrompt = () => {
             try {
@@ -202,13 +186,6 @@ export default function DietTrackerPage() {
         return () => clearInterval(id);
     }, []);
 
-    useEffect(() => {
-        if (foodSearchQuery && foodSearchQuery.length >= 2) {
-            searchFoods(foodSearchQuery);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dietFilterOn]);
-
     const searchFoods = async (q) => {
         setFoodSearchQuery(q);
         if (!q || q.length < 2) {
@@ -221,6 +198,81 @@ export default function DietTrackerPage() {
         } catch (err) {
             console.error('Food search failed', err);
         }
+    };
+
+    useEffect(() => {
+        if (!foodSearchQuery || foodSearchQuery.length < 2) return undefined;
+        const timeoutId = setTimeout(() => searchFoods(foodSearchQuery), 0);
+        return () => clearTimeout(timeoutId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dietFilterOn]);
+
+    useEffect(() => {
+        mealImagesRef.current = mealImages;
+    }, [mealImages]);
+
+    useEffect(() => () => {
+        mealImagesRef.current.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    }, []);
+
+    const clearMealImages = useCallback(() => {
+        setMealImages((currentImages) => {
+            currentImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+            return [];
+        });
+        if (mealImageInputRef.current) mealImageInputRef.current.value = '';
+    }, []);
+
+    const handleMealImageSelect = (event) => {
+        const files = Array.from(event.target.files || []);
+        const validFiles = files.filter((file) => {
+            if (!file.type.startsWith('image/')) {
+                toast.error(`${file.name} không phải là hình ảnh.`);
+                return false;
+            }
+            if (file.size > MAX_IMAGE_SIZE) {
+                toast.error(`${file.name} quá lớn. Tối đa 5MB.`);
+                return false;
+            }
+            return true;
+        });
+
+        if (validFiles.length > 0) {
+            setMealImages((currentImages) => [
+                ...currentImages,
+                ...validFiles.map((file, index) => ({
+                    id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${index}-${file.name}`,
+                    file,
+                    previewUrl: URL.createObjectURL(file),
+                    isPrimary: currentImages.length === 0 && index === 0,
+                })),
+            ]);
+        }
+
+        event.target.value = '';
+    };
+
+    const handleRemoveMealImage = (imageId) => {
+        setMealImages((currentImages) => {
+            const removedImage = currentImages.find((image) => image.id === imageId);
+            if (removedImage) URL.revokeObjectURL(removedImage.previewUrl);
+
+            const remainingImages = currentImages.filter((image) => image.id !== imageId);
+            if (removedImage?.isPrimary && remainingImages.length > 0) {
+                return remainingImages.map((image, index) => ({
+                    ...image,
+                    isPrimary: index === 0,
+                }));
+            }
+            return remainingImages;
+        });
+    };
+
+    const handleSetPrimaryMealImage = (imageId) => {
+        setMealImages((currentImages) => currentImages.map((image) => ({
+            ...image,
+            isPrimary: image.id === imageId,
+        })));
     };
 
     const addIngredientFromSearch = (food) => {
@@ -274,6 +326,7 @@ export default function DietTrackerPage() {
     };
 
     const removeIngredient = (idx) => {
+        if (ingredientItems.length === 1) clearMealImages();
         setIngredientItems((prev) => prev.filter((_, i) => i !== idx));
     };
 
@@ -362,7 +415,6 @@ export default function DietTrackerPage() {
                 llavaFoodName: analyzed?.llavaFoodName,
                 macroSource: analyzed?.macroSource,
                 estimatedTotalGrams: analyzed?.estimatedTotalGrams,
-                sendToPt: false,
             });
 
             setSelectedFile(null);
@@ -395,13 +447,9 @@ export default function DietTrackerPage() {
 
         const selectedCode = log.aiFoodCode || safeTopPredictions[0]?.foodCode || 'unknown';
 
-        let currentGrams = 350;
-        try {
-            const res = raw.userAdjustedGrams || raw.portionSize || raw.estimatedTotalGrams || 350;
-            currentGrams = Number(res) || 350;
-        } catch {
-            currentGrams = 350;
-        }
+        const currentGrams = Number(
+            raw.userAdjustedGrams || raw.portionSize || raw.estimatedTotalGrams || 350
+        ) || 350;
 
         setConfirmModal({
             logId: log.id,
@@ -425,6 +473,30 @@ export default function DietTrackerPage() {
         });
     };
 
+    const createAndSendMeal = async (payload) => {
+        const createResponse = await dietService.createLog({
+            ...payload,
+            sendToPt: false,
+        });
+        const logId = createResponse.data?.data?.id;
+        if (!logId) throw new Error('Không nhận được mã bữa ăn sau khi tạo');
+
+        try {
+            if (mealImages.length > 0) {
+                const orderedImages = [...mealImages].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
+                const formData = new FormData();
+                orderedImages.forEach((image) => formData.append('files', image.file));
+                await dietService.uploadImages(logId, formData);
+            }
+
+            await dietService.updateLog(logId, { sendToPt: true });
+            return logId;
+        } catch (error) {
+            await dietService.deleteLog(logId).catch(() => undefined);
+            throw error;
+        }
+    };
+
     const handleManualSubmit = async (e) => {
         e.preventDefault();
         if (ingredientItems.length === 0) {
@@ -433,113 +505,21 @@ export default function DietTrackerPage() {
         }
         try {
             setUploading(true);
-            await dietService.createLog({
+            const newLogId = await createAndSendMeal({
                 mealType: manualMealType,
                 mealSource: 'HOME_COOKED',
-                sendToPt: manualSendToPt,
                 items: ingredientItems.map((it) => ({
                     foodItemId: it.foodItemId,
                     quantityG: it.quantityG,
                 })),
             });
-            toast.success(manualSendToPt ? 'Đã lưu và gửi PT kiểm tra!' : 'Đã lưu bữa ăn!');
-            const logsRes = await dietService.getLogs({ page: 0, size: 1 });
-            const newLogId = logsRes.data.data?.content?.[0]?.id;
+            toast.success('Đã gửi bữa ăn cho PT duyệt!');
             if (newLogId && hasActivePt) schedulePostMealPrompt(newLogId);
-            setManualSendToPt(false);
             setIngredientItems([]);
+            clearMealImages();
             fetchData();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Lưu thất bại');
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleSaveRecipe = async () => {
-        if (!recipeName?.trim() || ingredientItems.length === 0) {
-            toast.error('Nhập tên và ít nhất 1 nguyên liệu');
-            return;
-        }
-        try {
-            setUploading(true);
-            await recipeService.create({
-                name: recipeName.trim(),
-                ingredients: ingredientItems.map((it) => ({
-                    foodItemId: it.foodItemId,
-                    gram: it.quantityG,
-                })),
-            });
-            toast.success('Đã lưu công thức!');
-            setRecipeName('');
-            loadSavedRecipes();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Không lưu được công thức');
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleLogFromRecipe = async (e) => {
-        e.preventDefault();
-        if (ingredientItems.length === 0) {
-            toast.error('Vui lòng chọn ít nhất 1 nguyên liệu');
-            return;
-        }
-        try {
-            setUploading(true);
-            let recipeId = null;
-            if (recipeName?.trim()) {
-                const saved = await recipeService.create({
-                    name: recipeName.trim(),
-                    ingredients: ingredientItems.map((it) => ({
-                        foodItemId: it.foodItemId,
-                        gram: it.quantityG,
-                    })),
-                });
-                recipeId = saved.data.data?.id;
-                loadSavedRecipes();
-            }
-            const res = await dietService.createLog({
-                mealType: manualMealType,
-                mealSource: 'HOME_COOKED',
-                sendToPt: manualSendToPt,
-                recipeId,
-                items: recipeId ? undefined : ingredientItems.map((it) => ({
-                    foodItemId: it.foodItemId,
-                    quantityG: it.quantityG,
-                })),
-            });
-            toast.success('Đã ghi nhật ký từ công thức!');
-            const logId = res.data.data?.id;
-            if (logId && hasActivePt) schedulePostMealPrompt(logId);
-            setManualSendToPt(false);
-            setIngredientItems([]);
-            setRecipeName('');
-            fetchData();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Lưu thất bại');
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleLogFromSavedRecipe = async (recipeId) => {
-        try {
-            setUploading(true);
-            const res = await dietService.createLog({
-                mealType: manualMealType,
-                mealSource: 'HOME_COOKED',
-                sendToPt: manualSendToPt,
-                recipeId,
-            });
-            toast.success('Đã ghi nhật ký từ công thức đã lưu!');
-            const logId = res.data.data?.id;
-            if (logId && hasActivePt) schedulePostMealPrompt(logId);
-            setManualSendToPt(false);
-            fetchData();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Lưu thất bại');
+            toast.error(err.response?.data?.message || 'Gửi bữa ăn thất bại');
         } finally {
             setUploading(false);
         }
@@ -578,15 +558,35 @@ export default function DietTrackerPage() {
         try {
             setConfirmingFood(true);
 
-            const res = await dietService.confirmRecognition(
-                confirmModal.logId,
-                confirmModal.selectedFoodCode,
-                confirmModal.adjustedGrams,
-                confirmModal.sendToPt ?? false
-            );
+            let res;
+            if (confirmModal.isEditing) {
+                const preview = getPreviewForSelection(
+                    confirmModal.selectedFoodCode,
+                    confirmModal.topPredictions,
+                    resnetDishes,
+                    confirmModal.adjustedGrams
+                );
+                res = await dietService.updateLog(confirmModal.logId, {
+                    foodDescription: preview?.foodName || confirmModal.foodName,
+                    foodCode: confirmModal.selectedFoodCode,
+                    portionGrams: confirmModal.adjustedGrams,
+                    calories: preview?.calories ?? confirmModal.calories,
+                    protein: preview?.protein ?? confirmModal.protein,
+                    carb: preview?.carb ?? confirmModal.carb,
+                    fat: preview?.fat ?? confirmModal.fat,
+                    sendToPt: true,
+                });
+            } else {
+                res = await dietService.confirmRecognition(
+                    confirmModal.logId,
+                    confirmModal.selectedFoodCode,
+                    confirmModal.adjustedGrams,
+                    true
+                );
+            }
 
             const data = res.data?.data;
-            toast.success('Xác nhận & lưu thành công');
+            toast.success('Đã gửi bữa ăn cho PT duyệt!');
             if (confirmModal.logId && hasActivePt) schedulePostMealPrompt(confirmModal.logId);
             if (data?.dietPrefWarning) {
                 toast.warning(data.dietPrefWarning);
@@ -595,67 +595,12 @@ export default function DietTrackerPage() {
             if (data?.controlLoopMessage && data?.intakeStatus && data.intakeStatus !== 'OK') {
                 toast.info(data.controlLoopMessage);
             }
-            if (data?.suggestSubmitToPt) {
-                setPendingSubmitPrompt({ logId: confirmModal.logId, message: data.controlLoopMessage });
-            }
             setConfirmModal(null);
             fetchData();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Không thể xác nhận món ăn');
+            toast.error(err.response?.data?.message || 'Không thể gửi bữa ăn');
         } finally {
             setConfirmingFood(false);
-        }
-    };
-
-    const handleUploadAdditionalImages = async (logId) => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.multiple = true;
-        input.accept = 'image/*';
-        input.onchange = async (e) => {
-            const files = Array.from(e.target.files || []);
-            const validFiles = files.filter(file => {
-                if (file.size > MAX_IMAGE_SIZE) {
-                    toast.error(`${file.name} quá lớn. Tối đa 5MB.`);
-                    return false;
-                }
-                return true;
-            });
-            if (!validFiles.length) return;
-
-            try {
-                setUploading(true);
-                const formData = new FormData();
-                validFiles.forEach((file) => formData.append('files', file));
-                await dietService.uploadImages(logId, formData);
-                toast.success('Đã tải hình ảnh lên thành công!');
-                fetchData();
-            } catch (err) {
-                toast.error(err.response?.data?.message || 'Không thể tải hình ảnh lên');
-            } finally {
-                setUploading(false);
-            }
-        };
-        input.click();
-    };
-
-    const handleSetPrimary = async (logId, imageId) => {
-        try {
-            await dietService.setPrimaryImage(logId, imageId);
-            toast.success('Đã cập nhật ảnh chính');
-            fetchData();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Không thể cập nhật');
-        }
-    };
-
-    const handleDeleteImage = async (logId, imageId) => {
-        try {
-            await dietService.deleteImage(logId, imageId);
-            toast.success('Đã xóa hình ảnh');
-            fetchData();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Không thể xóa hình ảnh');
         }
     };
 
@@ -716,7 +661,6 @@ export default function DietTrackerPage() {
                         dragActive={dragActive}
                         setDragActive={setDragActive}
                         selectedFile={selectedFile}
-                        setSelectedFile={setSelectedFile}
                         analyzing={analyzing}
                         handleAnalyze={handleAnalyze}
                         fileInputRef={fileInputRef}
@@ -724,7 +668,6 @@ export default function DietTrackerPage() {
                         manualMealType={manualMealType}
                         setManualMealType={setManualMealType}
                         foodSearchQuery={foodSearchQuery}
-                        setFoodSearchQuery={setFoodSearchQuery}
                         foodSearchResults={foodSearchResults}
                         searchFoods={searchFoods}
                         addIngredientFromSearch={addIngredientFromSearch}
@@ -732,41 +675,17 @@ export default function DietTrackerPage() {
                         updateIngredientQty={updateIngredientQty}
                         removeIngredient={removeIngredient}
                         ingredientTotals={ingredientTotals}
+                        mealImages={mealImages}
+                        mealImageInputRef={mealImageInputRef}
+                        handleMealImageSelect={handleMealImageSelect}
+                        handleRemoveMealImage={handleRemoveMealImage}
+                        handleSetPrimaryMealImage={handleSetPrimaryMealImage}
+                        onPreviewImage={setLightboxImage}
                         handleManualSubmit={handleManualSubmit}
                         uploading={uploading}
                         dietFilterOn={dietFilterOn}
                         setDietFilterOn={setDietFilterOn}
-                        manualSendToPt={manualSendToPt}
-                        setManualSendToPt={setManualSendToPt}
-                        savedRecipes={savedRecipes}
-                        recipeName={recipeName}
-                        setRecipeName={setRecipeName}
-                        handleSaveRecipe={handleSaveRecipe}
-                        handleLogFromRecipe={handleLogFromRecipe}
-                        handleLogFromSavedRecipe={handleLogFromSavedRecipe}
                     />
-
-                    {pendingSubmitPrompt && hasActivePt && (
-                        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div>
-                                <p className="font-semibold text-violet-900">Gửi PT kiểm tra?</p>
-                                <p className="text-sm text-violet-700">{pendingSubmitPrompt.message || 'Bữa này lệch macro — PT có thể hỗ trợ điều chỉnh.'}</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={() => setPendingSubmitPrompt(null)}>Không</Button>
-                                <Button size="sm" onClick={async () => {
-                                    try {
-                                        await dietService.submitForReview(pendingSubmitPrompt.logId);
-                                        toast.success('Đã gửi PT kiểm tra');
-                                        setPendingSubmitPrompt(null);
-                                        fetchData();
-                                    } catch (e) {
-                                        toast.error(e.response?.data?.message || 'Không gửi được');
-                                    }
-                                }}>Gửi PT</Button>
-                            </div>
-                        </div>
-                    )}
 
                     <div className="space-y-5">
                         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -775,12 +694,9 @@ export default function DietTrackerPage() {
                         <MealSection
                             logs={logs}
                             loading={loading}
-                            fetchData={fetchData}
                             handleEditLog={handleEditLog}
-                            handleUploadAdditionalImages={handleUploadAdditionalImages}
                             handleDelete={handleDelete}
-                            handleSetPrimary={handleSetPrimary}
-                            handleDeleteImage={handleDeleteImage}
+                            onPreviewImage={setLightboxImage}
                             setSosDietLogId={setSosDietLogId}
                             setSosMessage={setSosMessage}
                             setIsSosModalOpen={setIsSosModalOpen}
@@ -886,6 +802,12 @@ export default function DietTrackerPage() {
                 logId={postMealPrompt}
                 open={!!postMealPrompt}
                 onClose={() => setPostMealPrompt(null)}
+            />
+
+            <ImageLightbox
+                isOpen={!!lightboxImage}
+                imageUrl={lightboxImage}
+                onClose={() => setLightboxImage('')}
             />
         </div>
     );
