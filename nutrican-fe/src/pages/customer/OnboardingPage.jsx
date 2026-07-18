@@ -4,6 +4,7 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
+import { userService } from '../../services/userService';
 import { toast } from 'sonner';
 import { Loader2, ChevronRight, Sparkles } from 'lucide-react';
 
@@ -65,6 +66,7 @@ export default function OnboardingPage() {
   const [step2, setStep2] = useState({
     nutritionGoal: 'MAINTAIN',
     dietPreference: 'NORMAL',
+    allergyNotes: '',
     activityLevel: 'moderate',
     pregnancyTrimester: 1,
   });
@@ -147,6 +149,7 @@ export default function OnboardingPage() {
         pregnancyTrimester: step2.nutritionGoal === 'PREGNANT' ? step2.pregnancyTrimester : null,
         weightKg: Number(step1.weightKg) || undefined,
       });
+      await userService.updateAllergies({ allergyNotes: step2.allergyNotes });
       setStep(res.data.data?.step || 3);
       toast.success('Đã tạo mục tiêu macro tự động');
     } catch (e) {
@@ -245,6 +248,16 @@ export default function OnboardingPage() {
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
                   {DIET_PREFS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
                 </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Ghi chú dị ứng</label>
+                <textarea
+                  value={step2.allergyNotes}
+                  onChange={(e) => setStep2((s) => ({ ...s, allergyNotes: e.target.value }))}
+                  placeholder="Ví dụ: Dị ứng đậu phộng, hải sản..."
+                  className="w-full min-h-[80px] rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                />
               </div>
 
               <div className="space-y-1.5">

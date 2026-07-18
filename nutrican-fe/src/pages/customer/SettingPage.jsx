@@ -20,6 +20,7 @@ export default function SettingPage() {
   const [dietPreference, setDietPreference] = useState('NORMAL');
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
+  const [allergyNotes, setAllergyNotes] = useState('');
 
   useEffect(() => {
     fetchPreferences();
@@ -27,8 +28,13 @@ export default function SettingPage() {
 
   const fetchPreferences = async () => {
     try {
-      const profileRes = await userService.getProfile();
+      const [profileRes, allergyRes] = await Promise.all([
+        userService.getProfile(),
+        userService.getAllergies().catch(() => ({ data: { data: [] } }))
+      ]);
       const data = profileRes.data.data;
+      
+      setAllergyNotes(allergyRes.data.data?.allergyNotes || data.allergyNotes || '');
 
       if (data.dietPreference) setDietPreference(data.dietPreference);
       if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
@@ -62,9 +68,10 @@ export default function SettingPage() {
           bodyMetricReminder,
         },
       });
-      toast.success('Đã lưu cấu hình thông báo thành công');
+      await userService.updateAllergies({ allergyNotes });
+      toast.success('Đã lưu cấu hình thành công');
     } catch {
-      toast.error('Không thể lưu cấu hình thông báo');
+      toast.error('Không thể lưu cấu hình');
     } finally {
       setSaving(false);
     }
@@ -139,6 +146,47 @@ export default function SettingPage() {
                   </div>
                 </label>
               ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl animate-fade-in mt-6">
+        <CardContent className="p-6 space-y-6">
+          <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100">
+            <Settings className="w-5 h-5 text-indigo-500" />
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Sức khoẻ & Dinh dưỡng</h3>
+              <p className="text-slate-500 text-xs mt-0.5">Tùy chỉnh chế độ ăn và ghi chú dị ứng</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Chế độ ăn ưa thích</label>
+              <select
+                value={dietPreference}
+                onChange={(e) => setDietPreference(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+              >
+                {[
+                  { value: 'NORMAL', label: 'Ăn thường' },
+                  { value: 'VEGETARIAN', label: 'Ăn chay' },
+                  { value: 'VEGAN', label: 'Thuần chay' },
+                  { value: 'KETO', label: 'Keto' },
+                  { value: 'EAT_CLEAN', label: 'Eat clean' },
+                ].map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Ghi chú dị ứng</label>
+              <textarea
+                value={allergyNotes}
+                onChange={(e) => setAllergyNotes(e.target.value)}
+                placeholder="Ví dụ: Dị ứng đậu phộng, hải sản..."
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium min-h-[100px]"
+              />
             </div>
           </div>
 
