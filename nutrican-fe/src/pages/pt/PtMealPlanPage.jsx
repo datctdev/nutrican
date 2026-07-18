@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { workspaceService } from '../../services/workspaceService';
+import { dietService } from '../../services/dietService';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { ArrowLeft, Save, Calendar as CalendarIcon, Copy, Loader2, AlertCircle, FileText, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import MealPlanDayView from '../../components/pt/meal-plan/MealPlanDayView';
 import FoodSearchModal from '../../components/pt/meal-plan/FoodSearchModal';
+import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlanSuggestionReviewList';
 import TemplateModal from '../../components/pt/meal-plan/TemplateModal';
 import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
 
@@ -32,6 +34,37 @@ function formatDate(dateObj) {
   const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
   const dd = String(dateObj.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function toUiMealPlanItem(item, idx, foodsByCode) {
+  const food = foodsByCode.get(String(item.foodCode || '').trim().toLowerCase());
+  const baseServingSizeG = Number(food?.servingSizeG) || 100;
+  const portionGrams = Number(item.portionGrams) || baseServingSizeG;
+  const portionRatio = portionGrams / baseServingSizeG;
+  const baseCalories = Number(food?.calories) || 0;
+  const baseProtein = Number(food?.protein) || 0;
+  const baseCarb = Number(food?.carb) || 0;
+  const baseFat = Number(food?.fat) || 0;
+
+  return {
+    tempId: `api-${item.id || idx}-${Date.now()}`,
+    planDate: item.planDate,
+    mealType: item.mealType,
+    foodCode: item.foodCode || '',
+    nameVi: item.freeText || food?.nameVi || item.foodCode || 'Món ăn',
+    portionGrams,
+    baseServingSizeG,
+    baseCalories,
+    baseProtein,
+    baseCarb,
+    baseFat,
+    calcCalories: Math.round(baseCalories * portionRatio),
+    calcProtein: Math.round(baseProtein * portionRatio),
+    calcCarb: Math.round(baseCarb * portionRatio),
+    calcFat: Math.round(baseFat * portionRatio),
+    note: item.note || '',
+    eaten: item.eaten || false,
+  };
 }
 
 export default function PtMealPlanPage() {
@@ -89,24 +122,25 @@ export default function PtMealPlanPage() {
           setNotes(data.plan.notes || '');
           
           if (data.items?.length) {
-            const uiItems = data.items.map((item, idx) => ({
-              tempId: `api-${item.id || idx}-${Date.now()}`,
-              planDate: item.planDate,
-              mealType: item.mealType,
-              foodCode: item.foodCode || '',
-              nameVi: item.freeText || item.foodCode || 'Món ăn',
-              portionGrams: item.portionGrams || 100,
-              baseServingSizeG: 100,
-              baseCalories: 0,
-              baseProtein: 0,
-              baseCarb: 0,
-              baseFat: 0,
-              calcCalories: 0,
-              calcProtein: 0,
-              calcCarb: 0,
-              calcFat: 0,
-              eaten: item.eaten || false,
-            }));
+            const foodCodes = [...new Set(data.items.map((item) => item.foodCode).filter(Boolean))];
+            const foodsByCode = new Map();
+            if (foodCodes.length > 0) {
+              try {
+                const foodsRes = await dietService.getFoodsByCodes(foodCodes);
+                (foodsRes.data.data || []).forEach((food) => {
+                  if (food.foodCode) {
+                    foodsByCode.set(String(food.foodCode).trim().toLowerCase(), food);
+                  }
+                  (food.aliases || []).forEach((alias) => {
+                    foodsByCode.set(String(alias).trim().toLowerCase(), food);
+                  });
+                });
+              } catch (error) {
+                console.error('Không thể tải dinh dưỡng cho thực đơn:', error);
+              }
+            }
+
+            const uiItems = data.items.map((item, idx) => toUiMealPlanItem(item, idx, foodsByCode));
             setItems(uiItems);
           } else {
             setItems([]);
@@ -433,30 +467,14 @@ export default function PtMealPlanPage() {
 
       {pendingSuggestions.length > 0 && (
         <Card>
-          <CardContent className="p-5 space-y-2">
-            <p className="text-sm font-bold text-slate-600">Đề nghị thay món chờ duyệt</p>
-            {pendingSuggestions.map((s) => (
-              <div key={s.id} className="flex items-center justify-between gap-2 text-sm p-2 rounded-lg bg-violet-50 border border-violet-100">
-                <span>{s.suggestedFoodName} {s.suggestedGram ? `(${s.suggestedGram}g)` : ''}</span>
-                <div className="flex gap-1">
-                  <Button size="sm" onClick={async () => {
-                    try {
-                      await workspaceService.reviewMealPlanSuggestion(s.id, { action: 'APPROVE' });
-                      toast.success('Đã duyệt');
-                      refreshSuggestions();
-                      loadData();
-                    } catch { toast.error('Lỗi duyệt'); }
-                  }}>Duyệt</Button>
-                  <Button size="sm" variant="outline" onClick={async () => {
-                    try {
-                      await workspaceService.reviewMealPlanSuggestion(s.id, { action: 'REJECT' });
-                      toast.success('Đã từ chối');
-                      refreshSuggestions();
-                    } catch { toast.error('Lỗi'); }
-                  }}>Từ chối</Button>
-                </div>
-              </div>
-            ))}
+          <CardContent className="p-5">
+            <MealPlanSuggestionReviewList
+              suggestions={pendingSuggestions}
+              onUpdated={async () => {
+                await refreshSuggestions();
+                await loadData();
+              }}
+            />
           </CardContent>
         </Card>
       )}

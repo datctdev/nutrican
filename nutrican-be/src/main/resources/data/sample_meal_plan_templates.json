@@ -1,0 +1,542 @@
+{
+  "version": 2,
+  "mealSets": [
+    {
+      "key": "F_BF_EGG_SWEET_POTATO",
+      "mealType": "BREAKFAST",
+      "cheatMeal": false,
+      "note": "Luộc hoặc áp chảo không dầu; ưu tiên ăn rau trước.",
+      "items": [
+        { "foodCode": "trung ga", "freeText": "Trứng gà", "portionGrams": 100 },
+        { "foodCode": "long trang trung ga", "freeText": "Lòng trắng trứng gà", "portionGrams": 100 },
+        { "foodCode": "khoai lang", "freeText": "Khoai lang luộc", "portionGrams": 150 },
+        { "foodCode": "dua chuot", "freeText": "Dưa chuột", "portionGrams": 100 }
+      ]
+    },
+    {
+      "key": "F_BF_YOGURT_BANANA",
+      "mealType": "BREAKFAST",
+      "cheatMeal": false,
+      "note": "Không thêm đường hoặc sữa đặc.",
+      "items": [
+        { "foodCode": "sua chua (tu sua bo)", "freeText": "Sữa chua không đường", "portionGrams": 200 },
+        { "foodCode": "chuoi tieu", "freeText": "Chuối tiêu", "portionGrams": 150 },
+        { "foodCode": "lac hat", "freeText": "Lạc hạt rang không muối", "portionGrams": 10 }
+      ]
+    },
+    {
+      "key": "F_BF_EGG_BROWN_RICE",
+      "mealType": "BREAKFAST",
+      "cheatMeal": false,
+      "note": "Gạo lứt tính theo khối lượng khô trước khi nấu.",
+      "items": [
+        { "foodCode": "trung ga", "freeText": "Trứng gà", "portionGrams": 100 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 50 },
+        { "foodCode": "ca chua", "freeText": "Cà chua", "portionGrams": 150 }
+      ]
+    },
+
+    {
+      "key": "F_L_CHICKEN_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Gà hấp/nướng bỏ da; gạo lứt cân khô; súp lơ luộc.",
+      "items": [
+        { "foodCode": "thit ga rung", "freeText": "Thịt gà nạc bỏ da", "portionGrams": 180 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 60 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 200 }
+      ]
+    },
+    {
+      "key": "F_L_BEEF_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Bò áp chảo ít dầu; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "thit bo loai i", "freeText": "Thịt bò nạc", "portionGrams": 180 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 60 },
+        { "foodCode": "cai bap", "freeText": "Cải bắp luộc", "portionGrams": 200 }
+      ]
+    },
+    {
+      "key": "F_L_TUNA_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Cá hấp/nướng, không dùng sốt mayonnaise; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "ca ngu", "freeText": "Cá ngừ", "portionGrams": 200 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 70 },
+        { "foodCode": "rau muong", "freeText": "Rau muống luộc", "portionGrams": 200 }
+      ]
+    },
+    {
+      "key": "F_L_SALMON_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Cá hồi nướng/áp chảo không bơ; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "ca hoi", "freeText": "Cá hồi", "portionGrams": 180 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 60 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 200 }
+      ]
+    },
+    {
+      "key": "F_L_SHRIMP_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Tôm hấp; gạo lứt cân khô; rau luộc hoặc xào không dầu.",
+      "items": [
+        { "foodCode": "tom bien", "freeText": "Tôm biển", "portionGrams": 220 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 80 },
+        { "foodCode": "rau muong", "freeText": "Rau muống", "portionGrams": 200 }
+      ]
+    },
+
+    {
+      "key": "F_D_TUNA_SWEET_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Cá hấp/nướng; salad không sốt béo.",
+      "items": [
+        { "foodCode": "ca ngu", "freeText": "Cá ngừ", "portionGrams": 200 },
+        { "foodCode": "khoai lang", "freeText": "Khoai lang luộc", "portionGrams": 150 },
+        { "foodCode": "rau sa lach", "freeText": "Rau xà lách", "portionGrams": 200 },
+        { "foodCode": "ca chua", "freeText": "Cà chua", "portionGrams": 150 }
+      ]
+    },
+    {
+      "key": "F_D_CHICKEN_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Gà và khoai luộc/nướng, không chiên.",
+      "items": [
+        { "foodCode": "thit ga rung", "freeText": "Thịt gà nạc bỏ da", "portionGrams": 180 },
+        { "foodCode": "khoai tay", "freeText": "Khoai tây luộc", "portionGrams": 180 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 200 }
+      ]
+    },
+    {
+      "key": "F_D_SALMON_PUMPKIN",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Cá hồi nướng; bí đỏ và cải bắp hấp/luộc.",
+      "items": [
+        { "foodCode": "ca hoi", "freeText": "Cá hồi", "portionGrams": 180 },
+        { "foodCode": "bi ngo", "freeText": "Bí đỏ", "portionGrams": 300 },
+        { "foodCode": "cai bap", "freeText": "Cải bắp", "portionGrams": 200 },
+        { "foodCode": "qua bo vo xanh", "freeText": "Quả bơ", "portionGrams": 50 }
+      ]
+    },
+    {
+      "key": "F_D_BEEF_SWEET_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Bò áp chảo ít dầu; khoai và rau luộc.",
+      "items": [
+        { "foodCode": "thit bo loai i", "freeText": "Thịt bò nạc", "portionGrams": 180 },
+        { "foodCode": "khoai lang", "freeText": "Khoai lang luộc", "portionGrams": 180 },
+        { "foodCode": "rau muong", "freeText": "Rau muống luộc", "portionGrams": 200 }
+      ]
+    },
+    {
+      "key": "F_D_SHRIMP_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Tôm hấp; khoai luộc; salad không sốt béo.",
+      "items": [
+        { "foodCode": "tom bien", "freeText": "Tôm biển", "portionGrams": 220 },
+        { "foodCode": "khoai tay", "freeText": "Khoai tây luộc", "portionGrams": 200 },
+        { "foodCode": "rau sa lach", "freeText": "Rau xà lách", "portionGrams": 200 },
+        { "foodCode": "qua bo vo xanh", "freeText": "Quả bơ", "portionGrams": 50 }
+      ]
+    },
+
+    {
+      "key": "S_APPLE_YOGURT",
+      "mealType": "SNACK",
+      "cheatMeal": false,
+      "note": "Sữa chua không đường.",
+      "items": [
+        { "foodCode": "tao tay", "freeText": "Táo tây", "portionGrams": 200 },
+        { "foodCode": "sua chua (tu sua bo)", "freeText": "Sữa chua không đường", "portionGrams": 150 }
+      ]
+    },
+    {
+      "key": "S_GUAVA_YOGURT",
+      "mealType": "SNACK",
+      "cheatMeal": false,
+      "note": "Sữa chua không đường.",
+      "items": [
+        { "foodCode": "oi", "freeText": "Ổi", "portionGrams": 200 },
+        { "foodCode": "sua chua (tu sua bo)", "freeText": "Sữa chua không đường", "portionGrams": 150 }
+      ]
+    },
+    {
+      "key": "S_BANANA_MILK",
+      "mealType": "SNACK",
+      "cheatMeal": false,
+      "note": "Sữa tươi không đường.",
+      "items": [
+        { "foodCode": "chuoi tieu", "freeText": "Chuối tiêu", "portionGrams": 150 },
+        { "foodCode": "sua bo tuoi", "freeText": "Sữa bò tươi không đường", "portionGrams": 150 }
+      ]
+    },
+    {
+      "key": "S_ORANGE_PEANUT",
+      "mealType": "SNACK",
+      "cheatMeal": false,
+      "note": "Lạc rang không muối, không tẩm đường.",
+      "items": [
+        { "foodCode": "cam", "freeText": "Cam", "portionGrams": 250 },
+        { "foodCode": "lac hat", "freeText": "Lạc hạt rang không muối", "portionGrams": 15 }
+      ]
+    },
+
+    {
+      "key": "B_L_CHICKEN_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Gà hấp/nướng bỏ da; gạo lứt cân khô; rau luộc.",
+      "items": [
+        { "foodCode": "thit ga rung", "freeText": "Thịt gà nạc bỏ da", "portionGrams": 220 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 90 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "B_L_BEEF_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Bò áp chảo ít dầu; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "thit bo loai i", "freeText": "Thịt bò nạc", "portionGrams": 220 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 90 },
+        { "foodCode": "cai bap", "freeText": "Cải bắp luộc", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "B_L_TUNA_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Cá hấp/nướng; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "ca ngu", "freeText": "Cá ngừ", "portionGrams": 250 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 90 },
+        { "foodCode": "rau muong", "freeText": "Rau muống luộc", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "B_L_SALMON_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Cá hồi nướng không bơ; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "ca hoi", "freeText": "Cá hồi", "portionGrams": 220 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 90 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "B_L_SHRIMP_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Tôm hấp; gạo lứt cân khô; rau luộc.",
+      "items": [
+        { "foodCode": "tom bien", "freeText": "Tôm biển", "portionGrams": 260 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 100 },
+        { "foodCode": "rau muong", "freeText": "Rau muống", "portionGrams": 250 }
+      ]
+    },
+
+    {
+      "key": "B_D_TUNA_SWEET_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Cá hấp/nướng; salad không sốt béo.",
+      "items": [
+        { "foodCode": "ca ngu", "freeText": "Cá ngừ", "portionGrams": 250 },
+        { "foodCode": "khoai lang", "freeText": "Khoai lang luộc", "portionGrams": 250 },
+        { "foodCode": "rau sa lach", "freeText": "Rau xà lách", "portionGrams": 250 },
+        { "foodCode": "qua bo vo xanh", "freeText": "Quả bơ", "portionGrams": 50 }
+      ]
+    },
+    {
+      "key": "B_D_CHICKEN_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Gà và khoai luộc/nướng, không chiên.",
+      "items": [
+        { "foodCode": "thit ga rung", "freeText": "Thịt gà nạc bỏ da", "portionGrams": 220 },
+        { "foodCode": "khoai tay", "freeText": "Khoai tây luộc", "portionGrams": 250 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "B_D_SALMON_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Cá hồi nướng; khoai và cải bắp luộc.",
+      "items": [
+        { "foodCode": "ca hoi", "freeText": "Cá hồi", "portionGrams": 220 },
+        { "foodCode": "khoai tay", "freeText": "Khoai tây luộc", "portionGrams": 250 },
+        { "foodCode": "cai bap", "freeText": "Cải bắp", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "B_D_BEEF_SWEET_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Bò áp chảo ít dầu; khoai và rau luộc.",
+      "items": [
+        { "foodCode": "thit bo loai i", "freeText": "Thịt bò nạc", "portionGrams": 220 },
+        { "foodCode": "khoai lang", "freeText": "Khoai lang luộc", "portionGrams": 250 },
+        { "foodCode": "rau muong", "freeText": "Rau muống luộc", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "B_D_SHRIMP_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Tôm hấp; khoai luộc; salad không sốt béo.",
+      "items": [
+        { "foodCode": "tom bien", "freeText": "Tôm biển", "portionGrams": 260 },
+        { "foodCode": "khoai tay", "freeText": "Khoai tây luộc", "portionGrams": 250 },
+        { "foodCode": "rau sa lach", "freeText": "Rau xà lách", "portionGrams": 250 },
+        { "foodCode": "qua bo vo xanh", "freeText": "Quả bơ", "portionGrams": 100 }
+      ]
+    },
+
+    {
+      "key": "M_BF_EGG_SWEET_POTATO",
+      "mealType": "BREAKFAST",
+      "cheatMeal": false,
+      "note": "Bữa sáng giàu đạm; luộc hoặc áp chảo không dầu.",
+      "items": [
+        { "foodCode": "trung ga", "freeText": "Trứng gà", "portionGrams": 120 },
+        { "foodCode": "long trang trung ga", "freeText": "Lòng trắng trứng gà", "portionGrams": 150 },
+        { "foodCode": "khoai lang", "freeText": "Khoai lang luộc", "portionGrams": 250 },
+        { "foodCode": "dua chuot", "freeText": "Dưa chuột", "portionGrams": 100 }
+      ]
+    },
+    {
+      "key": "M_BF_YOGURT_BANANA",
+      "mealType": "BREAKFAST",
+      "cheatMeal": false,
+      "note": "Không thêm đường; dùng sữa tươi không đường.",
+      "items": [
+        { "foodCode": "sua chua (tu sua bo)", "freeText": "Sữa chua không đường", "portionGrams": 250 },
+        { "foodCode": "chuoi tieu", "freeText": "Chuối tiêu", "portionGrams": 200 },
+        { "foodCode": "lac hat", "freeText": "Lạc hạt rang không muối", "portionGrams": 20 },
+        { "foodCode": "sua bo tuoi", "freeText": "Sữa bò tươi không đường", "portionGrams": 200 }
+      ]
+    },
+    {
+      "key": "M_BF_EGG_BROWN_RICE",
+      "mealType": "BREAKFAST",
+      "cheatMeal": false,
+      "note": "Gạo lứt cân khô; trứng luộc hoặc áp chảo không dầu.",
+      "items": [
+        { "foodCode": "trung ga", "freeText": "Trứng gà", "portionGrams": 120 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 70 },
+        { "foodCode": "qua bo vo xanh", "freeText": "Quả bơ", "portionGrams": 50 },
+        { "foodCode": "ca chua", "freeText": "Cà chua", "portionGrams": 150 }
+      ]
+    },
+
+    {
+      "key": "M_L_CHICKEN_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Gà hấp/nướng bỏ da; gạo lứt cân khô; rau luộc.",
+      "items": [
+        { "foodCode": "thit ga rung", "freeText": "Thịt gà nạc bỏ da", "portionGrams": 250 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 110 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "M_L_BEEF_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Bò áp chảo ít dầu; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "thit bo loai i", "freeText": "Thịt bò nạc", "portionGrams": 250 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 110 },
+        { "foodCode": "cai bap", "freeText": "Cải bắp luộc", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "M_L_TUNA_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Cá hấp/nướng; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "ca ngu", "freeText": "Cá ngừ", "portionGrams": 300 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 110 },
+        { "foodCode": "rau muong", "freeText": "Rau muống luộc", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "M_L_SALMON_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Cá hồi nướng không bơ; gạo lứt cân khô.",
+      "items": [
+        { "foodCode": "ca hoi", "freeText": "Cá hồi", "portionGrams": 250 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 110 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "M_L_SHRIMP_RICE",
+      "mealType": "LUNCH",
+      "cheatMeal": false,
+      "note": "Tôm hấp; gạo lứt cân khô; rau luộc.",
+      "items": [
+        { "foodCode": "tom bien", "freeText": "Tôm biển", "portionGrams": 320 },
+        { "foodCode": "gao lut", "freeText": "Gạo lứt (cân khô)", "portionGrams": 120 },
+        { "foodCode": "rau muong", "freeText": "Rau muống", "portionGrams": 250 }
+      ]
+    },
+
+    {
+      "key": "M_D_TUNA_SWEET_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Cá hấp/nướng; salad không sốt béo.",
+      "items": [
+        { "foodCode": "ca ngu", "freeText": "Cá ngừ", "portionGrams": 300 },
+        { "foodCode": "khoai lang", "freeText": "Khoai lang luộc", "portionGrams": 300 },
+        { "foodCode": "rau sa lach", "freeText": "Rau xà lách", "portionGrams": 250 },
+        { "foodCode": "qua bo vo xanh", "freeText": "Quả bơ", "portionGrams": 100 }
+      ]
+    },
+    {
+      "key": "M_D_CHICKEN_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Gà và khoai luộc/nướng, không chiên.",
+      "items": [
+        { "foodCode": "thit ga rung", "freeText": "Thịt gà nạc bỏ da", "portionGrams": 250 },
+        { "foodCode": "khoai tay", "freeText": "Khoai tây luộc", "portionGrams": 300 },
+        { "foodCode": "sup lo xanh", "freeText": "Súp lơ xanh", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "M_D_SALMON_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Cá hồi nướng; khoai và cải bắp luộc.",
+      "items": [
+        { "foodCode": "ca hoi", "freeText": "Cá hồi", "portionGrams": 250 },
+        { "foodCode": "khoai tay", "freeText": "Khoai tây luộc", "portionGrams": 300 },
+        { "foodCode": "cai bap", "freeText": "Cải bắp", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "M_D_BEEF_SWEET_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Bò áp chảo ít dầu; khoai và rau luộc.",
+      "items": [
+        { "foodCode": "thit bo loai i", "freeText": "Thịt bò nạc", "portionGrams": 250 },
+        { "foodCode": "khoai lang", "freeText": "Khoai lang luộc", "portionGrams": 300 },
+        { "foodCode": "rau muong", "freeText": "Rau muống luộc", "portionGrams": 250 }
+      ]
+    },
+    {
+      "key": "M_D_SHRIMP_POTATO",
+      "mealType": "DINNER",
+      "cheatMeal": false,
+      "note": "Tôm hấp; khoai luộc; salad không sốt béo.",
+      "items": [
+        { "foodCode": "tom bien", "freeText": "Tôm biển", "portionGrams": 320 },
+        { "foodCode": "khoai tay", "freeText": "Khoai tây luộc", "portionGrams": 300 },
+        { "foodCode": "rau sa lach", "freeText": "Rau xà lách", "portionGrams": 250 },
+        { "foodCode": "qua bo vo xanh", "freeText": "Quả bơ", "portionGrams": 100 }
+      ]
+    },
+
+    {
+      "key": "CHEAT_D_BUN_THIT_NUONG",
+      "mealType": "DINNER",
+      "cheatMeal": true,
+      "note": "CHEAT MEAL có kiểm soát: chỉ dùng đúng bữa này, không thêm đồ chiên hoặc nước ngọt.",
+      "items": [
+        { "foodCode": "bun_thit_nuong", "freeText": "[CHEAT MEAL] Bún thịt nướng", "portionGrams": 500 },
+        { "foodCode": "dua chuot", "freeText": "Dưa chuột", "portionGrams": 100 }
+      ]
+    },
+    {
+      "key": "CHEAT_D_PHO",
+      "mealType": "DINNER",
+      "cheatMeal": true,
+      "note": "CHEAT MEAL có kiểm soát: không quẩy, không nước ngọt, hạn chế uống hết nước dùng.",
+      "items": [
+        { "foodCode": "pho", "freeText": "[CHEAT MEAL] Phở bò", "portionGrams": 650 },
+        { "foodCode": "rau sa lach", "freeText": "Rau ăn kèm", "portionGrams": 100 }
+      ]
+    },
+    {
+      "key": "CHEAT_L_COM_TAM",
+      "mealType": "LUNCH",
+      "cheatMeal": true,
+      "note": "CHEAT MEAL có kiểm soát: chọn sườn nạc, giảm mỡ hành và nước mắm đường.",
+      "items": [
+        { "foodCode": "com_tam", "freeText": "[CHEAT MEAL] Cơm tấm sườn", "portionGrams": 400 },
+        { "foodCode": "dua chuot", "freeText": "Dưa chuột", "portionGrams": 100 }
+      ]
+    },
+    {
+      "key": "CHEAT_D_BUN_BO_HUE",
+      "mealType": "DINNER",
+      "cheatMeal": true,
+      "note": "CHEAT MEAL có kiểm soát: bỏ giò/chả thêm, không nước ngọt, không ăn thêm món phụ.",
+      "items": [
+        { "foodCode": "bun_bo_hue", "freeText": "[CHEAT MEAL] Bún bò Huế", "portionGrams": 650 },
+        { "foodCode": "rau sa lach", "freeText": "Rau ăn kèm", "portionGrams": 100 }
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "name": "Giảm mỡ 1.500 kcal - 7 ngày",
+      "description": "Healthy meal-prep 7 ngày: đạm nạc + tinh bột tốt + rau mỗi bữa; chỉ 1 cheat meal tối Thứ 7.",
+      "days": [
+        { "dayOffset": 0, "meals": ["F_BF_EGG_SWEET_POTATO", "F_L_CHICKEN_RICE", "F_D_TUNA_SWEET_POTATO", "S_APPLE_YOGURT"] },
+        { "dayOffset": 1, "meals": ["F_BF_YOGURT_BANANA", "F_L_BEEF_RICE", "F_D_CHICKEN_POTATO", "S_GUAVA_YOGURT"] },
+        { "dayOffset": 2, "meals": ["F_BF_EGG_BROWN_RICE", "F_L_SALMON_RICE", "F_D_SHRIMP_POTATO", "S_ORANGE_PEANUT"] },
+        { "dayOffset": 3, "meals": ["F_BF_EGG_SWEET_POTATO", "F_L_TUNA_RICE", "F_D_SALMON_PUMPKIN", "S_APPLE_YOGURT"] },
+        { "dayOffset": 4, "meals": ["F_BF_YOGURT_BANANA", "F_L_CHICKEN_RICE", "F_D_BEEF_SWEET_POTATO", "S_GUAVA_YOGURT"] },
+        { "dayOffset": 5, "meals": ["F_BF_EGG_BROWN_RICE", "F_L_SHRIMP_RICE", "CHEAT_D_BUN_THIT_NUONG", "S_ORANGE_PEANUT"] },
+        { "dayOffset": 6, "meals": ["F_BF_EGG_SWEET_POTATO", "F_L_SALMON_RICE", "F_D_TUNA_SWEET_POTATO", "S_APPLE_YOGURT"] }
+      ]
+    },
+    {
+      "name": "Cân bằng 1.800 kcal - 7 ngày",
+      "description": "Healthy cân bằng 7 ngày, khẩu phần vừa; 2 cheat meal có kiểm soát vào tối Thứ 4 và trưa Chủ Nhật.",
+      "days": [
+        { "dayOffset": 0, "meals": ["F_BF_EGG_SWEET_POTATO", "B_L_CHICKEN_RICE", "B_D_TUNA_SWEET_POTATO", "S_APPLE_YOGURT"] },
+        { "dayOffset": 1, "meals": ["F_BF_YOGURT_BANANA", "B_L_BEEF_RICE", "B_D_CHICKEN_POTATO", "S_GUAVA_YOGURT"] },
+        { "dayOffset": 2, "meals": ["F_BF_EGG_BROWN_RICE", "B_L_SALMON_RICE", "CHEAT_D_PHO", "S_ORANGE_PEANUT"] },
+        { "dayOffset": 3, "meals": ["F_BF_EGG_SWEET_POTATO", "B_L_TUNA_RICE", "B_D_SALMON_POTATO", "S_APPLE_YOGURT"] },
+        { "dayOffset": 4, "meals": ["F_BF_YOGURT_BANANA", "B_L_CHICKEN_RICE", "B_D_BEEF_SWEET_POTATO", "S_GUAVA_YOGURT"] },
+        { "dayOffset": 5, "meals": ["F_BF_EGG_BROWN_RICE", "B_L_SHRIMP_RICE", "B_D_TUNA_SWEET_POTATO", "S_ORANGE_PEANUT"] },
+        { "dayOffset": 6, "meals": ["F_BF_EGG_SWEET_POTATO", "CHEAT_L_COM_TAM", "B_D_SHRIMP_POTATO", "S_APPLE_YOGURT"] }
+      ]
+    },
+    {
+      "name": "Tăng cơ 2.200 kcal - Giàu đạm",
+      "description": "Clean bulk 7 ngày: tăng khẩu phần đạm và tinh bột tốt; chỉ 1 cheat meal tối Thứ 7, không ăn tự do cả ngày.",
+      "days": [
+        { "dayOffset": 0, "meals": ["M_BF_EGG_SWEET_POTATO", "M_L_CHICKEN_RICE", "M_D_TUNA_SWEET_POTATO", "S_APPLE_YOGURT"] },
+        { "dayOffset": 1, "meals": ["M_BF_YOGURT_BANANA", "M_L_BEEF_RICE", "M_D_CHICKEN_POTATO", "S_BANANA_MILK"] },
+        { "dayOffset": 2, "meals": ["M_BF_EGG_BROWN_RICE", "M_L_SALMON_RICE", "M_D_SHRIMP_POTATO", "S_ORANGE_PEANUT"] },
+        { "dayOffset": 3, "meals": ["M_BF_EGG_SWEET_POTATO", "M_L_TUNA_RICE", "M_D_SALMON_POTATO", "S_APPLE_YOGURT"] },
+        { "dayOffset": 4, "meals": ["M_BF_YOGURT_BANANA", "M_L_CHICKEN_RICE", "M_D_BEEF_SWEET_POTATO", "S_GUAVA_YOGURT"] },
+        { "dayOffset": 5, "meals": ["M_BF_EGG_BROWN_RICE", "M_L_SHRIMP_RICE", "CHEAT_D_BUN_BO_HUE", "S_BANANA_MILK"] },
+        { "dayOffset": 6, "meals": ["M_BF_EGG_SWEET_POTATO", "M_L_SALMON_RICE", "M_D_TUNA_SWEET_POTATO", "S_APPLE_YOGURT"] }
+      ]
+    }
+  ]
+}

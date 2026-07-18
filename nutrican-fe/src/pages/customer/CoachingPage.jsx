@@ -14,10 +14,13 @@ import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import Modal from '../../components/common/Modal';
 import MealPlanSkipModal from './components/MealPlanSkipModal';
+import MealPlanWeekView from './components/MealPlanWeekView';
+import MealPlanWeekPicker from './components/MealPlanWeekPicker';
+import MealReplacementModal from './components/MealReplacementModal';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
 import {
-  Loader2, Utensils, Calendar, Sparkles, Check, ChevronRight, User, AlertCircle, RefreshCw, X, ShieldAlert, BookOpen,
+  Loader2, Utensils, Calendar, Sparkles, Check, User, AlertCircle, X, ShieldAlert, BookOpen,
   MessageSquare, Send, ImagePlus, UploadCloud, Clock, ShoppingCart
 } from 'lucide-react';
 import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
@@ -25,9 +28,20 @@ import useWebSocket from '../../hooks/useWebSocket';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 
-const MEAL_TYPE_LABEL = {
-  BREAKFAST: 'Sáng', LUNCH: 'Trưa', DINNER: 'Tối', SNACK: 'Phụ',
-};
+function toLocalDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentWeekStart() {
+  const date = new Date();
+  const daysSinceMonday = (date.getDay() + 6) % 7;
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - daysSinceMonday);
+  return toLocalDateKey(date);
+}
 
 const APPT_STATUS_LABEL = {
   PENDING: { text: 'Chờ xác nhận', cls: 'bg-amber-100 text-amber-700' },
@@ -78,12 +92,17 @@ export default function CoachingPage() {
   // Meal plan states
   const [mealPlan, setMealPlan] = useState(null);
   const [mealPlanItems, setMealPlanItems] = useState([]);
+  const [mealPlanWeeks, setMealPlanWeeks] = useState([]);
+  const [selectedMealPlanWeek, setSelectedMealPlanWeek] = useState('');
   const [mealPlanPrefWarnings, setMealPlanPrefWarnings] = useState([]);
+  const [mealPlanSuggestions, setMealPlanSuggestions] = useState([]);
   const [loadingMealPlan, setLoadingMealPlan] = useState(false);
   const [weeklySummaries, setWeeklySummaries] = useState([]);
   const [newWeeklySummary, setNewWeeklySummary] = useState(false);
-  const [skipModalItemId, setSkipModalItemId] = useState(null);
+  const [skipModalContext, setSkipModalContext] = useState(null);
   const [skippingMeal, setSkippingMeal] = useState(false);
+  const [replacementModalItem, setReplacementModalItem] = useState(null);
+  const [submittingReplacement, setSubmittingReplacement] = useState(false);
   const [groceryModalOpen, setGroceryModalOpen] = useState(false);
 
   // Appointment states
@@ -347,13 +366,39 @@ export default function CoachingPage() {
   const activeThread = ptThreads.find(t => t.mappingId === activeMappingId);
 
   // Meal plan & Appointment service loads
-  const fetchMealPlan = async () => {
+  const fetchMealPlan = async (requestedWeekStart) => {
     setLoadingMealPlan(true);
     try {
-      const res = await mealPlanService.getCurrent();
+      const weeksRes = await mealPlanService.getAvailableWeeks();
+      const availableWeeks = weeksRes.data.data || [];
+      setMealPlanWeeks(availableWeeks);
+
+      const currentWeekStart = getCurrentWeekStart();
+      const requestedWeekExists = availableWeeks.some(
+        (week) => week.weekStart === requestedWeekStart,
+      );
+      const targetWeekStart = requestedWeekExists
+        ? requestedWeekStart
+        : (availableWeeks.find((week) => week.weekStart === currentWeekStart)?.weekStart
+          || availableWeeks[0]?.weekStart);
+
+      if (!targetWeekStart) {
+        setMealPlan(null);
+        setMealPlanItems([]);
+        setMealPlanPrefWarnings([]);
+        setMealPlanSuggestions([]);
+        setSelectedMealPlanWeek('');
+        return;
+      }
+
+      const res = await mealPlanService.getCurrent(targetWeekStart);
       setMealPlan(res.data.data?.plan || res.data.data?.[0] || res.data.data);
       setMealPlanItems(res.data.data?.items || []);
       setMealPlanPrefWarnings(res.data.data?.dietPrefWarnings || []);
+      setSelectedMealPlanWeek(targetWeekStart);
+
+      const suggestionsRes = await mealPlanService.getSuggestions(targetWeekStart);
+      setMealPlanSuggestions(suggestionsRes.data.data || []);
       
       const sumRes = await mealPlanService.getWeeklySummaries();
       setWeeklySummaries(sumRes.data.data || []);
@@ -361,6 +406,8 @@ export default function CoachingPage() {
     } catch {
       setMealPlan(null);
       setMealPlanItems([]);
+      setMealPlanPrefWarnings([]);
+      setMealPlanSuggestions([]);
     } finally {
       setLoadingMealPlan(false);
     }
@@ -412,39 +459,133 @@ export default function CoachingPage() {
     }
   };
 
-  const handleSuggestReplacement = async (itemId) => {
-    const name = window.prompt('Món bạn muốn thay thế:');
-    if (!name) return;
-    const gram = window.prompt('Khẩu phần (g):', '350');
+  const refreshMealPlanSuggestions = async () => {
+    if (!selectedMealPlanWeek) return;
     try {
-      await mealPlanService.suggestReplacement(itemId, {
-        suggestedFoodName: name,
-        suggestedGram: gram ? Number(gram) : undefined,
-      });
-      toast.success('Đã gửi đề nghị thay thế cho PT');
+      const response = await mealPlanService.getSuggestions(selectedMealPlanWeek);
+      setMealPlanSuggestions(response.data.data || []);
     } catch {
-      toast.error('Không gửi được đề nghị');
+      // Keep the current snapshot if a background refresh fails.
     }
   };
 
-  const handleSkipMeal = (itemId) => {
-    setSkipModalItemId(itemId);
+  useEffect(() => {
+    if (!selectedMealPlanWeek) return undefined;
+
+    const handleReplacementUpdated = async () => {
+      try {
+        const [planResponse, suggestionsResponse] = await Promise.all([
+          mealPlanService.getCurrent(selectedMealPlanWeek),
+          mealPlanService.getSuggestions(selectedMealPlanWeek),
+        ]);
+        const planData = planResponse.data.data;
+        setMealPlan(planData?.plan || planData?.[0] || planData);
+        setMealPlanItems(planData?.items || []);
+        setMealPlanPrefWarnings(planData?.dietPrefWarnings || []);
+        setMealPlanSuggestions(suggestionsResponse.data.data || []);
+      } catch {
+        // The persisted notification remains available if this live refresh fails.
+      }
+    };
+
+    window.addEventListener('meal_plan_replacement_updated', handleReplacementUpdated);
+    return () => {
+      window.removeEventListener('meal_plan_replacement_updated', handleReplacementUpdated);
+    };
+  }, [selectedMealPlanWeek]);
+
+  const handleSuggestReplacement = (item) => {
+    setReplacementModalItem(item);
   };
 
-  const confirmSkipMeal = async ({ skipReason, skipNote }) => {
-    if (!skipModalItemId) return;
+  const confirmReplacement = async (payload) => {
+    if (!replacementModalItem) return;
+    setSubmittingReplacement(true);
+    try {
+      await mealPlanService.suggestReplacement(replacementModalItem.id, payload);
+      await refreshMealPlanSuggestions();
+      setReplacementModalItem(null);
+      toast.success('Đã gửi yêu cầu thay món cho PT');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không gửi được yêu cầu thay món');
+    } finally {
+      setSubmittingReplacement(false);
+    }
+  };
+
+  const cancelReplacement = async (suggestionId) => {
+    try {
+      await mealPlanService.cancelReplacement(suggestionId);
+      await refreshMealPlanSuggestions();
+      toast.success('Đã hủy yêu cầu thay món');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không thể hủy yêu cầu');
+    }
+  };
+
+  const handleOpenSkip = (item, mealItems, initialScope = 'ITEM') => {
+    setSkipModalContext({ item, mealItems, initialScope });
+  };
+
+  const confirmSkipMeal = async ({ skipReason, skipNote, scope }) => {
+    if (!skipModalContext) return;
+    const { item, mealItems } = skipModalContext;
     setSkippingMeal(true);
     try {
-      await mealPlanService.skipItem(skipModalItemId, { skipReason, skipNote });
-      setMealPlanItems((items) => items.map((i) => (
-        i.id === skipModalItemId ? { ...i, eaten: false, skipReason } : i
-      )));
-      toast.success('Đã ghi nhận bỏ qua món');
-      setSkipModalItemId(null);
-    } catch {
-      toast.error('Không thể bỏ qua món');
+      if (scope === 'MEAL') {
+        await mealPlanService.skipMeal(mealPlan.id, {
+          planDate: item.planDate,
+          mealType: item.mealType,
+          skipReason,
+          skipNote,
+        });
+        const mealIds = new Set(mealItems.map((mealItem) => mealItem.id));
+        setMealPlanItems((currentItems) => currentItems.map((currentItem) => (
+          mealIds.has(currentItem.id)
+            ? { ...currentItem, eaten: false, skipReason, skipNote }
+            : currentItem
+        )));
+        toast.success('Đã ghi nhận không ăn cả bữa');
+      } else {
+        await mealPlanService.skipItem(item.id, { skipReason, skipNote });
+        setMealPlanItems((currentItems) => currentItems.map((currentItem) => (
+          currentItem.id === item.id
+            ? { ...currentItem, eaten: false, skipReason, skipNote }
+            : currentItem
+        )));
+        toast.success('Đã ghi nhận không ăn món');
+      }
+      setSkipModalContext(null);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không thể cập nhật trạng thái không ăn');
     } finally {
       setSkippingMeal(false);
+    }
+  };
+
+  const handleUndoSkip = async (itemId) => {
+    try {
+      await mealPlanService.unskipItem(itemId);
+      setMealPlanItems((currentItems) => currentItems.map((item) => (
+        item.id === itemId ? { ...item, skipReason: null, skipNote: null } : item
+      )));
+      toast.success('Đã hoàn tác');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không thể hoàn tác');
+    }
+  };
+
+  const handleUndoEntireMeal = async (planDate, mealType) => {
+    try {
+      await mealPlanService.unskipMeal(mealPlan.id, { planDate, mealType });
+      setMealPlanItems((currentItems) => currentItems.map((item) => (
+        item.planDate === planDate && item.mealType === mealType
+          ? { ...item, skipReason: null, skipNote: null }
+          : item
+      )));
+      toast.success('Đã hoàn tác cả bữa');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không thể hoàn tác cả bữa');
     }
   };
 
@@ -478,17 +619,6 @@ export default function CoachingPage() {
       setSubmittingRefund(false);
     }
   };
-
-  const groupedMealItems = mealPlanItems.reduce((acc, item) => {
-    const key = item.planDate || 'unknown';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(item);
-    return acc;
-  }, {});
-
-  const mealPlanPrefWarnCodes = new Set(
-    (mealPlanPrefWarnings || []).map((w) => w.foodCode).filter(Boolean)
-  );
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-fade-in px-4">
@@ -742,21 +872,32 @@ export default function CoachingPage() {
                 )}
 
                 <Card className="border-slate-200 shadow-sm rounded-3xl bg-white">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-5">
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        <Utensils className="w-5 h-5 text-emerald-600" /> Thực đơn tuần này
+                        <Utensils className="w-5 h-5 text-emerald-600" /> Thực đơn theo tuần
                       </h3>
-                      {mealPlanItems.length > 0 && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => setGroceryModalOpen(true)} 
-                          className="gap-2 rounded-xl text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 font-bold"
-                        >
-                          <ShoppingCart className="w-4 h-4" /> Danh sách đi chợ
-                        </Button>
-                      )}
+                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                        {mealPlanWeeks.length > 0 && (
+                          <MealPlanWeekPicker
+                            weeks={mealPlanWeeks}
+                            value={selectedMealPlanWeek}
+                            loading={loadingMealPlan}
+                            onChange={fetchMealPlan}
+                          />
+                        )}
+                        {mealPlanItems.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={loadingMealPlan}
+                            onClick={() => setGroceryModalOpen(true)}
+                            className="w-full gap-2 rounded-xl text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 font-bold sm:w-auto"
+                          >
+                            <ShoppingCart className="w-4 h-4" /> Danh sách đi chợ
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     
                     {loadingMealPlan ? (
@@ -770,46 +911,17 @@ export default function CoachingPage() {
                         <p className="text-xs text-slate-400 mt-1">Liên hệ với PT qua tin nhắn để nhận được thực đơn tuần mới.</p>
                       </div>
                     ) : (
-                      <div className="space-y-6">
-                        {Object.entries(groupedMealItems).sort().map(([date, items]) => (
-                          <div key={date} className="space-y-2.5">
-                            <p className="text-xs font-black text-slate-450 uppercase tracking-widest">{date}</p>
-                            <div className="space-y-2">
-                              {items.map((item) => (
-                                <label key={item.id} className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-100 bg-slate-50/30 hover:bg-slate-50/80 cursor-pointer transition-colors">
-                                  <input type="checkbox" checked={!!item.eaten} onChange={(e) => handleMarkEaten(item.id, e.target.checked)}
-                                    className="rounded border-slate-350 text-blue-600" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-slate-800 truncate">
-                                      {item.freeText || item.foodCode || 'Món ăn'}
-                                      {item.foodCode && mealPlanPrefWarnCodes.has(item.foodCode) && (
-                                        <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded ml-1.5 uppercase">Kỵ Sở Thích</span>
-                                      )}
-                                      <span className="text-slate-400 font-medium ml-1.5">
-                                        · {MEAL_TYPE_LABEL[item.mealType] || item.mealType}
-                                      </span>
-                                    </p>
-                                    {item.portionGrams && (
-                                      <p className="text-xs text-slate-500 mt-0.5">{item.portionGrams}g</p>
-                                    )}
-                                  </div>
-                                  {item.eaten && <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
-                                  <div className="flex flex-col sm:flex-row gap-1.5 flex-shrink-0">
-                                    <Button type="button" size="sm" variant="outline" className="text-[10px] h-7 font-bold rounded-lg border-slate-200 text-slate-700"
-                                      onClick={(e) => { e.preventDefault(); handleSuggestReplacement(item.id); }}>
-                                      Thay thế
-                                    </Button>
-                                    <Button type="button" size="sm" variant="ghost" className="text-[10px] h-7 font-bold text-amber-700 hover:bg-amber-50 rounded-lg"
-                                      onClick={(e) => { e.preventDefault(); handleSkipMeal(item.id); }}>
-                                      Bỏ qua
-                                    </Button>
-                                  </div>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      <MealPlanWeekView
+                        items={mealPlanItems}
+                        preferenceWarnings={mealPlanPrefWarnings}
+                        suggestions={mealPlanSuggestions}
+                        onMarkEaten={handleMarkEaten}
+                        onSuggestReplacement={handleSuggestReplacement}
+                        onCancelReplacement={cancelReplacement}
+                        onOpenSkip={handleOpenSkip}
+                        onUndoSkip={handleUndoSkip}
+                        onUndoEntireMeal={handleUndoEntireMeal}
+                      />
                     )}
                   </CardContent>
                 </Card>
@@ -1051,13 +1163,26 @@ export default function CoachingPage() {
         </div>
       </Modal>
 
+      {replacementModalItem && (
+        <MealReplacementModal
+          open={true}
+          item={replacementModalItem}
+          saving={submittingReplacement}
+          onClose={() => setReplacementModalItem(null)}
+          onConfirm={confirmReplacement}
+        />
+      )}
+
       {/* Skip meal warning modal */}
-      {skipModalItemId && (
+      {skipModalContext && (
         <MealPlanSkipModal
-          isOpen={true}
-          onClose={() => setSkipModalItemId(null)}
+          open={true}
+          item={skipModalContext.item}
+          mealItemCount={skipModalContext.mealItems.length}
+          initialScope={skipModalContext.initialScope}
+          onClose={() => setSkipModalContext(null)}
           onConfirm={confirmSkipMeal}
-          isLoading={skippingMeal}
+          saving={skippingMeal}
         />
       )}
 

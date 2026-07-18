@@ -1,13 +1,26 @@
 // src/components/layouts/Header.jsx
-import { Link, useNavigate, useLocation, href } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { notificationService } from '../../services/notificationService';
 import { toast } from 'sonner';
 import { useState, useEffect } from 'react';
-import { Menu, X, ChevronDown, Bell, LogOut, User, Settings, LayoutDashboard, Sparkles, Target } from 'lucide-react';
+import { Menu, X, ChevronDown, Bell, LogOut, User, Settings, LayoutDashboard, Loader2 } from 'lucide-react';
 import logo from '../../assets/nutrican_logo.png';
 import { workspaceService } from '../../services/workspaceService';
+
+async function fetchNotificationSnapshot() {
+    const [listResponse, countResponse] = await Promise.all([
+        notificationService.list({ page: 0, size: 10 }),
+        notificationService.unreadCount(),
+    ]);
+    const notifications = listResponse.data?.data?.content || [];
+    const serverUnreadCount = countResponse.data?.data ?? 0;
+    return {
+        notifications,
+        unreadCount: notifications.length > 0 ? serverUnreadCount : 0,
+    };
+}
 
 export default function Header() {
     const { user, logout, isAuthenticated } = useAuthStore();
@@ -16,18 +29,44 @@ export default function Header() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
-    const { unreadCount, notifications, setNotifications, markAsRead, markAllAsRead } = useNotificationStore();
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
+    const { unreadCount, notifications, markAsRead, markAllAsRead, clearNotifications } = useNotificationStore();
     const [pendingHiresCount, setPendingHiresCount] = useState(0);
 
     useEffect(() => {
-        if (!isAuthenticated) return;
-        notificationService.unreadCount()
-            .then((res) => useNotificationStore.setState({ unreadCount: res.data?.data ?? 0 }))
-            .catch(() => { });
-        notificationService.list({ page: 0, size: 10 })
-            .then((res) => setNotifications(res.data?.data?.content || []))
-            .catch(() => { });
-    }, [isAuthenticated, setNotifications]);
+        clearNotifications();
+        if (!isAuthenticated) return undefined;
+
+        let active = true;
+        const refresh = () => {
+            fetchNotificationSnapshot()
+                .then((snapshot) => {
+                    if (active) useNotificationStore.setState(snapshot);
+                })
+                .catch(() => { });
+        };
+        refresh();
+        window.addEventListener('notification_count_updated', refresh);
+        return () => {
+            active = false;
+            window.removeEventListener('notification_count_updated', refresh);
+        };
+    }, [clearNotifications, isAuthenticated, user?.id]);
+
+    const handleNotificationToggle = async () => {
+        const opening = !notifOpen;
+        setNotifOpen(opening);
+        if (!opening) return;
+
+        setLoadingNotifications(true);
+        try {
+            useNotificationStore.setState(await fetchNotificationSnapshot());
+        } catch {
+            // Keep the latest in-memory snapshot if the refresh fails.
+        } finally {
+            setLoadingNotifications(false);
+        }
+    };
 
     useEffect(() => {
         if (!isAuthenticated || !user?.role?.startsWith('PT')) return;
@@ -78,6 +117,8 @@ export default function Header() {
             case 'REFUND':
             case 'WEEKLY_SUMMARY':
                 return '/profile';
+            case 'MEAL_PLAN':
+                return role?.startsWith('PT') ? '/pt/clients' : '/coaching?tab=meal-plan';
             default:
                 return getDashboardLink();
         }
@@ -196,11 +237,11 @@ export default function Header() {
                                     <button
                                         type="button"
                                         aria-label="Thông báo"
-                                        onClick={() => setNotifOpen(!notifOpen)}
+                                        onClick={handleNotificationToggle}
                                         className="relative p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors"
                                     >
                                         <Bell className="w-5 h-5" />
-                                        {unreadCount > 0 && (
+                                        {unreadCount > 0 && notifications.length > 0 && (
                                             <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center">
                                                 {unreadCount > 9 ? '9+' : unreadCount}
                                             </span>
@@ -212,9 +253,15 @@ export default function Header() {
                                             <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white rounded-xl shadow-lg border border-slate-200 z-50">
                                                 <div className="flex items-center justify-between px-4 py-3 border-b">
                                                     <span className="font-semibold text-sm">Thông báo</span>
-                                                    <button type="button" className="text-xs text-blue-600" onClick={() => { markAllAsRead(); notificationService.markAllRead(); }}>Đọc tất cả</button>
+                                                    {notifications.length > 0 && unreadCount > 0 && (
+                                                        <button type="button" className="text-xs font-semibold text-blue-600 hover:text-blue-700" onClick={() => { markAllAsRead(); notificationService.markAllRead(); }}>Đọc tất cả</button>
+                                                    )}
                                                 </div>
-                                                {notifications?.length ? notifications.map((n) => (
+                                                {loadingNotifications ? (
+                                                    <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-400">
+                                                        <Loader2 className="h-4 w-4 animate-spin" /> Đang tải thông báo...
+                                                    </div>
+                                                ) : notifications?.length ? notifications.map((n) => (
                                                     <button
                                                         key={n.id}
                                                         type="button"
@@ -225,7 +272,13 @@ export default function Header() {
                                                         <p className="text-xs text-slate-500 line-clamp-2">{n.body || n.message}</p>
                                                     </button>
                                                 )) : (
-                                                    <p className="px-4 py-6 text-sm text-slate-500 text-center">Chưa có thông báo</p>
+                                                    <div className="px-4 py-8 text-center">
+                                                        <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                                                            <Bell className="h-5 w-5" />
+                                                        </span>
+                                                        <p className="mt-2 text-sm font-semibold text-slate-600">Chưa có thông báo</p>
+                                                        <p className="mt-0.5 text-xs text-slate-400">Các cập nhật mới sẽ xuất hiện tại đây.</p>
+                                                    </div>
                                                 )}
                                             </div>
                                         </>

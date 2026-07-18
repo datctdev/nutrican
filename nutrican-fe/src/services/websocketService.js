@@ -119,7 +119,6 @@ const handleWebSocketMessage = (message) => {
 
         case 'REFUND_UPDATE': {
             const status = data?.status || '';
-            const action = data?.action || '';
             const isApproved = status === 'APPROVED' || status === 'AUTO_APPROVED';
             const isRejected = status === 'REJECTED';
             const title = isApproved ? 'Hoàn tiền đã được duyệt' : isRejected ? 'Yêu cầu hoàn tiền bị từ chối' : 'Cập nhật hoàn tiền';
@@ -177,6 +176,18 @@ const handleWebSocketMessage = (message) => {
         case 'NOTIFICATION_COUNT': {
             const count = data?.unreadCount ?? 0;
             useNotificationStore.setState({ unreadCount: count });
+            window.dispatchEvent(new CustomEvent('notification_count_updated'));
+            break;
+        }
+
+        case 'MEAL_PLAN_REPLACEMENT_UPDATED': {
+            const approved = data?.status === 'APPROVED';
+            if (approved) {
+                toast.success('PT đã duyệt yêu cầu thay món');
+            } else {
+                toast.info('PT đã phản hồi yêu cầu thay món');
+            }
+            window.dispatchEvent(new CustomEvent('meal_plan_replacement_updated', { detail: data }));
             break;
         }
 

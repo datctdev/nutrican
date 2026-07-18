@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../ui/button';
 
@@ -89,6 +88,11 @@ export default function MealPlanDayView({ date, items = [], onUpdateItems, onOpe
                             <span>C: {item.calcCarb}g</span>
                             <span>F: {item.calcFat}g</span>
                           </div>
+                          {item.note && (
+                            <p className={`mt-1.5 text-xs ${item.nameVi?.includes('[CHEAT MEAL]') ? 'font-semibold text-amber-700' : 'text-slate-500'}`}>
+                              {item.note}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2">

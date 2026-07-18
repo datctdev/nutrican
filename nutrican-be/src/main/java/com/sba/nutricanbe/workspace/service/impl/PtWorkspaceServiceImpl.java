@@ -23,6 +23,9 @@ import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
 import com.sba.nutricanbe.user.service.UserProfileService;
+import com.sba.nutricanbe.user.service.NotificationService;
+import com.sba.nutricanbe.user.dto.NotificationPayload;
+import com.sba.nutricanbe.user.enums.NotificationLinkType;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.BodyMetric;
@@ -99,6 +102,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final MealPlanTemplateRepository mealPlanTemplateRepository;
     private final MealPlanTemplateItemRepository mealPlanTemplateItemRepository;
     private final StorageService storageService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -751,30 +755,70 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         MealPlanSuggestion suggestion = mealPlanSuggestionRepository.findById(suggestionId)
                 .orElseThrow(() -> new ResourceNotFoundException("MealPlanSuggestion", suggestionId));
         assertActiveMapping(ptId, suggestion.getCustomerId());
+        if (suggestion.getStatus() != MealPlanSuggestionStatus.PENDING) {
+            throw new BadRequestException("Only a pending replacement request can be reviewed");
+        }
+        MealPlanItem item = mealPlanItemRepository.findById(suggestion.getMealPlanItemId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "MealPlanItem", suggestion.getMealPlanItemId()));
+        MealPlan plan = mealPlanRepository.findById(item.getMealPlanId())
+                .orElseThrow(() -> new ResourceNotFoundException("MealPlan", item.getMealPlanId()));
+        if (!ptId.equals(plan.getPtId())) {
+            throw new UnauthorizedException("You can only review requests for your own meal plans");
+        }
+        if (item.getPlanDate().isBefore(LocalDate.now())) {
+            suggestion.setStatus(MealPlanSuggestionStatus.EXPIRED);
+            suggestion.setDecidedAt(LocalDateTime.now());
+            return ApiResponse.success(toSuggestionDto(mealPlanSuggestionRepository.save(suggestion)),
+                    "Suggestion expired because the meal date has passed");
+        }
+        if (Boolean.TRUE.equals(item.getEaten()) || item.getSkipReason() != null) {
+            throw new BadRequestException("The item is no longer eligible for replacement");
+        }
         String action = request.getAction() != null ? request.getAction().toUpperCase() : "";
         if ("APPROVE".equals(action)) {
             suggestion.setStatus(MealPlanSuggestionStatus.APPROVED);
-            mealPlanItemRepository.findById(suggestion.getMealPlanItemId()).ifPresent(item -> {
-                if (suggestion.getSuggestedFoodCode() != null) {
-                    item.setFoodCode(suggestion.getSuggestedFoodCode());
-                }
-                if (suggestion.getSuggestedFoodName() != null) {
-                    item.setFreeText(suggestion.getSuggestedFoodName());
-                }
-                if (suggestion.getSuggestedGram() != null) {
-                    item.setPortionGrams(suggestion.getSuggestedGram());
-                }
-                item.setSkipReason(null);
-                item.setSkipNote(null);
-                mealPlanItemRepository.save(item);
-            });
+            if (suggestion.getSuggestedFoodCode() != null) {
+                item.setFoodCode(suggestion.getSuggestedFoodCode());
+            }
+            if (suggestion.getSuggestedFoodName() != null) {
+                item.setFreeText(suggestion.getSuggestedFoodName());
+            }
+            if (suggestion.getSuggestedGram() != null) {
+                item.setPortionGrams(suggestion.getSuggestedGram());
+            }
+            item.setEaten(false);
+            item.setSkipReason(null);
+            item.setSkipNote(null);
+            mealPlanItemRepository.save(item);
         } else if ("REJECT".equals(action)) {
+            if (request.getPtNote() == null || request.getPtNote().isBlank()) {
+                throw new BadRequestException("ptNote is required when rejecting a replacement request");
+            }
             suggestion.setStatus(MealPlanSuggestionStatus.REJECTED);
         } else {
             throw new BadRequestException("action must be APPROVE or REJECT");
         }
         suggestion.setPtNote(request.getPtNote());
-        return ApiResponse.success(toSuggestionDto(mealPlanSuggestionRepository.save(suggestion)), "Suggestion updated");
+        suggestion.setDecidedAt(LocalDateTime.now());
+        MealPlanSuggestion saved = mealPlanSuggestionRepository.save(suggestion);
+        notificationService.notify(suggestion.getCustomerId(), NotificationPayload.builder()
+                .type("MEAL_PLAN_REPLACEMENT_" + suggestion.getStatus().name())
+                .title(suggestion.getStatus() == MealPlanSuggestionStatus.APPROVED
+                        ? "PT đã duyệt thay món" : "PT từ chối thay món")
+                .body(suggestion.getStatus() == MealPlanSuggestionStatus.APPROVED
+                        ? suggestion.getSuggestedFoodName()
+                        : request.getPtNote())
+                .linkType(NotificationLinkType.MEAL_PLAN)
+                .linkRefId(plan.getId())
+                .sendEmail(false)
+                .build());
+        webSocketSessionService.sendToUserOnly(suggestion.getCustomerId(), "MEAL_PLAN_REPLACEMENT_UPDATED",
+                Map.of(
+                        "suggestionId", suggestion.getId(),
+                        "status", suggestion.getStatus().name(),
+                        "mealPlanItemId", suggestion.getMealPlanItemId()));
+        return ApiResponse.success(toSuggestionDto(saved), "Suggestion updated");
     }
 
     @Override
@@ -805,23 +849,56 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ApiResponse<List<MealPlanSuggestionDto>> getPendingMealPlanSuggestions(UUID ptId, UUID clientId) {
         assertActiveMapping(ptId, clientId);
         return ApiResponse.success(mealPlanSuggestionRepository
                 .findByCustomerIdAndStatus(clientId, MealPlanSuggestionStatus.PENDING)
-                .stream().map(this::toSuggestionDto).toList());
+                .stream()
+                .filter(suggestion -> isSuggestionOwnedByPt(suggestion, ptId))
+                .map(this::expireSuggestionIfStale)
+                .filter(suggestion -> suggestion.getStatus() == MealPlanSuggestionStatus.PENDING)
+                .map(this::toSuggestionDto)
+                .toList());
     }
 
     private MealPlanSuggestionDto toSuggestionDto(MealPlanSuggestion s) {
+        MealPlanItem item = mealPlanItemRepository.findById(s.getMealPlanItemId()).orElse(null);
         return MealPlanSuggestionDto.builder()
                 .id(s.getId())
                 .mealPlanItemId(s.getMealPlanItemId())
+                .originalFoodCode(s.getOriginalFoodCode())
+                .originalFoodName(s.getOriginalFoodName())
+                .originalGram(s.getOriginalGram())
                 .suggestedFoodCode(s.getSuggestedFoodCode())
                 .suggestedFoodName(s.getSuggestedFoodName())
                 .suggestedGram(s.getSuggestedGram())
+                .requestReason(s.getRequestReason())
+                .customerNote(s.getCustomerNote())
+                .ptNote(s.getPtNote())
+                .planDate(item != null ? item.getPlanDate() : null)
+                .mealType(item != null && item.getMealType() != null ? item.getMealType().name() : null)
                 .status(s.getStatus() != null ? s.getStatus().name() : null)
+                .createdAt(s.getCreatedAt())
+                .decidedAt(s.getDecidedAt())
                 .build();
+    }
+
+    private boolean isSuggestionOwnedByPt(MealPlanSuggestion suggestion, UUID ptId) {
+        return mealPlanItemRepository.findById(suggestion.getMealPlanItemId())
+                .flatMap(item -> mealPlanRepository.findById(item.getMealPlanId()))
+                .map(plan -> ptId.equals(plan.getPtId()))
+                .orElse(false);
+    }
+
+    private MealPlanSuggestion expireSuggestionIfStale(MealPlanSuggestion suggestion) {
+        MealPlanItem item = mealPlanItemRepository.findById(suggestion.getMealPlanItemId()).orElse(null);
+        if (item != null && item.getPlanDate().isBefore(LocalDate.now())) {
+            suggestion.setStatus(MealPlanSuggestionStatus.EXPIRED);
+            suggestion.setDecidedAt(LocalDateTime.now());
+            return mealPlanSuggestionRepository.save(suggestion);
+        }
+        return suggestion;
     }
 
     private void assertActiveMapping(UUID ptId, UUID clientId) {
@@ -1032,6 +1109,11 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     @Transactional
     public ApiResponse<Void> applyTemplateToClient(UUID ptId, UUID templateId, UUID clientId, ApplyTemplateRequest request) {
         assertActiveMapping(ptId, clientId);
+        MealPlanTemplate template = mealPlanTemplateRepository.findById(templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("MealPlanTemplate", templateId));
+        if (!ptId.equals(template.getPtId())) {
+            throw new UnauthorizedException("You can only apply your own meal-plan templates");
+        }
         LocalDate weekStart = LocalDate.parse(request.getWeekStart());
         
         List<MealPlanTemplateItem> templateItems = mealPlanTemplateItemRepository.findByTemplateIdOrderByDayOffsetAscMealTypeAsc(templateId);
@@ -1043,10 +1125,14 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .orElseGet(() -> {
                     MealPlan newPlan = MealPlan.builder()
                             .clientId(clientId)
+                            .ptId(ptId)
                             .weekStart(weekStart)
                             .build();
                     return mealPlanRepository.save(newPlan);
                 });
+
+        plan.setPtId(ptId);
+        plan = mealPlanRepository.save(plan);
                 
         // OVERRIDE: Delete existing items for that plan
         mealPlanItemRepository.deleteByMealPlanId(plan.getId());
@@ -1060,6 +1146,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                     .foodCode(tItem.getFoodCode())
                     .freeText(tItem.getFreeText())
                     .portionGrams(tItem.getPortionGrams())
+                    .note(tItem.getNote())
                     .build();
             mealPlanItemRepository.save(item);
         }
