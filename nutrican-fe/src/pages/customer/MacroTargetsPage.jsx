@@ -78,11 +78,6 @@ export default function MacroTargetsPage() {
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
   const [savingHealth, setSavingHealth] = useState(false);
   const [userGender, setUserGender] = useState('male');
-  const [postMealRatingOptIn, setPostMealRatingOptIn] = useState(true);
-  const [hireResultEmail, setHireResultEmail] = useState(true);
-  const [sosResultEmail, setSosResultEmail] = useState(true);
-  const [weeklySummaryEmail, setWeeklySummaryEmail] = useState(true);
-  const [bodyMetricReminder, setBodyMetricReminder] = useState(true);
 
   // Section 3: Goal & Progress states
   const [goalForm, setGoalForm] = useState({ targetWeight: '', baselineWeight: '', targetDate: '' });
@@ -139,13 +134,6 @@ export default function MacroTargetsPage() {
       if (data.gender) {
         setUserGender(data.gender);
       }
-
-      const optIn = data.notificationOptIn || {};
-      setPostMealRatingOptIn(optIn.postMealRating !== false);
-      setHireResultEmail(optIn.hireResultEmail !== false);
-      setSosResultEmail(optIn.sosResultEmail !== false);
-      setWeeklySummaryEmail(optIn.weeklySummaryEmail !== false);
-      setBodyMetricReminder(optIn.bodyMetricReminder !== false);
 
       const g = goalsRes.data.data;
       setProgressGoals(g);
@@ -366,13 +354,6 @@ export default function MacroTargetsPage() {
           dietPreference,
           nutritionGoal,
           pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
-          notificationOptIn: {
-            postMealRating: postMealRatingOptIn,
-            hireResultEmail,
-            sosResultEmail,
-            weeklySummaryEmail,
-            bodyMetricReminder,
-          },
         }),
       ]);
       toast.success('Đã lưu sức khỏe & dinh dưỡng');
@@ -958,44 +939,6 @@ export default function MacroTargetsPage() {
                     </select>
                   </div>
                 )}
-
-                <label className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={postMealRatingOptIn}
-                    onChange={(e) => setPostMealRatingOptIn(e.target.checked)}
-                    className="rounded border-slate-350 text-blue-600 mt-1"
-                  />
-                  <div>
-                    <p className="text-sm font-extrabold text-slate-800">Nhắc đánh giá sau bữa ăn</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Tự động kích hoạt thông báo nhắc nhở đánh giá độ hài lòng khoảng 30 phút sau khi bạn ghi nhận bữa ăn.</p>
-                  </div>
-                </label>
-
-                <div className="space-y-3 pt-4 border-t border-slate-100">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Đăng ký thông báo qua Email</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[
-                      { checked: hireResultEmail, set: setHireResultEmail, title: 'Kết quả thuê PT', desc: 'Nhận email thông báo khi PT chấp nhận/từ chối.' },
-                      { checked: sosResultEmail, set: setSosResultEmail, title: 'Yêu cầu khẩn cấp (SOS)', desc: 'Nhận email khi ticket SOS được xử lý/phân công.' },
-                      { checked: weeklySummaryEmail, set: setWeeklySummaryEmail, title: 'Báo cáo tổng kết tuần', desc: 'Nhận email chứa đánh giá chi tiết hàng tuần từ PT.' },
-                      { checked: bodyMetricReminder, set: setBodyMetricReminder, title: 'Nhắc ghi cân hàng tuần', desc: 'Thông báo nhắc nếu bạn chưa ghi cân nặng quá 7 ngày.' },
-                    ].map((item) => (
-                      <label key={item.title} className="flex items-start gap-3 p-3.5 rounded-2xl border border-slate-100 bg-white hover:bg-slate-50/50 cursor-pointer transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={(e) => item.set(e.target.checked)}
-                          className="rounded border-slate-350 text-blue-600 mt-1"
-                        />
-                        <div>
-                          <p className="text-sm font-extrabold text-slate-800">{item.title}</p>
-                          <p className="text-[11px] text-slate-500 mt-0.5">{item.desc}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
 
                 <div className="pt-4 border-t border-slate-100 flex gap-3">
                   <Button

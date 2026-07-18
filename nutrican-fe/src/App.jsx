@@ -34,6 +34,7 @@ import OnboardingGuard from './components/common/OnboardingGuard';
 import ChatPage from './pages/pt/ChatPage';
 import CustomerChatPage from './pages/customer/CustomerChatPage';
 import OnboardingPage from './pages/customer/OnboardingPage';
+import SettingPage from './pages/customer/SettingPage';
 
 function App() {
     const router = createBrowserRouter([
@@ -80,6 +81,10 @@ function App() {
                 {
                     path: '/kyc',
                     element: <ProtectedRoute><KycPage /></ProtectedRoute>,
+                },
+                {
+                    path: '/settings',
+                    element: <ProtectedRoute><SettingPage /></ProtectedRoute>,
                 },
                 {
                     path: '/chat',

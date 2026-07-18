@@ -266,9 +266,11 @@ export default function Header() {
                                                     <Link to="/profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
                                                         <User className="w-4 h-4 text-slate-400" /> Trang cá nhân
                                                     </Link>
-                                                    <Link to="/kyc" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
-                                                        <User className="w-4 h-4 text-slate-400" /> Trở thành huấn luyện viên
-                                                    </Link>
+                                                    {user?.role === 'CUSTOMER' && (
+                                                        <Link to="/kyc" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
+                                                            <User className="w-4 h-4 text-slate-400" /> Trở thành huấn luyện viên
+                                                        </Link>
+                                                    )}
                                                     <Link to="/settings" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
                                                         <Settings className="w-4 h-4 text-slate-400" /> Cài đặt
                                                     </Link>
