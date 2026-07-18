@@ -136,9 +136,7 @@ public class OnboardingServiceImpl implements OnboardingService {
                 .filter(c -> c != null && c.compareTo(BigDecimal.ZERO) > 0)
                 .isPresent();
         boolean forceRedirect = !completed
-                && user.getOnboardingSkippedAt() == null
-                && user.getOnboardingStep() != null
-                && user.getOnboardingStep() > 0;
+                && user.getOnboardingSkippedAt() == null;
         boolean showBanner = !completed && !forceRedirect;
 
         List<String> missing = new ArrayList<>();

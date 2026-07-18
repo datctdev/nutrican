@@ -67,15 +67,15 @@ function App() {
                 },
                 {
                     path: '/profile',
-                    element: <ProtectedRoute><ProfilePage /></ProtectedRoute>,
+                    element: <ProtectedRoute><OnboardingGuard><ProfilePage /></OnboardingGuard></ProtectedRoute>,
                 },
                 {
                     path: '/coaching',
-                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><CoachingPage /></ProtectedRoute>,
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><OnboardingGuard><CoachingPage /></OnboardingGuard></ProtectedRoute>,
                 },
                 {
                     path: '/macro-targets',
-                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><MacroTargetsPage /></ProtectedRoute>,
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><OnboardingGuard><MacroTargetsPage /></OnboardingGuard></ProtectedRoute>,
                 },
                 {
                     path: '/kyc',
@@ -83,7 +83,7 @@ function App() {
                 },
                 {
                     path: '/chat',
-                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><CustomerChatPage /></ProtectedRoute>,
+                    element: <ProtectedRoute allowedRoles={['CUSTOMER']}><OnboardingGuard><CustomerChatPage /></OnboardingGuard></ProtectedRoute>,
                 },
                 {
                     path: '/admin',

@@ -69,6 +69,14 @@ export const useAuthStore = create(
           let redirectPath = '/diet';
           if (role === 'ADMIN') redirectPath = '/admin';
           else if (role === 'PT_CERTIFIED' || role === 'PT_FREELANCE') redirectPath = '/pt';
+          else if (role === 'CUSTOMER') {
+            try {
+              const { resolveCustomerHomePath } = await import('../services/profileExtensionsService');
+              redirectPath = await resolveCustomerHomePath();
+            } catch (e) {
+              redirectPath = '/diet';
+            }
+          }
           window.location.href = redirectPath;
           return response;
         } catch (error) {
