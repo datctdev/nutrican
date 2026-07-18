@@ -11,12 +11,15 @@ export const useNotificationStore = create((set) => ({
     unreadCount: state.unreadCount + 1,
   })),
 
-  markAsRead: (id) => set((state) => ({
-    notifications: state.notifications.map((n) =>
-      n.id === id ? { ...n, isRead: true } : n
-    ),
-    unreadCount: Math.max(0, state.unreadCount - 1),
-  })),
+  markAsRead: (id) => set((state) => {
+    const wasUnread = state.notifications.some((n) => n.id === id && !n.isRead);
+    return {
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, isRead: true } : n
+      ),
+      unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount,
+    };
+  }),
 
   markAllAsRead: () => set((state) => ({
     notifications: state.notifications.map((n) => ({ ...n, isRead: true })),

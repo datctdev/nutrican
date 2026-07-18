@@ -7,6 +7,7 @@ import { dietService } from '../../services/dietService';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 import ProgressTimelineCard from '../customer/components/ProgressTimelineCard';
+import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlanSuggestionReviewList';
 import { toast } from 'sonner';
 import { ArrowLeft, TrendingUp, Utensils, Camera, Loader2 } from 'lucide-react';
 
@@ -828,31 +829,14 @@ export default function ClientProgressPage() {
 
           {data?.pendingSuggestions?.length > 0 && (
             <Card>
-              <CardContent className="p-5 space-y-2">
-                <p className="text-sm font-bold text-slate-600">Đề nghị thay món chờ duyệt</p>
-                {data.pendingSuggestions.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between gap-2 text-sm p-2 rounded-lg bg-violet-50 border border-violet-100">
-                    <span>{s.suggestedFoodName} {s.suggestedGram ? `(${s.suggestedGram}g)` : ''}</span>
-                    <div className="flex gap-1">
-                      <Button size="sm" onClick={async () => {
-                        try {
-                          await workspaceService.reviewMealPlanSuggestion(s.id, { action: 'APPROVE' });
-                          toast.success('Đã duyệt');
-                          const res = await workspaceService.getClientProgress(clientId);
-                          setData(res.data.data);
-                        } catch { toast.error('Lỗi duyệt'); }
-                      }}>Duyệt</Button>
-                      <Button size="sm" variant="outline" onClick={async () => {
-                        try {
-                          await workspaceService.reviewMealPlanSuggestion(s.id, { action: 'REJECT' });
-                          toast.success('Đã từ chối');
-                          const res = await workspaceService.getClientProgress(clientId);
-                          setData(res.data.data);
-                        } catch { toast.error('Lỗi'); }
-                      }}>Từ chối</Button>
-                    </div>
-                  </div>
-                ))}
+              <CardContent className="p-5">
+                <MealPlanSuggestionReviewList
+                  suggestions={data.pendingSuggestions}
+                  onUpdated={async () => {
+                    const response = await workspaceService.getClientProgress(clientId);
+                    setData(response.data.data);
+                  }}
+                />
               </CardContent>
             </Card>
           )}

@@ -12,6 +12,8 @@ import java.util.UUID;
 @Repository
 public interface MealPlanRepository extends JpaRepository<MealPlan, UUID> {
     Optional<MealPlan> findFirstByClientIdAndWeekStartOrderByCreatedAtDesc(UUID clientId, LocalDate weekStart);
+    Optional<MealPlan> findFirstByClientIdAndWeekStartAndIsPublishedTrueOrderByCreatedAtDesc(
+            UUID clientId, LocalDate weekStart);
     List<MealPlan> findByClientIdOrderByWeekStartDesc(UUID clientId);
     List<MealPlan> findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(UUID clientId);
 }

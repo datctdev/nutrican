@@ -4,7 +4,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { userService } from '../../services/userService';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 import ProgressTimelineCard from './components/ProgressTimelineCard';
-import MealPlanSkipModal from './components/MealPlanSkipModal';
 import { mealPlanService } from '../../services/mealPlanService';
 import { appointmentService } from '../../services/appointmentService';
 import { refundService } from '../../services/refundService';
@@ -86,8 +85,6 @@ export default function ProfilePage() {
   const [loadingMealPlan, setLoadingMealPlan] = useState(false);
   const [weeklySummaries, setWeeklySummaries] = useState([]);
   const [newWeeklySummary, setNewWeeklySummary] = useState(false);
-  const [skipModalItemId, setSkipModalItemId] = useState(null);
-  const [skippingMeal, setSkippingMeal] = useState(false);
   const [postMealRatingOptIn, setPostMealRatingOptIn] = useState(true);
   const [hireResultEmail, setHireResultEmail] = useState(true);
   const [sosResultEmail, setSosResultEmail] = useState(true);
@@ -253,42 +250,6 @@ export default function ProfilePage() {
       setMealPlanItems((items) => items.map((i) => (i.id === itemId ? { ...i, eaten } : i)));
     } catch {
       toast.error('Không thể cập nhật món ăn');
-    }
-  };
-
-  const handleSkipMeal = (itemId) => {
-    setSkipModalItemId(itemId);
-  };
-
-  const confirmSkipMeal = async ({ skipReason, skipNote }) => {
-    if (!skipModalItemId) return;
-    setSkippingMeal(true);
-    try {
-      await mealPlanService.skipItem(skipModalItemId, { skipReason, skipNote });
-      setMealPlanItems((items) => items.map((i) => (
-        i.id === skipModalItemId ? { ...i, eaten: false, skipReason } : i
-      )));
-      toast.success('Đã ghi nhận bỏ qua món');
-      setSkipModalItemId(null);
-    } catch {
-      toast.error('Không thể bỏ qua món');
-    } finally {
-      setSkippingMeal(false);
-    }
-  };
-
-  const handleSuggestReplacement = async (itemId) => {
-    const name = window.prompt('Món bạn muốn thay thế:');
-    if (!name) return;
-    const gram = window.prompt('Khẩu phần (g):', '350');
-    try {
-      await mealPlanService.suggestReplacement(itemId, {
-        suggestedFoodName: name,
-        suggestedGram: gram ? Number(gram) : undefined,
-      });
-      toast.success('Đã gửi đề nghị thay thế cho PT');
-    } catch {
-      toast.error('Không gửi được đề nghị');
     }
   };
 
@@ -481,12 +442,15 @@ export default function ProfilePage() {
       {/* Meal plan */}
       <Card className="border-slate-200 shadow-sm">
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <Utensils className="w-5 h-5 text-emerald-600" />
             <h3 className="text-lg font-bold text-slate-900">Thực đơn tuần</h3>
             {newWeeklySummary && (
               <span className="text-[10px] font-bold text-white bg-violet-600 px-2 py-0.5 rounded-full">Tổng kết mới</span>
             )}
+            <Button type="button" variant="outline" size="sm" onClick={() => navigate('/coaching?tab=meal-plan')} className="ml-auto rounded-xl text-xs font-bold">
+              Quản lý thực đơn
+            </Button>
           </div>
           {weeklySummaries.length > 0 && (
             <div className="mb-4 p-4 rounded-xl bg-violet-50 border border-violet-100 space-y-2">
@@ -540,16 +504,6 @@ export default function ProfilePage() {
                           )}
                         </div>
                         {item.eaten && <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
-                        <div className="flex flex-col gap-1 flex-shrink-0">
-                          <Button type="button" size="sm" variant="outline" className="text-[10px] h-7"
-                            onClick={(e) => { e.preventDefault(); handleSuggestReplacement(item.id); }}>
-                            Đề nghị
-                          </Button>
-                          <Button type="button" size="sm" variant="ghost" className="text-[10px] h-7 text-amber-700"
-                            onClick={(e) => { e.preventDefault(); handleSkipMeal(item.id); }}>
-                            Bỏ qua
-                          </Button>
-                        </div>
                       </label>
                     ))}
                   </div>
@@ -766,12 +720,6 @@ export default function ProfilePage() {
         </div>
       </Modal>
 
-      <MealPlanSkipModal
-        open={!!skipModalItemId}
-        onClose={() => setSkipModalItemId(null)}
-        onConfirm={confirmSkipMeal}
-        saving={skippingMeal}
-      />
     </div>
   );
 }

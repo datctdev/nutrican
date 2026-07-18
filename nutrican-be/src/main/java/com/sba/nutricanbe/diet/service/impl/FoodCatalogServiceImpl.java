@@ -17,8 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -110,9 +113,34 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
     @Override
     @Transactional(readOnly = true)
     public List<FoodItemResponse> getByCodes(List<String> codes) {
-        if (codes == null || codes.isEmpty()) return List.of();
-        return foodItemRepository.findByFoodCodeIn(codes).stream()
-                .map(this::toResponse).collect(Collectors.toList());
+        if (codes == null || codes.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, FoodItem> foodsByCode = new LinkedHashMap<>();
+        for (FoodItem food : foodItemRepository.findAll()) {
+            if (food.getFoodCode() != null && !food.getFoodCode().isBlank()) {
+                foodsByCode.putIfAbsent(normalizeCode(food.getFoodCode()), food);
+            }
+            if (food.getAliases() != null) {
+                food.getAliases().stream()
+                        .filter(alias -> alias != null && !alias.isBlank())
+                        .forEach(alias -> foodsByCode.putIfAbsent(normalizeCode(alias), food));
+            }
+        }
+
+        return codes.stream()
+                .filter(Objects::nonNull)
+                .map(this::normalizeCode)
+                .map(foodsByCode::get)
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private String normalizeCode(String code) {
+        return code.trim().toLowerCase(Locale.ROOT);
     }
 
     @Override
@@ -130,17 +158,17 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
         if (foodCode == null || foodCode.isBlank()) {
             return Optional.empty();
         }
-        String code = foodCode.trim().toLowerCase(Locale.ROOT);
+        String code = normalizeCode(foodCode);
 
-        Optional<FoodItemResponse> bySource = foodItemRepository.findAll().stream()
-                .filter(f -> ResNetFoodDefaults.SOURCE.equals(f.getSource())
-                        || "RESNET_VTN_10".equals(f.getSource()))
-                .filter(f -> f.getAliases() != null && f.getAliases().stream()
-                        .anyMatch(alias -> code.equals(alias.toLowerCase(Locale.ROOT))))
+        Optional<FoodItemResponse> byCode = foodItemRepository.findAll().stream()
+                .filter(f -> (f.getFoodCode() != null && code.equals(normalizeCode(f.getFoodCode())))
+                        || (f.getAliases() != null && f.getAliases().stream()
+                        .filter(Objects::nonNull)
+                        .anyMatch(alias -> code.equals(normalizeCode(alias)))))
                 .findFirst()
                 .map(this::toResponse);
-        if (bySource.isPresent()) {
-            return bySource;
+        if (byCode.isPresent()) {
+            return byCode;
         }
 
         return ResNetFoodCodeMapping.catalogNameVi(code)
