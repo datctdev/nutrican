@@ -32,6 +32,8 @@ public class ProgressDataDto {
     private List<MealPlanSuggestionDto> pendingSuggestions;
     private List<PostMealWeekAggregateDto> postMealAggregate;
     private List<WeeklySummaryDto> weeklySummaries;
+    private List<MealPlanWeekOption> mealPlanWeeks;
+    private MealPlanAdherenceSummary mealPlanAdherence;
 
     @Data
     @Builder
@@ -65,5 +67,49 @@ public class ProgressDataDto {
         private BigDecimal avgFat;
         private BigDecimal adherenceRate;
         private BigDecimal mealPlanAdherenceRate;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MealPlanWeekOption {
+        private UUID planId;
+        private LocalDate weekStart;
+        private LocalDate weekEnd;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MealPlanAdherenceSummary {
+        private LocalDate weekStart;
+        private LocalDate weekEnd;
+        private Integer totalItems;
+        private Integer dueItems;
+        private Integer eatenItems;
+        private Integer skippedItems;
+        private Integer pendingItems;
+        private Integer expectedMealSlots;
+        private Integer loggedMealSlots;
+        private BigDecimal adherenceRate;
+        private BigDecimal logCoverageRate;
+        private List<DailyMealPlanAdherence> daily;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class DailyMealPlanAdherence {
+        private LocalDate date;
+        private Integer totalItems;
+        private Integer dueItems;
+        private Integer eatenItems;
+        private Integer skippedItems;
+        private Integer pendingItems;
+        private BigDecimal adherenceRate;
+        private Boolean future;
     }
 }
