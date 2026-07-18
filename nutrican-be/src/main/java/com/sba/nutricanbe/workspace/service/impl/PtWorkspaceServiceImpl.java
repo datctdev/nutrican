@@ -891,7 +891,6 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .gender(request.getGender())
                 .dateOfBirth(request.getDateOfBirth())
                 .allergyNotes(request.getAllergyNotes())
-                .allergicFoodCodes(request.getAllergicFoodCodes())
                 .dietPreference(request.getDietPreference() != null ? request.getDietPreference() : com.sba.nutricanbe.user.enums.DietPreference.NORMAL)
                 .address(request.getSpecialNotes())
                 .role(com.sba.nutricanbe.common.enums.UserRole.CUSTOMER)

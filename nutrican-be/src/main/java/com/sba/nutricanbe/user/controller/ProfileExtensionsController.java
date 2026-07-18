@@ -45,23 +45,18 @@ public class ProfileExtensionsController {
     private final BodyMetricRepository bodyMetricRepository;
     private final com.sba.nutricanbe.user.service.OnboardingService onboardingService;
     private final com.sba.nutricanbe.user.service.CoachingLifecycleService coachingLifecycleService;
-
     @GetMapping("/allergies")
-    public ResponseEntity<ApiResponse<AllergyProfileRequest>> getAllergies(@AuthenticationPrincipal User user) {
-        AllergyProfileRequest res = new AllergyProfileRequest();
-        res.setAllergyNotes(user.getAllergyNotes() != null ? user.getAllergyNotes() : "");
-        res.setAllergicFoodCodes(user.getAllergicFoodCodes() != null ? user.getAllergicFoodCodes() : java.util.List.of());
-        return ResponseEntity.ok(ApiResponse.success(res));
+    public ResponseEntity<ApiResponse<String>> getAllergies(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.success(user.getAllergyNotes() != null ? user.getAllergyNotes() : "", "Allergies fetched"));
     }
 
     @PutMapping("/allergies")
-    public ResponseEntity<ApiResponse<AllergyProfileRequest>> updateAllergies(
+    public ResponseEntity<ApiResponse<String>> updateAllergies(
             @AuthenticationPrincipal User user,
             @RequestBody AllergyProfileRequest request) {
         user.setAllergyNotes(request.getAllergyNotes());
-        user.setAllergicFoodCodes(request.getAllergicFoodCodes());
         userRepository.save(user);
-        return ResponseEntity.ok(ApiResponse.success(request, "Allergies updated"));
+        return ResponseEntity.ok(ApiResponse.success(request.getAllergyNotes(), "Allergies updated"));
     }
 
     @PutMapping("/preferences")
