@@ -64,8 +64,11 @@ public class PtWorkspaceController {
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return ResponseEntity.ok(ptWorkspaceService.getClientProgress(user.getId(), clientId, startDate, endDate));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate mealPlanWeekStart) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientProgress(
+                user.getId(), clientId, startDate, endDate, mealPlanWeekStart));
     }
 
     @GetMapping("/clients/{clientId}/body-metrics")

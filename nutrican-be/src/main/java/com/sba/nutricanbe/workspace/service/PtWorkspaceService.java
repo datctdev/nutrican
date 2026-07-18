@@ -38,6 +38,9 @@ public interface PtWorkspaceService {
 
     ApiResponse<ProgressDataDto> getClientProgress(UUID ptId, UUID clientId, LocalDate startDate, LocalDate endDate);
 
+    ApiResponse<ProgressDataDto> getClientProgress(
+            UUID ptId, UUID clientId, LocalDate startDate, LocalDate endDate, LocalDate mealPlanWeekStart);
+
     ApiResponse<Void> assignClient(UUID ptId, UUID clientId);
 
     ApiResponse<PtStatsDto> getStats(UUID ptId);
