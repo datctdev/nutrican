@@ -246,6 +246,7 @@ export default function MealPlanWeekView({
             (item) => latestSuggestionByItem.get(item.id)?.status === 'PENDING',
           );
           const dateHasPassed = activeDate < todayKey;
+          const dateIsFuture = activeDate > todayKey;
 
           return (
             <section key={mealType} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -292,7 +293,7 @@ export default function MealPlanWeekView({
                     const suggestion = latestSuggestionByItem.get(item.id);
                     const pendingReplacement = suggestion?.status === 'PENDING';
                     const skipped = Boolean(item.skipReason);
-                    const locked = dateHasPassed || pendingReplacement || skipped;
+                    const locked = dateHasPassed || dateIsFuture || pendingReplacement || skipped;
 
                     return (
                       <div
@@ -310,6 +311,7 @@ export default function MealPlanWeekView({
                         <input
                           type="checkbox"
                           aria-label={`Đánh dấu đã ăn ${getDisplayName(item)}`}
+                          title={dateIsFuture ? 'Chỉ có thể xác nhận đã ăn khi đến ngày' : undefined}
                           checked={!!item.eaten}
                           disabled={locked}
                           onChange={(event) => onMarkEaten(item.id, event.target.checked)}
