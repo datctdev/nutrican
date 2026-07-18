@@ -8,11 +8,13 @@ import { profileExtensionsService } from '../../services/profileExtensionsServic
 import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 import ProgressTimelineCard from '../customer/components/ProgressTimelineCard';
 import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlanSuggestionReviewList';
+import MealPlanWeekPicker from '../customer/components/MealPlanWeekPicker';
 import { toast } from 'sonner';
 import { ArrowLeft, TrendingUp, Utensils, Camera, Loader2 } from 'lucide-react';
 
 function AdherenceDonut({ percent }) {
-  const p = Math.min(100, Math.max(0, Number(percent) || 0));
+  const hasValue = percent !== null && percent !== undefined && Number.isFinite(Number(percent));
+  const p = hasValue ? Math.min(100, Math.max(0, Number(percent))) : 0;
   const r = 36;
   const c = 2 * Math.PI * r;
   const offset = c - (p / 100) * c;
@@ -23,7 +25,9 @@ function AdherenceDonut({ percent }) {
         <circle cx="48" cy="48" r={r} fill="none" stroke="#10b981" strokeWidth="10"
           strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round" />
       </svg>
-      <p className="text-2xl font-bold text-emerald-600 -mt-14 rotate-0">{p}%</p>
+      <p className="text-2xl font-bold text-emerald-600 -mt-14 rotate-0">
+        {hasValue ? `${p}%` : '—'}
+      </p>
       <p className="text-xs text-slate-500 mt-8">Tuân thủ thực đơn</p>
     </div>
   );
@@ -131,6 +135,8 @@ export default function ClientProgressPage() {
 
   const [isEditingMacros, setIsEditingMacros] = useState(false);
   const [savingMacros, setSavingMacros] = useState(false);
+  const [selectedMealPlanWeek, setSelectedMealPlanWeek] = useState('');
+  const [loadingMealPlanWeek, setLoadingMealPlanWeek] = useState(false);
   const [macroForm, setMacroForm] = useState({
     nutritionGoal: 'MAINTAIN',
     dailyCalories: '',
@@ -138,6 +144,17 @@ export default function ClientProgressPage() {
     carb: '',
     fat: '',
   });
+
+  const loadProgress = useCallback(async (weekStart) => {
+    const params = weekStart ? { mealPlanWeekStart: weekStart } : undefined;
+    const response = await workspaceService.getClientProgress(clientId, params);
+    const progressData = response.data.data;
+    setData(progressData);
+    if (progressData?.mealPlanAdherence?.weekStart) {
+      setSelectedMealPlanWeek(progressData.mealPlanAdherence.weekStart);
+    }
+    return progressData;
+  }, [clientId]);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -167,8 +184,7 @@ export default function ClientProgressPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await workspaceService.getClientProgress(clientId);
-        setData(res.data.data);
+        await loadProgress();
       } catch {
         toast.error('Không tải được tiến độ học viên');
       } finally {
@@ -181,7 +197,20 @@ export default function ClientProgressPage() {
         loadProfile();
       }, 0);
     }
-  }, [clientId, loadProfile]);
+  }, [clientId, loadProfile, loadProgress]);
+
+  useEffect(() => {
+    const handleMealPlanProgressUpdated = (event) => {
+      const update = event.detail;
+      if (update?.clientId !== clientId) return;
+      if (selectedMealPlanWeek && update?.weekStart !== selectedMealPlanWeek) return;
+      loadProgress(selectedMealPlanWeek || update?.weekStart).catch(() => undefined);
+    };
+    window.addEventListener('meal_plan_progress_updated', handleMealPlanProgressUpdated);
+    return () => {
+      window.removeEventListener('meal_plan_progress_updated', handleMealPlanProgressUpdated);
+    };
+  }, [clientId, loadProgress, selectedMealPlanWeek]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -201,8 +230,7 @@ export default function ClientProgressPage() {
       setEditForm(updatedData);
       setIsEditing(false);
       toast.success('Cập nhật hồ sơ sức khỏe thành công!');
-      const resProg = await workspaceService.getClientProgress(clientId);
-      setData(resProg.data.data);
+      await loadProgress(selectedMealPlanWeek || undefined);
       if (updatedData.allergicFoodCodes && updatedData.allergicFoodCodes.length > 0) {
         dietService.getFoodsByCodes(updatedData.allergicFoodCodes)
           .then(resFoods => setAllergicFoods(resFoods.data?.data || []))
@@ -310,31 +338,108 @@ export default function ClientProgressPage() {
       <Button variant="ghost" onClick={() => navigate('/pt/clients')} className="gap-2">
         <ArrowLeft className="w-4 h-4" /> Quay lại danh sách
       </Button>
-      <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-        <TrendingUp className="w-6 h-6 text-primary" />
-        {data?.clientName || 'Tiến độ học viên'}
-      </h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+          <TrendingUp className="w-6 h-6 text-primary" />
+          {data?.clientName || 'Tiến độ học viên'}
+        </h1>
+        {data?.mealPlanWeeks?.length > 0 && (
+          <MealPlanWeekPicker
+            weeks={data.mealPlanWeeks}
+            value={selectedMealPlanWeek}
+            loading={loadingMealPlanWeek}
+            onChange={async (weekStart) => {
+              setSelectedMealPlanWeek(weekStart);
+              setLoadingMealPlanWeek(true);
+              try {
+                await loadProgress(weekStart);
+              } catch {
+                toast.error('Không tải được tiến độ tuần đã chọn');
+              } finally {
+                setLoadingMealPlanWeek(false);
+              }
+            }}
+          />
+        )}
+      </div>
       {loading ? (
         <p className="text-slate-500">Đang tải...</p>
       ) : (
         <>
           <div className="grid md:grid-cols-4 gap-4">
             <Card><CardContent className="p-5">
-              <p className="text-sm text-slate-500">Calories TB/ngày</p>
+              <p className="text-sm text-slate-500">Calories TB/ngày trong tuần</p>
               <p className="text-2xl font-bold">{summary?.avgCalories ?? '—'}</p>
+              <p className="mt-1 text-xs text-slate-400">Tổng các bữa theo ngày rồi lấy trung bình</p>
             </CardContent></Card>
             <Card><CardContent className="p-5">
-              <p className="text-sm text-slate-500">Protein TB</p>
-              <p className="text-2xl font-bold">{summary?.avgProtein ?? '—'}g</p>
+              <p className="text-sm text-slate-500">Protein TB/ngày trong tuần</p>
+              <p className="text-2xl font-bold">
+                {summary?.avgProtein != null ? `${summary.avgProtein}g` : '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">Chỉ lấy nhật ký đã ghi nhận</p>
             </CardContent></Card>
-            <Card><CardContent className="p-5 flex justify-center">
-              <AdherenceDonut percent={summary?.mealPlanAdherenceRate} />
+            <Card><CardContent className="flex flex-col items-center p-5">
+              <AdherenceDonut percent={data?.mealPlanAdherence?.adherenceRate} />
+              <p className="mt-2 text-center text-xs text-slate-500">
+                <strong className="text-emerald-700">{data?.mealPlanAdherence?.eatenItems ?? 0}</strong>
+                {' / '}{data?.mealPlanAdherence?.dueItems ?? 0} món đã đến hạn
+              </p>
+              {(data?.mealPlanAdherence?.skippedItems ?? 0) > 0 && (
+                <p className="mt-1 text-[11px] font-semibold text-amber-600">
+                  {data.mealPlanAdherence.skippedItems} món không ăn
+                </p>
+              )}
+              {(data?.mealPlanAdherence?.pendingItems ?? 0) > 0 && (
+                <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                  {data.mealPlanAdherence.pendingItems} món chưa xác nhận
+                </p>
+              )}
             </CardContent></Card>
             <Card><CardContent className="p-5">
-              <p className="text-sm text-slate-500 flex items-center gap-1"><Utensils className="w-3.5 h-3.5" /> Log adherence</p>
-              <p className="text-2xl font-bold">{summary?.adherenceRate != null ? `${summary.adherenceRate}%` : '—'}</p>
+              <p className="flex items-center gap-1 text-sm text-slate-500">
+                <Utensils className="w-3.5 h-3.5" /> Độ phủ nhật ký
+              </p>
+              <p className="text-2xl font-bold">
+                {data?.mealPlanAdherence?.logCoverageRate != null
+                  ? `${data.mealPlanAdherence.logCoverageRate}%`
+                  : '—'}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                {data?.mealPlanAdherence?.loggedMealSlots ?? 0}
+                {' / '}{data?.mealPlanAdherence?.expectedMealSlots ?? 0} bữa đã đến hạn có nhật ký
+              </p>
             </CardContent></Card>
           </div>
+
+          {data?.mealPlanAdherence?.daily?.length > 0 && (
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="p-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                  {data.mealPlanAdherence.daily.map((day) => (
+                    <div
+                      key={day.date}
+                      className={`rounded-xl border px-3 py-2 ${day.future
+                        ? 'border-slate-100 bg-slate-50 text-slate-400'
+                        : Number(day.adherenceRate) === 100
+                          ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-200 bg-white text-slate-700'}`}
+                    >
+                      <p className="text-[10px] font-bold uppercase">
+                        {new Date(`${day.date}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'short' })}
+                      </p>
+                      <p className="text-sm font-extrabold">
+                        {new Date(`${day.date}T00:00:00`).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                      </p>
+                      <p className="mt-1 text-[11px] font-semibold">
+                        {day.future ? 'Chưa đến' : `${day.eatenItems}/${day.dueItems} món`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Hồ sơ sức khỏe & Mục tiêu */}
           {profile && (
@@ -833,8 +938,7 @@ export default function ClientProgressPage() {
                 <MealPlanSuggestionReviewList
                   suggestions={data.pendingSuggestions}
                   onUpdated={async () => {
-                    const response = await workspaceService.getClientProgress(clientId);
-                    setData(response.data.data);
+                    await loadProgress(selectedMealPlanWeek || undefined);
                   }}
                 />
               </CardContent>
