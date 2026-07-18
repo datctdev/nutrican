@@ -1,6 +1,6 @@
 // src/pages/customer/components/FoodInputCard.jsx
-import { 
-    Sparkles, Keyboard, Camera, Upload, RefreshCw, X, ChefHat
+import {
+    Sparkles, Keyboard, Camera, RefreshCw, X, Send, ImagePlus, Star, Trash2
 } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
@@ -13,7 +13,6 @@ export default function FoodInputCard({
     dragActive,
     setDragActive,
     selectedFile,
-    setSelectedFile,
     analyzing,
     handleAnalyze,
     fileInputRef,
@@ -21,7 +20,6 @@ export default function FoodInputCard({
     manualMealType,
     setManualMealType,
     foodSearchQuery,
-    setFoodSearchQuery,
     foodSearchResults,
     searchFoods,
     addIngredientFromSearch,
@@ -29,18 +27,16 @@ export default function FoodInputCard({
     updateIngredientQty,
     removeIngredient,
     ingredientTotals,
+    mealImages = [],
+    mealImageInputRef,
+    handleMealImageSelect,
+    handleRemoveMealImage,
+    handleSetPrimaryMealImage,
+    onPreviewImage,
     handleManualSubmit,
     uploading,
     dietFilterOn,
     setDietFilterOn,
-    manualSendToPt,
-    setManualSendToPt,
-    savedRecipes,
-    recipeName,
-    setRecipeName,
-    handleSaveRecipe,
-    handleLogFromRecipe,
-    handleLogFromSavedRecipe,
 }) {
     return (
         <Card className="overflow-hidden border-slate-200 shadow-sm bg-white">
@@ -60,13 +56,6 @@ export default function FoodInputCard({
                         className={`flex-1 sm:w-36 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'manual' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                         <Keyboard className="w-4 h-4" /> Nhập thủ công
-                    </button>
-                    <button 
-                        type="button"
-                        onClick={() => setInputMode('recipe')} 
-                        className={`flex-1 sm:w-36 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-lg transition-all ${inputMode === 'recipe' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                        <ChefHat className="w-4 h-4" /> Công thức
                     </button>
                 </div>
 
@@ -111,8 +100,8 @@ export default function FoodInputCard({
                             <Button type="button" variant="outline" className="bg-white border-slate-300 text-slate-700 pointer-events-none rounded-xl">Chọn hình ảnh</Button>
                         )}
                     </div>
-                ) : (inputMode === 'manual' || inputMode === 'recipe') ? (
-                    <form onSubmit={inputMode === 'recipe' ? handleLogFromRecipe : handleManualSubmit} className="space-y-5 animate-fade-in bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
+                ) : inputMode === 'manual' ? (
+                    <form onSubmit={handleManualSubmit} className="space-y-5 animate-fade-in bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1.5">Bữa ăn</label>
                             <select 
@@ -126,19 +115,6 @@ export default function FoodInputCard({
                                 <option value="SNACK">Bữa phụ</option>
                             </select>
                         </div>
-
-                        {inputMode === 'recipe' && (
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">Tên công thức</label>
-                                <input
-                                    type="text"
-                                    value={recipeName || ''}
-                                    onChange={(e) => setRecipeName?.(e.target.value)}
-                                    placeholder="Ví dụ: Cơm gà xào"
-                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                                />
-                            </div>
-                        )}
 
                         <label className="flex items-center gap-2 text-sm text-slate-600 mb-2">
                             <input
@@ -215,6 +191,85 @@ export default function FoodInputCard({
                         )}
 
                         {ingredientItems.length > 0 && (
+                            <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-700">Hình ảnh gửi cho PT</p>
+                                        <p className="mt-0.5 text-xs text-slate-500">Có thể chọn nhiều ảnh, tối đa 5MB mỗi ảnh.</p>
+                                    </div>
+                                    <input
+                                        ref={mealImageInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        className="hidden"
+                                        onChange={handleMealImageSelect}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={uploading}
+                                        onClick={() => mealImageInputRef.current?.click()}
+                                        className="rounded-xl border-primary/25 text-primary hover:bg-primary/5"
+                                    >
+                                        <ImagePlus className="mr-2 h-4 w-4" />
+                                        Chọn ảnh gửi kèm
+                                    </Button>
+                                </div>
+
+                                {mealImages.length > 0 && (
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                                        {mealImages.map((image) => (
+                                            <div key={image.id} className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onPreviewImage?.(image.previewUrl)}
+                                                    className="h-full w-full cursor-zoom-in border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+                                                    aria-label={`Xem ảnh lớn: ${image.file.name}`}
+                                                >
+                                                    <img
+                                                        src={image.previewUrl}
+                                                        alt={image.file.name}
+                                                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                                    />
+                                                </button>
+                                                {image.isPrimary && (
+                                                    <span className="pointer-events-none absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[10px] font-extrabold text-amber-950 shadow-sm">
+                                                        <Star className="h-3 w-3 fill-current" /> Ảnh chính
+                                                    </span>
+                                                )}
+                                                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center justify-end gap-1.5 bg-gradient-to-t from-slate-950/80 to-transparent p-2 pt-8">
+                                                    {!image.isPrimary && (
+                                                        <button
+                                                            type="button"
+                                                            disabled={uploading}
+                                                            onClick={() => handleSetPrimaryMealImage(image.id)}
+                                                            className="pointer-events-auto rounded-full bg-amber-400 p-2 text-amber-950 shadow-sm transition-colors hover:bg-amber-300 disabled:opacity-50"
+                                                            title="Đặt làm ảnh chính"
+                                                            aria-label={`Đặt ${image.file.name} làm ảnh chính`}
+                                                        >
+                                                            <Star className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        disabled={uploading}
+                                                        onClick={() => handleRemoveMealImage(image.id)}
+                                                        className="pointer-events-auto rounded-full bg-red-500 p-2 text-white shadow-sm transition-colors hover:bg-red-600 disabled:opacity-50"
+                                                        title="Xóa ảnh"
+                                                        aria-label={`Xóa ${image.file.name}`}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {ingredientItems.length > 0 && (
                             <div className="grid grid-cols-4 gap-2 p-4 bg-gradient-to-br from-primary/5 to-secondary/5 rounded-2xl border border-primary/10">
                                 <div className="text-center">
                                     <div className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Calo</div>
@@ -235,48 +290,14 @@ export default function FoodInputCard({
                             </div>
                         )}
 
-                        <label className="flex items-center gap-2 text-sm text-slate-600">
-                            <input
-                                type="checkbox"
-                                checked={manualSendToPt ?? false}
-                                onChange={(e) => setManualSendToPt?.(e.target.checked)}
-                                className="rounded border-slate-300"
-                            />
-                            Gửi PT kiểm tra
-                        </label>
-
-                        {inputMode === 'recipe' && savedRecipes?.length > 0 && (
-                            <div className="space-y-2">
-                                <label className="block text-sm font-bold text-slate-700">Công thức đã lưu</label>
-                                <div className="space-y-2 max-h-40 overflow-auto">
-                                    {savedRecipes.map((r) => (
-                                        <div key={r.id} className="flex items-center justify-between gap-2 p-3 bg-white rounded-xl border border-slate-200">
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-semibold text-slate-800 truncate">{r.name}</p>
-                                                <p className="text-xs text-slate-500">{Math.round(r.totalCalories || 0)} kcal</p>
-                                            </div>
-                                            <Button type="button" size="sm" variant="outline" onClick={() => handleLogFromSavedRecipe?.(r.id)}>
-                                                Dùng lại
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
                         <div className="flex flex-wrap gap-2">
-                            {inputMode === 'recipe' && (
-                                <Button type="button" variant="outline" disabled={uploading || !recipeName || ingredientItems.length === 0}
-                                    onClick={handleSaveRecipe} className="rounded-xl">
-                                    Lưu công thức
-                                </Button>
-                            )}
                             <Button 
                                 type="submit" 
                                 disabled={uploading || ingredientItems.length === 0} 
                                 className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md px-8 h-12"
                             >
-                                {uploading ? 'Đang lưu...' : (inputMode === 'recipe' ? 'Ghi nhật ký từ công thức' : 'Lưu bữa ăn')}
+                                <Send className="w-4 h-4 mr-2" />
+                                {uploading ? 'Đang gửi...' : 'Gửi bữa ăn'}
                             </Button>
                         </div>
                     </form>

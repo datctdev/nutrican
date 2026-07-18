@@ -1,8 +1,8 @@
 // src/pages/customer/components/MealSection.jsx
 import { useState, useEffect } from 'react';
-import { 
-    Upload, Camera, FileText, AlertTriangle, Trash2, 
-    CheckCircle2, Clock, XCircle, Activity, Star, X, Edit 
+import {
+    Camera, FileText, AlertTriangle, Trash2,
+    CheckCircle2, Clock, XCircle, Activity, Star, Edit
 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { Skeleton } from '../../../components/ui/skeleton';
@@ -10,8 +10,6 @@ import {
     getFullImageUrl, getLogFoodTitle, FOOD_CODE_LABELS, 
     REASON_LABELS, formatAiConfidence
 } from './dietUtils';
-import { dietService } from '../../../services/dietService';
-import { toast } from 'sonner';
 
 const SafeImage = ({ src, alt, className }) => {
     const [hasError, setHasError] = useState(false);
@@ -77,26 +75,39 @@ const StatusBadge = ({ status, reviewStatus }) => {
 export default function MealSection({
     logs,
     loading,
-    fetchData,
     handleEditLog,
-    handleUploadAdditionalImages,
     handleDelete,
-    handleSetPrimary,
-    handleDeleteImage,
+    onPreviewImage,
     setSosDietLogId,
     setSosMessage,
     setIsSosModalOpen,
     hasActivePt = false,
 }) {
     const renderLogImages = (log) => {
-        const images = [
-            { url: getFullImageUrl(log.imageUrl), isPrimary: true, id: null },
-            ...(log.additionalImages || []).map(img => ({ 
-                url: getFullImageUrl(img.imageUrl), 
-                isPrimary: img.isPrimary, 
-                id: img.id 
-            })),
-        ].filter(img => img.url);
+        const primaryUrl = getFullImageUrl(log.imageUrl);
+        const normalizeImageUrl = (url) => url?.split('?')[0];
+        const storedImages = (log.additionalImages || []).map((img) => ({
+            url: getFullImageUrl(img.imageUrl),
+            isPrimary: Boolean(img.isPrimary),
+            id: img.id,
+        })).filter((img) => img.url);
+        const storedPrimary = storedImages.find((img) => (
+            img.isPrimary || (primaryUrl && normalizeImageUrl(img.url) === normalizeImageUrl(primaryUrl))
+        ));
+
+        const candidateImages = storedPrimary
+            ? storedImages.map((img) => ({ ...img, isPrimary: img === storedPrimary }))
+            : [
+                ...(primaryUrl ? [{ url: primaryUrl, isPrimary: true, id: null }] : []),
+                ...storedImages.map((img) => ({ ...img, isPrimary: false })),
+            ];
+        const seenImages = new Set();
+        const images = candidateImages.filter((img) => {
+            const key = img.id || normalizeImageUrl(img.url);
+            if (!key || seenImages.has(key)) return false;
+            seenImages.add(key);
+            return true;
+        });
 
         if (images.length === 0) return null;
 
@@ -104,32 +115,21 @@ export default function MealSection({
             <div className="flex gap-2 mt-4 flex-wrap">
                 {images.map((img, idx) => (
                     <div key={img.id || `primary-${idx}`} className="relative group">
-                        <SafeImage
-                            src={img.url}
-                            alt="meal"
-                            className="w-20 h-20 object-cover rounded-xl border border-slate-200 shadow-sm"
-                        />
+                        <button
+                            type="button"
+                            onClick={() => onPreviewImage?.(img.url)}
+                            className="block cursor-zoom-in rounded-xl border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                            aria-label="Xem ảnh bữa ăn lớn"
+                        >
+                            <SafeImage
+                                src={img.url}
+                                alt="Bữa ăn"
+                                className="w-20 h-20 object-cover rounded-xl border border-slate-200 shadow-sm transition-transform duration-200 group-hover:scale-105"
+                            />
+                        </button>
                         {img.isPrimary && (
-                            <div className="absolute -top-2 -right-2 bg-amber-400 text-amber-900 rounded-full p-1 shadow-sm">
+                            <div className="pointer-events-none absolute z-10 -top-2 -right-2 bg-amber-400 text-amber-900 rounded-full p-1 shadow-sm">
                                 <Star className="w-3.5 h-3.5 fill-current" />
-                            </div>
-                        )}
-                        {img.id && (
-                            <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                <button 
-                                    onClick={() => handleSetPrimary(log.id, img.id)} 
-                                    className="bg-amber-500 text-white rounded-full p-1.5 hover:bg-amber-600 shadow-sm" 
-                                    title="Đặt làm ảnh chính"
-                                >
-                                    <Star className="w-3 h-3" />
-                                </button>
-                                <button 
-                                    onClick={() => handleDeleteImage(log.id, img.id)} 
-                                    className="bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 shadow-sm" 
-                                    title="Xóa"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
                             </div>
                         )}
                     </div>
@@ -161,6 +161,7 @@ export default function MealSection({
                 const logDate = new Date(log.createdAt || log.logDate);
                 const displayTime = isNaN(logDate) ? '--' : `${logDate.getHours()}h`;
                 const macros = log.macrosJson || {};
+                const isReviewRejected = log.reviewStatus === 'REJECTED' || log.status === 'REJECTED';
 
                 return (
                     <div key={log.id} id={`log-${log.id}`} className="relative flex items-start gap-6 animate-slide-in" style={{ animationDelay: `${idx * 100}ms` }}>
@@ -221,9 +222,9 @@ export default function MealSection({
 
                                     {/* PHẢN HỒI VÀ LÝ DO TỪ PT */}
                                     {(log.ptNote || log.ptCorrectionReason) && log.status !== 'DRAFT' && log.status !== 'MANUAL_REQUIRED' && (
-                                        <div className={`mt-4 p-4 rounded-xl border text-sm ${log.status === 'REJECTED' ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-secondary/10 border-secondary/20 text-secondary-foreground'}`}>
+                                        <div className={`mt-4 p-4 rounded-xl border text-sm ${isReviewRejected ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
                                             <p className="font-extrabold mb-1.5 flex items-center gap-2">
-                                                {log.status === 'REJECTED' ? <XCircle className="w-4 h-4"/> : <CheckCircle2 className="w-4 h-4"/>}
+                                                {isReviewRejected ? <XCircle className="w-4 h-4"/> : <CheckCircle2 className="w-4 h-4"/>}
                                                 Phản hồi từ Huấn luyện viên
                                             </p>
 
@@ -239,43 +240,15 @@ export default function MealSection({
                                         </div>
                                     )}
 
-                                    {log.status === 'LOGGED' && log.reviewStatus === 'NOT_REQUIRED' && (
-                                        <div className="flex items-center gap-2 mt-4">
-                                            <Button
-                                                size="sm"
-                                                onClick={async () => {
-                                                    await dietService.submitForReview(log.id);
-                                                    toast.success('Đã gửi cho PT duyệt');
-                                                    fetchData();
-                                                }}
-                                                className="bg-warning hover:bg-warning/90 text-white rounded-lg text-xs font-bold h-9"
-                                            >
-                                                Gửi PT kiểm tra
-                                            </Button>
-                                        </div>
-                                    )}
-
                                     {(log.status === 'DRAFT' || log.status === 'MANUAL_REQUIRED') && (
                                         <div className="flex items-center gap-2 mt-4 flex-wrap">
-                                            <Button 
-                                                size="sm" 
-                                                onClick={async () => { 
-                                                    await dietService.submitForReview(log.id); 
-                                                    toast.success('Đã gửi cho PT duyệt thành công'); 
-                                                    fetchData(); 
-                                                }} 
-                                                className="bg-warning hover:bg-warning/90 text-white rounded-lg text-xs font-bold h-9 shadow-md shadow-warning/20"
-                                            >
-                                                Xác nhận & gửi PT Duyệt
-                                            </Button>
-
                                             <Button 
                                                 size="sm" 
                                                 variant="outline" 
                                                 onClick={() => handleEditLog(log)} 
                                                 className="border-primary/30 text-primary hover:bg-primary/5 rounded-lg text-xs font-bold h-9"
                                             >
-                                                <Edit className="w-3.5 h-3.5 mr-1.5" /> Sửa thông số
+                                                <Edit className="w-3.5 h-3.5 mr-1.5" /> Sửa & gửi bữa ăn
                                             </Button>
 
                                             {!log.sosTicketFlag && hasActivePt && (
@@ -299,17 +272,9 @@ export default function MealSection({
                                 <div className="flex items-center gap-2">
                                     <Button 
                                         variant="ghost" 
-                                        onClick={() => handleUploadAdditionalImages(log.id)} 
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl h-10 w-10 p-0" 
-                                        title="Thêm ảnh"
-                                    >
-                                        <Upload className="w-5 h-5" />
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
                                         onClick={() => handleDelete(log.id)} 
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-danger hover:bg-danger/5 rounded-xl h-10 w-10 p-0" 
-                                        title="Xóa"
+                                        className="text-slate-400 hover:text-danger hover:bg-danger/5 rounded-xl h-10 w-10 p-0"
+                                        title="Xóa bữa ăn"
                                     >
                                         <Trash2 className="w-5 h-5" />
                                     </Button>

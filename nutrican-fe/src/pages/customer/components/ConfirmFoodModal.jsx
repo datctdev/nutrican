@@ -1,5 +1,5 @@
 // src/pages/customer/components/ConfirmFoodModal.jsx
-import { X, Sparkles } from 'lucide-react';
+import { X, Sparkles, Send } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { 
     FOOD_CODE_LABELS, formatPredictionConfidence, getManualDishOptions, 
@@ -52,7 +52,7 @@ export default function ConfirmFoodModal({
                                 Xác nhận món ăn
                             </h3>
                             <p className="text-xs text-slate-600 mt-1">
-                                ResNet Phase 2 + NutriHome · kéo gram → xác nhận để lưu
+                                ResNet Phase 2 + NutriHome · kéo gram → xác nhận để gửi
                             </p>
                             {confirmModal.llavaUsed && confirmModal.llavaFoodName && (
                                 <p className="text-xs text-emerald-700 mt-1.5 font-medium truncate">
@@ -72,7 +72,7 @@ export default function ConfirmFoodModal({
                     </div>
                     {confirmModal.needsConfirmation && (
                         <p className="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
-                            Độ tin cậy thấp — chọn đúng món và chỉnh gram trước khi lưu.
+                            Độ tin cậy thấp — chọn đúng món và chỉnh gram trước khi gửi.
                         </p>
                     )}
                     {confirmModal.dietPrefWarning && (
@@ -212,15 +212,6 @@ export default function ConfirmFoodModal({
                             Tổng: {selectedPrediction.calories ?? '—'} kcal · {confirmModal.adjustedGrams ?? '—'}g
                         </p>
                     )}
-                    <label className="flex items-center gap-2 mb-3 text-sm text-slate-600 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            className="rounded border-slate-300"
-                            checked={confirmModal.sendToPt ?? false}
-                            onChange={(e) => setConfirmModal((prev) => ({ ...prev, sendToPt: e.target.checked }))}
-                        />
-                        Gửi PT duyệt sau khi lưu
-                    </label>
                     <div className="flex gap-3">
                         <Button
                             type="button"
@@ -237,7 +228,8 @@ export default function ConfirmFoodModal({
                             disabled={confirmingFood || !confirmModal.selectedFoodCode}
                             onClick={handleConfirmRecognition}
                         >
-                            {confirmingFood ? 'Đang lưu...' : 'Xác nhận & lưu'}
+                            <Send className="w-4 h-4 mr-2" />
+                            {confirmingFood ? 'Đang gửi...' : 'Gửi bữa ăn'}
                         </Button>
                     </div>
                 </div>

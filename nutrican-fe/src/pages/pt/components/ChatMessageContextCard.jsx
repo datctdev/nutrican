@@ -2,14 +2,14 @@
 import { FileText, Utensils, Calendar } from 'lucide-react';
 
 const TYPE_CONFIG = {
-  DIET_LOG: { label: 'Nhật ký bữa ăn', icon: Utensils, path: '/pt/reviews' },
+  DIET_LOG: { label: 'Nhật ký bữa ăn', icon: Utensils, path: '/pt/clients/dietlog' },
   MEAL_PLAN: { label: 'Thực đơn', icon: FileText, path: '/pt/clients' },
   APPOINTMENT: { label: 'Lịch hẹn', icon: Calendar, path: '/pt/appointments' },
 };
 
 export default function ChatMessageContextCard({ contextType, contextRefId, onNavigate }) {
   if (!contextType || !contextRefId) return null;
-  const config = TYPE_CONFIG[contextType] || { label: contextType, icon: FileText, path: '/pt/reviews' };
+  const config = TYPE_CONFIG[contextType] || { label: contextType, icon: FileText, path: '/pt/clients/dietlog' };
   const Icon = config.icon;
 
   return (

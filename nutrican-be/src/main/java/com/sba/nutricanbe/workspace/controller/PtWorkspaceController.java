@@ -46,8 +46,9 @@ public class PtWorkspaceController {
     public ResponseEntity<ApiResponse<PageResponse<DietLogReviewResponse>>> getPendingLogs(
             @AuthenticationPrincipal User user,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(ptWorkspaceService.getPendingLogs(user.getId(), page, size));
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) UUID clientId) {
+        return ResponseEntity.ok(ptWorkspaceService.getPendingLogs(user.getId(), page, size, clientId));
     }
 
     @PutMapping("/diet-logs/{id}/review")

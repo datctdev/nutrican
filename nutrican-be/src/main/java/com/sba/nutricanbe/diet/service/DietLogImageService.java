@@ -17,5 +17,7 @@ public interface DietLogImageService {
 
     ApiResponse<Void> deleteImage(UUID dietLogId, UUID imageId, UUID userId);
 
+    ApiResponse<Void> deletePrimaryImage(UUID dietLogId, UUID userId);
+
     ApiResponse<Void> deleteAllImages(UUID dietLogId, UUID userId);
 }

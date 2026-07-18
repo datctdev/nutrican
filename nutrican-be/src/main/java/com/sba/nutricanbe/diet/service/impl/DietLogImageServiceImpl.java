@@ -44,33 +44,47 @@ public class DietLogImageServiceImpl implements DietLogImageService {
         }
 
         List<DietLogImageDto> uploadedImages = new ArrayList<>();
-        int existingCount = dietLogImageRepository.countByDietLogId(dietLogId);
+        List<DietLogImage> existingImages = new ArrayList<>(
+                dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(dietLogId));
+        ensureCurrentPrimaryRecord(dietLog, existingImages);
+        int nextSortOrder = existingImages.stream()
+                .map(DietLogImage::getSortOrder)
+                .filter(java.util.Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(-1) + 1;
+        boolean hasPrimaryImage = dietLog.getImageObjectName() != null;
 
         for (int i = 0; i < files.length; i++) {
             MultipartFile file = files[i];
             String objectName = minioService.uploadFile(file, "diet-logs/" + dietLog.getCustomerId());
             String presignedUrl = minioService.getPresignedUrl(objectName);
+            boolean makePrimary = !hasPrimaryImage && i == 0;
 
             DietLogImage dietLogImage = DietLogImage.builder()
                     .dietLog(dietLog)
                     .imageUrl(presignedUrl)
                     .imageObjectName(objectName)
-                    .isPrimary(false)
-                    .sortOrder(existingCount + i)
+                    .isPrimary(makePrimary)
+                    .sortOrder(nextSortOrder + i)
                     .fileSize(file.getSize())
                     .contentType(file.getContentType())
                     .build();
 
             dietLogImage = dietLogImageRepository.save(dietLogImage);
+            if (makePrimary) {
+                dietLog.setImageUrl(presignedUrl);
+                dietLog.setImageObjectName(objectName);
+                dietLogRepository.save(dietLog);
+            }
             uploadedImages.add(toDTO(dietLogImage));
-            log.info("Additional image uploaded for diet log {}: {}", dietLogId, objectName);
+            log.info("Image uploaded for diet log {}: {}", dietLogId, objectName);
         }
 
         return ApiResponse.success(uploadedImages, "Images uploaded successfully");
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ApiResponse<List<DietLogImageDto>> getImages(UUID dietLogId, UUID userId) {
         DietLog dietLog = dietLogRepository.findById(dietLogId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
@@ -79,7 +93,9 @@ public class DietLogImageServiceImpl implements DietLogImageService {
             throw new BadRequestException("You can only view images of your own diet logs");
         }
 
-        List<DietLogImage> images = dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(dietLogId);
+        List<DietLogImage> images = new ArrayList<>(
+                dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(dietLogId));
+        ensureCurrentPrimaryRecord(dietLog, images);
         return ApiResponse.success(images.stream().map(this::toDTO).toList());
     }
 
@@ -100,7 +116,9 @@ public class DietLogImageServiceImpl implements DietLogImageService {
             throw new BadRequestException("Image does not belong to this diet log");
         }
 
-        List<DietLogImage> allImages = dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(dietLogId);
+        List<DietLogImage> allImages = new ArrayList<>(
+                dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(dietLogId));
+        ensureCurrentPrimaryRecord(dietLog, allImages);
         for (DietLogImage img : allImages) {
             img.setIsPrimary(img.getId().equals(imageId));
         }
@@ -131,11 +149,46 @@ public class DietLogImageServiceImpl implements DietLogImageService {
             throw new BadRequestException("Image does not belong to this diet log");
         }
 
-        minioService.deleteFile(image.getImageObjectName());
-        dietLogImageRepository.delete(image);
+        List<DietLogImage> allImages = new ArrayList<>(
+                dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(dietLogId));
+        deleteImageRecord(dietLog, image, allImages);
 
         log.info("Image deleted from diet log {}: {}", dietLogId, imageId);
         return ApiResponse.success(null, "Image deleted");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Void> deletePrimaryImage(UUID dietLogId, UUID userId) {
+        DietLog dietLog = dietLogRepository.findById(dietLogId)
+                .orElseThrow(() -> new ResourceNotFoundException("DietLog", dietLogId));
+
+        if (!dietLog.getCustomerId().equals(userId)) {
+            throw new BadRequestException("You can only delete images from your own diet logs");
+        }
+
+        if (dietLog.getImageObjectName() == null) {
+            return ApiResponse.success(null, "Primary image already empty");
+        }
+
+        List<DietLogImage> allImages = new ArrayList<>(
+                dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(dietLogId));
+        DietLogImage storedPrimary = allImages.stream()
+                .filter(image -> sameObject(image.getImageObjectName(), dietLog.getImageObjectName()))
+                .findFirst()
+                .orElse(null);
+
+        if (storedPrimary != null) {
+            deleteImageRecord(dietLog, storedPrimary, allImages);
+        } else {
+            minioService.deleteFile(dietLog.getImageObjectName());
+            applyPrimaryImage(dietLog, allImages, allImages.isEmpty() ? null : allImages.get(0));
+            dietLogImageRepository.saveAll(allImages);
+            dietLogRepository.save(dietLog);
+        }
+
+        log.info("Primary image deleted from diet log {}", dietLogId);
+        return ApiResponse.success(null, "Primary image deleted");
     }
 
     @Override
@@ -149,13 +202,75 @@ public class DietLogImageServiceImpl implements DietLogImageService {
         }
 
         List<DietLogImage> images = dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(dietLogId);
-        for (DietLogImage image : images) {
-            minioService.deleteFile(image.getImageObjectName());
+        java.util.Set<String> objectNames = new java.util.LinkedHashSet<>();
+        if (dietLog.getImageObjectName() != null) {
+            objectNames.add(dietLog.getImageObjectName());
         }
+        images.stream().map(DietLogImage::getImageObjectName).forEach(objectNames::add);
+        objectNames.forEach(minioService::deleteFile);
         dietLogImageRepository.deleteAll(images);
+        dietLog.setImageUrl(null);
+        dietLog.setImageObjectName(null);
+        dietLogRepository.save(dietLog);
 
         log.info("All images deleted from diet log {}", dietLogId);
         return ApiResponse.success(null, "All images deleted");
+    }
+
+    private DietLogImage ensureCurrentPrimaryRecord(DietLog dietLog, List<DietLogImage> images) {
+        if (dietLog.getImageObjectName() == null) return null;
+
+        DietLogImage current = images.stream()
+                .filter(image -> sameObject(image.getImageObjectName(), dietLog.getImageObjectName()))
+                .findFirst()
+                .orElse(null);
+
+        if (current == null) {
+            current = dietLogImageRepository.save(DietLogImage.builder()
+                    .dietLog(dietLog)
+                    .imageUrl(dietLog.getImageUrl())
+                    .imageObjectName(dietLog.getImageObjectName())
+                    .isPrimary(true)
+                    .sortOrder(-1)
+                    .build());
+            images.add(0, current);
+        }
+
+        for (DietLogImage image : images) {
+            image.setIsPrimary(image.getId().equals(current.getId()));
+        }
+        dietLogImageRepository.saveAll(images);
+        return current;
+    }
+
+    private void deleteImageRecord(DietLog dietLog, DietLogImage image, List<DietLogImage> allImages) {
+        boolean deletingPrimary = sameObject(image.getImageObjectName(), dietLog.getImageObjectName())
+                || Boolean.TRUE.equals(image.getIsPrimary());
+        List<DietLogImage> remainingImages = allImages.stream()
+                .filter(candidate -> !candidate.getId().equals(image.getId()))
+                .toList();
+
+        minioService.deleteFile(image.getImageObjectName());
+        dietLogImageRepository.delete(image);
+
+        if (deletingPrimary) {
+            DietLogImage replacement = remainingImages.isEmpty() ? null : remainingImages.get(0);
+            applyPrimaryImage(dietLog, remainingImages, replacement);
+            dietLogImageRepository.saveAll(remainingImages);
+            dietLogRepository.save(dietLog);
+        }
+    }
+
+    private void applyPrimaryImage(DietLog dietLog, List<DietLogImage> images, DietLogImage primaryImage) {
+        for (DietLogImage image : images) {
+            image.setIsPrimary(primaryImage != null && image.getId().equals(primaryImage.getId()));
+        }
+        dietLog.setImageUrl(primaryImage != null ? primaryImage.getImageUrl() : null);
+        dietLog.setImageObjectName(primaryImage != null ? primaryImage.getImageObjectName() : null);
+    }
+
+    private boolean sameObject(String left, String right) {
+        return left != null && left.equals(right);
     }
 
     private DietLogImageDto toDTO(DietLogImage image) {

@@ -9,6 +9,7 @@ import com.sba.nutricanbe.diet.dto.SosTicketResponse;
 import com.sba.nutricanbe.user.entity.User;
 
 import com.sba.nutricanbe.diet.enums.MealComplexity;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 
 import com.sba.nutricanbe.diet.enums.MealSource;
 
@@ -23,6 +24,8 @@ import com.sba.nutricanbe.diet.service.DietLogFeedbackService;
 import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.diet.service.MealAnalysisService;
 import com.sba.nutricanbe.diet.service.SosService;
+import com.sba.nutricanbe.workspace.dto.DietLogReviewResponse;
+import com.sba.nutricanbe.workspace.service.PtWorkspaceService;
 
 import jakarta.validation.Valid;
 
@@ -35,6 +38,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import org.springframework.web.bind.annotation.*;
 
@@ -71,6 +75,7 @@ public class DietLogController {
     private final MealAnalysisService mealAnalysisService;
     private final SosService sosService;
     private final DietLogFeedbackService dietLogFeedbackService;
+    private final PtWorkspaceService ptWorkspaceService;
 
 
 
@@ -166,6 +171,18 @@ public class DietLogController {
 
         return ResponseEntity.ok(dietLogService.getLogs(user.getId(), page, size, startDate, endDate, status));
 
+    }
+
+    @GetMapping("/logs/client/{clientId}")
+    @PreAuthorize("hasAnyRole('PT_CERTIFIED', 'PT_FREELANCE')")
+    public ResponseEntity<ApiResponse<PageResponse<DietLogReviewResponse>>> getClientLogsForPt(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "APPROVED") DietLogReviewStatus reviewStatus) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientDietLogs(
+                user.getId(), clientId, page, size, reviewStatus));
     }
 
 
@@ -318,6 +335,13 @@ public class DietLogController {
 
         return ResponseEntity.ok(dietLogImageService.deleteImage(id, imageId, user.getId()));
 
+    }
+
+    @DeleteMapping("/logs/{id}/images/primary")
+    public ResponseEntity<ApiResponse<Void>> deletePrimaryImage(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(dietLogImageService.deletePrimaryImage(id, user.getId()));
     }
 
 

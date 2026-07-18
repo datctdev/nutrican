@@ -1,18 +1,20 @@
 // src/pages/pt/ReviewDietLogPage.jsx
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import {
     CheckCircle2, XCircle, SlidersHorizontal, Clock,
-    Image as ImageIcon, AlertTriangle, RefreshCw,
+    Image as ImageIcon, RefreshCw,
     Flame, Target, Activity, EyeOff, Eye, MessageSquare,
-    Star
+    Star, ArrowLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { workspaceService } from '../../services/workspaceService';
+import { dietService } from '../../services/dietService';
 import Modal from '../../components/common/Modal';
+import ImageLightbox from '../../components/common/ImageLightbox';
 
 const getFullImageUrl = (url) => {
     if (!url) return '';
@@ -21,31 +23,67 @@ const getFullImageUrl = (url) => {
     return `${minioUrl}/${url}`;
 };
 
-const getReviewImageUrl = (log) => {
-    if (log.imageUrl) return getFullImageUrl(log.imageUrl);
-    if (log.additionalImages && log.additionalImages.length > 0) {
-        const primary = log.additionalImages.find(img => img.isPrimary);
-        return getFullImageUrl(primary ? primary.imageUrl : log.additionalImages[0].imageUrl);
+const getImageKey = (url) => {
+    if (!url) return '';
+    const unsignedUrl = url.split(/[?#]/)[0];
+    try {
+        return decodeURIComponent(new URL(unsignedUrl, window.location.origin).pathname).replace(/\/+$/, '');
+    } catch {
+        return unsignedUrl.replace(/\/+$/, '');
     }
-    return null;
 };
 
-export default function ReviewDietLogPage() {
+const getReviewImages = (log) => {
+    const legacyImage = log.imageUrl
+        ? { id: null, url: getFullImageUrl(log.imageUrl), isPrimary: false }
+        : null;
+    const storedImages = (log.additionalImages || [])
+        .map((image) => ({
+            id: image.id,
+            url: getFullImageUrl(image.imageUrl),
+            isPrimary: Boolean(image.isPrimary),
+        }))
+        .filter((image) => image.url);
+    const declaredPrimary = storedImages.find((image) => image.isPrimary) || legacyImage || storedImages[0];
+    const primaryKey = getImageKey(declaredPrimary?.url);
+    const seen = new Set();
+
+    return [declaredPrimary, legacyImage, ...storedImages]
+        .filter((image) => image?.url)
+        .filter((image) => {
+            const key = getImageKey(image.url);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        })
+        .map((image) => ({
+            ...image,
+            isPrimary: getImageKey(image.url) === primaryKey,
+        }));
+};
+
+const getReviewImageUrl = (log) => {
+    return getReviewImages(log)[0]?.url || null;
+};
+
+export default function ReviewDietLogPage({ clientPage = false }) {
     const navigate = useNavigate();
-    const [logs, setLogs] = useState([]);
-    const [sosTickets, setSosTickets] = useState([]);
+    const [searchParams] = useSearchParams();
+    const selectedClientId = searchParams.get('clientId');
+    const selectedClientName = searchParams.get('clientName');
+    const selectedLogId = searchParams.get('logId');
+    const [pendingLogs, setPendingLogs] = useState([]);
+    const [reviewedLogs, setReviewedLogs] = useState([]);
+    const [activeList, setActiveList] = useState('PENDING');
     const [loading, setLoading] = useState(true);
-    const [sosLoading, setSosLoading] = useState(true);
+    const [reviewedLoading, setReviewedLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(null);
-    const [resolvingId, setResolvingId] = useState(null);
-    const [resolveNotes, setResolveNotes] = useState({});
 
     const [adjustingLog, setAdjustingLog] = useState(null);
     const [adjustForm, setAdjustForm] = useState({
         adjustedCalories: 0, adjustedProtein: 0, adjustedCarb: 0, adjustedFat: 0, note: '', correctionReason: 'OTHER',
     });
 
-    const [rejectReasons, setRejectReasons] = useState({});
     const [rejectModalLog, setRejectModalLog] = useState(null);
     const [rejectReason, setRejectReason] = useState('WRONG_FOOD');
 
@@ -55,6 +93,10 @@ export default function ReviewDietLogPage() {
     const [ptRblStats, setPtRblStats] = useState(null);
     const [pendingHiresCount, setPendingHiresCount] = useState(0);
     const [previewImage, setPreviewImage] = useState({});
+    const [lightboxImage, setLightboxImage] = useState('');
+    const isReviewedList = clientPage && activeList === 'APPROVED';
+    const logs = isReviewedList ? reviewedLogs : pendingLogs;
+    const listLoading = isReviewedList ? reviewedLoading : loading;
 
     const CORRECTION_REASONS = [
         { id: 'WRONG_FOOD', label: 'Sai món ăn' },
@@ -92,27 +134,52 @@ export default function ReviewDietLogPage() {
     const fetchPendingLogs = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await workspaceService.getPendingLogs({ size: 20 });
-            setLogs(response.data.data.content || []);
+            if (clientPage && !selectedClientId) {
+                setPendingLogs([]);
+                return;
+            }
+            const response = clientPage
+                ? await dietService.getClientLogsForPt(selectedClientId, {
+                    size: 50,
+                    reviewStatus: 'PENDING',
+                })
+                : await workspaceService.getPendingLogs({
+                    size: 20,
+                    clientId: selectedClientId || undefined,
+                });
+            setPendingLogs(response.data.data.content || []);
         } catch (err) {
             console.error(err);
             toast.error('Không thể tải danh sách bữa ăn');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [clientPage, selectedClientId]);
 
-    const fetchSosTickets = useCallback(async () => {
+    const fetchReviewedLogs = useCallback(async () => {
+        if (!clientPage || !selectedClientId) {
+            setReviewedLogs([]);
+            return;
+        }
+
         try {
-            setSosLoading(true);
-            const response = await workspaceService.getSosTickets();
-            setSosTickets(response.data.data || []);
+            setReviewedLoading(true);
+            const response = await dietService.getClientLogsForPt(selectedClientId, {
+                size: 50,
+                reviewStatus: 'APPROVED',
+            });
+            const content = response.data.data.content || [];
+            setReviewedLogs(content);
+            if (selectedLogId && content.some((log) => log.id === selectedLogId)) {
+                setActiveList('APPROVED');
+            }
         } catch (err) {
             console.error(err);
+            toast.error('Không thể tải lịch sử bữa ăn đã duyệt');
         } finally {
-            setSosLoading(false);
+            setReviewedLoading(false);
         }
-    }, []);
+    }, [clientPage, selectedClientId, selectedLogId]);
 
     const fetchPtRblStats = useCallback(async () => {
         try {
@@ -136,12 +203,11 @@ export default function ReviewDietLogPage() {
         let isMounted = true;
 
         const loadInitialData = async () => {
-            await Promise.all([
-                fetchPendingLogs(),
-                fetchSosTickets(),
-                fetchPtRblStats(),
-                fetchPendingClientsCount(),
-            ]);
+            if (clientPage) {
+                await Promise.all([fetchPendingLogs(), fetchReviewedLogs()]);
+                return;
+            }
+            await Promise.all([fetchPendingLogs(), fetchPtRblStats(), fetchPendingClientsCount()]);
         };
 
         if (isMounted) loadInitialData();
@@ -152,38 +218,36 @@ export default function ReviewDietLogPage() {
             setTimeout(() => {
                 if (isMounted) {
                     fetchPendingLogs();
-                    fetchSosTickets();
-                    fetchPtRblStats();
-                    fetchPendingClientsCount();
+                    if (clientPage) {
+                        fetchReviewedLogs();
+                    } else {
+                        fetchPtRblStats();
+                        fetchPendingClientsCount();
+                    }
                 }
             }, 500);
         };
 
         window.addEventListener('realtime_update', handleRealtimeUpdate);
         window.addEventListener('NEW_DIET_LOG', handleRealtimeUpdate);
-        window.addEventListener('SOS', handleRealtimeUpdate);
 
         return () => {
             isMounted = false;
             window.removeEventListener('realtime_update', handleRealtimeUpdate);
             window.removeEventListener('NEW_DIET_LOG', handleRealtimeUpdate);
-            window.removeEventListener('SOS', handleRealtimeUpdate);
         };
-    }, [fetchPendingLogs, fetchSosTickets, fetchPtRblStats]);
+    }, [clientPage, fetchPendingLogs, fetchReviewedLogs, fetchPtRblStats, fetchPendingClientsCount]);
 
-    const handleResolveSos = async (ticketId) => {
-        try {
-            setResolvingId(ticketId);
-            await workspaceService.resolveSosTicket(ticketId, { resolutionNote: resolveNotes[ticketId] || '' });
-            toast.success('Đã giải quyết yêu cầu SOS');
-            setResolveNotes((prev) => ({ ...prev, [ticketId]: '' }));
-            fetchSosTickets();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Lỗi khi giải quyết SOS');
-        } finally {
-            setResolvingId(null);
-        }
-    };
+    useEffect(() => {
+        if (!selectedLogId || listLoading) return undefined;
+        const frameId = requestAnimationFrame(() => {
+            document.getElementById(`review-log-${selectedLogId}`)?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
+        });
+        return () => cancelAnimationFrame(frameId);
+    }, [listLoading, logs, selectedLogId]);
 
     const handleReview = async (logId, action, extra = {}) => {
         try {
@@ -195,7 +259,11 @@ export default function ReviewDietLogPage() {
                         'Đã điều chỉnh chỉ số thành công!'
             );
             fetchPendingLogs();
-            fetchPtRblStats();
+            if (clientPage) {
+                fetchReviewedLogs();
+            } else {
+                fetchPtRblStats();
+            }
         } catch (err) {
             toast.error(err.response?.data?.message || 'Lỗi khi thao tác');
         } finally {
@@ -258,7 +326,7 @@ export default function ReviewDietLogPage() {
 
     return (
         <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4">
-            {pendingHiresCount > 0 && (
+            {!clientPage && pendingHiresCount > 0 && (
                 <div className="rounded-3xl border border-blue-200 bg-blue-50/50 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
@@ -280,16 +348,91 @@ export default function ReviewDietLogPage() {
             {/* HEADER */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Duyệt Bữa Ăn</h1>
-                    <p className="text-slate-500 mt-1 font-medium">Bạn có <strong className="text-blue-600">{logs.length}</strong> bữa ăn đang chờ kiểm tra và phê duyệt.</p>
+                    <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                        {clientPage
+                            ? `Nhật ký bữa ăn · ${selectedClientName || logs[0]?.customerName || 'Học viên'}`
+                            : selectedClientId
+                                ? `Duyệt bữa ăn · ${selectedClientName || logs[0]?.customerName || 'Học viên'}`
+                                : 'Duyệt Bữa Ăn'}
+                    </h1>
+                    <p className="text-slate-500 mt-1 font-medium">
+                        {clientPage ? (
+                            <>Theo dõi bữa ăn cần xử lý và lịch sử đã duyệt của học viên tại một nơi.</>
+                        ) : (
+                            <>
+                                {selectedClientId ? 'Đang hiển thị riêng ' : 'Bạn có '}
+                                <strong className="text-blue-600">{pendingLogs.length}</strong>
+                                {selectedClientId ? ' bữa ăn đang chờ duyệt của học viên này.' : ' bữa ăn đang chờ kiểm tra và phê duyệt.'}
+                            </>
+                        )}
+                    </p>
                 </div>
-                <Button onClick={fetchPendingLogs} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl font-bold h-11">
-                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Làm mới dữ liệu
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    {(clientPage || selectedClientId) && (
+                        <Button onClick={() => navigate(clientPage ? '/pt/clients' : '/pt/reviews')} variant="outline" className="bg-white border-blue-200 text-blue-700 hover:bg-blue-50 shadow-sm rounded-xl font-bold h-11">
+                            <ArrowLeft className="w-4 h-4 mr-2" /> {clientPage ? 'Danh sách học viên' : 'Xem tất cả'}
+                        </Button>
+                    )}
+                    <Button
+                        onClick={() => clientPage
+                            ? Promise.all([fetchPendingLogs(), fetchReviewedLogs()])
+                            : fetchPendingLogs()}
+                        variant="outline"
+                        className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl font-bold h-11"
+                    >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${(loading || reviewedLoading) ? 'animate-spin' : ''}`} /> Làm mới dữ liệu
+                    </Button>
+                </div>
             </div>
 
+            {clientPage && selectedClientId && (
+                <div className="grid grid-cols-1 gap-3 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-2" role="tablist" aria-label="Trạng thái bữa ăn">
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeList === 'PENDING'}
+                        onClick={() => setActiveList('PENDING')}
+                        className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-left transition-all ${activeList === 'PENDING'
+                            ? 'bg-amber-50 text-amber-950 shadow-sm ring-1 ring-amber-200'
+                            : 'text-slate-500 hover:bg-slate-50'}`}
+                    >
+                        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${activeList === 'PENDING' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
+                            <Clock className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block font-extrabold">Chờ duyệt</span>
+                            <span className="mt-0.5 block text-xs font-medium opacity-70">Các bữa ăn cần PT kiểm tra</span>
+                        </span>
+                        <span className={`rounded-full px-3 py-1 text-sm font-black ${activeList === 'PENDING' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                            {pendingLogs.length}
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={activeList === 'APPROVED'}
+                        onClick={() => setActiveList('APPROVED')}
+                        className={`flex items-center gap-4 rounded-2xl px-5 py-4 text-left transition-all ${activeList === 'APPROVED'
+                            ? 'bg-emerald-50 text-emerald-950 shadow-sm ring-1 ring-emerald-200'
+                            : 'text-slate-500 hover:bg-slate-50'}`}
+                    >
+                        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${activeList === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                            <CheckCircle2 className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block font-extrabold">Đã duyệt</span>
+                            <span className="mt-0.5 block text-xs font-medium opacity-70">Lịch sử bữa ăn đã hoàn tất</span>
+                        </span>
+                        <span className={`rounded-full px-3 py-1 text-sm font-black ${activeList === 'APPROVED' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                            {reviewedLogs.length}
+                        </span>
+                    </button>
+                </div>
+            )}
+
             {/* THỐNG KÊ RBL CỦA PT */}
-            {ptRblStats && (
+            {!clientPage && ptRblStats && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="p-5 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100/50 rounded-3xl shadow-sm flex flex-col justify-center">
                         <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Target className="w-3.5 h-3.5"/> Đã duyệt (30d)</p>
@@ -310,133 +453,78 @@ export default function ReviewDietLogPage() {
                 </div>
             )}
 
-            {/* KHU VỰC SOS TICKETS */}
-            <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-200/60 rounded-3xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-5 border-b border-red-200/50 pb-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-red-100 text-red-600 rounded-xl flex items-center justify-center">
-                            <AlertTriangle className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-black text-red-900 tracking-tight">Yêu cầu Khẩn cấp (SOS)</h2>
-                            <p className="text-sm font-medium text-red-700/80">Học viên cần bạn hỗ trợ định lượng ngay lập tức.</p>
-                        </div>
-                    </div>
-                    <Button onClick={fetchSosTickets} variant="outline" size="sm" className="bg-white border-red-200 text-red-700 hover:bg-red-50 rounded-xl font-bold">
-                        <RefreshCw className={`w-4 h-4 mr-2 ${sosLoading ? 'animate-spin' : ''}`} /> Tải lại SOS
-                    </Button>
-                </div>
-
-                {sosLoading ? (
-                    <Skeleton className="h-24 w-full rounded-2xl bg-red-100/50" />
-                ) : sosTickets.filter(t => t.status !== 'RESOLVED').length === 0 ? (
-                    <div className="text-center py-6">
-                        <CheckCircle2 className="w-8 h-8 text-red-300 mx-auto mb-2" />
-                        <p className="text-sm text-red-700/70 font-bold">Hiện không có yêu cầu SOS nào.</p>
-                    </div>
-                ) : (
-                    <div className="grid md:grid-cols-2 gap-4">
-                        {sosTickets.filter(t => t.status !== 'RESOLVED').map(ticket => {
-                            const linkedLog = logs.find((l) => l.id === ticket.dietLogId);
-                            return (
-                            <div key={ticket.id} className="bg-white border border-red-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                                <div className="flex justify-between items-start gap-3 mb-4">
-                                    <div>
-                                        <p className="font-extrabold text-slate-800 text-lg">{ticket.customerName || 'Học viên'}</p>
-                                        <span className="inline-block mt-1.5 text-[10px] font-black px-2.5 py-1 rounded-md bg-red-100 text-red-700 uppercase tracking-widest">
-                                            {ticket.status === 'RESOLVED' ? 'ĐÃ GIẢI QUYẾT' : 'ĐANG CHỜ'}
-                                        </span>
-                                    </div>
-                                    <Button
-                                        onClick={() => handleResolveSos(ticket.id)}
-                                        disabled={resolvingId === ticket.id}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9 text-xs font-bold shadow-sm shadow-emerald-500/20"
-                                    >
-                                        Đã giải quyết
-                                    </Button>
-                                </div>
-                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-3">
-                                    <p className="text-sm font-medium text-slate-700 italic">"{ticket.note}"</p>
-                                </div>
-                                {linkedLog && (
-                                    <div className="mb-3 p-3 rounded-xl border border-blue-100 bg-blue-50/50 text-xs text-slate-700">
-                                        <p className="font-bold text-blue-800 mb-1">Nhật ký liên quan</p>
-                                        <p>{linkedLog.foodDescription || 'Bữa ăn'} · {linkedLog.mealType} · {linkedLog.logDate}</p>
-                                        <p className="mt-1">~{linkedLog.macrosJson?.calories || linkedLog.aiPredictedMacros?.calories || 0} kcal</p>
-                                    </div>
-                                )}
-                                {ticket.dietLogId && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="mb-3 w-full rounded-xl text-xs"
-                                        onClick={() => navigate(`/pt/chat?contextLogId=${ticket.dietLogId}`, {
-                                            state: { targetClientId: linkedLog?.customerId },
-                                        })}
-                                    >
-                                        <MessageSquare className="w-3.5 h-3.5 mr-1.5" /> Hỏi qua chat
-                                    </Button>
-                                )}
-                                <input
-                                    type="text"
-                                    placeholder="Nhập ghi chú phản hồi cho học viên..."
-                                    value={resolveNotes[ticket.id] || ''}
-                                    onChange={(e) => setResolveNotes((prev) => ({ ...prev, [ticket.id]: e.target.value }))}
-                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-red-400 focus:bg-white transition-colors"
-                                />
-                            </div>
-                        );})}
-                    </div>
-                )}
-            </div>
-
             {/* DANH SÁCH BỮA ĂN CHỜ DUYỆT */}
-            {loading ? (
+            {listLoading ? (
                 <div className="space-y-6">
                     {[1, 2, 3].map(i => <Skeleton key={i} className="h-64 w-full rounded-3xl bg-slate-200" />)}
                 </div>
             ) : logs.length === 0 ? (
                 <div className="text-center py-24 bg-white rounded-3xl border border-slate-200 border-dashed shadow-sm">
-                    <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-5" />
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">Tuyệt vời! Đã hoàn thành.</h3>
-                    <p className="text-slate-500 mt-2 font-medium text-lg">Tất cả bữa ăn của học viên đã được bạn phê duyệt.</p>
+                    {isReviewedList
+                        ? <Clock className="w-20 h-20 text-slate-300 mx-auto mb-5" />
+                        : <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-5" />}
+                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">
+                        {isReviewedList
+                            ? 'Chưa có bữa ăn đã duyệt'
+                            : selectedClientId ? 'Không có bữa ăn chờ duyệt' : 'Tuyệt vời! Đã hoàn thành.'}
+                    </h3>
+                    <p className="text-slate-500 mt-2 font-medium text-lg">
+                        {isReviewedList
+                            ? 'Các bữa ăn sau khi được PT phê duyệt sẽ xuất hiện tại đây.'
+                            : selectedClientId
+                            ? `${selectedClientName || 'Học viên này'} hiện không có bữa ăn nào cần bạn kiểm tra.`
+                            : 'Tất cả bữa ăn của học viên đã được bạn phê duyệt.'}
+                    </p>
                 </div>
             ) : (
                 <div className="space-y-6">
-                    {logs.map((log) => (
-                        <Card key={log.id} className="bg-white border-slate-200 shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 rounded-3xl group">
+                    {logs.map((log) => {
+                        const reviewImage = previewImage[log.id] || getReviewImageUrl(log);
+
+                        return (
+                        <Card
+                            key={log.id}
+                            id={`review-log-${log.id}`}
+                            className={`bg-white shadow-sm overflow-hidden hover:shadow-lg transition-all duration-300 rounded-3xl group ${selectedLogId === log.id
+                                ? 'border-blue-400 ring-4 ring-blue-500/10'
+                                : isReviewedList ? 'border-emerald-200' : 'border-slate-200'}`}
+                        >
                             <div className="flex flex-col md:flex-row">
 
                                 {/* Cột Ảnh */}
-                                <div className="md:w-80 h-64 md:h-auto bg-slate-100 flex flex-col items-center justify-center text-slate-400 border-b md:border-b-0 md:border-r border-slate-200 relative overflow-hidden">
-                                    {previewImage[log.id] || getReviewImageUrl(log) ? (
-                                        <img src={previewImage[log.id] || getReviewImageUrl(log)} alt="Meal" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                    ) : (
-                                        <>
-                                            <ImageIcon className="w-12 h-12 mb-3 opacity-30" />
-                                            <span className="text-sm font-bold opacity-60">Không có ảnh đính kèm</span>
-                                        </>
-                                    )}
+                                {reviewImage && (
+                                    <div className="md:w-80 h-64 md:h-auto bg-slate-100 flex flex-col items-center justify-center text-slate-400 border-b md:border-b-0 md:border-r border-slate-200 relative overflow-hidden">
+                                        <button
+                                            type="button"
+                                            onClick={() => setLightboxImage(reviewImage)}
+                                            className="h-full w-full cursor-zoom-in border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-500 focus-visible:ring-inset"
+                                            aria-label="Xem ảnh bữa ăn rõ hơn"
+                                        >
+                                            <img
+                                                src={reviewImage}
+                                                alt="Bữa ăn"
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                            />
+                                        </button>
 
-                                    <div className="absolute top-4 left-4 flex flex-col gap-2">
-                                        <div className="bg-white/95 backdrop-blur px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm border border-slate-200/50">
-                                            <Clock className="w-3.5 h-3.5 text-amber-500" />
-                                            <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Chờ duyệt</span>
-                                        </div>
-                                        {log.sosTicketFlag && (
-                                            <div className="bg-red-500/95 backdrop-blur px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md border border-red-400">
-                                                <AlertTriangle className="w-3.5 h-3.5 text-white" />
-                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">CẦN HỖ TRỢ SOS</span>
+                                        <div className="absolute top-4 left-4 flex flex-col gap-2">
+                                            <div className="bg-white/95 backdrop-blur px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm border border-slate-200/50">
+                                                {isReviewedList
+                                                    ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                    : <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                                                <span className={`text-[10px] font-black uppercase tracking-widest ${isReviewedList ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                                    {isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
+                                                </span>
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Cột Thông tin & Hành động */}
                                 <div className="flex-1 p-6 md:p-8 flex flex-col justify-between bg-white">
                                     <div>
                                         {/* Tiêu đề thẻ */}
-                                        <div className="flex justify-between items-start mb-4">
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-blue-700 font-black text-lg border border-blue-200/50 shadow-sm">
                                                     {getInitials(log.customerName || 'HV')}
@@ -449,7 +537,52 @@ export default function ReviewDietLogPage() {
                                                     </p>
                                                 </div>
                                             </div>
+                                            {!reviewImage && (
+                                                <div className="flex flex-wrap justify-end gap-2">
+                                                    <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 border ${isReviewedList ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                                                        {isReviewedList
+                                                            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                            : <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest ${isReviewedList ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                                            {isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
+
+                                        {isReviewedList && (
+                                            <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                                                        <CheckCircle2 className="h-5 w-5" />
+                                                    </span>
+                                                    <div>
+                                                        <p className="text-sm font-extrabold text-emerald-900">
+                                                            {log.ptAction === 'ADJUST' ? 'Đã điều chỉnh và phê duyệt' : 'PT đã phê duyệt'}
+                                                        </p>
+                                                        {log.ptNote && <p className="mt-0.5 text-xs font-medium text-emerald-800/75">“{log.ptNote}”</p>}
+                                                    </div>
+                                                </div>
+                                                {log.ptReviewedAt && (
+                                                    <time className="text-xs font-bold text-emerald-700/70" dateTime={log.ptReviewedAt}>
+                                                        {new Date(log.ptReviewedAt).toLocaleString('vi-VN')}
+                                                    </time>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {!reviewImage && (
+                                            <div className="mb-4 flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600">
+                                                <div className="mt-0.5 rounded-xl bg-white p-2 text-slate-400 shadow-sm ring-1 ring-slate-200">
+                                                    <ImageIcon className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-700">Bữa ăn không có ảnh đính kèm</p>
+                                                    <p className="mt-0.5 text-xs leading-relaxed text-slate-500">Hãy đối chiếu thông tin dựa trên tên món, khẩu phần và chỉ số dinh dưỡng học viên đã gửi.</p>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Tên món & Chế độ Blind */}
                                         <div className="mt-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
@@ -457,14 +590,14 @@ export default function ReviewDietLogPage() {
                                                 <p className="text-slate-800 font-black text-xl capitalize flex-1 truncate">{log.foodDescription || 'Bữa ăn không có mô tả'}</p>
 
                                                 {/* Nút bật/tắt Blind Mode */}
-                                                <Button
+                                                {!isReviewedList && <Button
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={() => setBlindMode((p) => ({ ...p, [log.id]: !p[log.id] }))}
                                                     className={`h-9 rounded-xl font-bold border transition-colors ${blindMode[log.id] ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
                                                 >
                                                     {blindMode[log.id] ? <><Eye className="w-4 h-4 mr-1.5"/> Tắt Blind Mode</> : <><EyeOff className="w-4 h-4 mr-1.5"/> Bật Blind Mode</>}
-                                                </Button>
+                                                </Button>}
                                             </div>
 
                                             {(!blindMode[log.id] || blindRevealed[log.id] || log.blindSubmitted) && (log.restaurantName || log.aiConfidenceScore != null) && (
@@ -502,7 +635,7 @@ export default function ReviewDietLogPage() {
                                                 <>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
                                                         <MacroCol label="AI Dự đoán" macros={log.aiPredictedMacros} color="bg-purple-50/50 border-purple-100 text-purple-900" />
-                                                        <MacroCol label="Học viên đang thấy" macros={log.macrosJson} color="bg-white border-slate-200 text-slate-800 shadow-sm" />
+                                                        <MacroCol label={isReviewedList ? 'Kết quả đã duyệt' : 'Học viên đang thấy'} macros={log.macrosJson} color={isReviewedList ? 'bg-emerald-50/60 border-emerald-100 text-emerald-950 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
                                                     </div>
                                                     {(log.modelVersion || log.matchedFoodName) && (
                                                         <p className="text-[10px] font-bold text-slate-400 mt-3 flex items-center gap-2">
@@ -515,20 +648,23 @@ export default function ReviewDietLogPage() {
 
                                             {/* Thư viện ảnh đầy đủ */}
                                             {(() => {
-                                                const allImages = [
-                                                    { url: log.imageUrl ? getFullImageUrl(log.imageUrl) : null, isPrimary: true },
-                                                    ...(log.additionalImages || []).map(img => ({
-                                                        url: getFullImageUrl(img.imageUrl),
-                                                        isPrimary: img.isPrimary
-                                                    }))
-                                                ].filter(img => img.url);
+                                                const allImages = getReviewImages(log);
 
                                                 if (allImages.length <= 1) return null;
 
                                                 return (
                                                     <div className="flex gap-2 mt-4 flex-wrap border-t border-slate-200/60 pt-4 animate-fade-in">
                                                         {allImages.map((img, idx) => (
-                                                            <div key={idx} className="relative cursor-pointer hover:opacity-85 transition-opacity" onClick={() => setPreviewImage(prev => ({ ...prev, [log.id]: img.url }))}>
+                                                            <button
+                                                                key={img.id || getImageKey(img.url) || idx}
+                                                                type="button"
+                                                                className="relative cursor-zoom-in border-0 bg-transparent p-0 hover:opacity-85 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-xl"
+                                                                onClick={() => {
+                                                                    setPreviewImage((prev) => ({ ...prev, [log.id]: img.url }));
+                                                                    setLightboxImage(img.url);
+                                                                }}
+                                                                aria-label={`Xem ảnh bữa ăn ${idx + 1} rõ hơn`}
+                                                            >
                                                                 <img
                                                                     src={img.url}
                                                                     alt="Meal thumbnail"
@@ -543,7 +679,7 @@ export default function ReviewDietLogPage() {
                                                                         <Star className="w-2.5 h-2.5 fill-current text-white" />
                                                                     </div>
                                                                 )}
-                                                            </div>
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 );
@@ -551,7 +687,7 @@ export default function ReviewDietLogPage() {
                                         </div>
 
                                         {/* FORM ĐIỀU CHỈNH MACROS */}
-                                        {adjustingLog === log.id && (
+                                        {!isReviewedList && adjustingLog === log.id && (
                                             <div className="mt-4 p-6 bg-blue-50 border border-blue-100 rounded-2xl animate-fade-in shadow-inner">
                                                 <div className="flex items-center gap-2 mb-4">
                                                     <SlidersHorizontal className="w-5 h-5 text-blue-600" />
@@ -630,7 +766,7 @@ export default function ReviewDietLogPage() {
                                     </div>
 
                                     {/* THANH HÀNH ĐỘNG CHÍNH */}
-                                    {!adjustingLog && (
+                                    {!isReviewedList && !adjustingLog && (
                                         <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-3 mt-6 pt-6 border-t border-slate-100">
 
                                             <Button
@@ -664,10 +800,24 @@ export default function ReviewDietLogPage() {
                                             </Button>
                                         </div>
                                     )}
+                                    {isReviewedList && (
+                                        <div className="mt-5 flex justify-end border-t border-slate-100 pt-5">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => navigate(`/pt/chat?contextLogId=${log.id}`, {
+                                                    state: { targetClientId: log.customerId },
+                                                })}
+                                                className="w-full rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 sm:w-auto"
+                                            >
+                                                <MessageSquare className="mr-2 h-4 w-4" /> Hỏi về bữa ăn
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </Card>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
             {/* Modal Từ chối */}
@@ -712,6 +862,12 @@ export default function ReviewDietLogPage() {
                     </div>
                 </div>
             </Modal>
+
+            <ImageLightbox
+                isOpen={!!lightboxImage}
+                imageUrl={lightboxImage}
+                onClose={() => setLightboxImage('')}
+            />
         </div>
     );
 }

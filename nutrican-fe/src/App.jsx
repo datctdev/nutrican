@@ -23,6 +23,7 @@ import ClientProgressPage from './pages/pt/ClientProgressPage';
 import PtMealPlanPage from './pages/pt/PtMealPlanPage';
 import PtAppointmentsPage from './pages/pt/PtAppointmentsPage';
 import ReviewDietLogPage from './pages/pt/ReviewDietLogPage';
+import ClientDietLogPage from './pages/pt/ClientDietLogPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import PtVerificationPage from './pages/admin/PtVerificationPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
@@ -122,6 +123,7 @@ function App() {
                 { path: '/pt', element: <PtDashboardPage /> },
                 { path: '/pt/clients', element: <ClientListPage /> },
                 { path: '/pt/clients/:clientId/meal-plan', element: <PtMealPlanPage /> },
+                { path: '/pt/clients/dietlog', element: <ClientDietLogPage /> },
                 { path: '/pt/appointments', element: <PtAppointmentsPage /> },
                 { path: '/pt/progress/:clientId', element: <ClientProgressPage /> },
                 { path: '/pt/reviews', element: <ReviewDietLogPage /> },

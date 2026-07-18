@@ -8,7 +8,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 import {
     Search, Activity, MessageSquare,
     Users, Clock, ShieldAlert, TrendingUp, Utensils,
-    ChevronDown, UserCheck, UserX
+    ChevronDown, UserCheck, UserX, ClipboardCheck
 } from 'lucide-react';
 import { workspaceService } from '../../services/workspaceService';
 import { toast } from 'sonner';
@@ -386,6 +386,17 @@ export default function ClientListPage() {
                                                     Tiến độ <TrendingUp className="w-4 h-4 ml-1.5" />
                                                 </Button>
                                             </div>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => {
+                                                    const params = new URLSearchParams({ clientId: client.clientId });
+                                                    if (client.clientName) params.set('clientName', client.clientName);
+                                                    navigate(`/pt/clients/dietlog?${params.toString()}`);
+                                                }}
+                                                className="w-full border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl h-10 font-semibold text-sm"
+                                            >
+                                                <ClipboardCheck className="w-4 h-4 mr-2" /> Duyệt bữa ăn
+                                            </Button>
                                             <Button
                                                 variant="outline"
                                                 onClick={() => navigate(`/pt/clients/${client.clientId}/meal-plan`)}

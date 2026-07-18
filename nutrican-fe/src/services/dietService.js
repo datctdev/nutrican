@@ -9,6 +9,7 @@ export const dietService = {
     }),
 
     getLogs: (params) => api.get('/diet/logs', { params }),
+    getClientLogsForPt: (clientId, params) => api.get(`/diet/logs/client/${clientId}`, { params }),
     getLogById: (id) => api.get(`/diet/logs/${id}`),
     updateLog: (id, data) => api.put(`/diet/logs/${id}`, data),
     deleteLog: (id) => api.delete(`/diet/logs/${id}`),
@@ -37,4 +38,5 @@ export const dietService = {
     getImages: (logId) => api.get(`/diet/logs/${logId}/images`),
     setPrimaryImage: (logId, imageId) => api.put(`/diet/logs/${logId}/images/${imageId}/primary`),
     deleteImage: (logId, imageId) => api.delete(`/diet/logs/${logId}/images/${imageId}`),
+    deletePrimaryImage: (logId) => api.delete(`/diet/logs/${logId}/images/primary`),
 };

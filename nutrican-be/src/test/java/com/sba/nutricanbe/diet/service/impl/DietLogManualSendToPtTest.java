@@ -71,4 +71,35 @@ class DietLogManualSendToPtTest {
         assertEquals(DietLogReviewStatus.PENDING, result.getData().getReviewStatus());
         verify(dietLogHelper).notifyPtOfNewLog(any(DietLog.class));
     }
+
+    @Test
+    void updateLog_withSendToPt_setsPendingAndNotifiesPt() {
+        UUID customerId = UUID.randomUUID();
+        UUID logId = UUID.randomUUID();
+        DietLog existing = DietLog.builder()
+                .customerId(customerId)
+                .status(DietLogStatus.MANUAL_REQUIRED)
+                .reviewStatus(DietLogReviewStatus.NOT_REQUIRED)
+                .build();
+        when(dietLogRepository.findById(logId)).thenReturn(Optional.of(existing));
+        when(dietLogRepository.save(any(DietLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dietLogHelper.toResponse(any())).thenAnswer(invocation -> {
+            DietLog saved = invocation.getArgument(0);
+            return DietLogResponse.builder().reviewStatus(saved.getReviewStatus()).build();
+        });
+
+        CreateDietLogRequest request = new CreateDietLogRequest();
+        request.setCalories(java.math.BigDecimal.valueOf(450));
+        request.setProtein(java.math.BigDecimal.valueOf(20));
+        request.setCarb(java.math.BigDecimal.valueOf(55));
+        request.setFat(java.math.BigDecimal.valueOf(12));
+        request.setSendToPt(true);
+
+        var result = dietLogService.updateLog(logId, customerId, request);
+
+        assertEquals(DietLogReviewStatus.PENDING, result.getData().getReviewStatus());
+        assertEquals(DietLogStatus.LOGGED, existing.getStatus());
+        verify(dietLogHelper).assignPtReviewerIfNeeded(existing, customerId);
+        verify(dietLogHelper).notifyPtOfNewLog(existing);
+    }
 }
