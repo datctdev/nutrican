@@ -191,6 +191,10 @@ const handleWebSocketMessage = (message) => {
             break;
         }
 
+        case 'MEAL_PLAN_PROGRESS_UPDATED':
+            window.dispatchEvent(new CustomEvent('meal_plan_progress_updated', { detail: data }));
+            break;
+
         default:
             console.log('Unhandled WebSocket event:', event);
     }

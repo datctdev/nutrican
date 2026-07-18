@@ -69,9 +69,12 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.sba.nutricanbe.common.dto.MacroNutrients;
 import java.util.UUID;
@@ -256,41 +259,51 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<ProgressDataDto> getClientProgress(UUID ptId, UUID clientId, LocalDate startDate, LocalDate endDate) {
+        return getClientProgress(ptId, clientId, startDate, endDate, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<ProgressDataDto> getClientProgress(
+            UUID ptId, UUID clientId, LocalDate startDate, LocalDate endDate, LocalDate mealPlanWeekStart) {
         requirePtClientDataAccess(ptId, clientId);
         if (startDate == null) startDate = LocalDate.now().minusMonths(1);
         if (endDate == null) endDate = LocalDate.now();
 
         List<DietLog> logs = dietLogRepository.findByCustomerIdAndLogDateBetween(
                 clientId, startDate, endDate, PageRequest.of(0, 1000)).getContent();
-
         List<BodyMetric> metrics = bodyMetricRepository.findByUserIdAndDateRange(clientId, startDate, endDate);
 
         MacroTarget macroTarget = userQueryService.findMacroTargetByUserId(clientId).orElse(null);
         BigDecimal calorieTarget = macroTarget != null && macroTarget.getDailyCalories() != null
                 ? macroTarget.getDailyCalories() : BigDecimal.valueOf(2000);
 
-        List<ProgressDataDto.DailyCalorieData> calorieData = new ArrayList<>();
-        BigDecimal totalCalories = MacroUtils.ZERO;
-        BigDecimal totalProtein = MacroUtils.ZERO;
-        BigDecimal totalCarb = MacroUtils.ZERO;
-        BigDecimal totalFat = MacroUtils.ZERO;
-        int logCount = 0;
+        MealPlanProgressContext mealPlanContext = resolveMealPlanProgress(
+                ptId, clientId, mealPlanWeekStart, LocalDate.now());
+        LocalDate summaryWeekStart = mealPlanContext.selectedPlan() != null
+                ? mealPlanContext.selectedPlan().getWeekStart()
+                : LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+        LocalDate summaryWeekEnd = summaryWeekStart.plusDays(6);
+        List<DietLog> summaryLogs = dietLogRepository.findByCustomerIdAndLogDateBetween(
+                clientId, summaryWeekStart, summaryWeekEnd, PageRequest.of(0, 1000)).getContent();
 
-        for (DietLog log : logs) {
-            if (log.getMacrosJson() != null) {
-                calorieData.add(ProgressDataDto.DailyCalorieData.builder()
-                        .date(log.getLogDate())
-                        .calories(log.getMacrosJson().calories())
+        Map<LocalDate, MacroNutrients> historyMacrosByDay = aggregateLoggedMacrosByDay(logs);
+        List<ProgressDataDto.DailyCalorieData> calorieData = historyMacrosByDay.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> ProgressDataDto.DailyCalorieData.builder()
+                        .date(entry.getKey())
+                        .calories(entry.getValue().calories())
                         .target(calorieTarget)
-                        .build());
+                        .build())
+                .toList();
 
-                totalCalories = MacroUtils.add(totalCalories, log.getMacrosJson().calories());
-                totalProtein = MacroUtils.add(totalProtein, log.getMacrosJson().protein());
-                totalCarb = MacroUtils.add(totalCarb, log.getMacrosJson().carbs());
-                totalFat = MacroUtils.add(totalFat, log.getMacrosJson().fat());
-                logCount++;
-            }
-        }
+        ProgressDataDto.MealPlanAdherenceSummary mealPlanAdherence = buildMealPlanAdherence(
+                mealPlanContext.selectedPlan(), summaryLogs, LocalDate.now());
+        Map<LocalDate, MacroNutrients> summaryMacrosByDay = aggregateLoggedMacrosByDay(summaryLogs);
+        ProgressDataDto.MacroSummary macroSummary = buildMacroSummary(
+                summaryMacrosByDay,
+                mealPlanAdherence != null ? mealPlanAdherence.getLogCoverageRate() : null,
+                mealPlanAdherence != null ? mealPlanAdherence.getAdherenceRate() : null);
 
         List<ProgressDataDto.BodyMetricData> metricData = metrics.stream()
                 .map(m -> ProgressDataDto.BodyMetricData.builder()
@@ -301,26 +314,6 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                         .build())
                 .toList();
 
-        ProgressDataDto.MacroSummary macroSummary = null;
-        BigDecimal mealPlanAdherence = computeMealPlanAdherence(clientId);
-        if (logCount > 0) {
-            BigDecimal adherence = BigDecimal.valueOf(logCount)
-                    .divide(BigDecimal.valueOf(Math.max(calorieData.size(), 1)), 2, RoundingMode.HALF_UP)
-                    .multiply(BigDecimal.valueOf(100));
-            macroSummary = ProgressDataDto.MacroSummary.builder()
-                    .avgCalories(totalCalories.divide(BigDecimal.valueOf(logCount), 1, RoundingMode.HALF_UP))
-                    .avgProtein(totalProtein.divide(BigDecimal.valueOf(logCount), 1, RoundingMode.HALF_UP))
-                    .avgCarb(totalCarb.divide(BigDecimal.valueOf(logCount), 1, RoundingMode.HALF_UP))
-                    .avgFat(totalFat.divide(BigDecimal.valueOf(logCount), 1, RoundingMode.HALF_UP))
-                    .adherenceRate(adherence)
-                    .mealPlanAdherenceRate(mealPlanAdherence)
-                    .build();
-        } else if (mealPlanAdherence != null) {
-            macroSummary = ProgressDataDto.MacroSummary.builder()
-                    .mealPlanAdherenceRate(mealPlanAdherence)
-                    .build();
-        }
-
         User client = userRepository.findById(clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", clientId));
 
@@ -330,29 +323,34 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .calorieHistory(calorieData)
                 .bodyMetrics(metricData)
                 .macroSummary(macroSummary)
+                .mealPlanWeeks(mealPlanContext.availableWeeks())
+                .mealPlanAdherence(mealPlanAdherence)
                 .build();
 
         progressTimelineService.enrichProgress(response, clientId, startDate, endDate);
-        enrichMealPlanAndFeedback(response, clientId, startDate, endDate, logs);
+        enrichMealPlanAndFeedback(
+                response, clientId, startDate, endDate, logs, mealPlanContext.selectedPlan());
 
         return ApiResponse.success(response);
     }
 
     private void enrichMealPlanAndFeedback(ProgressDataDto response, UUID clientId,
-                                           LocalDate startDate, LocalDate endDate, List<DietLog> logs) {
+                                           LocalDate startDate, LocalDate endDate, List<DietLog> logs,
+                                           MealPlan selectedPlan) {
         List<MealPlanSkipItemDto> skips = new ArrayList<>();
-        mealPlanRepository.findByClientIdOrderByWeekStartDesc(clientId).stream().findFirst()
-                .ifPresent(plan -> mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId())
-                        .stream()
-                        .filter(i -> i.getSkipReason() != null)
-                        .forEach(i -> skips.add(MealPlanSkipItemDto.builder()
-                                .itemId(i.getId())
-                                .planDate(i.getPlanDate())
-                                .mealType(i.getMealType() != null ? i.getMealType().name() : null)
-                                .foodLabel(i.getFreeText() != null ? i.getFreeText() : i.getFoodCode())
-                                .skipReason(i.getSkipReason().name())
-                                .skipNote(i.getSkipNote())
-                                .build())));
+        if (selectedPlan != null) {
+            mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(selectedPlan.getId())
+                    .stream()
+                    .filter(i -> i.getSkipReason() != null)
+                    .forEach(i -> skips.add(MealPlanSkipItemDto.builder()
+                            .itemId(i.getId())
+                            .planDate(i.getPlanDate())
+                            .mealType(i.getMealType() != null ? i.getMealType().name() : null)
+                            .foodLabel(i.getFreeText() != null ? i.getFreeText() : i.getFoodCode())
+                            .skipReason(i.getSkipReason().name())
+                            .skipNote(i.getSkipNote())
+                            .build()));
+        }
         response.setSkipReasons(skips);
 
         List<MealPlanSuggestionDto> pending = mealPlanSuggestionRepository
@@ -664,20 +662,161 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         return userProfileService.setMacroTarget(clientId, request);
     }
 
-    private BigDecimal computeMealPlanAdherence(UUID clientId) {
-        return mealPlanRepository.findByClientIdOrderByWeekStartDesc(clientId).stream().findFirst()
-                .map(plan -> {
-                    List<MealPlanItem> items = mealPlanItemRepository
-                            .findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId());
-                    if (items.isEmpty()) {
-                        return null;
-                    }
-                    long eaten = items.stream().filter(i -> Boolean.TRUE.equals(i.getEaten())).count();
-                    return BigDecimal.valueOf(eaten * 100.0 / items.size())
-                            .setScale(1, RoundingMode.HALF_UP);
-                })
-                .orElse(null);
+    private MealPlanProgressContext resolveMealPlanProgress(
+            UUID ptId, UUID clientId, LocalDate requestedWeekStart, LocalDate today) {
+        Map<LocalDate, MealPlan> newestPlanByWeek = new LinkedHashMap<>();
+        mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(clientId).stream()
+                .filter(plan -> ptId.equals(plan.getPtId()))
+                .forEach(plan -> newestPlanByWeek.putIfAbsent(plan.getWeekStart(), plan));
+
+        List<ProgressDataDto.MealPlanWeekOption> availableWeeks = newestPlanByWeek.values().stream()
+                .map(plan -> ProgressDataDto.MealPlanWeekOption.builder()
+                        .planId(plan.getId())
+                        .weekStart(plan.getWeekStart())
+                        .weekEnd(plan.getWeekStart().plusDays(6))
+                        .build())
+                .toList();
+
+        MealPlan selectedPlan = requestedWeekStart != null
+                ? newestPlanByWeek.get(requestedWeekStart)
+                : null;
+        if (selectedPlan == null) {
+            LocalDate currentWeekStart = today.with(java.time.DayOfWeek.MONDAY);
+            selectedPlan = newestPlanByWeek.get(currentWeekStart);
+        }
+        if (selectedPlan == null) {
+            selectedPlan = newestPlanByWeek.values().stream()
+                    .filter(plan -> !plan.getWeekStart().isAfter(today))
+                    .findFirst()
+                    .orElseGet(() -> newestPlanByWeek.values().stream().findFirst().orElse(null));
+        }
+        return new MealPlanProgressContext(selectedPlan, availableWeeks);
     }
+
+    private ProgressDataDto.MealPlanAdherenceSummary buildMealPlanAdherence(
+            MealPlan plan, List<DietLog> weekLogs, LocalDate today) {
+        if (plan == null) {
+            return null;
+        }
+        List<MealPlanItem> items = mealPlanItemRepository
+                .findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId());
+        LocalDate weekStart = plan.getWeekStart();
+        LocalDate weekEnd = weekStart.plusDays(6);
+
+        List<MealPlanItem> dueItems = items.stream()
+                .filter(item -> item.getPlanDate() != null && !item.getPlanDate().isAfter(today))
+                .toList();
+        int eatenItems = (int) dueItems.stream().filter(item -> Boolean.TRUE.equals(item.getEaten())).count();
+        int skippedItems = (int) dueItems.stream().filter(item -> item.getSkipReason() != null).count();
+        int pendingItems = Math.max(0, dueItems.size() - eatenItems - skippedItems);
+
+        Set<MealSlot> expectedSlots = new HashSet<>();
+        dueItems.stream()
+                .filter(item -> item.getMealType() != null)
+                .forEach(item -> expectedSlots.add(new MealSlot(item.getPlanDate(), item.getMealType())));
+        Set<MealSlot> loggedSlots = new HashSet<>();
+        weekLogs.stream()
+                .filter(log -> log.getStatus() == DietLogStatus.LOGGED)
+                .filter(log -> log.getLogDate() != null && log.getMealType() != null)
+                .map(log -> new MealSlot(log.getLogDate(), log.getMealType()))
+                .filter(expectedSlots::contains)
+                .forEach(loggedSlots::add);
+
+        BigDecimal adherenceRate = percentage(eatenItems, dueItems.size());
+        BigDecimal logCoverageRate = percentage(loggedSlots.size(), expectedSlots.size());
+        List<ProgressDataDto.DailyMealPlanAdherence> daily = new ArrayList<>();
+        for (int offset = 0; offset < 7; offset++) {
+            LocalDate date = weekStart.plusDays(offset);
+            List<MealPlanItem> dayItems = items.stream()
+                    .filter(item -> date.equals(item.getPlanDate()))
+                    .toList();
+            boolean future = date.isAfter(today);
+            int dayDueItems = future ? 0 : dayItems.size();
+            int dayEatenItems = future ? 0 : (int) dayItems.stream()
+                    .filter(item -> Boolean.TRUE.equals(item.getEaten())).count();
+            int daySkippedItems = future ? 0 : (int) dayItems.stream()
+                    .filter(item -> item.getSkipReason() != null).count();
+            int dayPendingItems = Math.max(0, dayDueItems - dayEatenItems - daySkippedItems);
+            daily.add(ProgressDataDto.DailyMealPlanAdherence.builder()
+                    .date(date)
+                    .totalItems(dayItems.size())
+                    .dueItems(dayDueItems)
+                    .eatenItems(dayEatenItems)
+                    .skippedItems(daySkippedItems)
+                    .pendingItems(dayPendingItems)
+                    .adherenceRate(percentage(dayEatenItems, dayDueItems))
+                    .future(future)
+                    .build());
+        }
+
+        return ProgressDataDto.MealPlanAdherenceSummary.builder()
+                .weekStart(weekStart)
+                .weekEnd(weekEnd)
+                .totalItems(items.size())
+                .dueItems(dueItems.size())
+                .eatenItems(eatenItems)
+                .skippedItems(skippedItems)
+                .pendingItems(pendingItems)
+                .expectedMealSlots(expectedSlots.size())
+                .loggedMealSlots(loggedSlots.size())
+                .adherenceRate(adherenceRate)
+                .logCoverageRate(logCoverageRate)
+                .daily(daily)
+                .build();
+    }
+
+    private Map<LocalDate, MacroNutrients> aggregateLoggedMacrosByDay(List<DietLog> logs) {
+        Map<LocalDate, MacroNutrients> totals = new HashMap<>();
+        logs.stream()
+                .filter(log -> log.getStatus() == DietLogStatus.LOGGED)
+                .filter(log -> log.getLogDate() != null && log.getMacrosJson() != null)
+                .forEach(log -> totals.merge(
+                        log.getLogDate(), log.getMacrosJson(), MacroNutrients::add));
+        return totals;
+    }
+
+    private ProgressDataDto.MacroSummary buildMacroSummary(
+            Map<LocalDate, MacroNutrients> macrosByDay,
+            BigDecimal logCoverageRate,
+            BigDecimal mealPlanAdherenceRate) {
+        if (macrosByDay.isEmpty() && logCoverageRate == null && mealPlanAdherenceRate == null) {
+            return null;
+        }
+        MacroNutrients total = macrosByDay.values().stream()
+                .reduce(MacroNutrients.ZERO, MacroNutrients::add);
+        BigDecimal loggedDays = BigDecimal.valueOf(macrosByDay.size());
+        return ProgressDataDto.MacroSummary.builder()
+                .avgCalories(average(total.calories(), loggedDays))
+                .avgProtein(average(total.protein(), loggedDays))
+                .avgCarb(average(total.carbs(), loggedDays))
+                .avgFat(average(total.fat(), loggedDays))
+                .adherenceRate(logCoverageRate)
+                .mealPlanAdherenceRate(mealPlanAdherenceRate)
+                .build();
+    }
+
+    private BigDecimal average(BigDecimal total, BigDecimal count) {
+        return count.signum() == 0
+                ? null
+                : total.divide(count, 1, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal percentage(long numerator, long denominator) {
+        if (denominator <= 0) {
+            return null;
+        }
+        return BigDecimal.valueOf(numerator)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(denominator), 1, RoundingMode.HALF_UP);
+    }
+
+    private record MealPlanProgressContext(
+            MealPlan selectedPlan,
+            List<ProgressDataDto.MealPlanWeekOption> availableWeeks) {}
+
+    private record MealSlot(
+            LocalDate date,
+            com.sba.nutricanbe.diet.enums.MealType mealType) {}
 
     private void notifyClientOfReview(UUID clientId, UUID logId, String status) {
         log.info("Notifying client {} about review of log {}: status={}", clientId, logId, status);
