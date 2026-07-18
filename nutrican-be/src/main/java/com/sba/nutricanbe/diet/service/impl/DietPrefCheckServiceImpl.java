@@ -61,26 +61,42 @@ public class DietPrefCheckServiceImpl implements DietPrefCheckService {
     @Override
     public List<PlanDietPrefWarning> checkPlan(UUID clientId, List<String> foodCodes) {
         User user = userRepository.findById(clientId).orElse(null);
-        if (user == null || user.getDietPreference() == null || user.getDietPreference() == DietPreference.NORMAL) {
-            return List.of();
-        }
         List<PlanDietPrefWarning> warnings = new ArrayList<>();
-        if (foodCodes == null) {
+        if (user == null || foodCodes == null || foodCodes.isEmpty()) {
             return warnings;
         }
+
+        List<String> allergicCodes = user.getAllergicFoodCodes() != null ? user.getAllergicFoodCodes() : List.of();
+        boolean hasPreference = user.getDietPreference() != null && user.getDietPreference() != DietPreference.NORMAL;
+
         for (int i = 0; i < foodCodes.size(); i++) {
             String code = foodCodes.get(i);
             if (code == null || code.isBlank()) {
                 continue;
             }
-            List<String> tags = resolveTags(code);
-            if (!matchesPreference(user.getDietPreference(), tags)) {
+
+            // 1. Check allergy
+            if (allergicCodes.contains(code)) {
                 String name = ResNetFoodCodeMapping.catalogNameViOrDisplay(code, code);
                 warnings.add(PlanDietPrefWarning.builder()
                         .itemIndex(i)
                         .foodCode(code)
-                        .message(buildWarningMessage(user.getDietPreference(), name))
+                        .message("CẢNH BÁO: Món \"" + name + "\" chứa nguyên liệu học viên bị dị ứng!")
                         .build());
+                continue; // Skip pref check if allergy triggers
+            }
+
+            // 2. Check diet preference
+            if (hasPreference) {
+                List<String> tags = resolveTags(code);
+                if (!matchesPreference(user.getDietPreference(), tags)) {
+                    String name = ResNetFoodCodeMapping.catalogNameViOrDisplay(code, code);
+                    warnings.add(PlanDietPrefWarning.builder()
+                            .itemIndex(i)
+                            .foodCode(code)
+                            .message(buildWarningMessage(user.getDietPreference(), name))
+                            .build());
+                }
             }
         }
         return warnings;
@@ -89,25 +105,39 @@ public class DietPrefCheckServiceImpl implements DietPrefCheckService {
     @Override
     public List<PlanDietPrefWarning> checkFoodItems(UUID userId, List<FoodItem> foods) {
         User user = userRepository.findById(userId).orElse(null);
-        if (user == null || user.getDietPreference() == null || user.getDietPreference() == DietPreference.NORMAL) {
-            return List.of();
-        }
-        if (foods == null || foods.isEmpty()) {
-            return List.of();
-        }
         List<PlanDietPrefWarning> warnings = new ArrayList<>();
+        if (user == null || foods == null || foods.isEmpty()) {
+            return warnings;
+        }
+
+        List<String> allergicCodes = user.getAllergicFoodCodes() != null ? user.getAllergicFoodCodes() : List.of();
+        boolean hasPreference = user.getDietPreference() != null && user.getDietPreference() != DietPreference.NORMAL;
+
         for (int i = 0; i < foods.size(); i++) {
             FoodItem food = foods.get(i);
             if (food == null) {
                 continue;
             }
-            List<String> tags = food.getDietTags() != null ? food.getDietTags() : List.of();
-            if (!matchesPreference(user.getDietPreference(), tags)) {
+
+            String code = food.getId() != null ? food.getId().toString() : null;
+            if (code != null && allergicCodes.contains(code)) {
                 warnings.add(PlanDietPrefWarning.builder()
                         .itemIndex(i)
-                        .foodCode(food.getId() != null ? food.getId().toString() : null)
-                        .message(buildWarningMessage(user.getDietPreference(), food.getNameVi()))
+                        .foodCode(code)
+                        .message("CẢNH BÁO: Món \"" + food.getNameVi() + "\" chứa nguyên liệu học viên bị dị ứng!")
                         .build());
+                continue;
+            }
+
+            if (hasPreference) {
+                List<String> tags = food.getDietTags() != null ? food.getDietTags() : List.of();
+                if (!matchesPreference(user.getDietPreference(), tags)) {
+                    warnings.add(PlanDietPrefWarning.builder()
+                            .itemIndex(i)
+                            .foodCode(code)
+                            .message(buildWarningMessage(user.getDietPreference(), food.getNameVi()))
+                            .build());
+                }
             }
         }
         return warnings;

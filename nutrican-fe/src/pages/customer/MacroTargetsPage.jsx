@@ -20,8 +20,6 @@ import {
   Save
 } from 'lucide-react';
 
-
-
 const DIET_OPTIONS = [
   { value: 'NORMAL', label: 'Ăn thường' },
   { value: 'VEGETARIAN', label: 'Ăn chay' },
@@ -74,6 +72,7 @@ export default function MacroTargetsPage() {
 
   // Section 2: Health & nutrition states
   const [allergyNotes, setAllergyNotes] = useState('');
+  const [allergicFoodCodes, setAllergicFoodCodes] = useState([]);
   const [dietPreference, setDietPreference] = useState('NORMAL');
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
@@ -132,7 +131,8 @@ export default function MacroTargetsPage() {
       ]);
 
       const data = profileRes.data.data;
-      setAllergyNotes(allergyRes.data.data || data.allergyNotes || '');
+      setAllergyNotes(allergyRes.data.data?.allergyNotes || data.allergyNotes || '');
+      setAllergicFoodCodes(allergyRes.data.data?.allergicFoodCodes || data.allergicFoodCodes || []);
       if (data.dietPreference) setDietPreference(data.dietPreference);
       if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
       if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
@@ -361,7 +361,7 @@ export default function MacroTargetsPage() {
     setSavingHealth(true);
     try {
       await Promise.all([
-        userService.updateAllergies(allergyNotes),
+        userService.updateAllergies({ allergyNotes }),
         userService.updatePreferences({
           dietPreference,
           nutritionGoal,

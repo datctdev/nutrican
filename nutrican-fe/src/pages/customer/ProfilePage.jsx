@@ -21,8 +21,6 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 import useWebSocket from '../../hooks/useWebSocket';
 
-
-
 const DIET_OPTIONS = [
   { value: 'NORMAL', label: 'Ăn thường' },
   { value: 'VEGETARIAN', label: 'Ăn chay' },
@@ -147,7 +145,7 @@ export default function ProfilePage() {
       };
       setProfile(p);
       setEditForm({ fullName: p.fullName, phoneNumber: p.phoneNumber, address: p.address });
-      setAllergyNotes(allergyRes.data.data || data.allergyNotes || '');
+      setAllergyNotes(allergyRes.data.data?.allergyNotes || data.allergyNotes || '');
       if (data.dietPreference) setDietPreference(data.dietPreference);
       if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
       if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
