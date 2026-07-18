@@ -22,6 +22,27 @@ import {
 
 
 
+const DIET_OPTIONS = [
+  { value: 'NORMAL', label: 'Ăn thường' },
+  { value: 'VEGETARIAN', label: 'Ăn chay' },
+  { value: 'VEGAN', label: 'Thuần chay' },
+  { value: 'KETO', label: 'Keto' },
+  { value: 'EAT_CLEAN', label: 'Eat clean' },
+];
+
+const getGoalsByGender = (gender) => {
+  const baseGoals = [
+    { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
+    { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
+    { value: 'MAINTAIN', label: 'Duy trì' },
+    { value: 'RECOVERY', label: 'Phục hồi' },
+  ];
+  if (gender === 'female' || gender === 'FEMALE') {
+    return [...baseGoals, { value: 'PREGNANT', label: 'Mang thai' }];
+  }
+  return baseGoals;
+};
+
 export default function MacroTargetsPage() {
   const fileInputRef = useRef(null);
   const [activeSection, setActiveSection] = useState('nutrition'); // sidebar tabs: nutrition, health, progress
