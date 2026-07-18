@@ -31,6 +31,7 @@ import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.dto.NotificationPayload;
 import com.sba.nutricanbe.user.enums.NotificationLinkType;
 import com.sba.nutricanbe.user.service.NotificationService;
+import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 
@@ -54,6 +55,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import java.util.List;
+import java.util.Map;
 
 import java.util.UUID;
 
@@ -80,6 +82,8 @@ public class MealPlanController {
     private final WeeklySummaryRepository weeklySummaryRepository;
 
     private final NotificationService notificationService;
+
+    private final WebSocketSessionService webSocketSessionService;
 
 
 
@@ -247,6 +251,9 @@ public class MealPlanController {
         OwnedMealPlanItem owned = requireOwnedPublishedItem(user.getId(), itemId);
         MealPlanItem item = owned.item();
         assertDateIsActionable(item);
+        if (eaten && item.getPlanDate().isAfter(LocalDate.now())) {
+            throw new BadRequestException("Future meal-plan items cannot be marked as eaten");
+        }
         if (eaten && item.getSkipReason() != null) {
             throw new BadRequestException("Undo the skipped state before marking this item as eaten");
         }
@@ -255,8 +262,15 @@ public class MealPlanController {
         }
 
         item.setEaten(eaten);
+        MealPlanItem saved = mealPlanItemRepository.save(item);
+        webSocketSessionService.sendToUserOnly(owned.plan().getPtId(), "MEAL_PLAN_PROGRESS_UPDATED",
+                Map.of(
+                        "clientId", user.getId(),
+                        "planId", owned.plan().getId(),
+                        "weekStart", owned.plan().getWeekStart(),
+                        "planDate", item.getPlanDate()));
 
-        return ResponseEntity.ok(ApiResponse.success(mealPlanItemRepository.save(item)));
+        return ResponseEntity.ok(ApiResponse.success(saved));
 
     }
 
