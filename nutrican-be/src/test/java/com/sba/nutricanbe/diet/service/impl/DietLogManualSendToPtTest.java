@@ -1,8 +1,8 @@
 package com.sba.nutricanbe.diet.service.impl;
 
-import com.sba.nutricanbe.diet.dto.CreateDietLogRequest;
-import com.sba.nutricanbe.diet.dto.DietLogResponse;
-import com.sba.nutricanbe.diet.dto.IntakeControlResult;
+import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
+import com.sba.nutricanbe.diet.dto.response.DietLogResponse;
+import com.sba.nutricanbe.diet.dto.response.IntakeControlResult;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;

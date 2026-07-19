@@ -15,12 +15,14 @@ export default function MealPlanDayView({ date, items = [], onUpdateItems, onOpe
   const dayItems = items.filter(i => i.planDate === date);
 
   const handleRemove = (globalIndex) => {
+    if (items[globalIndex]?.eaten) return;
     const newItems = [...items];
     newItems.splice(globalIndex, 1);
     onUpdateItems(newItems);
   };
 
   const handleUpdateGrams = (globalIndex, grams) => {
+    if (items[globalIndex]?.eaten) return;
     const newItems = [...items];
     const item = newItems[globalIndex];
     const ratio = grams / (item.baseServingSizeG || 100);
@@ -100,12 +102,20 @@ export default function MealPlanDayView({ date, items = [], onUpdateItems, onOpe
                               type="number"
                               min="0"
                               value={item.portionGrams}
+                              disabled={item.eaten}
+                              title={item.eaten ? 'Học viên đã ăn món này. Chỉ có thể sửa sau khi học viên bỏ tích.' : undefined}
                               onChange={(e) => handleUpdateGrams(globalIndex, Number(e.target.value))}
-                              className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-center focus:ring-2 focus:ring-blue-500 outline-none"
+                              className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-center focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                             />
                             <span className="text-xs font-medium text-slate-500">gram</span>
                           </div>
-                          <button onClick={() => handleRemove(globalIndex)} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                          <button
+                            type="button"
+                            disabled={item.eaten}
+                            title={item.eaten ? 'Học viên đã ăn món này. Chỉ có thể xóa sau khi học viên bỏ tích.' : 'Xóa món'}
+                            onClick={() => handleRemove(globalIndex)}
+                            className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors disabled:text-slate-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>

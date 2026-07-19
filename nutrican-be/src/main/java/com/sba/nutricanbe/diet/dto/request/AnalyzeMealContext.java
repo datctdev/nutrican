@@ -1,4 +1,4 @@
-package com.sba.nutricanbe.diet.dto;
+package com.sba.nutricanbe.diet.dto.request;
 
 import com.sba.nutricanbe.diet.enums.MealComplexity;
 import com.sba.nutricanbe.diet.enums.MealSource;

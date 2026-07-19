@@ -47,10 +47,12 @@ function toUiMealPlanItem(item, idx, foodsByCode) {
   const baseFat = Number(food?.fat) || 0;
 
   return {
+    id: item.id,
     tempId: `api-${item.id || idx}-${Date.now()}`,
     planDate: item.planDate,
     mealType: item.mealType,
     foodCode: item.foodCode || '',
+    freeText: item.freeText || '',
     nameVi: item.freeText || food?.nameVi || item.foodCode || 'Món ăn',
     portionGrams,
     baseServingSizeG,
@@ -259,8 +261,10 @@ export default function PtMealPlanPage() {
     if (prevItems.length > 0) {
       const newCopied = prevItems.map((item, idx) => ({
         ...item,
+        id: undefined,
         tempId: `copy-${Date.now()}-${idx}`,
         planDate: selectedDate,
+        eaten: false,
       }));
       
       setItems([...items.filter(i => i.planDate !== selectedDate), ...newCopied]);
@@ -314,12 +318,13 @@ export default function PtMealPlanPage() {
         weekStart: formatDate(weekStart),
         notes,
         items: items.filter(i => i.foodCode || i.freeText).map(i => ({
+          id: i.id,
           planDate: i.planDate,
           mealType: i.mealType,
           foodCode: i.foodCode,
-          freeText: i.freeText || i.nameVi,
+          freeText: i.freeText ?? i.nameVi,
           portionGrams: i.portionGrams,
-          note: ''
+          note: i.note || ''
         }))
       };
 
@@ -428,7 +433,7 @@ export default function PtMealPlanPage() {
     <div className="max-w-6xl mx-auto px-4 py-8 pb-24 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Button variant="ghost" onClick={() => navigate(`/pt/clients/${clientId}`)} className="gap-2 mb-2 -ml-2 text-slate-500">
+          <Button variant="ghost" onClick={() => navigate('/pt/clients')} className="gap-2 mb-2 -ml-2 text-slate-500">
             <ArrowLeft className="w-4 h-4" /> Quay lại
           </Button>
           <div className="flex items-center gap-3">

@@ -2,8 +2,8 @@ package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.dto.MacroNutrients;
 import com.sba.nutricanbe.common.exception.BadRequestException;
-import com.sba.nutricanbe.diet.dto.PlanDietPrefWarning;
-import com.sba.nutricanbe.diet.dto.RecipeRequest;
+import com.sba.nutricanbe.diet.dto.request.RecipeRequest;
+import com.sba.nutricanbe.diet.dto.response.PlanDietPrefWarning;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.diet.entity.UserRecipe;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;

@@ -9,7 +9,7 @@ import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.service.DietLogImageService;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
-import com.sba.nutricanbe.diet.dto.DietLogImageDto;
+import com.sba.nutricanbe.diet.dto.response.DietLogImageDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

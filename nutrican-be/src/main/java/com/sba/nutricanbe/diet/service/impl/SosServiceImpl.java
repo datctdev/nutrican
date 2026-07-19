@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
-import com.sba.nutricanbe.diet.dto.SosTicketResponse;
+import com.sba.nutricanbe.diet.dto.response.SosTicketResponse;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.diet.entity.SosTicket;
@@ -18,7 +18,7 @@ import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.service.UserQueryService;
-import com.sba.nutricanbe.diet.dto.CreateSosRequest;
+import com.sba.nutricanbe.diet.dto.request.CreateSosRequest;
 import com.sba.nutricanbe.diet.service.SosService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
