@@ -2,24 +2,114 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '../../../components/ui/card';
 import { profileExtensionsService } from '../../../services/profileExtensionsService';
 
-function WeightLineChart({ metrics }) {
-  if (!metrics?.length) return <p className="text-sm text-slate-500">Chưa có dữ liệu cân nặng.</p>;
-  const points = metrics.slice(-14);
-  const maxW = Math.max(...points.map((m) => Number(m.weight) || 0), 1);
-  const minW = Math.min(...points.map((m) => Number(m.weight) || maxW));
-  const range = Math.max(maxW - minW, 1);
-  const w = 360;
-  const h = 120;
-  const pad = 12;
-  const path = points.map((m, i) => {
-    const x = pad + (i / Math.max(points.length - 1, 1)) * (w - pad * 2);
-    const y = h - pad - (((Number(m.weight) || 0) - minW) / range) * (h - pad * 2);
-    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-  }).join(' ');
+function BodyCompositionChart({ metrics, targetWeight }) {
+  if (!metrics?.length) return <p className="text-sm text-slate-500">Chưa có dữ liệu trạng thái cơ thể.</p>;
+  
+  // Lấy tối đa 7 kết quả gần nhất, sắp xếp từ cũ nhất đến mới nhất
+  const history = [...metrics].slice(0, 7).reverse();
+  
+  // Cột cuối cùng là cột Mục tiêu
+  const cols = [...history, { isTarget: true, weight: targetWeight, recordDate: 'Mục tiêu' }];
+  const colWidth = 100 / cols.length;
+
+  const renderRow = (label, subLabel, unit, dataKey, color, isTargetEmpty = false) => {
+    const dataPoints = cols.map(c => {
+      if (c.isTarget && isTargetEmpty) return null;
+      if (c.isTarget && !c[dataKey]) return null;
+      const val = Number(c[dataKey]);
+      if (isNaN(val) || val <= 0) return null;
+      return val;
+    }).filter(v => v !== null);
+
+    const maxV = dataPoints.length ? Math.max(...dataPoints) : 1;
+    const minV = dataPoints.length ? Math.min(...dataPoints) : 0;
+    const range = Math.max(maxV - minV, 1);
+
+    const points = cols.map((c, i) => {
+      if (c.isTarget && isTargetEmpty) return null;
+      if (c.isTarget && !c[dataKey]) return null;
+      const val = Number(c[dataKey]);
+      if (isNaN(val) || val <= 0) return null;
+      
+      const x = (i + 0.5) * (100 / cols.length);
+      const y = 75 - ((val - minV) / range) * 50; // Scale from 25% to 75% height
+      return { x, y, val, isTarget: c.isTarget };
+    });
+
+    const pathString = points
+      .filter(p => p !== null)
+      .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`)
+      .join(' ');
+
+    return (
+      <div className="flex border-b border-slate-800 relative h-20 items-center bg-white">
+        {/* Row Header */}
+        <div className="w-[110px] sm:w-[140px] flex-shrink-0 border-r border-slate-800 p-2 h-full flex flex-col justify-center bg-slate-100 z-10">
+          <div className="flex justify-between items-end">
+            <span className="font-bold text-slate-900 text-sm sm:text-base">{label}</span>
+            <span className="text-xs text-slate-600">({unit})</span>
+          </div>
+          {subLabel && <span className="text-[9px] sm:text-[10px] text-slate-500 leading-tight">{subLabel}</span>}
+        </div>
+        
+        {/* Row Grid and Data */}
+        <div className="flex-1 flex relative h-full">
+          {/* Vertical Grid Lines */}
+          {cols.map((_, i) => (
+            <div key={i} className={`h-full border-r ${i === cols.length - 2 ? 'border-slate-800 border-solid' : 'border-slate-300 border-dashed'}`} style={{ width: `${colWidth}%` }} />
+          ))}
+
+          {/* SVG Overlay for Lines */}
+          <svg className="absolute inset-0 w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
+            <path d={pathString} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            {points.map((p, i) => p && (
+              <circle key={i} cx={p.x} cy={p.y} r="3" fill={color} stroke="white" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            ))}
+          </svg>
+          
+          {/* Values Text */}
+          <div className="absolute inset-0 flex h-full pointer-events-none">
+             {points.map((p, i) => (
+                <div key={i} className="h-full relative flex justify-center" style={{ width: `${colWidth}%` }}>
+                  {p && (
+                    <div className={`absolute text-center text-xs sm:text-sm font-bold ${p.isTarget ? 'text-blue-600' : 'text-slate-800'}`} style={{ top: `calc(${p.y}% - 20px)` }}>
+                      {p.val}
+                    </div>
+                  )}
+                </div>
+             ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-lg h-32">
-      <path d={path} fill="none" stroke="#0d9488" strokeWidth="2.5" />
-    </svg>
+    <div className="border-t-2 border-l-2 border-r-2 border-b-2 border-slate-800 overflow-hidden w-full max-w-4xl font-sans">
+      <div className="bg-slate-100 border-b border-slate-800 p-2">
+        <h4 className="font-black text-slate-900 text-lg uppercase tracking-wider">Body Composition History</h4>
+      </div>
+      
+      {renderRow('Weight', '', 'kg', 'weight', '#000000', false)}
+      {renderRow('SMM', 'Skeletal Muscle Mass', 'kg', 'muscleMass', '#000000', true)}
+      {renderRow('PBF', 'Percent Body Fat', '%', 'bodyFatPercent', '#000000', true)}
+      
+      {/* Date Row */}
+      <div className="flex bg-slate-200 h-12 items-center">
+        <div className="w-[110px] sm:w-[140px] flex-shrink-0 border-r border-slate-800 p-2 h-full flex items-center bg-slate-300 text-xs font-bold text-slate-700">
+          <span className="mr-2">☑ Recent</span> <span className="text-slate-500 font-normal">☐ Total</span>
+        </div>
+        <div className="flex-1 flex h-full">
+          {cols.map((c, i) => (
+            <div key={i} className={`h-full flex flex-col items-center justify-center border-r ${i === cols.length - 2 ? 'border-slate-800 border-solid' : 'border-slate-400 border-dashed'}`} style={{ width: `${colWidth}%` }}>
+              <span className={`text-[9px] sm:text-[11px] font-bold text-center ${c.isTarget ? 'text-blue-700' : 'text-slate-700'}`}>
+                {c.isTarget ? c.recordDate : new Date(c.recordDate).toLocaleDateString('vi-VN')}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -36,30 +126,32 @@ export default function ProgressTimelineCard({ goals, milestones, regressionAler
   const metrics = bodyMetrics?.length ? bodyMetrics : fetchedMetrics;
 
   return (
-    <Card className="border-slate-200 shadow-sm">
-      <CardContent className={`p-${compact ? '4' : '6'} space-y-4`}>
-        <h3 className="font-bold text-slate-900">Tiến độ mục tiêu</h3>
+    <Card className="border-slate-200 shadow-sm overflow-hidden">
+      <CardContent className={`p-${compact ? '4' : '6'} space-y-6 overflow-x-auto`}>
         {regressionAlert?.active && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             {regressionAlert.message}
           </div>
         )}
-        {goals ? (
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><span className="text-slate-500">Mục tiêu:</span> {goals.nutritionGoal || '—'}</div>
-            <div><span className="text-slate-500">Cân mục tiêu:</span> {goals.targetWeight ? `${goals.targetWeight} kg` : '—'}</div>
-            <div><span className="text-slate-500">Baseline:</span> {goals.baselineWeight ? `${goals.baselineWeight} kg` : '—'}</div>
-            <div><span className="text-slate-500">Dự kiến đạt:</span> {projectedCompletion || goals.targetDate || '—'}</div>
+        
+        {goals && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div><span className="text-slate-500 block text-xs uppercase font-bold mb-1">Mục tiêu</span> <span className="font-semibold text-slate-800">{goals.nutritionGoal || '—'}</span></div>
+            <div><span className="text-slate-500 block text-xs uppercase font-bold mb-1">Cân mục tiêu</span> <span className="font-semibold text-blue-600">{goals.targetWeight ? `${goals.targetWeight} kg` : '—'}</span></div>
+            <div><span className="text-slate-500 block text-xs uppercase font-bold mb-1">Cân bắt đầu</span> <span className="font-semibold text-slate-800">{goals.baselineWeight ? `${goals.baselineWeight} kg` : '—'}</span></div>
+            <div><span className="text-slate-500 block text-xs uppercase font-bold mb-1">Dự kiến đạt</span> <span className="font-semibold text-slate-800">{projectedCompletion || goals.targetDate || '—'}</span></div>
           </div>
-        ) : (
-          <p className="text-sm text-slate-500">Chưa khai báo mục tiêu.</p>
         )}
-        <WeightLineChart metrics={metrics} />
+        
+        <div className="min-w-[600px]">
+          <BodyCompositionChart metrics={metrics} targetWeight={goals?.targetWeight} />
+        </div>
+
         {milestones?.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 pt-2">
             {milestones.slice(0, 6).map((m) => (
-              <span key={m.id} className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-800">
-                {m.title}
+              <span key={m.id} className="text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                ⭐ {m.title}
               </span>
             ))}
           </div>
