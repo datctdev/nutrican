@@ -180,6 +180,38 @@ export default function SettingPage() {
             </div>
 
             <div>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Mục tiêu dinh dưỡng</label>
+              <select
+                value={nutritionGoal}
+                onChange={(e) => setNutritionGoal(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+              >
+                {[
+                  { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
+                  { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
+                  { value: 'MAINTAIN', label: 'Duy trì' },
+                  { value: 'PREGNANT', label: 'Mang thai' },
+                  { value: 'RECOVERY', label: 'Phục hồi' },
+                ].map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            {nutritionGoal === 'PREGNANT' && (
+              <div className="animate-fade-in">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Giai đoạn thai kỳ</label>
+                <select
+                  value={pregnancyTrimester}
+                  onChange={(e) => setPregnancyTrimester(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+                >
+                  <option value={1}>3 tháng đầu (Trimester 1)</option>
+                  <option value={2}>3 tháng giữa (Trimester 2)</option>
+                  <option value={3}>3 tháng cuối (Trimester 3)</option>
+                </select>
+              </div>
+            )}
+
+            <div>
               <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Ghi chú dị ứng</label>
               <textarea
                 value={allergyNotes}
