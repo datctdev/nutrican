@@ -60,10 +60,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 User principalUser = userRepository.findById(userId).orElse(null);
 
                 if (isActiveForAuthentication(principalUser)) {
+                    java.util.List<org.springframework.security.core.GrantedAuthority> authorities = new java.util.ArrayList<>();
+                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+                    
+                    // Role Hierarchy: PTs and ADMIN also have CUSTOMER privileges
+                    if ("PT_CERTIFIED".equals(role) || "PT_FREELANCE".equals(role) || "ADMIN".equals(role)) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+                    }
+                    
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             principalUser,
                             null,
-                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
+                            authorities
                     );
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);

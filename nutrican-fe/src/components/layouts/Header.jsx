@@ -23,7 +23,7 @@ async function fetchNotificationSnapshot() {
 }
 
 export default function Header() {
-    const { user, logout, isAuthenticated } = useAuthStore();
+    const { user, logout, isAuthenticated, activeRole, setActiveRole } = useAuthStore();
     const navigate = useNavigate();
     const location = useLocation();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -104,21 +104,23 @@ export default function Header() {
 
     const navigateFromNotification = (n) => {
         const role = user?.role;
+        const currentMode = activeRole || role;
+        const isPtMode = currentMode?.startsWith('PT');
         const link = n.linkType;
         switch (link) {
             case 'DIET_LOG':
-                return role?.startsWith('PT') ? '/pt/reviews' : '/diet';
+                return isPtMode ? '/pt/reviews' : '/diet';
             case 'CHAT':
-                return role?.startsWith('PT') ? '/pt/chat' : '/chat';
+                return isPtMode ? '/pt/chat' : '/chat';
             case 'SOS':
-                return role === 'ADMIN' ? '/admin/sos' : role?.startsWith('PT') ? '/pt/reviews' : '/diet';
+                return role === 'ADMIN' ? '/admin/sos' : isPtMode ? '/pt/reviews' : '/diet';
             case 'HIRE':
-                return role?.startsWith('PT') ? '/pt/clients' : '/marketplace';
+                return isPtMode ? '/pt/clients' : '/marketplace';
             case 'REFUND':
             case 'WEEKLY_SUMMARY':
                 return '/profile';
             case 'MEAL_PLAN':
-                return role?.startsWith('PT') ? '/pt/clients' : '/coaching?tab=meal-plan';
+                return isPtMode ? '/pt/clients' : '/coaching?tab=meal-plan';
             default:
                 return getDashboardLink();
         }
@@ -173,6 +175,7 @@ export default function Header() {
             { label: 'Lịch hẹn', href: '/pt/appointments' },
             { label: 'Tin nhắn', href: '/pt/chat' },
             { label: 'Đánh giá', href: '/pt/reviews' },
+            { label: 'Portfolio', href: '/pt/portfolio' },
         ],
         PT_FREELANCE: [
             { label: 'Bảng điều khiển', href: '/pt' },
@@ -180,6 +183,7 @@ export default function Header() {
             { label: 'Lịch hẹn', href: '/pt/appointments' },
             { label: 'Tin nhắn', href: '/pt/chat' },
             { label: 'Đánh giá', href: '/pt/reviews' },
+            { label: 'Portfolio', href: '/pt/portfolio' },
         ],
         ADMIN: [
             { label: 'Bảng điều khiển', href: '/admin' },
@@ -190,7 +194,7 @@ export default function Header() {
         ],
     };
 
-    const currentNavItems = navItems[user?.role] || [];
+    const currentNavItems = navItems[activeRole || user?.role] || [];
 
     return (
         <header className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
@@ -316,6 +320,21 @@ export default function Header() {
                                                     <Link to={getDashboardLink()} onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
                                                         <LayoutDashboard className="w-4 h-4 text-slate-400" /> Bảng điều khiển
                                                     </Link>
+                                                    {user?.role?.startsWith('PT') && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                setActiveRole(activeRole === 'CUSTOMER' ? user.role : 'CUSTOMER');
+                                                                setProfileMenuOpen(false);
+                                                                navigate(activeRole === 'CUSTOMER' ? '/pt' : '/diet');
+                                                            }} 
+                                                            className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <User className="w-4 h-4 text-slate-400" /> 
+                                                                {activeRole === 'CUSTOMER' ? 'Chuyển sang Huấn luyện viên' : 'Chuyển sang Khách hàng'}
+                                                            </div>
+                                                        </button>
+                                                    )}
                                                     <Link to="/profile" onClick={() => setProfileMenuOpen(false)} className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
                                                         <User className="w-4 h-4 text-slate-400" /> Trang cá nhân
                                                     </Link>

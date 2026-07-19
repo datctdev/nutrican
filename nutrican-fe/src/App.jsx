@@ -24,6 +24,7 @@ import PtMealPlanPage from './pages/pt/PtMealPlanPage';
 import PtAppointmentsPage from './pages/pt/PtAppointmentsPage';
 import ReviewDietLogPage from './pages/pt/ReviewDietLogPage';
 import ClientDietLogPage from './pages/pt/ClientDietLogPage';
+import PtPortfolioEditor from './pages/pt/PtPortfolioEditor';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import PtVerificationPage from './pages/admin/PtVerificationPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
@@ -128,6 +129,7 @@ function App() {
                 { path: '/pt/progress/:clientId', element: <ClientProgressPage /> },
                 { path: '/pt/reviews', element: <ReviewDietLogPage /> },
                 { path: '/pt/chat', element: <ChatPage /> },
+                { path: '/pt/portfolio', element: <PtPortfolioEditor /> },
             ],
         },
     ]);

@@ -3,6 +3,7 @@ import api from './api';
 export const userService = {
   getProfile: () => api.get('/profile/me'),
   updateProfile: (data) => api.put('/profile/me', data),
+  updatePtProfile: (data) => api.put('/profile/pt', data),
   uploadAvatar: (formData) => api.put('/profile/avatar', formData),
   getMacroTarget: () => api.get('/profile/macro-target'),
   setMacroTarget: (data) => api.put('/profile/macro-target', data),

@@ -52,7 +52,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<PageResponse<PtProfileResponse>> searchPts(PtSearchRequest request, User customer) {
-        if (customer != null && customer.getRole() == UserRole.CUSTOMER) {
+        if (customer != null && customer.hasCustomerPrivileges()) {
             request.setCustomerId(customer.getId());
             if (customer.getNutritionGoal() != null) {
                 request.setCustomerNutritionGoal(customer.getNutritionGoal().name());
@@ -173,7 +173,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
         PtProfileResponse response = PtProfileResponse.toPtProfileResponse(profile);
 
-        if (user != null && user.getRole() == UserRole.CUSTOMER) {
+        if (user != null && user.hasCustomerPrivileges()) {
             mappingRepository.findByPt_IdAndClient_Id(profile.getUser().getId(), user.getId())
                     .ifPresent(mapping -> response.setMappingStatus(mapping.getStatus().name()));
         }
@@ -248,7 +248,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
         User customer = userRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", customerId));
-        if (customer.getRole() != UserRole.CUSTOMER) {
+        if (!customer.hasCustomerPrivileges()) {
             throw new BadRequestException("Only customers can hire a PT");
         }
         if (pt.getId().equals(customer.getId())) {

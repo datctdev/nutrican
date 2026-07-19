@@ -39,6 +39,13 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.updateProfile(user.getId(), request));
     }
 
+    @PutMapping("/pt")
+    public ResponseEntity<ApiResponse<PtProfileSummary>> updateMyPtProfile(
+            @AuthenticationPrincipal User user,
+            @RequestBody com.sba.nutricanbe.user.dto.UpdatePtProfileRequest request) {
+        return ResponseEntity.ok(userProfileService.updatePtProfile(user.getId(), request));
+    }
+
     @PutMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<String>> uploadAvatar(
             @AuthenticationPrincipal User user,

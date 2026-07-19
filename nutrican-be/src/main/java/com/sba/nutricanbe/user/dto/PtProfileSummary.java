@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -29,6 +30,7 @@ public class PtProfileSummary {
     private String rateUnit;
     private List<String> specializations;
     private List<CertificationData> certifications;
+    private Map<String, Object> portfolioShowcase;
     private BigDecimal rating;
     private Integer totalReviews;
     private String tier;

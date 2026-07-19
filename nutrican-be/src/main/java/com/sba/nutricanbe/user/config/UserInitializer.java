@@ -81,8 +81,8 @@ public class UserInitializer implements CommandLineRunner {
 
         seedPtProfile(
                 certifiedPt,
-                "Certified nutrition coach with strength training focus.",
-                "Build sustainable habits, then optimize performance.",
+                "Chào bạn, mình là PT chuyên nghiệp với hơn 5 năm kinh nghiệm. Mình tin rằng mọi sự thay đổi đều bắt đầu từ thói quen nhỏ nhất. Hãy để mình đồng hành cùng bạn trên con đường chinh phục vóc dáng trong mơ.",
+                "Kỷ luật là cầu nối giữa mục tiêu và thành tựu. Tập luyện không chỉ thay đổi cơ thể mà còn rèn giũa ý chí.",
                 LocalDate.of(2016, 3, 1),
                 List.of("Fat loss", "Muscle gain", "Meal planning"),
                 Tier.TIER_1,
@@ -177,6 +177,27 @@ public class UserInitializer implements CommandLineRunner {
                         .totalReviews(0)
                         .verificationStatus(UserStatus.ACTIVE)
                         .ptRequestStatus(UserStatus.ACTIVE)
+                        .instagramUrl("https://instagram.com/pt.nutrican")
+                        .linkedinUrl("https://linkedin.com/in/pt-nutrican")
+                        .portfolioShowcase(java.util.Map.of(
+                          "coverPhotoUrl", "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=1470&auto=format&fit=crop",
+                          "transformations", java.util.List.of(
+                            java.util.Map.of(
+                              "id", 1,
+                              "title", "Giảm 15kg mỡ thừa trong 3 tháng",
+                              "story", "Học viên Nguyễn Văn A đã kiên trì theo lịch tập tạ 4 buổi/tuần và chế độ ăn Low-Carb. Kết quả sau 12 tuần thực sự ngoài sức mong đợi. Cơ thể nhẹ nhàng hơn và các chỉ số sức khỏe đều trở về mức tuyệt vời.",
+                              "beforeUrl", "https://placehold.co/600x400/eeeeee/999999?text=Before+Image",
+                              "afterUrl", "https://placehold.co/600x400/d1fae5/065f46?text=After+Image"
+                            ),
+                            java.util.Map.of(
+                              "id", 2,
+                              "title", "Tăng 8kg cơ bắp, thay đổi vóc dáng",
+                              "story", "Từ một người gầy gò 55kg, bạn B đã áp dụng chế độ Bulk an toàn. Chú trọng các bài tập Compound như Squat, Deadlift, Bench Press. Giờ đây tự tin diện những bộ quần áo body.",
+                              "beforeUrl", "https://placehold.co/600x400/eeeeee/999999?text=Before+Image+2",
+                              "afterUrl", "https://placehold.co/600x400/d1fae5/065f46?text=After+Image+2"
+                            )
+                          )
+                        ))
                         .build()));
     }
 
