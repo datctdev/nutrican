@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.diet.dto.response;
 
+import com.sba.nutricanbe.diet.entity.WeeklySummary;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,4 +20,14 @@ public class MealPlanWeeklySummaryResponse {
     private String summaryText;
     private BigDecimal adherenceRate;
     private String nextPlanNote;
+
+    public static MealPlanWeeklySummaryResponse from(WeeklySummary summary) {
+        return MealPlanWeeklySummaryResponse.builder()
+                .id(summary.getId())
+                .weekStartDate(summary.getWeekStartDate())
+                .summaryText(summary.getSummaryText())
+                .adherenceRate(summary.getAdherenceRate())
+                .nextPlanNote(summary.getNextPlanNote())
+                .build();
+    }
 }

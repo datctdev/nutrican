@@ -1,5 +1,7 @@
 package com.sba.nutricanbe.diet.dto.response;
 
+import com.sba.nutricanbe.diet.entity.MealPlanItem;
+import com.sba.nutricanbe.diet.entity.MealPlanSuggestion;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -33,4 +35,28 @@ public class MealPlanSuggestionResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime decidedAt;
+
+    public static MealPlanSuggestionResponse from(
+            MealPlanSuggestion suggestion, MealPlanItem item) {
+        return MealPlanSuggestionResponse.builder()
+                .id(suggestion.getId())
+                .mealPlanItemId(suggestion.getMealPlanItemId())
+                .customerId(suggestion.getCustomerId())
+                .originalFoodCode(suggestion.getOriginalFoodCode())
+                .originalFoodName(suggestion.getOriginalFoodName())
+                .originalGram(suggestion.getOriginalGram())
+                .suggestedFoodCode(suggestion.getSuggestedFoodCode())
+                .suggestedFoodName(suggestion.getSuggestedFoodName())
+                .suggestedGram(suggestion.getSuggestedGram())
+                .requestReason(suggestion.getRequestReason())
+                .customerNote(suggestion.getCustomerNote())
+                .ptNote(suggestion.getPtNote())
+                .planDate(item != null ? item.getPlanDate() : null)
+                .mealType(item != null && item.getMealType() != null ? item.getMealType().name() : null)
+                .status(suggestion.getStatus() != null ? suggestion.getStatus().name() : null)
+                .createdAt(suggestion.getCreatedAt())
+                .updatedAt(suggestion.getUpdatedAt())
+                .decidedAt(suggestion.getDecidedAt())
+                .build();
+    }
 }
