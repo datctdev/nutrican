@@ -21,4 +21,6 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     long countByPtId(UUID ptId);
 
     List<Review> findByReviewerId(UUID reviewerId);
+
+    boolean existsByPtIdAndReviewerId(UUID ptId, UUID reviewerId);
 }

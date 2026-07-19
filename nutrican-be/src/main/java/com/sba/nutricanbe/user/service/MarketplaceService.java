@@ -19,9 +19,13 @@ public interface MarketplaceService {
 
     ApiResponse<PageResponse<ReviewResponse>> getPtReviews(UUID ptId, int page, int size);
 
-    ApiResponse<ReviewResponse> createReview(UUID ptId, UUID reviewerId, CreateReviewRequest request);
+    ApiResponse<ReviewResponse> createReview(UUID ptId, UUID reviewerId, CreateReviewRequest request, org.springframework.web.multipart.MultipartFile image);
 
     ApiResponse<PtClientMappingResponse> hirePt(UUID ptId, UUID customerId);
 
     ApiResponse<PtClientMappingResponse> updateHireRequest(UUID clientId, UUID ptId, String action);
+
+    ApiResponse<ReviewResponse> updateReview(UUID ptId, UUID reviewId, UUID reviewerId, CreateReviewRequest request, org.springframework.web.multipart.MultipartFile image);
+
+    ApiResponse<Void> deleteReview(UUID ptId, UUID reviewId, UUID reviewerId);
 }

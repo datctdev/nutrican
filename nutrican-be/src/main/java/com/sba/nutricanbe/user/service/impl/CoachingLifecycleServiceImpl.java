@@ -12,6 +12,7 @@ import com.sba.nutricanbe.user.enums.CoachingEndRequestedBy;
 import com.sba.nutricanbe.user.enums.TerminationReason;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
+import com.sba.nutricanbe.user.repository.ReviewRepository;
 import com.sba.nutricanbe.user.service.CoachingLifecycleService;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
     private final PtClientMappingRepository mappingRepository;
     private final PtProfileRepository ptProfileRepository;
     private final WebSocketSessionService webSocketSessionService;
+    private final ReviewRepository reviewRepository;
 
     @Override
     @Transactional
@@ -86,14 +88,24 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
     public List<CoachingHistoryDto> getCoachingHistory(UUID customerId) {
         return mappingRepository.findByClient_IdAndStatusOrderByCompletedAtDesc(
                         customerId, ClientMappingStatus.COMPLETED).stream()
-                .map(m -> CoachingHistoryDto.builder()
-                        .mappingId(m.getId())
-                        .ptId(m.getPt().getId())
-                        .ptName(m.getPt().getFullName())
-                        .status(m.getStatus())
-                        .completedAt(m.getCompletedAt())
-                        .assignedAt(m.getAssignedAt())
-                        .build())
+                .map(m -> {
+                    boolean hasReviewed = reviewRepository.existsByPtIdAndReviewerId(m.getPt().getId(), customerId);
+
+                    PtProfile profile = ptProfileRepository.findByUserId(m.getPt().getId()).orElse(null);
+                    UUID profileId = (profile != null) ? profile.getId() : null;
+
+                    return CoachingHistoryDto.builder()
+                            .mappingId(m.getId())
+                            .ptId(m.getPt().getId())
+                            .ptProfileId(profileId)
+                            .ptName(m.getPt().getFullName())
+                            .ptAvatarUrl(m.getPt().getAvatarUrl())
+                            .status(m.getStatus())
+                            .completedAt(m.getCompletedAt())
+                            .assignedAt(m.getAssignedAt())
+                            .hasReviewed(hasReviewed)
+                            .build();
+                })
                 .toList();
     }
 
