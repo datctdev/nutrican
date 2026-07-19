@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.ai.catalog.ResNetFoodCodeMapping;
-import com.sba.nutricanbe.diet.dto.PlanDietPrefWarning;
+import com.sba.nutricanbe.diet.dto.response.PlanDietPrefWarning;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.diet.enums.DietTag;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;

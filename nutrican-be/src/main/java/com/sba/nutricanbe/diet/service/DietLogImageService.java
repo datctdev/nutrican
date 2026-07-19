@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.diet.service;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
-import com.sba.nutricanbe.diet.dto.DietLogImageDto;
+import com.sba.nutricanbe.diet.dto.response.DietLogImageDto;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;

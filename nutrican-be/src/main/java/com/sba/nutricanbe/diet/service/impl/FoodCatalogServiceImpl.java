@@ -5,7 +5,7 @@ import com.sba.nutricanbe.ai.catalog.ResNetFoodDefaults;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
-import com.sba.nutricanbe.diet.dto.FoodItemResponse;
+import com.sba.nutricanbe.diet.dto.response.FoodItemResponse;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
 import com.sba.nutricanbe.user.entity.User;

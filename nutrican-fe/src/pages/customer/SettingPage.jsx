@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { userService } from '../../services/userService';
 import { Card, CardContent } from '../../components/ui/card';
+import { profileExtensionsService } from '../../services/profileExtensionsService';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { Loader2, Settings, Bell, Mail, Smartphone } from 'lucide-react';
@@ -20,6 +21,7 @@ export default function SettingPage() {
   const [dietPreference, setDietPreference] = useState('NORMAL');
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
+  const [targetWeight, setTargetWeight] = useState('');
   const [allergyNotes, setAllergyNotes] = useState('');
 
   useEffect(() => {
@@ -28,9 +30,10 @@ export default function SettingPage() {
 
   const fetchPreferences = async () => {
     try {
-      const [profileRes, allergyRes] = await Promise.all([
+      const [profileRes, allergyRes, goalsRes] = await Promise.all([
         userService.getProfile(),
-        userService.getAllergies().catch(() => ({ data: { data: [] } }))
+        userService.getAllergies().catch(() => ({ data: { data: [] } })),
+        profileExtensionsService.getGoals().catch(() => ({ data: { data: null } }))
       ]);
       const data = profileRes.data.data;
       
@@ -39,6 +42,10 @@ export default function SettingPage() {
       if (data.dietPreference) setDietPreference(data.dietPreference);
       if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
       if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
+
+      if (goalsRes.data?.data) {
+        setTargetWeight(goalsRes.data.data.targetWeight || '');
+      }
 
       const optIn = data.notificationOptIn || {};
       setPostMealRatingOptIn(optIn.postMealRating !== false);
@@ -69,6 +76,15 @@ export default function SettingPage() {
         },
       });
       await userService.updateAllergies({ allergyNotes });
+
+      if (targetWeight) {
+        await profileExtensionsService.saveGoals({
+          nutritionGoal,
+          targetWeight: Number(targetWeight),
+          trimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null
+        });
+      }
+
       toast.success('Đã lưu cấu hình thành công');
     } catch {
       toast.error('Không thể lưu cấu hình');
@@ -178,6 +194,50 @@ export default function SettingPage() {
                 ].map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
+
+            <div>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Mục tiêu dinh dưỡng</label>
+              <select
+                value={nutritionGoal}
+                onChange={(e) => setNutritionGoal(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+              >
+                {[
+                  { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
+                  { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
+                  { value: 'MAINTAIN', label: 'Duy trì' },
+                  { value: 'PREGNANT', label: 'Mang thai' },
+                  { value: 'RECOVERY', label: 'Phục hồi' },
+                ].map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Cân nặng mục tiêu (kg)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={targetWeight}
+                onChange={(e) => setTargetWeight(e.target.value)}
+                placeholder="Ví dụ: 65.5"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+
+            {nutritionGoal === 'PREGNANT' && (
+              <div className="animate-fade-in">
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Giai đoạn thai kỳ</label>
+                <select
+                  value={pregnancyTrimester}
+                  onChange={(e) => setPregnancyTrimester(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+                >
+                  <option value={1}>3 tháng đầu (Trimester 1)</option>
+                  <option value={2}>3 tháng giữa (Trimester 2)</option>
+                  <option value={3}>3 tháng cuối (Trimester 3)</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Ghi chú dị ứng</label>

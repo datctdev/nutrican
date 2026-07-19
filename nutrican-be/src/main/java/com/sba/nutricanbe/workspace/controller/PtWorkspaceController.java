@@ -119,7 +119,7 @@ public class PtWorkspaceController {
     }
 
     @GetMapping("/sos")
-    public ResponseEntity<ApiResponse<java.util.List<com.sba.nutricanbe.diet.dto.SosTicketResponse>>> getSosTickets(
+    public ResponseEntity<ApiResponse<java.util.List<com.sba.nutricanbe.diet.dto.response.SosTicketResponse>>> getSosTickets(
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ptWorkspaceService.getSosTickets(user.getId()));
     }

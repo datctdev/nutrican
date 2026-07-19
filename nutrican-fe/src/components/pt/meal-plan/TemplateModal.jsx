@@ -38,7 +38,7 @@ export default function TemplateModal({ isOpen, onClose, onApply, onSaveAsTempla
       toast.success('Đã áp dụng mẫu thành công!');
       onClose();
     } catch (e) {
-      toast.error('Lỗi khi áp dụng mẫu');
+      toast.error(e.response?.data?.message || 'Lỗi khi áp dụng mẫu');
     }
   };
 

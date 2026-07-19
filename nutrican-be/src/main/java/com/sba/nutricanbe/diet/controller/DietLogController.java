@@ -4,7 +4,7 @@ package com.sba.nutricanbe.diet.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
-import com.sba.nutricanbe.diet.dto.SosTicketResponse;
+import com.sba.nutricanbe.diet.dto.response.SosTicketResponse;
 
 import com.sba.nutricanbe.user.entity.User;
 
@@ -15,7 +15,8 @@ import com.sba.nutricanbe.diet.enums.MealSource;
 
 import com.sba.nutricanbe.common.util.MultipartUtils;
 
-import com.sba.nutricanbe.diet.dto.*;
+import com.sba.nutricanbe.diet.dto.request.*;
+import com.sba.nutricanbe.diet.dto.response.*;
 import com.sba.nutricanbe.diet.entity.DietLogFeedback;
 
 import com.sba.nutricanbe.diet.service.DietLogImageService;

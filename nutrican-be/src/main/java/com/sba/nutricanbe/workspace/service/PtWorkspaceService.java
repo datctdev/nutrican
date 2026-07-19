@@ -18,7 +18,7 @@ import com.sba.nutricanbe.workspace.dto.*;
 
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
-import com.sba.nutricanbe.diet.dto.SosTicketResponse;
+import com.sba.nutricanbe.diet.dto.response.SosTicketResponse;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 
 import java.time.LocalDate;
