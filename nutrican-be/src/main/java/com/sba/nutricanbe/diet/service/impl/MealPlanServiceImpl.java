@@ -150,8 +150,7 @@ public class MealPlanServiceImpl implements MealPlanService {
     @Transactional(readOnly = true)
     public List<MealPlanWeekResponse> getPublishedPlanWeeks(UUID customerId) {
         return mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(customerId).stream()
-                .map(plan -> new MealPlanWeekResponse(
-                        plan.getId(), plan.getWeekStart(), plan.getWeekStart().plusDays(6)))
+                .map(MealPlanWeekResponse::from)
                 .toList();
     }
 
@@ -160,13 +159,7 @@ public class MealPlanServiceImpl implements MealPlanService {
     public List<MealPlanWeeklySummaryResponse> getWeeklySummaries(UUID customerId) {
         return weeklySummaryRepository.findByClientIdOrderByWeekStartDateDesc(customerId).stream()
                 .limit(8)
-                .map(summary -> MealPlanWeeklySummaryResponse.builder()
-                        .id(summary.getId())
-                        .weekStartDate(summary.getWeekStartDate())
-                        .summaryText(summary.getSummaryText())
-                        .adherenceRate(summary.getAdherenceRate())
-                        .nextPlanNote(summary.getNextPlanNote())
-                        .build())
+                .map(MealPlanWeeklySummaryResponse::from)
                 .toList();
     }
 
@@ -207,7 +200,7 @@ public class MealPlanServiceImpl implements MealPlanService {
                         "planId", owned.plan().getId(),
                         "weekStart", owned.plan().getWeekStart(),
                         "planDate", item.getPlanDate()));
-        return toItemResponse(saved);
+        return MealPlanItemResponse.from(saved);
     }
 
     @Override
@@ -267,7 +260,7 @@ public class MealPlanServiceImpl implements MealPlanService {
                 .linkRefId(plan.getClientId())
                 .sendEmail(false)
                 .build());
-        return toSuggestionResponse(suggestion, item);
+        return MealPlanSuggestionResponse.from(suggestion, item);
     }
 
     @Override
@@ -290,7 +283,7 @@ public class MealPlanServiceImpl implements MealPlanService {
         if (skipReason == MealPlanSkipReason.ALLERGY) {
             notifyAllergy(plan, foodLabel(item) + " (" + item.getPlanDate() + ")", false);
         }
-        return toItemResponse(mealPlanItemRepository.save(item));
+        return MealPlanItemResponse.from(mealPlanItemRepository.save(item));
     }
 
     @Override
@@ -300,7 +293,7 @@ public class MealPlanServiceImpl implements MealPlanService {
         assertDateIsActionable(item);
         item.setSkipReason(null);
         item.setSkipNote(null);
-        return toItemResponse(mealPlanItemRepository.save(item));
+        return MealPlanItemResponse.from(mealPlanItemRepository.save(item));
     }
 
     @Override
@@ -332,7 +325,7 @@ public class MealPlanServiceImpl implements MealPlanService {
         if (reason == MealPlanSkipReason.ALLERGY) {
             notifyAllergy(plan, request.getPlanDate() + " · " + mealType.name(), true);
         }
-        return mealPlanItemRepository.saveAll(items).stream().map(this::toItemResponse).toList();
+        return mealPlanItemRepository.saveAll(items).stream().map(MealPlanItemResponse::from).toList();
     }
 
     @Override
@@ -350,7 +343,7 @@ public class MealPlanServiceImpl implements MealPlanService {
             item.setSkipReason(null);
             item.setSkipNote(null);
         });
-        return mealPlanItemRepository.saveAll(items).stream().map(this::toItemResponse).toList();
+        return mealPlanItemRepository.saveAll(items).stream().map(MealPlanItemResponse::from).toList();
     }
 
     @Override
@@ -370,7 +363,7 @@ public class MealPlanServiceImpl implements MealPlanService {
                 .findByCustomerIdAndMealPlanItemIdInOrderByCreatedAtDesc(customerId, List.copyOf(itemsById.keySet()))
                 .stream()
                 .map(suggestion -> expireIfStale(suggestion, itemsById.get(suggestion.getMealPlanItemId())))
-                .map(suggestion -> toSuggestionResponse(
+                .map(suggestion -> MealPlanSuggestionResponse.from(
                         suggestion, itemsById.get(suggestion.getMealPlanItemId())))
                 .toList();
     }
@@ -402,7 +395,7 @@ public class MealPlanServiceImpl implements MealPlanService {
                 .linkRefId(plan.getClientId())
                 .sendEmail(false)
                 .build());
-        return toSuggestionResponse(mealPlanSuggestionRepository.save(suggestion), item);
+        return MealPlanSuggestionResponse.from(mealPlanSuggestionRepository.save(suggestion), item);
     }
 
     private MealPlanSaveResult finalizeSave(
@@ -416,8 +409,8 @@ public class MealPlanServiceImpl implements MealPlanService {
         List<PlanDietPrefWarning> dietPrefWarnings = dietPrefCheckService.checkPlan(clientId, foodCodes);
         List<MealPlanItem> savedItems = saveItems(plan.getId(), items);
         return MealPlanSaveResult.builder()
-                .plan(toPlanResponse(plan))
-                .items(savedItems.stream().map(this::toItemResponse).toList())
+                .plan(MealPlanResponse.from(plan))
+                .items(savedItems.stream().map(MealPlanItemResponse::from).toList())
                 .dietPrefWarnings(dietPrefWarnings)
                 .macroWarning(computeMacroWarning(clientId, items))
                 .build();
@@ -432,8 +425,8 @@ public class MealPlanServiceImpl implements MealPlanService {
                 .toList();
         List<MealPlanItem> savedItems = syncItems(plan.getId(), requestedItems);
         return MealPlanSaveResult.builder()
-                .plan(toPlanResponse(plan))
-                .items(savedItems.stream().map(this::toItemResponse).toList())
+                .plan(MealPlanResponse.from(plan))
+                .items(savedItems.stream().map(MealPlanItemResponse::from).toList())
                 .dietPrefWarnings(dietPrefCheckService.checkPlan(clientId, foodCodes))
                 .macroWarning(computeMacroWarning(clientId, requestedItems))
                 .build();
@@ -583,8 +576,8 @@ public class MealPlanServiceImpl implements MealPlanService {
                 .filter(code -> code != null && !code.isBlank())
                 .toList();
         return new MealPlanDetailResponse(
-                toPlanResponse(plan),
-                items.stream().map(this::toItemResponse).toList(),
+                MealPlanResponse.from(plan),
+                items.stream().map(MealPlanItemResponse::from).toList(),
                 dietPrefCheckService.checkPlan(clientId, foodCodes));
     }
 
@@ -674,61 +667,6 @@ public class MealPlanServiceImpl implements MealPlanService {
 
     private String foodLabel(MealPlanItem item) {
         return item.getFreeText() != null ? item.getFreeText() : item.getFoodCode();
-    }
-
-    private MealPlanResponse toPlanResponse(MealPlan plan) {
-        return MealPlanResponse.builder()
-                .id(plan.getId())
-                .createdAt(plan.getCreatedAt())
-                .updatedAt(plan.getUpdatedAt())
-                .clientId(plan.getClientId())
-                .ptId(plan.getPtId())
-                .weekStart(plan.getWeekStart())
-                .notes(plan.getNotes())
-                .isPublished(plan.getIsPublished())
-                .build();
-    }
-
-    private MealPlanItemResponse toItemResponse(MealPlanItem item) {
-        return MealPlanItemResponse.builder()
-                .id(item.getId())
-                .createdAt(item.getCreatedAt())
-                .updatedAt(item.getUpdatedAt())
-                .mealPlanId(item.getMealPlanId())
-                .planDate(item.getPlanDate())
-                .mealType(item.getMealType())
-                .foodCode(item.getFoodCode())
-                .freeText(item.getFreeText())
-                .portionGrams(item.getPortionGrams())
-                .note(item.getNote())
-                .eaten(item.getEaten())
-                .skipReason(item.getSkipReason())
-                .skipNote(item.getSkipNote())
-                .build();
-    }
-
-    private MealPlanSuggestionResponse toSuggestionResponse(
-            MealPlanSuggestion suggestion, MealPlanItem item) {
-        return MealPlanSuggestionResponse.builder()
-                .id(suggestion.getId())
-                .mealPlanItemId(suggestion.getMealPlanItemId())
-                .customerId(suggestion.getCustomerId())
-                .originalFoodCode(suggestion.getOriginalFoodCode())
-                .originalFoodName(suggestion.getOriginalFoodName())
-                .originalGram(suggestion.getOriginalGram())
-                .suggestedFoodCode(suggestion.getSuggestedFoodCode())
-                .suggestedFoodName(suggestion.getSuggestedFoodName())
-                .suggestedGram(suggestion.getSuggestedGram())
-                .requestReason(suggestion.getRequestReason())
-                .customerNote(suggestion.getCustomerNote())
-                .ptNote(suggestion.getPtNote())
-                .planDate(item != null ? item.getPlanDate() : null)
-                .mealType(item != null && item.getMealType() != null ? item.getMealType().name() : null)
-                .status(suggestion.getStatus() != null ? suggestion.getStatus().name() : null)
-                .createdAt(suggestion.getCreatedAt())
-                .updatedAt(suggestion.getUpdatedAt())
-                .decidedAt(suggestion.getDecidedAt())
-                .build();
     }
 
     private record OwnedMealPlanItem(MealPlan plan, MealPlanItem item) {

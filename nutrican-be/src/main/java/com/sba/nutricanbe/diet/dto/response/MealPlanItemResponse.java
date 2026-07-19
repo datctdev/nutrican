@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.diet.dto.response;
 
+import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.enums.MealPlanSkipReason;
 import com.sba.nutricanbe.diet.enums.MealType;
 import lombok.AllArgsConstructor;
@@ -30,4 +31,22 @@ public class MealPlanItemResponse {
     private Boolean eaten;
     private MealPlanSkipReason skipReason;
     private String skipNote;
+
+    public static MealPlanItemResponse from(MealPlanItem item) {
+        return MealPlanItemResponse.builder()
+                .id(item.getId())
+                .createdAt(item.getCreatedAt())
+                .updatedAt(item.getUpdatedAt())
+                .mealPlanId(item.getMealPlanId())
+                .planDate(item.getPlanDate())
+                .mealType(item.getMealType())
+                .foodCode(item.getFoodCode())
+                .freeText(item.getFreeText())
+                .portionGrams(item.getPortionGrams())
+                .note(item.getNote())
+                .eaten(item.getEaten())
+                .skipReason(item.getSkipReason())
+                .skipNote(item.getSkipNote())
+                .build();
+    }
 }
