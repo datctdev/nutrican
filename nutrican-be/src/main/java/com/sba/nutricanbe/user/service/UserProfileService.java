@@ -32,5 +32,7 @@ public interface UserProfileService {
     ApiResponse<String> uploadCv(UUID userId, MultipartFile file);
 
     ApiResponse<PtProfileSummary> resubmitPt(UUID userId, PtRegistrationRequest request);
+
+    ApiResponse<String> uploadPortfolioImage(UUID userId, MultipartFile file);
 }
 

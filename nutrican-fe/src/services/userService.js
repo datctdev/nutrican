@@ -1,3 +1,4 @@
+// src/services/userService.js
 import api from './api';
 
 export const userService = {
@@ -31,4 +32,11 @@ export const userService = {
   },
   getRequireKycSetting: () => api.get('/settings/require-kyc'),
   updateRequireKycSetting: (value) => api.put(`/admin/settings/require-kyc?value=${value}`),
+    uploadPortfolioImage: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/profile/pt/portfolio-image', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
 };

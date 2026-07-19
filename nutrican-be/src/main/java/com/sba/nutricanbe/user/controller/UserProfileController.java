@@ -99,5 +99,12 @@ public class UserProfileController {
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(userProfileService.uploadCv(user.getId(), file));
     }
+
+    @PostMapping(value = "/pt/portfolio-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<String>> uploadPortfolioImage(
+            @AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userProfileService.uploadPortfolioImage(user.getId(), file));
+    }
 }
 
