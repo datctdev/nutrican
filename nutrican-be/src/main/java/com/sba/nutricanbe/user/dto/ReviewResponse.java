@@ -19,16 +19,23 @@ public class ReviewResponse {
     private String reviewerName;
     private Double rating;
     private String comment;
+    private Boolean isAnonymous;
+    private String imageUrl;
     private LocalDateTime createdAt;
 
     public static ReviewResponse toReviewResponse(Review review) {
+        boolean isAnon = Boolean.TRUE.equals(review.getIsAnonymous());
+        String displayName = isAnon ? "Học viên ẩn danh" : review.getReviewer().getFullName();
+
         return ReviewResponse.builder()
                 .id(review.getId())
                 .ptId(review.getPt().getId())
                 .reviewerId(review.getReviewer().getId())
-                .reviewerName(review.getReviewer().getFullName())
+                .reviewerName(displayName)
                 .rating(review.getRating())
                 .comment(review.getComment())
+                .isAnonymous(isAnon)
+                .imageUrl(review.getImageUrl())
                 .createdAt(review.getCreatedAt())
                 .build();
     }

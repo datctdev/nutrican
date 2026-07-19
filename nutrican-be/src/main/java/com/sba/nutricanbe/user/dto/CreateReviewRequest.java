@@ -13,4 +13,6 @@ public class CreateReviewRequest {
     private Double rating;
 
     private String comment;
+
+    private Boolean isAnonymous;
 }

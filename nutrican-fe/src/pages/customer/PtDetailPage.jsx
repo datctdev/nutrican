@@ -1,13 +1,22 @@
 // src/pages/customer/PtDetailPage.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { marketplaceService } from '../../services/marketplaceService';
-import { Star, ShieldCheck, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send } from 'lucide-react';
+import { Star, ShieldCheck, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, EyeOff, ImageIcon, Edit3, Trash2, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import ImageLightbox from '../../components/common/ImageLightbox';
+import Modal from '../../components/common/Modal'; // Đảm bảo đã import Modal
+
+const getFullImageUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    const minioUrl = import.meta.env.VITE_MINIO_URL || 'http://localhost:9000/nutrican-media';
+    return `${minioUrl}/${url}`;
+};
 
 export default function PtDetailPage() {
     const { id } = useParams();
@@ -18,35 +27,41 @@ export default function PtDetailPage() {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const [showReviewForm, setShowReviewForm] = useState(false);
-    const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
+    // Review Modal States (Create/Edit)
+    const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+    const [reviewData, setReviewData] = useState({ rating: 5, comment: '', isAnonymous: false });
+    const [reviewImage, setReviewImage] = useState(null);
+    const [imagePreview, setImagePreview] = useState('');
     const [submittingReview, setSubmittingReview] = useState(false);
 
+    // Edit State
+    const [editingReviewId, setEditingReviewId] = useState(null);
+
+    // Delete Modal States (Giao diện xóa đánh giá mới)
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deletingReview, setDeletingReview] = useState(false);
+
+    const [lightboxImage, setLightboxImage] = useState('');
     const [hireStatus, setHireStatus] = useState('NONE');
     const [hiring, setHiring] = useState(false);
 
     const fetchAllData = useCallback(async () => {
         try {
             setLoading(true);
-
-            // 1. Tải chi tiết PT
             const response = await marketplaceService.getPtDetail(id);
             const ptData = response.data.data;
             setPt(ptData);
 
-            // Cập nhật trạng thái từ Backend trả về
             if (ptData.mappingStatus) {
                 setHireStatus(ptData.mappingStatus);
             }
 
-            // 2. Tải danh sách đánh giá
             try {
-                const revRes = await marketplaceService.getPtReviews(ptData.userId, { page: 0, size: 10 });
+                const revRes = await marketplaceService.getPtReviews(ptData.userId, { page: 0, size: 50 });
                 setReviews(revRes.data.data.content || []);
             } catch (err) {
                 console.error('Lỗi khi tải đánh giá:', err);
             }
-
         } catch (err) {
             console.error(err);
             toast.error('Không thể tải thông tin PT');
@@ -60,25 +75,100 @@ export default function PtDetailPage() {
         fetchAllData();
     }, [fetchAllData]);
 
+    const myReview = useMemo(() => {
+        if (!user || !reviews.length) return null;
+        return reviews.find(r => r.reviewerId === user.id);
+    }, [reviews, user]);
+
+    const otherReviews = useMemo(() => {
+        if (!user) return reviews;
+        return reviews.filter(r => r.reviewerId !== user.id);
+    }, [reviews, user]);
+
+    const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                toast.error('Ảnh quá lớn. Vui lòng chọn ảnh dưới 5MB');
+                return;
+            }
+            setReviewImage(file);
+            setImagePreview(URL.createObjectURL(file));
+        }
+    };
+
+    const openCreateModal = () => {
+        setReviewData({ rating: 5, comment: '', isAnonymous: false });
+        setReviewImage(null);
+        setImagePreview('');
+        setEditingReviewId(null);
+        setIsReviewModalOpen(true);
+    };
+
+    const openEditModal = () => {
+        if (!myReview) return;
+        setReviewData({
+            rating: myReview.rating,
+            comment: myReview.comment || '',
+            isAnonymous: myReview.isAnonymous
+        });
+        setReviewImage(null);
+        setImagePreview(myReview.imageUrl ? getFullImageUrl(myReview.imageUrl) : '');
+        setEditingReviewId(myReview.id);
+        setIsReviewModalOpen(true);
+    };
+
+    // LOGIC THỰC THI XÓA ĐÁNH GIÁ MỚI
+    const executeDeleteReview = async () => {
+        if (!myReview) return;
+
+        try {
+            setDeletingReview(true);
+            await marketplaceService.deleteReview(pt.userId, myReview.id);
+            toast.success('Đã xóa đánh giá thành công!');
+
+            // Đóng modal xóa
+            setIsDeleteModalOpen(false);
+
+            // Cập nhật lại data PT và Reviews
+            const [ptRes, revRes] = await Promise.all([
+                marketplaceService.getPtDetail(id),
+                marketplaceService.getPtReviews(pt.userId, { page: 0, size: 50 })
+            ]);
+            setPt(ptRes.data.data);
+            setReviews(revRes.data.data.content || []);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Không thể xóa đánh giá');
+        } finally {
+            setDeletingReview(false);
+        }
+    };
+
     const handleSubmitReview = async (e) => {
         e.preventDefault();
         try {
             setSubmittingReview(true);
-            await marketplaceService.createReview(pt.userId, reviewData);
-            toast.success('Đã gửi đánh giá thành công!');
-            setShowReviewForm(false);
-            setReviewData({ rating: 5, comment: '' });
 
-            // Tải lại reviews
-            const revRes = await marketplaceService.getPtReviews(pt.userId, { page: 0, size: 10 });
+            if (editingReviewId) {
+                await marketplaceService.updateReview(pt.userId, editingReviewId, reviewData, reviewImage);
+                toast.success('Đã cập nhật đánh giá thành công!');
+            } else {
+                await marketplaceService.createReview(pt.userId, reviewData, reviewImage);
+                toast.success('Đã gửi đánh giá thành công!');
+            }
+
+            setIsReviewModalOpen(false);
+
+            const [ptRes, revRes] = await Promise.all([
+                marketplaceService.getPtDetail(id),
+                marketplaceService.getPtReviews(pt.userId, { page: 0, size: 50 })
+            ]);
+            setPt(ptRes.data.data);
             setReviews(revRes.data.data.content || []);
+
         } catch (err) {
             console.error(err);
-            if(err.response?.data?.message) {
-                toast.error(err.response.data.message);
-            } else {
-                toast.error('Không thể gửi đánh giá');
-            }
+            toast.error(err.response?.data?.message || 'Không thể thao tác');
         } finally {
             setSubmittingReview(false);
         }
@@ -95,19 +185,12 @@ export default function PtDetailPage() {
         try {
             setHiring(true);
             await marketplaceService.hirePt(pt.userId);
-
             setHireStatus('PENDING');
-            toast.success('Đã gửi yêu cầu thuê PT!', {
-                description: 'Vui lòng chờ Huấn luyện viên xác nhận.'
-            });
+            toast.success('Đã gửi yêu cầu thuê PT!');
         } catch (err) {
-            console.error(err);
             const errorMsg = err.response?.data?.message || 'Có lỗi xảy ra khi gửi yêu cầu';
             toast.error(errorMsg);
-
-            // FIX LỖI: Nhận diện từ khóa Tiếng Việt từ Backend để set PENDING
-            const lowerMsg = errorMsg.toLowerCase();
-            if (lowerMsg.includes('đã gửi') || lowerMsg.includes('chờ') || lowerMsg.includes('liên kết')) {
+            if (errorMsg.toLowerCase().includes('đã gửi') || errorMsg.toLowerCase().includes('chờ') || errorMsg.toLowerCase().includes('liên kết')) {
                 setHireStatus('PENDING');
             }
         } finally {
@@ -118,8 +201,69 @@ export default function PtDetailPage() {
     const renderStars = (rating, interactive = false) => (
         <div className="flex gap-1">
             {[1, 2, 3, 4, 5].map((star) => (
-                <Star key={star} onClick={interactive ? () => setReviewData({ ...reviewData, rating: star }) : undefined} className={`w-5 h-5 ${interactive ? 'cursor-pointer' : ''} ${star <= (interactive ? reviewData.rating : rating) ? 'fill-amber-400 text-amber-500' : 'text-slate-200 transition-colors'}`} />
+                <Star
+                    key={star}
+                    onClick={interactive ? () => setReviewData({ ...reviewData, rating: star }) : undefined}
+                    className={`w-6 h-6 ${interactive ? 'cursor-pointer hover:scale-110 transition-transform' : ''} ${star <= (interactive ? reviewData.rating : rating) ? 'fill-amber-400 text-amber-500 drop-shadow-sm' : 'text-slate-200 transition-colors'}`}
+                />
             ))}
+        </div>
+    );
+
+    const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'HV';
+
+    const ReviewCard = ({ rev, isMine }) => (
+        <div className={`p-6 rounded-3xl transition-all ${isMine ? 'bg-blue-50/50 border-2 border-blue-200 shadow-md' : 'bg-white border border-slate-100 shadow-sm hover:shadow-md'}`}>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                <div className="flex gap-4">
+                    <div className={`w-12 h-12 rounded-full font-black flex items-center justify-center text-lg shadow-sm shrink-0 border ${isMine ? 'bg-blue-600 text-white border-blue-700' : 'bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 border-slate-200/60'}`}>
+                        {rev.isAnonymous && !isMine ? <EyeOff className="w-5 h-5 opacity-70"/> : getInitials(rev.reviewerName)}
+                    </div>
+                    <div>
+                        <p className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                            {isMine ? 'Đánh giá của bạn' : rev.reviewerName}
+                            {rev.isAnonymous && <span className="text-[10px] bg-slate-200/70 text-slate-600 px-2 py-0.5 rounded-md flex items-center gap-1 font-bold"><EyeOff className="w-3 h-3"/> Ẩn danh</span>}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                            {rev.createdAt ? new Date(rev.createdAt).toLocaleDateString('vi-VN', {year:'numeric', month:'long', day:'numeric'}) : ''}
+                            {isMine && editingReviewId === rev.id && ' (Đã chỉnh sửa)'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:items-end gap-2">
+                    <div className="flex items-center gap-1 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-100 h-fit w-fit">
+                        <span className="text-sm font-black text-amber-700 mr-1">{rev.rating}</span>
+                        <Star className="w-4 h-4 fill-current text-amber-500" />
+                    </div>
+                    {isMine && (
+                        <div className="flex gap-2 mt-1">
+                            <button onClick={openEditModal} className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-100/50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors">
+                                <Edit3 className="w-3 h-3" /> Sửa
+                            </button>
+                            {/* MỞ MODAL XÓA THAY VÌ CONFIRM CỦA TRÌNH DUYỆT */}
+                            <button onClick={() => setIsDeleteModalOpen(true)} className="text-xs font-bold text-red-600 hover:text-red-800 flex items-center gap-1 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg transition-colors">
+                                <Trash2 className="w-3 h-3" /> Xóa
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className={`p-4 rounded-2xl border font-medium leading-relaxed text-[15px] ${isMine ? 'bg-white border-blue-100 text-blue-900' : 'bg-slate-50 border-slate-100 text-slate-700'}`}>
+                "{rev.comment || 'Không có bình luận.'}"
+            </div>
+
+            {rev.imageUrl && (
+                <div className="mt-4">
+                    <button
+                        onClick={() => setLightboxImage(getFullImageUrl(rev.imageUrl))}
+                        className="h-24 w-24 rounded-2xl border border-slate-200 overflow-hidden hover:opacity-85 transition-opacity shadow-sm cursor-zoom-in"
+                    >
+                        <img src={getFullImageUrl(rev.imageUrl)} alt="Evidence" className="w-full h-full object-cover" />
+                    </button>
+                </div>
+            )}
         </div>
     );
 
@@ -129,7 +273,7 @@ export default function PtDetailPage() {
     return (
         <div className="max-w-5xl mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4">
             <button onClick={() => navigate(-1)} className="flex items-center text-sm font-bold text-slate-500 hover:text-slate-900 transition-colors bg-slate-100 px-4 py-2 rounded-xl w-fit">
-                <ArrowLeft className="w-4 h-4 mr-1.5" /> Trở lại danh sách PT
+                <ArrowLeft className="w-4 h-4 mr-1.5" /> Trở lại
             </button>
 
             <Card className="bg-white border-slate-200 shadow-sm overflow-hidden rounded-3xl relative">
@@ -177,7 +321,6 @@ export default function PtDetailPage() {
                             </div>
 
                             <div className="flex flex-col gap-3 min-w-[200px]">
-                                {/* LOGIC NÚT ACTION CHÍNH */}
                                 {hireStatus === 'ACTIVE' ? (
                                     <Button
                                         onClick={() => navigate('/chat', { state: { targetPtId: pt.userId } })}
@@ -192,6 +335,13 @@ export default function PtDetailPage() {
                                     >
                                         <Clock className="w-5 h-5 mr-2" /> Đang chờ duyệt
                                     </Button>
+                                ) : hireStatus === 'COMPLETED' ? (
+                                    <Button
+                                        disabled
+                                        className="w-full h-14 bg-slate-100 text-slate-500 border border-slate-200 text-lg font-bold rounded-2xl cursor-not-allowed opacity-100"
+                                    >
+                                        Đã kết thúc khóa học
+                                    </Button>
                                 ) : (
                                     <Button
                                         onClick={handleHirePt}
@@ -203,14 +353,13 @@ export default function PtDetailPage() {
                                     </Button>
                                 )}
 
-                                {/* LOGIC UX MỚI: ẨN NÚT ĐÁNH GIÁ NẾU CHƯA THUÊ */}
-                                {(hireStatus === 'ACTIVE' || hireStatus === 'INACTIVE') && (
+                                {hireStatus === 'COMPLETED' && !myReview && (
                                     <Button
                                         variant="outline"
-                                        onClick={() => setShowReviewForm(!showReviewForm)}
-                                        className="w-full h-12 border-slate-200 text-slate-600 font-bold rounded-2xl hover:bg-slate-50"
+                                        onClick={openCreateModal}
+                                        className="w-full h-12 border-amber-200 text-amber-700 font-bold rounded-2xl hover:bg-amber-50 shadow-sm"
                                     >
-                                        Viết Đánh Giá
+                                        <Star className="w-4 h-4 mr-2 text-amber-500"/> Viết Đánh Giá
                                     </Button>
                                 )}
                             </div>
@@ -226,70 +375,127 @@ export default function PtDetailPage() {
                 </CardContent>
             </Card>
 
-            {showReviewForm && (
-                <Card className="p-8 bg-slate-50 border-slate-200 rounded-3xl animate-in slide-in-from-top-4 fade-in">
-                    <h3 className="text-xl font-black text-slate-800 mb-6">Chia sẻ trải nghiệm của bạn</h3>
-                    <form onSubmit={handleSubmitReview} className="space-y-6">
-                        <div>
-                            <label className="text-sm font-black text-slate-400 uppercase tracking-widest block mb-3">Chất lượng PT</label>
-                            <div className="bg-white p-4 rounded-2xl border border-slate-100 inline-block shadow-sm">
-                                {renderStars(reviewData.rating, true)}
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-sm font-black text-slate-400 uppercase tracking-widest block mb-3">Nhận xét chi tiết</label>
-                            <textarea
-                                value={reviewData.comment}
-                                onChange={(e) => setReviewData({...reviewData, comment: e.target.value})}
-                                className="w-full p-4 rounded-2xl border border-slate-200 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 font-medium text-slate-700 bg-white"
-                                rows="4"
-                                placeholder="Huấn luyện viên này đã giúp bạn thay đổi như thế nào?..."
-                                required
-                            />
-                        </div>
-                        <div className="flex gap-3">
-                            <Button type="submit" disabled={submittingReview} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold px-8 h-12">
-                                {submittingReview ? 'Đang gửi...' : 'Gửi Đánh Giá'}
-                            </Button>
-                            <Button type="button" variant="outline" onClick={() => setShowReviewForm(false)} className="rounded-xl font-bold h-12 border-slate-200 text-slate-600 bg-white hover:bg-slate-50">
-                                Hủy
-                            </Button>
-                        </div>
-                    </form>
-                </Card>
-            )}
-
             <Card className="p-8 rounded-3xl bg-white shadow-sm border-slate-200">
                 <h3 className="text-2xl font-black text-slate-900 mb-8">Đánh giá từ Học viên</h3>
                 {reviews.length === 0 ? (
                     <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
                         <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                         <p className="text-slate-500 font-bold">Chưa có đánh giá nào.</p>
-                        <p className="text-slate-400 text-sm mt-1">Hãy là người đầu tiên để lại nhận xét!</p>
+                        <p className="text-slate-400 text-sm mt-1">Các đánh giá của học viên sau khi kết thúc khóa sẽ hiển thị tại đây.</p>
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        {reviews.map(rev => (
-                            <div key={rev.id} className="border border-slate-100 p-6 rounded-2xl bg-white shadow-sm">
-                                <div className="flex gap-4 mb-4">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 font-black flex items-center justify-center text-lg border border-slate-200/60 shadow-sm">
-                                        {rev.reviewerName?.slice(0,2).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-slate-900 text-lg">{rev.reviewerName}</p>
-                                        <div className="mt-1">
-                                            {renderStars(rev.rating)}
-                                        </div>
-                                    </div>
-                                </div>
-                                <p className="text-slate-700 font-medium leading-relaxed bg-slate-50 p-4 rounded-xl text-[15px]">
-                                    "{rev.comment}"
-                                </p>
-                            </div>
-                        ))}
+                        {myReview && <ReviewCard rev={myReview} isMine={true} />}
+                        {otherReviews.map(rev => <ReviewCard key={rev.id} rev={rev} isMine={false} />)}
                     </div>
                 )}
             </Card>
+
+            {/* MODAL TẠO/SỬA ĐÁNH GIÁ */}
+            <Modal
+                isOpen={isReviewModalOpen}
+                onClose={() => !submittingReview && setIsReviewModalOpen(false)}
+                title={editingReviewId ? "Sửa đánh giá của bạn" : "Chia sẻ trải nghiệm của bạn"}
+            >
+                <form onSubmit={handleSubmitReview} className="space-y-6 mt-4">
+                    <div className="flex flex-col items-center justify-center py-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-3">Chất lượng PT</label>
+                        {renderStars(reviewData.rating, true)}
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-black text-slate-600 uppercase tracking-widest block mb-2">Nhận xét chi tiết</label>
+                        <textarea
+                            value={reviewData.comment}
+                            onChange={(e) => setReviewData({...reviewData, comment: e.target.value})}
+                            className="w-full p-4 rounded-2xl border border-slate-200 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 font-medium text-slate-700 bg-slate-50 focus:bg-white transition-all"
+                            rows="4"
+                            placeholder="Huấn luyện viên này đã giúp bạn thay đổi như thế nào? (Kinh nghiệm, thực đơn, sự tận tâm...)"
+                            required
+                        />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                        <div>
+                            <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block mb-2">Đính kèm ảnh minh chứng</label>
+                            <div className="flex items-center gap-3">
+                                <label className="cursor-pointer bg-white hover:bg-slate-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 shadow-sm">
+                                    <ImageIcon className="w-4 h-4"/> {imagePreview ? 'Đổi Ảnh' : 'Chọn Ảnh'}
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                                </label>
+                                {imagePreview && (
+                                    <img src={imagePreview} alt="Preview" className="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-sm" />
+                                )}
+                            </div>
+                        </div>
+
+                        <label className="flex items-center gap-3 cursor-pointer bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors w-full sm:w-auto mt-2 sm:mt-0">
+                            <input
+                                type="checkbox"
+                                checked={reviewData.isAnonymous}
+                                onChange={(e) => setReviewData({...reviewData, isAnonymous: e.target.checked})}
+                                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer border-slate-300"
+                            />
+                            <div>
+                                <span className="text-sm font-bold text-slate-800 block">Đánh giá ẩn danh</span>
+                                <span className="text-[10px] text-slate-500">Tên của bạn sẽ được ẩn đi.</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-slate-100">
+                        <Button type="button" variant="outline" onClick={() => setIsReviewModalOpen(false)} className="flex-1 rounded-xl font-bold h-12 border-slate-200 text-slate-600 bg-white hover:bg-slate-50">
+                            Hủy
+                        </Button>
+                        <Button type="submit" disabled={submittingReview} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-12 shadow-md shadow-blue-500/20">
+                            {submittingReview ? 'Đang lưu...' : 'Lưu Đánh Giá'}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* MODAL XÓA ĐÁNH GIÁ (GIAO DIỆN MỚI THAY CHO ALERT) */}
+            <Modal
+                isOpen={isDeleteModalOpen}
+                onClose={() => !deletingReview && setIsDeleteModalOpen(false)}
+                title={
+                    <div className="flex items-center gap-2 text-red-600">
+                        <AlertTriangle className="w-5 h-5" />
+                        Xác nhận xóa đánh giá
+                    </div>
+                }
+            >
+                <div className="space-y-4 mt-2">
+                    <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                        Bạn có chắc chắn muốn xóa đánh giá này không? Hành động này không thể hoàn tác, nhưng bạn có thể viết lại đánh giá mới sau đó.
+                    </p>
+                    <div className="flex gap-3 justify-end pt-5 border-t border-slate-100">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsDeleteModalOpen(false)}
+                            disabled={deletingReview}
+                            className="flex-1 rounded-xl font-bold border-slate-200 text-slate-600 bg-white hover:bg-slate-50 h-11"
+                        >
+                            Hủy bỏ
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={executeDeleteReview}
+                            disabled={deletingReview}
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold shadow-md shadow-red-500/20 h-11"
+                        >
+                            {deletingReview ? 'Đang xóa...' : 'Xóa Đánh Giá'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            <ImageLightbox
+                isOpen={!!lightboxImage}
+                imageUrl={lightboxImage}
+                onClose={() => setLightboxImage('')}
+            />
         </div>
     );
 }

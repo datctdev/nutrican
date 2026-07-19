@@ -170,16 +170,18 @@ export default function Header() {
         PT_CERTIFIED: [
             { label: 'Bảng điều khiển', href: '/pt' },
             { label: 'Học viên của tôi', href: '/pt/clients' },
+            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
             { label: 'Lịch hẹn', href: '/pt/appointments' },
             { label: 'Tin nhắn', href: '/pt/chat' },
-            { label: 'Đánh giá', href: '/pt/reviews' },
+            { label: 'Đánh giá', href: '/pt/ratings' },
         ],
         PT_FREELANCE: [
             { label: 'Bảng điều khiển', href: '/pt' },
             { label: 'Học viên của tôi', href: '/pt/clients' },
+            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
             { label: 'Lịch hẹn', href: '/pt/appointments' },
             { label: 'Tin nhắn', href: '/pt/chat' },
-            { label: 'Đánh giá', href: '/pt/reviews' },
+            { label: 'Đánh giá', href: '/pt/ratings' },
         ],
         ADMIN: [
             { label: 'Bảng điều khiển', href: '/admin' },

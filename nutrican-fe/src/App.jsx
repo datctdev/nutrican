@@ -36,6 +36,7 @@ import ChatPage from './pages/pt/ChatPage';
 import CustomerChatPage from './pages/customer/CustomerChatPage';
 import OnboardingPage from './pages/customer/OnboardingPage';
 import SettingPage from './pages/customer/SettingPage';
+import PtRatingsPage from './pages/pt/PtRatingsPage';
 
 function App() {
     const router = createBrowserRouter([
@@ -127,6 +128,7 @@ function App() {
                 { path: '/pt/appointments', element: <PtAppointmentsPage /> },
                 { path: '/pt/progress/:clientId', element: <ClientProgressPage /> },
                 { path: '/pt/reviews', element: <ReviewDietLogPage /> },
+                { path: '/pt/ratings', element: <PtRatingsPage /> },
                 { path: '/pt/chat', element: <ChatPage /> },
             ],
         },

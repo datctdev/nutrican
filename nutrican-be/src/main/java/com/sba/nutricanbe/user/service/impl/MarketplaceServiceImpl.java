@@ -2,6 +2,7 @@ package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
+import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.Review;
@@ -48,6 +49,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     private final ReviewRepository reviewRepository;
     private final PtClientMappingRepository mappingRepository;
     private final WebSocketSessionService webSocketSessionService;
+    private final StorageService storageService;
 
     @Override
     @Transactional(readOnly = true)
@@ -191,7 +193,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
     @Override
     @Transactional
-    public ApiResponse<ReviewResponse> createReview(UUID ptId, UUID reviewerId, CreateReviewRequest request) {
+    public ApiResponse<ReviewResponse> createReview(UUID ptId, UUID reviewerId, CreateReviewRequest request, org.springframework.web.multipart.MultipartFile image) {
         User pt = userRepository.findById(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
 
@@ -202,12 +204,17 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         User reviewer = userRepository.findById(reviewerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Reviewer", reviewerId));
 
-        boolean hasHired = mappingRepository.findByPt_IdAndClient_Id(ptId, reviewerId)
-                .map(m -> m.getStatus() == ClientMappingStatus.ACTIVE || m.getStatus() == ClientMappingStatus.INACTIVE)
+        boolean hasCompleted = mappingRepository.findByPt_IdAndClient_Id(ptId, reviewerId)
+                .map(m -> m.getStatus() == ClientMappingStatus.COMPLETED)
                 .orElse(false);
 
-        if (!hasHired) {
-            throw new BadRequestException("Bạn chỉ có thể đánh giá Huấn luyện viên mà bạn đã từng làm việc cùng.");
+        if (!hasCompleted) {
+            throw new BadRequestException("Bạn chỉ có thể đánh giá sau khi đã hoàn thành khóa Huấn luyện với PT này (Trạng thái Kết thúc).");
+        }
+
+        String uploadedImageUrl = null;
+        if (image != null && !image.isEmpty()) {
+            uploadedImageUrl = storageService.uploadFile(image, "reviews");
         }
 
         Review review = Review.builder()
@@ -215,6 +222,8 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 .reviewer(reviewer)
                 .rating(request.getRating())
                 .comment(request.getComment())
+                .isAnonymous(Boolean.TRUE.equals(request.getIsAnonymous()))
+                .imageUrl(uploadedImageUrl)
                 .build();
 
         review = reviewRepository.save(review);
@@ -228,7 +237,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         ptProfileRepository.save(profile);
 
         log.info("Review created for PT: {} by user: {}", ptId, reviewerId);
-        return ApiResponse.success(ReviewResponse.toReviewResponse(review), "Review submitted successfully");
+        return ApiResponse.success(ReviewResponse.toReviewResponse(review), "Gửi đánh giá thành công!");
     }
 
     @Override
@@ -324,5 +333,56 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         payload.put("accepted", accepted);
         String event = accepted ? "HIRE_ACCEPTED" : "HIRE_REJECTED";
         webSocketSessionService.sendToUser(customerId, event, payload);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<ReviewResponse> updateReview(UUID ptId, UUID reviewId, UUID reviewerId, CreateReviewRequest request, org.springframework.web.multipart.MultipartFile image) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review", reviewId));
+
+        if (!review.getReviewer().getId().equals(reviewerId)) {
+            throw new BadRequestException("Bạn chỉ có thể chỉnh sửa đánh giá của chính mình.");
+        }
+
+        review.setRating(request.getRating());
+        review.setComment(request.getComment());
+        review.setIsAnonymous(Boolean.TRUE.equals(request.getIsAnonymous()));
+
+        if (image != null && !image.isEmpty()) {
+            String uploadedImageUrl = storageService.uploadFile(image, "reviews");
+            review.setImageUrl(uploadedImageUrl);
+        }
+
+        reviewRepository.save(review);
+        updatePtRatingStats(ptId);
+
+        return ApiResponse.success(ReviewResponse.toReviewResponse(review), "Cập nhật đánh giá thành công!");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Void> deleteReview(UUID ptId, UUID reviewId, UUID reviewerId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review", reviewId));
+
+        if (!review.getReviewer().getId().equals(reviewerId)) {
+            throw new BadRequestException("Bạn chỉ có thể xóa đánh giá của chính mình.");
+        }
+
+        reviewRepository.delete(review);
+        updatePtRatingStats(ptId);
+
+        return ApiResponse.success(null, "Đã xóa đánh giá thành công!");
+    }
+
+    private void updatePtRatingStats(UUID ptId) {
+        PtProfile profile = ptProfileRepository.findByUserId(ptId).orElse(null);
+        if (profile != null) {
+            Double avgRating = reviewRepository.findAverageRatingByPtId(ptId);
+            profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.valueOf(5.0));
+            profile.setTotalReviews((int) reviewRepository.countByPtId(ptId));
+            ptProfileRepository.save(profile);
+        }
     }
 }
