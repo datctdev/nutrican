@@ -8,7 +8,8 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import {
   Loader2, ArrowLeft, Target, Beef, Wheat, Droplet,
-  Upload, CheckCircle2, Zap, Scale, Heart, TrendingUp
+  Upload, CheckCircle2, Zap, Scale, Heart, TrendingUp,
+  Pencil, X
 } from 'lucide-react';
 
 export default function MacroTargetsPage() {
@@ -35,6 +36,60 @@ export default function MacroTargetsPage() {
     lbm: ''
   });
   const [inBodyPreview, setInBodyPreview] = useState(null);
+
+  // Edit Goal Modal State
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [editGoalForm, setEditGoalForm] = useState({
+    nutritionGoal: 'MAINTAIN',
+    targetWeight: '',
+    targetDate: ''
+  });
+
+  const openGoalModal = () => {
+    setEditGoalForm({
+      nutritionGoal: progressGoals?.nutritionGoal || nutritionGoal || 'MAINTAIN',
+      targetWeight: progressGoals?.targetWeight || '',
+      targetDate: progressGoals?.targetDate || ''
+    });
+    setShowGoalModal(true);
+  };
+
+  const handleSaveGoal = async () => {
+    const currentWeight = bodyMetricHistory[0]?.weight || 0;
+    const target = Number(editGoalForm.targetWeight);
+    
+    if (editGoalForm.nutritionGoal === 'WEIGHT_LOSS' && currentWeight && target >= currentWeight) {
+      return toast.error('Lỗi: Cân nặng mục tiêu (Giảm cân) phải NHỎ HƠN cân nặng hiện tại!');
+    }
+    if (editGoalForm.nutritionGoal === 'WEIGHT_GAIN' && currentWeight && target <= currentWeight) {
+      return toast.error('Lỗi: Cân nặng mục tiêu (Tăng cân) phải LỚN HƠN cân nặng hiện tại!');
+    }
+    
+    setIsSaving(true);
+    try {
+      await profileExtensionsService.saveGoals({
+        nutritionGoal: editGoalForm.nutritionGoal,
+        targetWeight: target || null,
+        targetDate: editGoalForm.targetDate || null
+      });
+      
+      // Update User Preferences for consistency
+      await userService.updatePreferences({
+        nutritionGoal: editGoalForm.nutritionGoal
+      });
+      
+      const goalsRes = await profileExtensionsService.getGoals();
+      setProgressGoals(goalsRes.data.data);
+      setNutritionGoal(editGoalForm.nutritionGoal);
+      
+      toast.success('Đã cập nhật mục tiêu thành công');
+      setShowGoalModal(false);
+    } catch (err) {
+      toast.error('Lỗi khi lưu mục tiêu');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -324,7 +379,12 @@ export default function MacroTargetsPage() {
 
       {/* TIMELINE CHART */}
       <div className="pt-2">
-        <h3 className="text-lg font-bold text-slate-900 mb-4 px-2">Biểu Đồ Theo Dõi</h3>
+        <div className="flex justify-between items-center mb-4 px-2">
+          <h3 className="text-lg font-bold text-slate-900">Biểu Đồ Theo Dõi</h3>
+          <Button onClick={openGoalModal} variant="outline" className="text-xs font-bold border-slate-300 text-slate-700 bg-white hover:bg-slate-50 h-8 px-3 rounded-lg">
+            <Pencil className="w-3.5 h-3.5 mr-1.5" /> Sửa Mục Tiêu
+          </Button>
+        </div>
         <ProgressTimelineCard 
           goals={progressGoals} 
           milestones={milestones} 
@@ -332,6 +392,72 @@ export default function MacroTargetsPage() {
           compact={false} 
         />
       </div>
+
+      {/* MODAL: EDIT GOAL */}
+      {showGoalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up relative">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-lg font-black text-slate-900">Cập nhật Mục tiêu</h3>
+              <button onClick={() => setShowGoalModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Loại Mục tiêu</label>
+                <select
+                  value={editGoalForm.nutritionGoal}
+                  onChange={(e) => setEditGoalForm(f => ({ ...f, nutritionGoal: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium outline-none focus:border-blue-500"
+                >
+                  <option value="WEIGHT_LOSS">Giảm cân</option>
+                  <option value="WEIGHT_GAIN">Tăng cân</option>
+                  <option value="MAINTAIN">Duy trì</option>
+                  <option value="PREGNANT">Mang thai</option>
+                  <option value="RECOVERY">Phục hồi</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">
+                  Cân nặng hướng đến (kg)
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={editGoalForm.targetWeight}
+                  onChange={(e) => setEditGoalForm(f => ({ ...f, targetWeight: e.target.value }))}
+                  placeholder="Ví dụ: 65.5"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">
+                  Ngày dự kiến đạt được
+                </label>
+                <input
+                  type="date"
+                  value={editGoalForm.targetDate}
+                  onChange={(e) => setEditGoalForm(f => ({ ...f, targetDate: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+              <Button onClick={() => setShowGoalModal(false)} variant="ghost" className="font-bold text-slate-600 hover:bg-slate-200 rounded-xl">
+                Hủy
+              </Button>
+              <Button onClick={handleSaveGoal} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-6">
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : 'Lưu Mục tiêu'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
