@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.diet.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
-import com.sba.nutricanbe.diet.dto.FoodItemResponse;
+import com.sba.nutricanbe.diet.dto.response.FoodItemResponse;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
 import com.sba.nutricanbe.user.entity.User;
 import lombok.RequiredArgsConstructor;

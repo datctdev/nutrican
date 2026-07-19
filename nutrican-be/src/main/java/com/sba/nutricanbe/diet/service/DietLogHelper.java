@@ -8,8 +8,8 @@ import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
-import com.sba.nutricanbe.diet.dto.DietLogItemRequest;
-import com.sba.nutricanbe.diet.dto.DietLogResponse;
+import com.sba.nutricanbe.diet.dto.request.DietLogItemRequest;
+import com.sba.nutricanbe.diet.dto.response.DietLogResponse;
 
 import java.math.BigDecimal;
 import java.util.List;

@@ -1,10 +1,10 @@
 package com.sba.nutricanbe.diet.service;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
-import com.sba.nutricanbe.diet.dto.AnalyzeMealContext;
-import com.sba.nutricanbe.diet.dto.AnalyzeMealResponse;
-import com.sba.nutricanbe.diet.dto.ConfirmRecognitionRequest;
-import com.sba.nutricanbe.diet.dto.DietLogResponse;
+import com.sba.nutricanbe.diet.dto.request.AnalyzeMealContext;
+import com.sba.nutricanbe.diet.dto.request.ConfirmRecognitionRequest;
+import com.sba.nutricanbe.diet.dto.response.AnalyzeMealResponse;
+import com.sba.nutricanbe.diet.dto.response.DietLogResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;

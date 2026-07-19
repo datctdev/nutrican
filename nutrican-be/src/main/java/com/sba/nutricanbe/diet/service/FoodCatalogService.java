@@ -1,6 +1,6 @@
 package com.sba.nutricanbe.diet.service;
 
-import com.sba.nutricanbe.diet.dto.FoodItemResponse;
+import com.sba.nutricanbe.diet.dto.response.FoodItemResponse;
 
 import java.util.List;
 import java.util.Optional;

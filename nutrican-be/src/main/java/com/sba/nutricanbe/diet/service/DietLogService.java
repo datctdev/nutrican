@@ -2,9 +2,9 @@ package com.sba.nutricanbe.diet.service;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
-import com.sba.nutricanbe.diet.dto.CreateDietLogRequest;
-import com.sba.nutricanbe.diet.dto.DietLogResponse;
-import com.sba.nutricanbe.diet.dto.DietSummaryResponse;
+import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
+import com.sba.nutricanbe.diet.dto.response.DietLogResponse;
+import com.sba.nutricanbe.diet.dto.response.DietSummaryResponse;
 
 import java.time.LocalDate;
 import java.util.UUID;

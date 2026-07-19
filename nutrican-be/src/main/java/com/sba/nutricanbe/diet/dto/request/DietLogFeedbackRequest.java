@@ -1,4 +1,4 @@
-package com.sba.nutricanbe.diet.dto;
+package com.sba.nutricanbe.diet.dto.request;
 
 import lombok.Data;
 

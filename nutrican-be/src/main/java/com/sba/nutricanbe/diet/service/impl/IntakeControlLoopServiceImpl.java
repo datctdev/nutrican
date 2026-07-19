@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.util.MacroUtils;
-import com.sba.nutricanbe.diet.dto.IntakeControlResult;
+import com.sba.nutricanbe.diet.dto.response.IntakeControlResult;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.IntakeDayStatus;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;

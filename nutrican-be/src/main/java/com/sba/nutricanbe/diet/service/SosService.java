@@ -1,8 +1,8 @@
 package com.sba.nutricanbe.diet.service;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
-import com.sba.nutricanbe.diet.dto.SosTicketResponse;
-import com.sba.nutricanbe.diet.dto.CreateSosRequest;
+import com.sba.nutricanbe.diet.dto.request.CreateSosRequest;
+import com.sba.nutricanbe.diet.dto.response.SosTicketResponse;
 
 import java.util.List;
 import java.util.UUID;

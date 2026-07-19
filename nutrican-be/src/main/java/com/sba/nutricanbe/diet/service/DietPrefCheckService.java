@@ -1,6 +1,6 @@
 package com.sba.nutricanbe.diet.service;
 
-import com.sba.nutricanbe.diet.dto.PlanDietPrefWarning;
+import com.sba.nutricanbe.diet.dto.response.PlanDietPrefWarning;
 import com.sba.nutricanbe.user.enums.DietPreference;
 
 import java.util.List;

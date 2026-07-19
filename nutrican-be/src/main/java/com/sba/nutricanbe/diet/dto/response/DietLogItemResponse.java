@@ -1,4 +1,4 @@
-package com.sba.nutricanbe.diet.dto;
+package com.sba.nutricanbe.diet.dto.response;
 
 import com.sba.nutricanbe.diet.enums.DietLogItemSource;
 import lombok.AllArgsConstructor;

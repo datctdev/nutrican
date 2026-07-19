@@ -1,14 +1,14 @@
 package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.dto.MacroNutrients;
-import com.sba.nutricanbe.diet.dto.DietSummaryResponse;
+import com.sba.nutricanbe.diet.dto.response.DietSummaryResponse;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
-import com.sba.nutricanbe.diet.dto.IntakeControlResult;
+import com.sba.nutricanbe.diet.dto.response.IntakeControlResult;
 import com.sba.nutricanbe.diet.enums.IntakeStatus;
 import com.sba.nutricanbe.user.service.UserQueryService;
 import org.junit.jupiter.api.Test;
@@ -77,7 +77,7 @@ class DietLogConfirmFlowTest {
                 IntakeControlResult.builder().intakeStatus(IntakeStatus.OK).build());
         when(dietLogHelper.toResponse(any())).thenAnswer(inv -> {
             DietLog log = inv.getArgument(0);
-            return com.sba.nutricanbe.diet.dto.DietLogResponse.builder()
+            return com.sba.nutricanbe.diet.dto.response.DietLogResponse.builder()
                     .status(log.getStatus())
                     .reviewStatus(log.getReviewStatus())
                     .build();

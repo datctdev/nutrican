@@ -2,7 +2,7 @@ package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
-import com.sba.nutricanbe.diet.dto.DietLogFeedbackRequest;
+import com.sba.nutricanbe.diet.dto.request.DietLogFeedbackRequest;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.DietLogFeedback;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;

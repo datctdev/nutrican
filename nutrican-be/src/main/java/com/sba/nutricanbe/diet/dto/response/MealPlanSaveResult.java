@@ -1,7 +1,5 @@
-package com.sba.nutricanbe.diet.dto;
+package com.sba.nutricanbe.diet.dto.response;
 
-import com.sba.nutricanbe.diet.entity.MealPlan;
-import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,8 +12,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MealPlanSaveResult {
-    private MealPlan plan;
-    private List<MealPlanItem> items;
+    private MealPlanResponse plan;
+    private List<MealPlanItemResponse> items;
     private List<PlanDietPrefWarning> dietPrefWarnings;
     private String macroWarning;
 }

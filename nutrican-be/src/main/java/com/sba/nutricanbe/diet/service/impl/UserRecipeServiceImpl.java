@@ -3,10 +3,10 @@ package com.sba.nutricanbe.diet.service.impl;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.util.MacroUtils;
-import com.sba.nutricanbe.diet.dto.DietLogItemRequest;
-import com.sba.nutricanbe.diet.dto.PlanDietPrefWarning;
-import com.sba.nutricanbe.diet.dto.RecipeRequest;
-import com.sba.nutricanbe.diet.dto.RecipeResponse;
+import com.sba.nutricanbe.diet.dto.request.DietLogItemRequest;
+import com.sba.nutricanbe.diet.dto.request.RecipeRequest;
+import com.sba.nutricanbe.diet.dto.response.PlanDietPrefWarning;
+import com.sba.nutricanbe.diet.dto.response.RecipeResponse;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.diet.entity.UserRecipe;
 import com.sba.nutricanbe.diet.entity.UserRecipeIngredient;
@@ -52,8 +52,7 @@ public class UserRecipeServiceImpl implements UserRecipeService {
         recipe.setTotalFat(built.totalFat().setScale(1, RoundingMode.HALF_UP));
         UserRecipe saved = recipeRepository.save(recipe);
         return toResponse(saved, built.foods());
-    }
-
+ }
     @Override
     @Transactional
     public RecipeResponse update(UUID userId, UUID recipeId, RecipeRequest request) {
@@ -182,4 +181,3 @@ public class UserRecipeServiceImpl implements UserRecipeService {
     private record BuildResult(List<UserRecipeIngredient> ingredients, List<FoodItem> foods,
                                BigDecimal totalCal, BigDecimal totalPro, BigDecimal totalCarb, BigDecimal totalFat) {}
 }
-

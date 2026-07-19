@@ -44,7 +44,7 @@ import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.PtCorrectionReason;
 import com.sba.nutricanbe.diet.enums.PtReviewAction;
 import com.sba.nutricanbe.diet.enums.SosTicketStatus;
-import com.sba.nutricanbe.diet.dto.SosTicketResponse;
+import com.sba.nutricanbe.diet.dto.response.SosTicketResponse;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.RblDatasetFilter;
 import com.sba.nutricanbe.common.util.RblMetricsUtil;
@@ -1273,7 +1273,14 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         plan.setPtId(ptId);
         plan = mealPlanRepository.save(plan);
                 
-        // OVERRIDE: Delete existing items for that plan
+        List<MealPlanItem> existingItems = mealPlanItemRepository
+                .findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId());
+        if (existingItems.stream().anyMatch(item -> Boolean.TRUE.equals(item.getEaten()))) {
+            throw new BadRequestException(
+                    "Cannot apply a template while the plan contains items already marked as eaten");
+        }
+
+        // OVERRIDE: Delete existing editable items for that plan
         mealPlanItemRepository.deleteByMealPlanId(plan.getId());
         
         for (MealPlanTemplateItem tItem : templateItems) {
