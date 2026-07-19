@@ -2,7 +2,7 @@ package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.enums.UserStatus;
-import com.sba.nutricanbe.user.dto.CertificationData;
+import com.sba.nutricanbe.user.dto.*;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.entity.User;
@@ -12,13 +12,7 @@ import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
-import com.sba.nutricanbe.user.dto.MacroTargetRequest;
-import com.sba.nutricanbe.user.dto.MacroTargetResponse;
-import com.sba.nutricanbe.user.dto.PtProfileSummary;
-import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
-import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
-import com.sba.nutricanbe.user.dto.UpdatePtProfileRequest;
-import com.sba.nutricanbe.user.dto.UserProfileResponse;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.service.UserProfileService;
 import com.sba.nutricanbe.common.repository.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,18 +23,93 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserProfileServiceImpl implements UserProfileService {
-
     private final UserRepository userRepository;
     private final MacroTargetRepository macroTargetRepository;
     private final PtProfileRepository ptProfileRepository;
     private final StorageService minioService;
     private final SystemSettingRepository systemSettingRepository;
+
+    @Override
+    @Transactional
+    public ApiResponse<PtProfileSummary> updatePtProfile(
+            UUID userId,
+            UpdatePtProfileRequest request
+    ) {
+        PtProfile ptProfile = ptProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("PtProfile", userId));
+
+        if (request.getBio() != null) {
+            ptProfile.setBio(request.getBio());
+        }
+
+        if (request.getTrainingPhilosophy() != null) {
+            ptProfile.setTrainingPhilosophy(request.getTrainingPhilosophy());
+        }
+
+        if (request.getContactPhone() != null) {
+            ptProfile.setContactPhone(request.getContactPhone());
+        }
+
+        if (request.getLocation() != null) {
+            ptProfile.setLocation(request.getLocation());
+        }
+
+        if (request.getTrainingMode() != null) {
+            ptProfile.setTrainingMode(request.getTrainingMode());
+        }
+
+        if (request.getOnlineRate() != null) {
+            ptProfile.setOnlineRate(request.getOnlineRate());
+        }
+
+        if (request.getOnlineRateUnit() != null) {
+            ptProfile.setOnlineRateUnit(request.getOnlineRateUnit());
+        }
+
+        if (request.getOfflineRate() != null) {
+            ptProfile.setOfflineRate(request.getOfflineRate());
+        }
+
+        if (request.getOfflineRateUnit() != null) {
+            ptProfile.setOfflineRateUnit(request.getOfflineRateUnit());
+        }
+
+        if (request.getSpecializations() != null) {
+            ptProfile.setSpecializations(request.getSpecializations());
+        }
+
+        if (request.getInstagramUrl() != null) {
+            ptProfile.setInstagramUrl(request.getInstagramUrl());
+        }
+
+        if (request.getLinkedinUrl() != null) {
+            ptProfile.setLinkedinUrl(request.getLinkedinUrl());
+        }
+
+        if (request.getPortfolioShowcase() != null) {
+            ptProfile.setPortfolioShowcase(request.getPortfolioShowcase());
+        }
+
+        PtProfile savedProfile = ptProfileRepository.save(ptProfile);
+
+        log.info("PT profile updated for user: {}", userId);
+
+        return ApiResponse.success(
+                toPtProfileSummary(savedProfile),
+                "PT Profile updated successfully"
+        );
+    }
+
+    private static final Set<String> ALLOWED_RATE_UNITS = Set.of(
+            "HOUR", "SESSION_60", "SESSION_90", "MONTH");
 
     @Override
     @Transactional(readOnly = true)
@@ -53,6 +122,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Override
     @Transactional
     public ApiResponse<PtProfileSummary> registerAsPt(UUID userId, PtRegistrationRequest request) {
+        validateAndNormalizeServiceRates(request);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
@@ -92,10 +162,12 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .contactPhone(request.getContactPhone())
                 .trainingMode(request.getTrainingMode())
                 .location(request.getLocation())
-                .rateUnit(request.getRateUnit())
+                .onlineRate(request.getOnlineRate())
+                .onlineRateUnit(request.getOnlineRateUnit())
+                .offlineRate(request.getOfflineRate())
+                .offlineRateUnit(request.getOfflineRateUnit())
                 .specializations(request.getSpecializations())
                 .certifications(certDataList)
-                .hourlyRate(request.getHourlyRate())
                 .gender(request.getGender())
                 .cvUrl(request.getCvUrl())
                 .instagramUrl(request.getInstagramUrl())
@@ -112,6 +184,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Override
     @Transactional
     public ApiResponse<PtProfileSummary> resubmitPt(UUID userId, PtRegistrationRequest request) {
+        validateAndNormalizeServiceRates(request);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         PtProfile profile = ptProfileRepository.findByUserId(userId)
@@ -161,10 +234,12 @@ public class UserProfileServiceImpl implements UserProfileService {
         profile.setContactPhone(request.getContactPhone());
         profile.setTrainingMode(request.getTrainingMode());
         profile.setLocation(request.getLocation());
-        profile.setRateUnit(request.getRateUnit());
+        profile.setOnlineRate(request.getOnlineRate());
+        profile.setOnlineRateUnit(request.getOnlineRateUnit());
+        profile.setOfflineRate(request.getOfflineRate());
+        profile.setOfflineRateUnit(request.getOfflineRateUnit());
         profile.setSpecializations(request.getSpecializations());
         profile.setCertifications(certs);
-        profile.setHourlyRate(request.getHourlyRate());
         profile.setGender(request.getGender());
         profile.setCvUrl(request.getCvUrl());
         profile.setInstagramUrl(request.getInstagramUrl());
@@ -202,7 +277,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     public ApiResponse<String> uploadCv(UUID userId, MultipartFile file) {
         // Validate file type
         String contentType = file.getContentType();
-        if (contentType == null || (!contentType.equals("application/pdf") && 
+        if (contentType == null || (!contentType.equals("application/pdf") &&
                 !contentType.equals("application/msword") &&
                 !contentType.contains("word") &&
                 !contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))) {
@@ -241,28 +316,6 @@ public class UserProfileServiceImpl implements UserProfileService {
         user = userRepository.save(user);
         log.info("Profile updated for user: {}", userId);
         return ApiResponse.success(toProfileResponse(user), "Profile updated successfully");
-    }
-
-    @Override
-    @Transactional
-    public ApiResponse<PtProfileSummary> updatePtProfile(UUID userId, UpdatePtProfileRequest request) {
-        PtProfile ptProfile = ptProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("PtProfile", userId));
-
-        if (request.getBio() != null) ptProfile.setBio(request.getBio());
-        if (request.getTrainingPhilosophy() != null) ptProfile.setTrainingPhilosophy(request.getTrainingPhilosophy());
-        if (request.getLocation() != null) ptProfile.setLocation(request.getLocation());
-        if (request.getTrainingMode() != null) ptProfile.setTrainingMode(request.getTrainingMode());
-        if (request.getHourlyRate() != null) ptProfile.setHourlyRate(request.getHourlyRate());
-        if (request.getSpecializations() != null) ptProfile.setSpecializations(request.getSpecializations());
-        if (request.getInstagramUrl() != null) ptProfile.setInstagramUrl(request.getInstagramUrl());
-        if (request.getLinkedinUrl() != null) ptProfile.setLinkedinUrl(request.getLinkedinUrl());
-        if (request.getPortfolioShowcase() != null) ptProfile.setPortfolioShowcase(request.getPortfolioShowcase());
-
-        ptProfile = ptProfileRepository.save(ptProfile);
-        log.info("PT Profile updated for user: {}", userId);
-        
-        return ApiResponse.success(toPtProfileSummary(ptProfile), "PT Profile updated successfully");
     }
 
     @Override
@@ -370,14 +423,15 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .contactPhone(ptProfile.getContactPhone())
                 .trainingMode(ptProfile.getTrainingMode())
                 .location(ptProfile.getLocation())
-                .rateUnit(ptProfile.getRateUnit())
+                .onlineRate(ptProfile.getOnlineRate())
+                .onlineRateUnit(ptProfile.getOnlineRateUnit())
+                .offlineRate(ptProfile.getOfflineRate())
+                .offlineRateUnit(ptProfile.getOfflineRateUnit())
                 .specializations(ptProfile.getSpecializations())
                 .certifications(ptProfile.getCertifications())
                 .rating(ptProfile.getRating())
                 .totalReviews(ptProfile.getTotalReviews())
                 .tier(ptProfile.getTier() != null ? ptProfile.getTier().name() : null)
-                .hourlyRate(ptProfile.getHourlyRate())
-                .portfolioShowcase(ptProfile.getPortfolioShowcase())
                 .cvUrl(ptProfile.getCvUrl())
                 .instagramUrl(ptProfile.getInstagramUrl())
                 .linkedinUrl(ptProfile.getLinkedinUrl())
@@ -386,6 +440,51 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .ptRequestStatus(ptProfile.getPtRequestStatus() != null ? ptProfile.getPtRequestStatus().name() : null)
                 .verificationStatus(ptProfile.getVerificationStatus() != null ? ptProfile.getVerificationStatus().name() : null)
                 .build();
+    }
+
+    private void validateAndNormalizeServiceRates(PtRegistrationRequest request) {
+        TrainingMode mode = request.getTrainingMode();
+        if (mode == null) {
+            throw new BadRequestException("Vui lòng chọn hình thức huấn luyện");
+        }
+
+        boolean supportsOnline = mode == TrainingMode.ONLINE || mode == TrainingMode.BOTH;
+        boolean supportsOffline = mode == TrainingMode.OFFLINE || mode == TrainingMode.BOTH;
+
+        if (supportsOnline) {
+            request.setOnlineRateUnit(validateRate(
+                    "online", request.getOnlineRate(), request.getOnlineRateUnit()));
+        } else {
+            request.setOnlineRate(null);
+            request.setOnlineRateUnit(null);
+        }
+
+        if (supportsOffline) {
+            request.setOfflineRateUnit(validateRate(
+                    "offline", request.getOfflineRate(), request.getOfflineRateUnit()));
+            if (request.getLocation() == null || request.getLocation().isBlank()) {
+                throw new BadRequestException("Vui lòng chọn địa điểm huấn luyện offline");
+            }
+            request.setLocation(request.getLocation().trim());
+        } else {
+            request.setOfflineRate(null);
+            request.setOfflineRateUnit(null);
+            request.setLocation(null);
+        }
+    }
+
+    private String validateRate(String mode, BigDecimal rate, String rateUnit) {
+        if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Phí huấn luyện " + mode + " phải lớn hơn 0");
+        }
+        if (rateUnit == null || rateUnit.isBlank()) {
+            throw new BadRequestException("Vui lòng chọn đơn vị tính cho hình thức " + mode);
+        }
+        String normalizedUnit = rateUnit.trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_RATE_UNITS.contains(normalizedUnit)) {
+            throw new BadRequestException("Đơn vị tính cho hình thức " + mode + " không hợp lệ");
+        }
+        return normalizedUnit;
     }
 
     private MacroTargetResponse toMacroResponse(MacroTarget target) {

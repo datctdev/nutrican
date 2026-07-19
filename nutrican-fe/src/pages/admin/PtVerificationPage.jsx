@@ -6,7 +6,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { adminService } from '../../services/adminService';
 import {
-  CheckCircle2, XCircle, Clock, ShieldCheck, Mail, BookOpen,
+  CheckCircle2, XCircle, ShieldCheck, Mail, BookOpen,
   Award, MapPin, Phone, Monitor, Dumbbell, Globe, Calendar,
   ExternalLink, ZoomIn, Star, Loader2, Link2
 } from 'lucide-react';
@@ -208,9 +208,14 @@ export default function PtVerificationPage() {
                                 {GENDER_LABEL[pt.gender] || pt.gender}
                               </span>
                             )}
-                            {pt.hourlyRate && (
+                            {pt.onlineRate && (
                               <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full">
-                                {parseInt(pt.hourlyRate).toLocaleString('vi-VN')}đ{RATE_UNIT_LABEL[pt.rateUnit] || ''}
+                                ONLINE: {parseInt(pt.onlineRate).toLocaleString('vi-VN')}đ{RATE_UNIT_LABEL[pt.onlineRateUnit] || ''}
+                              </span>
+                            )}
+                            {pt.offlineRate && (
+                              <span className="text-xs font-semibold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full">
+                                OFFLINE: {parseInt(pt.offlineRate).toLocaleString('vi-VN')}đ{RATE_UNIT_LABEL[pt.offlineRateUnit] || ''}
                               </span>
                             )}
                           </div>

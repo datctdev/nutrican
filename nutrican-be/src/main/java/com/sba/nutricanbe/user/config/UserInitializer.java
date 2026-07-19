@@ -9,6 +9,7 @@ import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 import com.sba.nutricanbe.user.enums.Tier;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
@@ -86,6 +87,8 @@ public class UserInitializer implements CommandLineRunner {
                 LocalDate.of(2016, 3, 1),
                 List.of("Fat loss", "Muscle gain", "Meal planning"),
                 Tier.TIER_1,
+                TrainingMode.BOTH,
+                BigDecimal.valueOf(1200000),
                 BigDecimal.valueOf(450000));
 
         seedPtProfile(
@@ -95,7 +98,9 @@ public class UserInitializer implements CommandLineRunner {
                 LocalDate.of(2019, 6, 1),
                 List.of("Lifestyle coaching", "Home workout", "Vietnamese diet"),
                 Tier.TIER_2,
-                BigDecimal.valueOf(300000));
+                TrainingMode.ONLINE,
+                BigDecimal.valueOf(900000),
+                null);
 
         seedMapping(certifiedPt, customerOne, ClientMappingStatus.ACTIVE);
         seedMapping(freelancePt, customerTwo, ClientMappingStatus.PENDING);
@@ -157,12 +162,20 @@ public class UserInitializer implements CommandLineRunner {
                                LocalDate experienceStartDate,
                                List<String> specializations,
                                Tier tier,
-                               BigDecimal hourlyRate) {
+                               TrainingMode trainingMode,
+                               BigDecimal onlineRate,
+                               BigDecimal offlineRate) {
         ptProfileRepository.findByUserId(pt.getId())
                 .ifPresentOrElse(profile -> {
                     profile.setIsVerified(true);
                     profile.setVerificationStatus(UserStatus.ACTIVE);
                     profile.setPtRequestStatus(UserStatus.ACTIVE);
+                    profile.setTrainingMode(trainingMode);
+                    profile.setLocation(trainingMode == TrainingMode.ONLINE ? null : pt.getAddress());
+                    profile.setOnlineRate(onlineRate);
+                    profile.setOnlineRateUnit(onlineRate == null ? null : "MONTH");
+                    profile.setOfflineRate(offlineRate);
+                    profile.setOfflineRateUnit(offlineRate == null ? null : "SESSION_60");
                     ptProfileRepository.save(profile);
                 }, () -> ptProfileRepository.save(PtProfile.builder()
                         .user(pt)
@@ -172,7 +185,12 @@ public class UserInitializer implements CommandLineRunner {
                         .experienceStartDate(experienceStartDate)
                         .specializations(specializations)
                         .tier(tier)
-                        .hourlyRate(hourlyRate)
+                        .trainingMode(trainingMode)
+                        .location(trainingMode == TrainingMode.ONLINE ? null : pt.getAddress())
+                        .onlineRate(onlineRate)
+                        .onlineRateUnit(onlineRate == null ? null : "MONTH")
+                        .offlineRate(offlineRate)
+                        .offlineRateUnit(offlineRate == null ? null : "SESSION_60")
                         .rating(BigDecimal.valueOf(5.0))
                         .totalReviews(0)
                         .verificationStatus(UserStatus.ACTIVE)
@@ -180,23 +198,23 @@ public class UserInitializer implements CommandLineRunner {
                         .instagramUrl("https://instagram.com/pt.nutrican")
                         .linkedinUrl("https://linkedin.com/in/pt-nutrican")
                         .portfolioShowcase(java.util.Map.of(
-                          "coverPhotoUrl", "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=1470&auto=format&fit=crop",
-                          "transformations", java.util.List.of(
-                            java.util.Map.of(
-                              "id", 1,
-                              "title", "Giảm 15kg mỡ thừa trong 3 tháng",
-                              "story", "Học viên Nguyễn Văn A đã kiên trì theo lịch tập tạ 4 buổi/tuần và chế độ ăn Low-Carb. Kết quả sau 12 tuần thực sự ngoài sức mong đợi. Cơ thể nhẹ nhàng hơn và các chỉ số sức khỏe đều trở về mức tuyệt vời.",
-                              "beforeUrl", "https://placehold.co/600x400/eeeeee/999999?text=Before+Image",
-                              "afterUrl", "https://placehold.co/600x400/d1fae5/065f46?text=After+Image"
-                            ),
-                            java.util.Map.of(
-                              "id", 2,
-                              "title", "Tăng 8kg cơ bắp, thay đổi vóc dáng",
-                              "story", "Từ một người gầy gò 55kg, bạn B đã áp dụng chế độ Bulk an toàn. Chú trọng các bài tập Compound như Squat, Deadlift, Bench Press. Giờ đây tự tin diện những bộ quần áo body.",
-                              "beforeUrl", "https://placehold.co/600x400/eeeeee/999999?text=Before+Image+2",
-                              "afterUrl", "https://placehold.co/600x400/d1fae5/065f46?text=After+Image+2"
-                            )
-                          )
+                                "coverPhotoUrl", "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=1470&auto=format&fit=crop",
+                                "transformations", java.util.List.of(
+                                        java.util.Map.of(
+                                                "id", 1,
+                                                "title", "Giảm 15kg mỡ thừa trong 3 tháng",
+                                                "story", "Học viên Nguyễn Văn A đã kiên trì theo lịch tập tạ 4 buổi/tuần và chế độ ăn Low-Carb. Kết quả sau 12 tuần thực sự ngoài sức mong đợi. Cơ thể nhẹ nhàng hơn và các chỉ số sức khỏe đều trở về mức tuyệt vời.",
+                                                "beforeUrl", "https://placehold.co/600x400/eeeeee/999999?text=Before+Image",
+                                                "afterUrl", "https://placehold.co/600x400/d1fae5/065f46?text=After+Image"
+                                        ),
+                                        java.util.Map.of(
+                                                "id", 2,
+                                                "title", "Tăng 8kg cơ bắp, thay đổi vóc dáng",
+                                                "story", "Từ một người gầy gò 55kg, bạn B đã áp dụng chế độ Bulk an toàn. Chú trọng các bài tập Compound như Squat, Deadlift, Bench Press. Giờ đây tự tin diện những bộ quần áo body.",
+                                                "beforeUrl", "https://placehold.co/600x400/eeeeee/999999?text=Before+Image+2",
+                                                "afterUrl", "https://placehold.co/600x400/d1fae5/065f46?text=After+Image+2"
+                                        )
+                                )
                         ))
                         .build()));
     }

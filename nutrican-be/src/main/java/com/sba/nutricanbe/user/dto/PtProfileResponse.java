@@ -2,6 +2,7 @@ package com.sba.nutricanbe.user.dto;
 
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,7 +30,12 @@ public class PtProfileResponse {
     private BigDecimal rating;
     private Integer totalReviews;
     private String tier;
-    private BigDecimal hourlyRate;
+    private TrainingMode trainingMode;
+    private String location;
+    private BigDecimal onlineRate;
+    private String onlineRateUnit;
+    private BigDecimal offlineRate;
+    private String offlineRateUnit;
     private String mappingStatus;
     private Integer maxClients;
     private Long activeClientCount;
@@ -38,7 +44,7 @@ public class PtProfileResponse {
     private List<String> preferredDietTypes;
     private Boolean goalMatch;
     private Boolean dietMatch;
-    
+
     private Map<String, Object> portfolioShowcase;
     private List<CertificationData> certifications;
     private String instagramUrl;
@@ -60,14 +66,15 @@ public class PtProfileResponse {
                 .rating(profile.getRating())
                 .totalReviews(profile.getTotalReviews())
                 .tier(profile.getTier().name())
-                .hourlyRate(profile.getHourlyRate())
+                .trainingMode(profile.getTrainingMode())
+                .location(profile.getLocation())
+                .onlineRate(profile.getOnlineRate())
+                .onlineRateUnit(profile.getOnlineRateUnit())
+                .offlineRate(profile.getOfflineRate())
+                .offlineRateUnit(profile.getOfflineRateUnit())
                 .maxClients(profile.getMaxClients())
                 .preferredGoals(profile.getPreferredGoals())
                 .preferredDietTypes(profile.getPreferredDietTypes())
-                .portfolioShowcase(profile.getPortfolioShowcase())
-                .certifications(profile.getCertifications())
-                .instagramUrl(profile.getInstagramUrl())
-                .linkedinUrl(profile.getLinkedinUrl())
                 .build();
     }
 }

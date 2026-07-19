@@ -27,14 +27,16 @@ public class PtProfileSummary {
     private String contactPhone;
     private TrainingMode trainingMode;
     private String location;
-    private String rateUnit;
+    private BigDecimal onlineRate;
+    private String onlineRateUnit;
+    private BigDecimal offlineRate;
+    private String offlineRateUnit;
     private List<String> specializations;
     private List<CertificationData> certifications;
     private Map<String, Object> portfolioShowcase;
     private BigDecimal rating;
     private Integer totalReviews;
     private String tier;
-    private BigDecimal hourlyRate;
     private String cvUrl;
     private String instagramUrl;
     private String linkedinUrl;

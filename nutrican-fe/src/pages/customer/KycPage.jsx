@@ -52,6 +52,12 @@ const TRAINING_MODE_OPTIONS = [
   { value: 'BOTH', label: 'Cả hai', icon: Globe },
 ];
 
+const modeIncludes = (selectedMode, optionMode) =>
+  selectedMode === optionMode || selectedMode === 'BOTH';
+
+const hasPositiveRate = (value) =>
+  value !== '' && value !== null && value !== undefined && Number(value) > 0;
+
 const LOCATION_OPTIONS = [
   'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ',
   'Hải Phòng', 'Bình Dương', 'Đồng Nai', 'Vũng Tàu', 'Khác',
@@ -86,14 +92,19 @@ function validatePtForm(form, certList) {
     return 'Vui lòng chọn ít nhất 1 chuyên môn';
   if (!form.trainingMode)
     return 'Vui lòng chọn hình thức huấn luyện';
-  if (!form.location)
+  if (modeIncludes(form.trainingMode, 'OFFLINE') && !form.location)
     return 'Vui lòng chọn địa điểm hoạt động';
-  if (form.hourlyRate === '' || form.hourlyRate == null || parseFloat(form.hourlyRate) < 0)
+  if (modeIncludes(form.trainingMode, 'ONLINE') && !hasPositiveRate(form.onlineRate))
     return 'Phí dịch vụ không được âm';
-  if (!form.rateUnit)
+  if (modeIncludes(form.trainingMode, 'ONLINE') && !form.onlineRateUnit)
     return 'Vui lòng chọn đơn vị tính phí';
 
   // Lọc ra các chứng chỉ có nhập liệu
+  if (modeIncludes(form.trainingMode, 'OFFLINE') && !hasPositiveRate(form.offlineRate))
+    return 'Phí huấn luyện offline phải lớn hơn 0';
+  if (modeIncludes(form.trainingMode, 'OFFLINE') && !form.offlineRateUnit)
+    return 'Vui lòng chọn đơn vị tính phí offline';
+
   const filledCerts = certList.filter(c => c.name.trim() || c.issuingOrganization.trim() || c.certificateImageUrl);
 
   if (form.preferredTrack === 'CERTIFIED' && filledCerts.length === 0)
@@ -376,8 +387,10 @@ export default function KycPage() {
     specializations: [],
     trainingMode: '',
     location: '',
-    hourlyRate: '',
-    rateUnit: 'SESSION_60',
+    onlineRate: '',
+    onlineRateUnit: 'MONTH',
+    offlineRate: '',
+    offlineRateUnit: 'SESSION_60',
     cvUrl: '',
     cvFileName: '',
     instagramUrl: '',
@@ -557,6 +570,8 @@ export default function KycPage() {
     if (err) { toast.error(err); return; }
     setIsSubmittingPt(true);
     const filledCerts = certList.filter(c => c.name.trim() || c.issuingOrganization.trim() || c.certificateImageUrl);
+    const offersOnline = modeIncludes(ptForm.trainingMode, 'ONLINE');
+    const offersOffline = modeIncludes(ptForm.trainingMode, 'OFFLINE');
 
     try {
       const payload = {
@@ -569,9 +584,11 @@ export default function KycPage() {
           ? `${ptForm.experienceStartDate}-01` : ptForm.experienceStartDate,
         specializations: ptForm.specializations,
         trainingMode: ptForm.trainingMode,
-        location: ptForm.location,
-        hourlyRate: parseFloat(ptForm.hourlyRate),
-        rateUnit: ptForm.rateUnit,
+        location: offersOffline ? ptForm.location : null,
+        onlineRate: offersOnline ? Number(ptForm.onlineRate) : null,
+        onlineRateUnit: offersOnline ? ptForm.onlineRateUnit : null,
+        offlineRate: offersOffline ? Number(ptForm.offlineRate) : null,
+        offlineRateUnit: offersOffline ? ptForm.offlineRateUnit : null,
         certifications: filledCerts.map(c => ({
           name: c.name,
           issuingOrganization: c.issuingOrganization,
@@ -1115,6 +1132,7 @@ export default function KycPage() {
                   </div>
 
                   {/* Location */}
+                  {modeIncludes(ptForm.trainingMode, 'OFFLINE') && (
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Địa Điểm Hoạt Động *</label>
                     <div className="relative">
@@ -1127,32 +1145,62 @@ export default function KycPage() {
                       </select>
                     </div>
                   </div>
+                  )}
 
                   {/* Hourly Rate + Unit */}
+                  {modeIncludes(ptForm.trainingMode, 'ONLINE') && (
                   <div>
-                    <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Dịch Vụ *</label>
+                    <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Huấn Luyện ONLINE *</label>
                     <div className="flex gap-3">
                       <div className="relative flex-1">
-                        <input type="number" value={ptForm.hourlyRate} min={0}
-                          onChange={(e) => setPtForm(p => ({ ...p, hourlyRate: e.target.value }))}
+                        <input type="number" value={ptForm.onlineRate} min={1}
+                          onChange={(e) => setPtForm(p => ({ ...p, onlineRate: e.target.value }))}
                           placeholder="VD: 300000"
                           className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">VNĐ</span>
                       </div>
-                      <select value={ptForm.rateUnit}
-                        onChange={(e) => setPtForm(p => ({ ...p, rateUnit: e.target.value }))}
+                      <select value={ptForm.onlineRateUnit}
+                        onChange={(e) => setPtForm(p => ({ ...p, onlineRateUnit: e.target.value }))}
                         className="px-3 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm bg-white">
                         {RATE_UNIT_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                       </select>
                     </div>
-                    {ptForm.hourlyRate && (
+                    {ptForm.onlineRate && (
                       <p className="text-xs text-slate-500 mt-1.5">
                         Phí: <span className="font-bold text-slate-700">
-                          {parseInt(ptForm.hourlyRate).toLocaleString('vi-VN')}đ
-                        </span> / {RATE_UNIT_OPTIONS.find(r => r.value === ptForm.rateUnit)?.label?.toLowerCase()}
+                          {parseInt(ptForm.onlineRate).toLocaleString('vi-VN')}đ
+                        </span> / {RATE_UNIT_OPTIONS.find(r => r.value === ptForm.onlineRateUnit)?.label?.toLowerCase()}
                       </p>
                     )}
                   </div>
+                  )}
+
+                  {modeIncludes(ptForm.trainingMode, 'OFFLINE') && (
+                  <div>
+                    <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Huấn Luyện OFFLINE *</label>
+                    <div className="flex gap-3">
+                      <div className="relative flex-1">
+                        <input type="number" value={ptForm.offlineRate} min={1}
+                          onChange={(e) => setPtForm(current => ({ ...current, offlineRate: e.target.value }))}
+                          placeholder="VD: 300000"
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm" />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">VNĐ</span>
+                      </div>
+                      <select value={ptForm.offlineRateUnit}
+                        onChange={(e) => setPtForm(current => ({ ...current, offlineRateUnit: e.target.value }))}
+                        className="px-3 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm bg-white">
+                        {RATE_UNIT_OPTIONS.map(unit => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
+                      </select>
+                    </div>
+                    {ptForm.offlineRate && (
+                      <p className="text-xs text-slate-500 mt-1.5">
+                        Phí: <span className="font-bold text-slate-700">
+                          {parseInt(ptForm.offlineRate).toLocaleString('vi-VN')}đ
+                        </span> / {RATE_UNIT_OPTIONS.find(unit => unit.value === ptForm.offlineRateUnit)?.label?.toLowerCase()}
+                      </p>
+                    )}
+                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

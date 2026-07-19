@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.user.dto;
 
+import com.sba.nutricanbe.user.enums.Gender;
 import com.sba.nutricanbe.user.enums.TrainingMode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
@@ -7,7 +8,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import com.sba.nutricanbe.user.enums.Gender;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,7 +24,7 @@ import java.util.List;
 public class PtRegistrationRequest {
 
     @NotBlank(message = "Loại hình mong muốn là bắt buộc")
-    private String preferredTrack; // "CERTIFIED" or "FREELANCE"
+    private String preferredTrack;
 
     @NotBlank(message = "Giới thiệu bản thân là bắt buộc")
     @Size(min = 100, message = "Giới thiệu bản thân tối thiểu 100 ký tự")
@@ -40,24 +40,26 @@ public class PtRegistrationRequest {
     @NotNull(message = "Ngày bắt đầu làm PT là bắt buộc")
     private LocalDate experienceStartDate;
 
-    @NotEmpty(message = "Vui lòng chọn ít nhất 1 chuyên môn")
+    @NotEmpty(message = "Vui lòng chọn ít nhất một chuyên môn")
     private List<String> specializations;
 
     @NotNull(message = "Hình thức huấn luyện là bắt buộc")
     private TrainingMode trainingMode;
 
-    @NotBlank(message = "Địa điểm hoạt động là bắt buộc")
     private String location;
 
-    @NotNull(message = "Phí dịch vụ là bắt buộc")
-    @DecimalMin(value = "0", message = "Phí dịch vụ không được âm")
-    private BigDecimal hourlyRate;
+    @DecimalMin(value = "0", inclusive = false, message = "Phí huấn luyện online phải lớn hơn 0")
+    private BigDecimal onlineRate;
+
+    private String onlineRateUnit;
+
+    @DecimalMin(value = "0", inclusive = false, message = "Phí huấn luyện offline phải lớn hơn 0")
+    private BigDecimal offlineRate;
+
+    private String offlineRateUnit;
 
     @NotNull(message = "Giới tính là bắt buộc")
     private Gender gender;
-
-    @NotBlank(message = "Đơn vị tính phí là bắt buộc")
-    private String rateUnit; // "HOUR" | "SESSION_60" | "SESSION_90" | "MONTH"
 
     @Valid
     private List<CertificationRequest> certifications;
