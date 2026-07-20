@@ -9,8 +9,13 @@ import { Link } from 'react-router-dom';
 import {
   Loader2, ArrowLeft, Target, Beef, Wheat, Droplet,
   Upload, CheckCircle2, Zap, Scale, Heart, TrendingUp,
-  Pencil, X
+  Pencil, X, Activity, AlertTriangle, RefreshCw
 } from 'lucide-react';
+import {
+  ACTIVITY_LEVEL_OPTIONS,
+  DEFAULT_ACTIVITY_LEVEL,
+  ActivityLevelInfoTooltip,
+} from './components/activityLevelOptions';
 
 export default function MacroTargetsPage() {
   const fileInputRef = useRef(null);
@@ -20,6 +25,8 @@ export default function MacroTargetsPage() {
   const [macros, setMacros] = useState({ dailyCalories: 0, protein: 0, carb: 0, fat: 0 });
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
+  const [activityLevel, setActivityLevel] = useState(DEFAULT_ACTIVITY_LEVEL);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   
   const [progressGoals, setProgressGoals] = useState(null);
   const [bodyMetricHistory, setBodyMetricHistory] = useState([]);
@@ -36,6 +43,9 @@ export default function MacroTargetsPage() {
     lbm: ''
   });
   const [inBodyPreview, setInBodyPreview] = useState(null);
+
+  // Confirm Recalculate Modal State
+  const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
 
   // Edit Goal Modal State
   const [showGoalModal, setShowGoalModal] = useState(false);
@@ -117,6 +127,7 @@ export default function MacroTargetsPage() {
       if (profileRes.data?.data) {
         setNutritionGoal(profileRes.data.data.nutritionGoal || 'MAINTAIN');
         setPregnancyTrimester(profileRes.data.data.pregnancyTrimester || 1);
+        setActivityLevel(profileRes.data.data.activityLevel || DEFAULT_ACTIVITY_LEVEL);
       }
 
       if (goalsRes.data?.data) {
@@ -181,10 +192,11 @@ export default function MacroTargetsPage() {
         lbm: updateForm.lbm ? Number(updateForm.lbm) : null,
       });
 
-      // 2. Fetch Macro Suggestion based on new weight (backend automatically uses latest BodyMetric)
+      // 2. Fetch Macro Suggestion — BE uses stored activityLevel when param omitted; pass explicitly for clarity
       const suggestionRes = await userService.getMacroSuggestion({
         nutritionGoal,
         pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+        activityLevel,
       });
 
       const newMacros = suggestionRes.data?.data;
@@ -212,6 +224,33 @@ export default function MacroTargetsPage() {
       toast.error('Có lỗi xảy ra khi cập nhật tiến độ');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRecalculateMacros = async () => {
+    setShowRecalcConfirm(false);
+    setIsRecalculating(true);
+    try {
+      const res = await userService.recalculateMacros({
+        activityLevel,
+        nutritionGoal,
+        pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+      });
+      const data = res.data?.data;
+      if (data?.activityLevel) setActivityLevel(data.activityLevel);
+      if (data?.macros) {
+        setMacros({
+          dailyCalories: data.macros.dailyCalories || 0,
+          protein: data.macros.protein || 0,
+          carb: data.macros.carb || data.macros.carbs || 0,
+          fat: data.macros.fat || 0,
+        });
+      }
+      toast.success('Đã cập nhật mức vận động và tính lại macro');
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Không tính lại được macro');
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -306,6 +345,42 @@ export default function MacroTargetsPage() {
         </CardContent>
       </Card>
 
+      {/* ACTIVITY LEVEL → recalculate macros */}
+      <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Activity className="w-5 h-5 text-blue-600" />
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Mức độ vận động</h3>
+              <p className="text-xs text-slate-500 mt-0.5">TDEE = BMR × R — áp dụng sẽ tính lại mục tiêu macro</p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Mức độ vận động hàng ngày</label>
+              <ActivityLevelInfoTooltip />
+            </div>
+            <select
+              value={activityLevel}
+              onChange={(e) => setActivityLevel(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+            >
+              {ACTIVITY_LEVEL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <Button
+            onClick={() => setShowRecalcConfirm(true)}
+            disabled={isRecalculating || isSaving}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-5 font-bold text-sm"
+          >
+            {isRecalculating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Áp dụng & tính lại macro
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* UPDATE STATION */}
       <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl">
         <CardContent className="p-6">
@@ -392,6 +467,75 @@ export default function MacroTargetsPage() {
           compact={false} 
         />
       </div>
+
+      {/* MODAL: CONFIRM RECALCULATE MACROS */}
+      {showRecalcConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up relative">
+            <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 text-white relative overflow-hidden">
+              <div className="absolute -top-4 -right-4 opacity-20 pointer-events-none">
+                <RefreshCw className="w-28 h-28" />
+              </div>
+              <div className="flex items-center gap-3 relative z-10">
+                <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black">Tính lại mục tiêu macro?</h3>
+                  <p className="text-indigo-100 text-xs font-medium mt-0.5">
+                    {ACTIVITY_LEVEL_OPTIONS.find((o) => o.value === activityLevel)?.label || 'Mức vận động mới'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 font-medium leading-relaxed">
+                  Áp dụng mức vận động mới sẽ <span className="font-bold">ghi đè</span> mục tiêu Calo / Đạm / Tinh bột / Chất béo hiện tại của bạn.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Calo</p>
+                  <p className="text-sm font-bold text-slate-800">{macros.dailyCalories.toLocaleString()}</p>
+                </div>
+                <div className="bg-rose-50 border border-rose-100 rounded-xl py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-rose-400">Đạm</p>
+                  <p className="text-sm font-bold text-rose-600">{macros.protein}g</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-400">Tinh bột</p>
+                  <p className="text-sm font-bold text-amber-600">{macros.carb}g</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-400">Béo</p>
+                  <p className="text-sm font-bold text-indigo-600">{macros.fat}g</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 text-center font-medium">Các giá trị hiện tại ở trên sẽ được thay thế bằng kết quả tính mới.</p>
+            </div>
+
+            <div className="p-6 pt-0 flex gap-3">
+              <Button
+                onClick={() => setShowRecalcConfirm(false)}
+                variant="ghost"
+                className="flex-1 font-bold text-slate-600 hover:bg-slate-100 rounded-xl py-5"
+              >
+                Huỷ
+              </Button>
+              <Button
+                onClick={handleRecalculateMacros}
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold rounded-xl py-5 shadow-lg shadow-indigo-500/30"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> Áp dụng ngay
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: EDIT GOAL */}
       {showGoalModal && (

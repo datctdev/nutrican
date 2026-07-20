@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { userService } from '../../services/userService';
 import { Card, CardContent } from '../../components/ui/card';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { Loader2, Settings, Bell, Mail, Smartphone } from 'lucide-react';
+import { Loader2, Settings, Bell, Mail, Smartphone, ChevronRight, Target } from 'lucide-react';
 
 export default function SettingPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -176,6 +177,24 @@ export default function SettingPage() {
               <p className="text-slate-500 text-xs mt-0.5">Tùy chỉnh chế độ ăn và ghi chú dị ứng</p>
             </div>
           </div>
+
+          <Link
+            to="/macro-targets"
+            className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-indigo-100 bg-indigo-50/60 hover:bg-indigo-50 transition-colors"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                <Target className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-extrabold text-slate-800">Điều chỉnh macro & mức vận động</p>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  Đổi mức vận động (TDEE) và tính lại calo/P/C/F tại trang Tiến độ
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+          </Link>
 
           <div className="space-y-4">
             <div>

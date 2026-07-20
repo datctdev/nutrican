@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import MealPlanDayView from '../../components/pt/meal-plan/MealPlanDayView';
 import FoodSearchModal from '../../components/pt/meal-plan/FoodSearchModal';
 import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlanSuggestionReviewList';
+import SelfPlanSubmissionReviewList from '../../components/pt/meal-plan/SelfPlanSubmissionReviewList';
 import TemplateModal from '../../components/pt/meal-plan/TemplateModal';
 import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
 
@@ -88,6 +89,7 @@ export default function PtMealPlanPage() {
   const [items, setItems] = useState([]);
   const [prefWarnCodes, setPrefWarnCodes] = useState(new Set());
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
+  const [pendingSelfPlans, setPendingSelfPlans] = useState([]);
   
   // Modal state
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -170,6 +172,12 @@ export default function PtMealPlanPage() {
       workspaceService.getPendingMealPlanSuggestions(clientId)
         .then((res) => setPendingSuggestions(res.data.data || []))
         .catch(() => setPendingSuggestions([]));
+      workspaceService.listSelfPlanSubmissions()
+        .then((res) => {
+          const all = res.data?.data || [];
+          setPendingSelfPlans(all.filter((s) => String(s.customerId) === String(clientId)));
+        })
+        .catch(() => setPendingSelfPlans([]));
         
     } catch {
       toast.error('Lỗi khi tải dữ liệu học viên');
@@ -191,6 +199,13 @@ export default function PtMealPlanPage() {
       setPendingSuggestions(res.data.data || []);
     } catch {
       setPendingSuggestions([]);
+    }
+    try {
+      const res = await workspaceService.listSelfPlanSubmissions();
+      const all = res.data?.data || [];
+      setPendingSelfPlans(all.filter((s) => String(s.customerId) === String(clientId)));
+    } catch {
+      setPendingSelfPlans([]);
     }
   };
 
@@ -469,6 +484,20 @@ export default function PtMealPlanPage() {
           </Button>
         </div>
       </div>
+
+      {pendingSelfPlans.length > 0 && (
+        <Card>
+          <CardContent className="p-5">
+            <SelfPlanSubmissionReviewList
+              submissions={pendingSelfPlans}
+              onUpdated={async () => {
+                await refreshSuggestions();
+                await loadData();
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {pendingSuggestions.length > 0 && (
         <Card>

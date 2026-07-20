@@ -20,6 +20,7 @@ export const profileExtensionsService = {
   submitOnboarding: (data) => api.post('/profile/onboarding', data),
   skipOnboarding: () => api.post('/profile/onboarding/skip'),
   getCoachingHistory: () => api.get('/profile/coaching-history'),
+  hasActivePt: () => api.get('/profile/has-active-pt'),
   requestEndCoaching: () => api.post('/profile/end-coaching'),
   confirmEndCoaching: () => api.put('/profile/end-coaching/confirm'),
   setMaxClients: (maxClients) => api.put('/profile/pt/max-clients', { maxClients }),

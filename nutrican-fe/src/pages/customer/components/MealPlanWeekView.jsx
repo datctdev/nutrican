@@ -24,25 +24,25 @@ const SKIP_REASON_LABEL = {
 
 const MEAL_META = {
   BREAKFAST: {
-    label: 'Bữa sáng',
+    label: 'Buổi sáng',
     icon: Coffee,
     headerClass: 'bg-amber-50 text-amber-800 border-amber-100',
     iconClass: 'bg-amber-100 text-amber-700',
   },
   LUNCH: {
-    label: 'Bữa trưa',
+    label: 'Buổi trưa',
     icon: Sun,
     headerClass: 'bg-emerald-50 text-emerald-800 border-emerald-100',
     iconClass: 'bg-emerald-100 text-emerald-700',
   },
   DINNER: {
-    label: 'Bữa tối',
+    label: 'Buổi tối',
     icon: Moon,
     headerClass: 'bg-indigo-50 text-indigo-800 border-indigo-100',
     iconClass: 'bg-indigo-100 text-indigo-700',
   },
   SNACK: {
-    label: 'Bữa phụ',
+    label: 'Buổi chiều / khuya',
     icon: Cookie,
     headerClass: 'bg-violet-50 text-violet-800 border-violet-100',
     iconClass: 'bg-violet-100 text-violet-700',

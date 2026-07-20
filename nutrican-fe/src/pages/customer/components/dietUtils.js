@@ -69,19 +69,59 @@ export const RESNET_MACRO_ESTIMATES = {
 
 export function resolveResnetFoodCode(dish) {
     if (!dish) return null;
-    const alias = dish.aliases?.find((a) => RESNET_FOOD_CODES.includes(a));
-    if (alias) return alias;
-    if (dish.nameEn) return dish.nameEn.replace(/ /g, '_');
+    if (dish.foodCode && typeof dish.foodCode === 'string' && dish.foodCode.trim()) {
+        return dish.foodCode.trim().toLowerCase().replace(/\s+/g, '_');
+    }
+    const snakeAlias = dish.aliases?.find((a) => typeof a === 'string' && /^[a-z0-9]+(?:_[a-z0-9]+)*$/i.test(a.trim()));
+    if (snakeAlias) return snakeAlias.trim().toLowerCase();
+    if (dish.nameEn) return dish.nameEn.trim().toLowerCase().replace(/\s+/g, '_');
     return null;
+}
+
+/**
+ * Dominant macro tag from kcal contribution (pro×4, carb×4, fat×9).
+ * Returns one label if max share ≥ 45%; null if total kcal is 0 / missing.
+ */
+export function getDominantMacroTag({ protein, carb, fat } = {}) {
+    const p = Number(protein) || 0;
+    const c = Number(carb) || 0;
+    const f = Number(fat) || 0;
+    const proKcal = p * 4;
+    const carbKcal = c * 4;
+    const fatKcal = f * 9;
+    const total = proKcal + carbKcal + fatKcal;
+    if (total <= 0) return null;
+    const shares = [
+        { label: 'Giàu đạm', kcal: proKcal },
+        { label: 'Giàu tinh bột', kcal: carbKcal },
+        { label: 'Giàu béo', kcal: fatKcal },
+    ];
+    shares.sort((a, b) => b.kcal - a.kcal);
+    if (shares[0].kcal / total < 0.45) return null;
+    return shares[0].label;
 }
 
 export function getManualDishOptions(resnetDishes) {
     if (resnetDishes?.length > 0) return resnetDishes;
-    return RESNET_FOOD_CODES.map((code) => ({
-        nameVi: FOOD_CODE_LABELS[code],
-        aliases: [code],
-        ...RESNET_MACRO_ESTIMATES[code],
-    }));
+    return [];
+}
+
+/** Up to 8 default hints from resnetDishes (alphabet), preferring names matching llavaFoodName. */
+export function getDefaultDishHints(resnetDishes, llavaFoodName, limit = 8) {
+    const dishes = getManualDishOptions(resnetDishes);
+    if (!dishes.length) return [];
+    const q = (llavaFoodName || '').trim().toLowerCase();
+    const scored = dishes
+        .map((d) => {
+            const name = (d.nameVi || d.nameEn || '').toLowerCase();
+            const code = resolveResnetFoodCode(d) || '';
+            let score = 0;
+            if (q && (name.includes(q) || code.includes(q.replace(/\s+/g, '_')))) score = 2;
+            else if (q && q.split(/\s+/).some((w) => w.length > 1 && name.includes(w))) score = 1;
+            return { d, score, name };
+        })
+        .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'vi'));
+    return scored.slice(0, limit).map((x) => x.d);
 }
 
 export function getServingGForCode(foodCode, resnetDishes) {
@@ -90,6 +130,11 @@ export function getServingGForCode(foodCode, resnetDishes) {
     return Math.round(
         Number(dish?.servingSizeG || dish?.servingG || RESNET_MACRO_ESTIMATES[foodCode]?.servingG || 350)
     );
+}
+
+export function getServingGForDish(dish) {
+    if (!dish) return 350;
+    return Math.round(Number(dish.servingSizeG || dish.servingG || 350));
 }
 
 export function scaleMacrosByGrams(dish, grams, servingG) {
@@ -147,3 +192,299 @@ export const calculateProgress = (current, target) => {
     if (!target) return 0;
     return Math.min(100, (current / target) * 100);
 };
+
+/** Local calendar YYYY-MM-DD (not UTC). */
+export function formatLocalDate(date = new Date()) {
+    const d = date instanceof Date ? date : new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+export function parseLocalDate(iso) {
+    if (!iso || typeof iso !== 'string') return new Date();
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+}
+
+export function addDaysIso(iso, delta) {
+    const d = parseLocalDate(iso);
+    d.setDate(d.getDate() + delta);
+    return formatLocalDate(d);
+}
+
+export function todayLocalIso() {
+    return formatLocalDate(new Date());
+}
+
+export function isFutureIso(iso) {
+    return iso > todayLocalIso();
+}
+
+export function isTodayIso(iso) {
+    return iso === todayLocalIso();
+}
+
+export function formatDisplayDate(iso) {
+    const d = parseLocalDate(iso);
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+export function monthKeyFromIso(iso) {
+    return iso.slice(0, 7);
+}
+
+/** Minutes since local midnight from Date or ISO (UTC → local). */
+export function toLocalMinutes(isoOrDate = new Date()) {
+    const d = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
+    if (Number.isNaN(d.getTime())) return 0;
+    return d.getHours() * 60 + d.getMinutes();
+}
+
+/** UI meal periods (5) — not API meal types. */
+export const MEAL_PERIODS = ['MORNING', 'NOON', 'AFTERNOON', 'EVENING', 'LATE'];
+
+export const MEAL_PERIOD_LABELS = {
+    MORNING: 'Buổi sáng',
+    NOON: 'Buổi trưa',
+    AFTERNOON: 'Buổi chiều',
+    EVENING: 'Buổi tối',
+    LATE: 'Buổi khuya',
+};
+
+export const MEAL_TYPE_LABELS = {
+    BREAKFAST: 'Buổi sáng',
+    LUNCH: 'Buổi trưa',
+    DINNER: 'Buổi tối',
+    /** API chỉ có SNACK — gộp chiều/khuya trên UI plan/nhật ký */
+    SNACK: 'Buổi chiều / khuya',
+};
+
+export function periodToMealType(period) {
+    switch (period) {
+        case 'MORNING': return 'BREAKFAST';
+        case 'NOON': return 'LUNCH';
+        case 'AFTERNOON': return 'SNACK';
+        case 'EVENING': return 'DINNER';
+        case 'LATE': return 'SNACK';
+        default: return 'SNACK';
+    }
+}
+
+/**
+ * MORNING 04:00–10:59, NOON 11:00–12:59, AFTERNOON 13:00–17:59,
+ * EVENING 18:00–21:59, LATE 22:00–03:59 (wrap).
+ */
+export function mealPeriodFromMinutes(minutes) {
+    const m = ((Number(minutes) % (24 * 60)) + (24 * 60)) % (24 * 60);
+    if (m >= 4 * 60 && m < 11 * 60) return 'MORNING';
+    if (m >= 11 * 60 && m < 13 * 60) return 'NOON';
+    if (m >= 13 * 60 && m < 18 * 60) return 'AFTERNOON';
+    if (m >= 18 * 60 && m < 22 * 60) return 'EVENING';
+    return 'LATE';
+}
+
+export function getCurrentMealPeriod(date = new Date()) {
+    return mealPeriodFromMinutes(toLocalMinutes(date));
+}
+
+/** Periods whose window has fully ended (AI lock on today). */
+export function getLockedMealPeriods(date = new Date()) {
+    const minutes = toLocalMinutes(date);
+    const current = mealPeriodFromMinutes(minutes);
+    const order = MEAL_PERIODS;
+    const idx = order.indexOf(current);
+    const locked = new Set();
+    for (let i = 0; i < idx; i += 1) locked.add(order[i]);
+    if (current !== 'LATE' && minutes >= 4 * 60) locked.add('LATE');
+    return locked;
+}
+
+export function isFutureMealPeriod(period, date = new Date()) {
+    const order = MEAL_PERIODS;
+    const current = getCurrentMealPeriod(date);
+    const locked = getLockedMealPeriods(date);
+    if (locked.has(period)) return false;
+    return order.indexOf(period) > order.indexOf(current);
+}
+
+export function suggestMealType(date = new Date()) {
+    return periodToMealType(getCurrentMealPeriod(date));
+}
+
+export function getLockedMealTypes(date = new Date()) {
+    const locked = new Set();
+    getLockedMealPeriods(date).forEach((p) => locked.add(periodToMealType(p)));
+    return locked;
+}
+
+/** SNACK → Buổi chiều / Buổi khuya theo giờ; không rõ giờ → Buổi chiều / khuya. */
+export function formatMealTypeLabel(mealType, createdAt) {
+    if (mealType === 'SNACK' && createdAt) {
+        const period = mealPeriodFromMinutes(toLocalMinutes(createdAt));
+        if (period === 'AFTERNOON') return 'Buổi chiều';
+        if (period === 'LATE') return 'Buổi khuya';
+    }
+    return MEAL_TYPE_LABELS[mealType] || mealType || 'Bữa ăn';
+}
+
+/** Group diary into 5 period sections. Prefer persisted mealPeriod (SoT). */
+export function resolveLogMealPeriod(log) {
+    if (log?.mealPeriod && MEAL_PERIODS.includes(log.mealPeriod)) {
+        return log.mealPeriod;
+    }
+    const mealType = log?.mealType;
+    const ts = log?.createdAt || log?.logDate;
+    if (mealType === 'BREAKFAST') return 'MORNING';
+    if (mealType === 'LUNCH') return 'NOON';
+    if (mealType === 'DINNER') return 'EVENING';
+    if (mealType === 'SNACK' && ts) {
+        const period = mealPeriodFromMinutes(toLocalMinutes(ts));
+        if (period === 'AFTERNOON' || period === 'LATE') return period;
+        return period === 'NOON' || period === 'MORNING' ? 'AFTERNOON' : 'LATE';
+    }
+    if (mealType === 'SNACK') return 'AFTERNOON';
+    return 'AFTERNOON';
+}
+
+/**
+ * Mark-eaten gate. LATE spans midnight:
+ * open for planDate=today when hour>=22, or planDate=yesterday when hour<4.
+ */
+export function isMealPeriodOpen(planDate, period, now = new Date()) {
+    if (!planDate || !period) return false;
+    const nowDate = now instanceof Date ? now : new Date(now);
+    if (Number.isNaN(nowDate.getTime())) return false;
+    const today = formatLocalDate(nowDate);
+    const plan = typeof planDate === 'string' ? planDate.slice(0, 10) : formatLocalDate(planDate);
+    const hour = nowDate.getHours();
+
+    if (period === 'LATE') {
+        const y = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate() - 1);
+        const yesterday = formatLocalDate(y);
+        return (plan === today && hour >= 22) || (plan === yesterday && hour < 4);
+    }
+    return plan === today && getCurrentMealPeriod(nowDate) === period;
+}
+
+/** Periods already past today (for makeup select). Empty when hour < 4 (soft UX). */
+export function getPastMealPeriodsForMakeup(date = new Date()) {
+    const minutes = toLocalMinutes(date);
+    if (minutes < 4 * 60) return [];
+    const current = getCurrentMealPeriod(date);
+    const idx = MEAL_PERIODS.indexOf(current);
+    const past = [];
+    for (let i = 0; i < idx; i += 1) past.push(MEAL_PERIODS[i]);
+    if (current !== 'LATE') past.push('LATE');
+    return past;
+}
+
+/** Mirror IntakeControlLoopServiceImpl (calo only). */
+export function computeIntakeStatus(projectedCalories, targetCalories, date = new Date()) {
+    const projected = Number(projectedCalories) || 0;
+    const target = Number(targetCalories) || 0;
+    if (target <= 0) return { intakeStatus: 'OK', controlLoopMessage: null };
+    if (projected > target * 1.2) {
+        return {
+            intakeStatus: 'OVER_MACRO',
+            controlLoopMessage: `Hôm nay bạn đã nạp ${Math.round(projected)} kcal, vượt ~20% mục tiêu ${Math.round(target)} kcal.`,
+        };
+    }
+    const hour = (date instanceof Date ? date : new Date(date)).getHours();
+    if (hour >= 18 && projected < target * 0.5) {
+        return {
+            intakeStatus: 'UNDER_INTAKE',
+            controlLoopMessage: `Hôm nay mới ${Math.round(projected)} kcal — dưới 50% mục tiêu. Hãy bổ sung bữa ăn.`,
+        };
+    }
+    return { intakeStatus: 'OK', controlLoopMessage: null };
+}
+
+export function scaleFoodMacros(food, quantityG) {
+    const serving = Number(food?.servingSizeG) > 0 ? Number(food.servingSizeG) : 100;
+    const qty = Number(quantityG) > 0 ? Number(quantityG) : serving;
+    const ratio = qty / serving;
+    return {
+        calories: Math.round((Number(food?.calories) || 0) * ratio * 100) / 100,
+        protein: Math.round((Number(food?.protein) || 0) * ratio * 100) / 100,
+        carb: Math.round((Number(food?.carb ?? food?.carbs) || 0) * ratio * 100) / 100,
+        fat: Math.round((Number(food?.fat) || 0) * ratio * 100) / 100,
+        quantityG: qty,
+    };
+}
+
+/**
+ * plannedTotals: mealType with active SELF → only SELF; else include PT.
+ * Optional draftItem replaces excludeItemId macros when editing.
+ */
+export function computePlannedTotals(items = [], { draftItem = null, excludeItemId = null } = {}) {
+    const list = Array.isArray(items) ? items : [];
+    const activeSelfByMeal = new Set();
+    list.forEach((i) => {
+        if (i.source !== 'SELF') return;
+        if (i.applied || i.eaten || i.skipReason) return;
+        if (excludeItemId && String(i.id) === String(excludeItemId)) return;
+        activeSelfByMeal.add(i.mealType);
+    });
+    if (draftItem?.mealType) activeSelfByMeal.add(draftItem.mealType);
+
+    let calories = 0;
+    let protein = 0;
+    let carb = 0;
+    let fat = 0;
+
+    list.forEach((i) => {
+        if (i.eaten || i.skipReason || i.applied) return;
+        if (excludeItemId && String(i.id) === String(excludeItemId)) return;
+        if (i.source === 'PT' && activeSelfByMeal.has(i.mealType) && i.sourceType !== 'SELF_OVERRIDE') return;
+        if (i.source === 'SELF' && !activeSelfByMeal.has(i.mealType)) return;
+        calories += Number(i.calories) || 0;
+        protein += Number(i.protein) || 0;
+        carb += Number(i.carb ?? i.carbs) || 0;
+        fat += Number(i.fat) || 0;
+    });
+
+    if (draftItem) {
+        calories += Number(draftItem.calories) || 0;
+        protein += Number(draftItem.protein) || 0;
+        carb += Number(draftItem.carb ?? draftItem.carbs) || 0;
+        fat += Number(draftItem.fat) || 0;
+    }
+
+    return {
+        calories: Math.round(calories * 100) / 100,
+        protein: Math.round(protein * 100) / 100,
+        carb: Math.round(carb * 100) / 100,
+        fat: Math.round(fat * 100) / 100,
+    };
+}
+
+/** Page size for diet log list fetches (documented contract). */
+export const DIET_LOG_PAGE_SIZE = 50;
+/** Safety cap for pagination loops. */
+export const DIET_LOG_MAX_PAGES = 20;
+
+export async function fetchAllDietLogsForRange(dietService, { startDate, endDate }) {
+    const all = [];
+    let page = 0;
+    while (page < DIET_LOG_MAX_PAGES) {
+        const res = await dietService.getLogs({
+            page,
+            size: DIET_LOG_PAGE_SIZE,
+            startDate,
+            endDate,
+        });
+        const data = res.data?.data;
+        const content = data?.content || [];
+        all.push(...content);
+        const last = data?.last === true || content.length < DIET_LOG_PAGE_SIZE;
+        if (last) break;
+        page += 1;
+        if (page >= DIET_LOG_MAX_PAGES) {
+            console.warn('[diet] hit DIET_LOG_MAX_PAGES while fetching logs', { startDate, endDate });
+        }
+    }
+    return all;
+}
+

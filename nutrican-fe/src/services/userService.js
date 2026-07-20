@@ -14,6 +14,7 @@ export const userService = {
   updatePreferences: (data) => api.put('/profile/preferences', data),
   setMaxClients: (maxClients) => api.put('/profile/pt/max-clients', { maxClients }),
   getMacroSuggestion: (params) => api.get('/profile/macro-suggestion', { params }),
+  recalculateMacros: (data) => api.post('/profile/recalculate-macros', data),
   uploadCv: (file) => {
     const formData = new FormData();
     formData.append('file', file);

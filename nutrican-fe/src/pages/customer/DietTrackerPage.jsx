@@ -5,22 +5,49 @@ import { dietService } from '../../services/dietService';
 import PostMealRatingSheet from './components/PostMealRatingSheet';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
-import { RefreshCw, AlertTriangle, X, Send, Clock, CheckCircle2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { RefreshCw, AlertTriangle, X, Send, Clock, CheckCircle2, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
 import useWebSocket from '../../hooks/useWebSocket';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
-import { chatService } from '../../services/chatService';
 
 // Import subcomponents
 import NutritionProgress from './components/NutritionProgress';
 import MealSection from './components/MealSection';
 import FoodInputCard from './components/FoodInputCard';
+import DayPlanCard from './components/DayPlanCard';
 import ConfirmFoodModal from './components/ConfirmFoodModal';
+import DietDateCalendar from './components/DietDateCalendar';
 
-import { getPreviewForSelection, initialAdjustedGrams } from './components/dietUtils';
+import {
+    getPreviewForSelection,
+    initialAdjustedGrams,
+    getCurrentMealPeriod,
+    getLockedMealPeriods,
+    periodToMealType,
+    todayLocalIso,
+    isFutureIso,
+    isTodayIso,
+    formatDisplayDate,
+    addDaysIso,
+    monthKeyFromIso,
+    fetchAllDietLogsForRange,
+} from './components/dietUtils';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const POST_MEAL_PROMPT_KEY = 'nutrican_post_meal_prompt';
+
+function maxPlanDateIso() {
+    return addDaysIso(todayLocalIso(), 14);
+}
+
+/** Past + today + near future (day-plan). Invalid → today. */
+function clampDateParam(raw) {
+    const today = todayLocalIso();
+    if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return today;
+    const max = maxPlanDateIso();
+    if (raw > max) return max;
+    return raw;
+}
 
 function schedulePostMealPrompt(logId) {
     try {
@@ -35,6 +62,24 @@ function schedulePostMealPrompt(logId) {
 
 export default function DietTrackerPage() {
     useWebSocket();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    const initialDate = clampDateParam(searchParams.get('date'));
+    const [selectedDate, setSelectedDate] = useState(initialDate);
+    const [calendarOpen, setCalendarOpen] = useState(false);
+    const [viewingMonth, setViewingMonth] = useState(monthKeyFromIso(initialDate));
+    const [dottedDates, setDottedDates] = useState(() => new Set());
+    const [dotsLoading, setDotsLoading] = useState(false);
+
+    const selectedDateRef = useRef(selectedDate);
+    const viewingMonthRef = useRef(viewingMonth);
+    const calendarOpenRef = useRef(false);
+    const dayFetchSeq = useRef(0);
+    const monthFetchSeq = useRef(0);
+
+    useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);
+    useEffect(() => { viewingMonthRef.current = viewingMonth; }, [viewingMonth]);
+    useEffect(() => { calendarOpenRef.current = calendarOpen; }, [calendarOpen]);
 
     const [logs, setLogs] = useState([]);
     const [summary, setSummary] = useState(null);
@@ -47,15 +92,14 @@ export default function DietTrackerPage() {
     const [inputMode, setInputMode] = useState('ai');
     const fileInputRef = useRef(null);
 
-    const [manualMealType, setManualMealType] = useState('LUNCH');
+    const suggestedPeriod = getCurrentMealPeriod();
+    const [manualMealPeriod, setManualMealPeriod] = useState(suggestedPeriod);
     const [ingredientItems, setIngredientItems] = useState([]);
     const [mealImages, setMealImages] = useState([]);
     const mealImageInputRef = useRef(null);
     const mealImagesRef = useRef([]);
 
-    const [aiMealType, setAiMealType] = useState('LUNCH');
-    const [foodSearchQuery, setFoodSearchQuery] = useState('');
-    const [foodSearchResults, setFoodSearchResults] = useState([]);
+    const [aiMealPeriod, setAiMealPeriod] = useState(suggestedPeriod);
 
     const [isSosModalOpen, setIsSosModalOpen] = useState(false);
     const [sosMessage, setSosMessage] = useState('');
@@ -72,24 +116,101 @@ export default function DietTrackerPage() {
     const [onboardingBanner, setOnboardingBanner] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
 
-    const fetchData = useCallback(async () => {
-        try {
-            setLoading(true);
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const todayStr = `${year}-${month}-${day}`;
+    const isToday = isTodayIso(selectedDate);
+    const isFuture = isFutureIso(selectedDate);
+    // AI + Manual: hôm nay chỉ khung hiện tại
+    const applyAiPeriodLock = isToday;
+    const [makeupForPeriod, setMakeupForPeriod] = useState(null);
 
-            const [logsRes, summaryRes, sosRes, threadsRes] = await Promise.all([
-                dietService.getLogs({ page: 0, size: 10, startDate: todayStr, endDate: todayStr }),
-                dietService.getSummary({ date: todayStr }),
-                dietService.getSosTickets().catch(() => ({ data: { data: [] } })),
-                chatService.getThreads().catch(() => ({ data: { data: [] } })),
-            ]);
-            setLogs(logsRes.data.data.content || []);
-            const rawData = summaryRes.data.data || {};
-            const summaryData = {
+    useEffect(() => {
+        if (!isToday) {
+            setMakeupForPeriod(null);
+            return;
+        }
+        const current = getCurrentMealPeriod();
+        setAiMealPeriod(current);
+        setManualMealPeriod(current);
+        setMakeupForPeriod(null);
+    }, [isToday, selectedDate]);
+
+    useEffect(() => {
+        if (!isToday) return;
+        const locked = getLockedMealPeriods();
+        if (locked.has(aiMealPeriod)) {
+            setAiMealPeriod(getCurrentMealPeriod());
+        }
+        if (locked.has(manualMealPeriod)) {
+            setManualMealPeriod(getCurrentMealPeriod());
+        }
+    }, [isToday, aiMealPeriod, manualMealPeriod]);
+
+    const [plannedTotals, setPlannedTotals] = useState(null);
+    const changeSelectedDate = useCallback((nextIso) => {
+        const clamped = clampDateParam(nextIso);
+        setConfirmModal(null);
+        setSelectedFile(null);
+        setLogs([]);
+        setSummary(null);
+        setSelectedDate(clamped);
+        setViewingMonth(monthKeyFromIso(clamped));
+        setSearchParams((prev) => {
+            const p = new URLSearchParams(prev);
+            const today = todayLocalIso();
+            if (clamped === today) p.delete('date');
+            else p.set('date', clamped);
+            return p;
+        }, { replace: true });
+        if (isTodayIso(clamped)) {
+            const period = getCurrentMealPeriod();
+            setAiMealPeriod(period);
+            setManualMealPeriod(period);
+        }
+    }, [setSearchParams]);
+
+    const fetchMonthDots = useCallback(async (ym) => {
+        const seq = ++monthFetchSeq.current;
+        viewingMonthRef.current = ym;
+        const [y, m] = ym.split('-').map(Number);
+        const startDate = `${ym}-01`;
+        const lastDay = new Date(y, m, 0).getDate();
+        const endDate = `${ym}-${String(lastDay).padStart(2, '0')}`;
+        setDotsLoading(true);
+        try {
+            const logsInMonth = await fetchAllDietLogsForRange(dietService, { startDate, endDate });
+            if (seq !== monthFetchSeq.current || viewingMonthRef.current !== ym) return;
+            const set = new Set();
+            logsInMonth.forEach((log) => {
+                if (log.logDate) set.add(String(log.logDate).slice(0, 10));
+            });
+            setDottedDates(set);
+        } catch (err) {
+            console.error('Error fetching month dots', err);
+        } finally {
+            if (seq === monthFetchSeq.current) setDotsLoading(false);
+        }
+    }, []);
+
+    const fetchDay = useCallback(async (dateIso, { withMeta = false } = {}) => {
+        const seq = ++dayFetchSeq.current;
+        selectedDateRef.current = dateIso;
+        setLoading(true);
+        try {
+            const tasks = [
+                fetchAllDietLogsForRange(dietService, { startDate: dateIso, endDate: dateIso }),
+                dietService.getSummary({ date: dateIso }),
+            ];
+            if (withMeta) {
+                tasks.push(dietService.getSosTickets().catch(() => ({ data: { data: [] } })));
+                tasks.push(profileExtensionsService.hasActivePt().catch(() => ({ data: { data: { hasActivePt: false } } })));
+            }
+            const results = await Promise.all(tasks);
+            if (seq !== dayFetchSeq.current || selectedDateRef.current !== dateIso) return;
+
+            const dayLogs = results[0];
+            const summaryRes = results[1];
+            setLogs(dayLogs);
+            const rawData = summaryRes.data?.data || {};
+            setSummary({
                 date: rawData.date,
                 totalCalories: Number(rawData.totalCalories) || 0,
                 totalProtein: Number(rawData.totalProtein) || 0,
@@ -101,16 +222,24 @@ export default function DietTrackerPage() {
                 targetFat: Number(rawData.targetFat) || 65,
                 intakeStatus: rawData.intakeStatus || 'OK',
                 controlLoopMessage: rawData.controlLoopMessage || null,
-            };
-            setSummary(summaryData);
-            setSosTickets(sosRes.data.data || []);
-            setHasActivePt((threadsRes.data?.data || []).some(t => t.status === 'ACTIVE' || t.status === 'END_REQUESTED'));
+            });
+            if (withMeta) {
+                setSosTickets(results[2]?.data?.data || []);
+                setHasActivePt(Boolean(results[3]?.data?.data?.hasActivePt));
+            }
         } catch (err) {
             console.error('Error fetching diet data:', err);
         } finally {
-            setLoading(false);
+            if (seq === dayFetchSeq.current) setLoading(false);
         }
     }, []);
+
+    const syncAll = useCallback(() => {
+        fetchDay(selectedDateRef.current);
+        if (calendarOpenRef.current) {
+            fetchMonthDots(viewingMonthRef.current);
+        }
+    }, [fetchDay, fetchMonthDots]);
 
     const loadResNetDishes = useCallback(async () => {
         try {
@@ -122,35 +251,30 @@ export default function DietTrackerPage() {
     }, []);
 
     useEffect(() => {
+        fetchDay(selectedDate, { withMeta: true });
+    }, [selectedDate, fetchDay]);
+
+    useEffect(() => {
         let isMounted = true;
         let timeoutId = null;
 
-        const init = async () => {
-            await Promise.all([fetchData(), loadResNetDishes()]);
-        };
-
-        if (isMounted) {
-            init();
-        }
+        loadResNetDishes();
 
         profileExtensionsService.getOnboardingStatus()
             .then((res) => setOnboardingBanner(!!res.data?.data?.showBanner))
             .catch(() => setOnboardingBanner(false));
 
         const handleRealtimeUpdate = (e) => {
-            console.log("🔄 Lệnh Reload đã được gọi từ WebSocket (Phía Học Viên)!", e.type);
-
             if (e.type === 'SOS_RESOLVED' && e.detail) {
-                setSosTickets(prev => prev.map(t =>
+                setSosTickets((prev) => prev.map((t) =>
                     t.id === e.detail.ticketId
                         ? { ...t, status: 'RESOLVED', note: e.detail.note || t.note }
                         : t
                 ));
             }
-
             if (timeoutId) clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
-                if (isMounted) fetchData();
+                if (isMounted) syncAll();
             }, 1000);
         };
 
@@ -167,7 +291,13 @@ export default function DietTrackerPage() {
             window.removeEventListener('DIET_LOG_REVIEWED', handleRealtimeUpdate);
             window.removeEventListener('SOS_RESOLVED', handleRealtimeUpdate);
         };
-    }, [fetchData, loadResNetDishes]);
+    }, [loadResNetDishes, syncAll]);
+
+    useEffect(() => {
+        if (calendarOpen) {
+            fetchMonthDots(viewingMonth);
+        }
+    }, [calendarOpen, viewingMonth, fetchMonthDots]);
 
     useEffect(() => {
         const checkPrompt = () => {
@@ -185,27 +315,6 @@ export default function DietTrackerPage() {
         const id = setInterval(checkPrompt, 60000);
         return () => clearInterval(id);
     }, []);
-
-    const searchFoods = async (q) => {
-        setFoodSearchQuery(q);
-        if (!q || q.length < 2) {
-            setFoodSearchResults([]);
-            return;
-        }
-        try {
-            const res = await dietService.searchFoods(q, { dietFilter: dietFilterOn });
-            setFoodSearchResults(res.data.data || []);
-        } catch (err) {
-            console.error('Food search failed', err);
-        }
-    };
-
-    useEffect(() => {
-        if (!foodSearchQuery || foodSearchQuery.length < 2) return undefined;
-        const timeoutId = setTimeout(() => searchFoods(foodSearchQuery), 0);
-        return () => clearTimeout(timeoutId);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dietFilterOn]);
 
     useEffect(() => {
         mealImagesRef.current = mealImages;
@@ -299,8 +408,6 @@ export default function DietTrackerPage() {
                 fat: baseFat * ratio,
             },
         ]);
-        setFoodSearchQuery('');
-        setFoodSearchResults([]);
     };
 
     const updateIngredientQty = (idx, qty) => {
@@ -360,8 +467,11 @@ export default function DietTrackerPage() {
             setAnalyzing(true);
             const formData = new FormData();
             formData.append('file', selectedFile);
-            formData.append('meal_type', aiMealType);
+            formData.append('meal_type', periodToMealType(aiMealPeriod));
+            formData.append('meal_period', aiMealPeriod);
+            if (makeupForPeriod) formData.append('makeup_for_period', makeupForPeriod);
             formData.append('mealSource', 'HOME_COOKED');
+            formData.append('log_date', selectedDate);
 
             const res = await dietService.analyzeMeal(formData);
             const analyzed = res.data.data;
@@ -401,7 +511,8 @@ export default function DietTrackerPage() {
                 logId: analyzed.logId,
                 confirmed: false,
                 topPredictions: safeTopPredictions,
-                selectedFoodCode: selectedCode,
+                selectedFood: { type: 'code', value: selectedCode },
+                selectedDish: null,
                 portionRatio: analyzed?.portionRatio ?? 1,
                 portionSize: analyzed?.portionSize,
                 adjustedGrams: adjustedGramsSafe,
@@ -456,7 +567,8 @@ export default function DietTrackerPage() {
             confirmed: false,
             isEditing: true,
             topPredictions: safeTopPredictions,
-            selectedFoodCode: selectedCode,
+            selectedFood: { type: 'code', value: selectedCode },
+            selectedDish: null,
             portionRatio: raw.portionRatio ?? 1,
             portionSize: raw.portionSize,
             adjustedGrams: currentGrams,
@@ -506,8 +618,11 @@ export default function DietTrackerPage() {
         try {
             setUploading(true);
             const newLogId = await createAndSendMeal({
-                mealType: manualMealType,
+                mealType: periodToMealType(manualMealPeriod),
+                mealPeriod: manualMealPeriod,
+                makeupForPeriod: makeupForPeriod || undefined,
                 mealSource: 'HOME_COOKED',
+                logDate: selectedDate,
                 items: ingredientItems.map((it) => ({
                     foodItemId: it.foodItemId,
                     quantityG: it.quantityG,
@@ -516,8 +631,9 @@ export default function DietTrackerPage() {
             toast.success('Đã gửi bữa ăn cho PT duyệt!');
             if (newLogId && hasActivePt) schedulePostMealPrompt(newLogId);
             setIngredientItems([]);
+            setMakeupForPeriod(null);
             clearMealImages();
-            fetchData();
+            syncAll();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Gửi bữa ăn thất bại');
         } finally {
@@ -529,7 +645,7 @@ export default function DietTrackerPage() {
         try {
             await dietService.deleteLog(logId);
             toast.success('Đã xóa bữa ăn thành công');
-            fetchData();
+            syncAll();
         } catch (err) {
             console.error(err);
             toast.error('Không thể xóa bữa ăn');
@@ -554,39 +670,47 @@ export default function DietTrackerPage() {
     };
 
     const handleConfirmRecognition = async () => {
-        if (!confirmModal?.logId || !confirmModal?.selectedFoodCode) return;
+        const selected = confirmModal?.selectedFood;
+        if (!confirmModal?.logId || !selected?.value) return;
+        if (confirmingFood) return;
         try {
             setConfirmingFood(true);
 
             let res;
             if (confirmModal.isEditing) {
-                const preview = getPreviewForSelection(
-                    confirmModal.selectedFoodCode,
-                    confirmModal.topPredictions,
-                    resnetDishes,
-                    confirmModal.adjustedGrams
-                );
+                const code = selected.type === 'code' ? selected.value : null;
+                const preview = code
+                    ? getPreviewForSelection(
+                        code,
+                        confirmModal.topPredictions,
+                        resnetDishes,
+                        confirmModal.adjustedGrams
+                    )
+                    : null;
+                const dish = confirmModal.selectedDish;
                 res = await dietService.updateLog(confirmModal.logId, {
-                    foodDescription: preview?.foodName || confirmModal.foodName,
-                    foodCode: confirmModal.selectedFoodCode,
+                    foodDescription: preview?.foodName || dish?.nameVi || confirmModal.foodName,
+                    foodCode: code || undefined,
+                    foodItemId: selected.type === 'id' ? selected.value : undefined,
                     portionGrams: confirmModal.adjustedGrams,
-                    calories: preview?.calories ?? confirmModal.calories,
-                    protein: preview?.protein ?? confirmModal.protein,
-                    carb: preview?.carb ?? confirmModal.carb,
-                    fat: preview?.fat ?? confirmModal.fat,
+                    calories: preview?.calories ?? dish?.calories ?? confirmModal.calories,
+                    protein: preview?.protein ?? dish?.protein ?? confirmModal.protein,
+                    carb: preview?.carb ?? dish?.carb ?? confirmModal.carb,
+                    fat: preview?.fat ?? dish?.fat ?? confirmModal.fat,
                     sendToPt: true,
                 });
             } else {
-                res = await dietService.confirmRecognition(
-                    confirmModal.logId,
-                    confirmModal.selectedFoodCode,
-                    confirmModal.adjustedGrams,
-                    true
-                );
+                res = await dietService.confirmRecognition(confirmModal.logId, {
+                    foodCode: selected.type === 'code' ? selected.value : undefined,
+                    foodItemId: selected.type === 'id' ? selected.value : undefined,
+                    portionGrams: confirmModal.adjustedGrams,
+                    sendToPt: true,
+                });
             }
 
             const data = res.data?.data;
-            toast.success('Đã gửi bữa ăn cho PT duyệt!');
+            const pending = data?.reviewStatus === 'PENDING';
+            toast.success(pending ? 'Đã gửi bữa ăn cho PT duyệt!' : 'Đã lưu bữa ăn!');
             if (confirmModal.logId && hasActivePt) schedulePostMealPrompt(confirmModal.logId);
             if (data?.dietPrefWarning) {
                 toast.warning(data.dietPrefWarning);
@@ -596,11 +720,26 @@ export default function DietTrackerPage() {
                 toast.info(data.controlLoopMessage);
             }
             setConfirmModal(null);
-            fetchData();
+            syncAll();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Không thể gửi bữa ăn');
         } finally {
             setConfirmingFood(false);
+        }
+    };
+
+    const handleSwitchConfirmToManual = async () => {
+        const logId = confirmModal?.logId;
+        const isEditing = confirmModal?.isEditing;
+        setConfirmModal(null);
+        setInputMode('manual');
+        if (logId && !isEditing) {
+            try {
+                await dietService.deleteLog(logId);
+                toast.info('Đã chuyển sang nhập thủ công');
+            } catch {
+                toast.error('Không thể hủy bản nháp AI');
+            }
         }
     };
 
@@ -619,7 +758,7 @@ export default function DietTrackerPage() {
             setIsSosModalOpen(false);
             setSosMessage('');
             setSosDietLogId(null);
-            fetchData();
+            syncAll();
         } catch (error) {
             console.error(error);
             toast.error('Lỗi khi gửi yêu cầu SOS');
@@ -644,20 +783,74 @@ export default function DietTrackerPage() {
                 <div>
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-sans">Nhật Ký Dinh Dưỡng</h1>
                     <p className="text-slate-500 mt-1 font-medium">Phân tích bữa ăn tức thì và đạt mục tiêu hàng ngày.</p>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => changeSelectedDate(addDaysIso(selectedDate, -1))}
+                            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                            aria-label="Ngày trước"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setViewingMonth(monthKeyFromIso(selectedDate));
+                                setCalendarOpen(true);
+                            }}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-800"
+                        >
+                            <CalendarDays className="w-4 h-4 text-blue-600" />
+                            {isToday ? 'Hôm nay' : formatDisplayDate(selectedDate)}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const next = addDaysIso(selectedDate, 1);
+                                if (next <= maxPlanDateIso()) changeSelectedDate(next);
+                            }}
+                            disabled={selectedDate >= maxPlanDateIso()}
+                            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                            aria-label="Ngày sau"
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                        {!isToday && (
+                            <button
+                                type="button"
+                                onClick={() => changeSelectedDate(todayLocalIso())}
+                                className="text-xs font-bold text-blue-600 hover:underline px-2"
+                            >
+                                Về hôm nay
+                            </button>
+                        )}
+                    </div>
                 </div>
-                <Button onClick={fetchData} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl">
+                <Button onClick={syncAll} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl">
                     <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Đồng bộ dữ liệu
                 </Button>
             </div>
 
+            <DietDateCalendar
+                open={calendarOpen}
+                onClose={() => setCalendarOpen(false)}
+                selectedDate={selectedDate}
+                onSelectDate={changeSelectedDate}
+                viewingMonth={viewingMonth}
+                onViewingMonthChange={setViewingMonth}
+                dottedDates={dottedDates}
+                dotsLoading={dotsLoading}
+            />
+
             <div className="grid lg:grid-cols-12 gap-8">
                 {/* Cột trái: Nhập liệu & Nhật ký hành trình */}
                 <div className="lg:col-span-8 space-y-8">
+                    {!isFuture && (
                     <FoodInputCard
                         inputMode={inputMode}
                         setInputMode={setInputMode}
-                        aiMealType={aiMealType}
-                        setAiMealType={setAiMealType}
+                        aiMealPeriod={aiMealPeriod}
+                        setAiMealPeriod={setAiMealPeriod}
                         dragActive={dragActive}
                         setDragActive={setDragActive}
                         selectedFile={selectedFile}
@@ -665,11 +858,10 @@ export default function DietTrackerPage() {
                         handleAnalyze={handleAnalyze}
                         fileInputRef={fileInputRef}
                         handleFileSelect={handleFileSelect}
-                        manualMealType={manualMealType}
-                        setManualMealType={setManualMealType}
-                        foodSearchQuery={foodSearchQuery}
-                        foodSearchResults={foodSearchResults}
-                        searchFoods={searchFoods}
+                        manualMealPeriod={manualMealPeriod}
+                        setManualMealPeriod={setManualMealPeriod}
+                        makeupForPeriod={makeupForPeriod}
+                        setMakeupForPeriod={setMakeupForPeriod}
                         addIngredientFromSearch={addIngredientFromSearch}
                         ingredientItems={ingredientItems}
                         updateIngredientQty={updateIngredientQty}
@@ -685,15 +877,38 @@ export default function DietTrackerPage() {
                         uploading={uploading}
                         dietFilterOn={dietFilterOn}
                         setDietFilterOn={setDietFilterOn}
+                        applyAiPeriodLock={applyAiPeriodLock}
+                        hasActivePt={hasActivePt}
+                    />
+                    )}
+                    {isFuture && (
+                        <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500 font-medium">
+                            Không thể ghi nhật ký cho ngày trong tương lai.
+                        </div>
+                    )}
+
+                    <DayPlanCard
+                        selectedDate={selectedDate}
+                        dietFilterOn={dietFilterOn}
+                        targetCalories={summary?.targetCalories}
+                        summary={summary}
+                        hasActivePt={hasActivePt}
+                        isFuture={isFuture}
+                        onLogged={() => fetchDay(selectedDate)}
+                        onPlannedTotalsChange={setPlannedTotals}
                     />
 
                     <div className="space-y-5">
                         <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <Clock className="w-5 h-5 text-slate-400" /> Nhật ký hôm nay
+                            <Clock className="w-5 h-5 text-slate-400" />
+                            {isToday ? 'Nhật ký hôm nay' : `Nhật ký ngày ${formatDisplayDate(selectedDate)}`}
                         </h3>
                         <MealSection
                             logs={logs}
                             loading={loading}
+                            emptyMessage={isToday
+                                ? 'Hôm nay chưa có bữa ăn nào được ghi nhận.'
+                                : 'Ngày này chưa có bữa ăn nào được ghi nhận.'}
                             handleEditLog={handleEditLog}
                             handleDelete={handleDelete}
                             onPreviewImage={setLightboxImage}
@@ -707,7 +922,12 @@ export default function DietTrackerPage() {
 
                 {/* Cột phải: Thống kê calo & Yêu cầu SOS */}
                 <div className="lg:col-span-4 space-y-6">
-                    <NutritionProgress summary={summary} />
+                    <NutritionProgress
+                        summary={summary}
+                        plannedTotals={plannedTotals}
+                        isToday={isToday}
+                        isFuture={isFuture}
+                    />
 
                     {sosTickets.length > 0 && (
                         <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
@@ -796,6 +1016,7 @@ export default function DietTrackerPage() {
                 handleCancelConfirmation={handleCancelConfirmation}
                 handleConfirmRecognition={handleConfirmRecognition}
                 setConfirmModal={setConfirmModal}
+                onSwitchToManual={handleSwitchConfirmToManual}
             />
 
             <PostMealRatingSheet

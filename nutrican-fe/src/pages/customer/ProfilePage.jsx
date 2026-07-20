@@ -44,7 +44,7 @@ const REFUND_REASONS = [
 ];
 
 const MEAL_TYPE_LABEL = {
-  BREAKFAST: 'Sáng', LUNCH: 'Trưa', DINNER: 'Tối', SNACK: 'Phụ',
+  BREAKFAST: 'Buổi sáng', LUNCH: 'Buổi trưa', DINNER: 'Buổi tối', SNACK: 'Buổi chiều / khuya',
 };
 
 const APPT_STATUS_LABEL = {
