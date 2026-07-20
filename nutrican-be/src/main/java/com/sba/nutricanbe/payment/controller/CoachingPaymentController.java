@@ -3,6 +3,7 @@ package com.sba.nutricanbe.payment.controller;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.payment.dto.CoachingPaymentResult;
 import com.sba.nutricanbe.payment.dto.CreateCoachingPaymentResponse;
+import com.sba.nutricanbe.payment.dto.VnPayIpnResponse;
 import com.sba.nutricanbe.payment.service.CoachingPaymentService;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.entity.User;
@@ -63,6 +64,16 @@ public class CoachingPaymentController {
                 .encode()
                 .toUriString();
         response.sendRedirect(redirectUrl);
+    }
+
+    /**
+     * Server-to-server Instant Payment Notification from VNPay.
+     * Configure this URL on the merchant portal (and optionally via {@code VNPAY_IPN_URL}).
+     */
+    @GetMapping("/vnpay/ipn")
+    public ResponseEntity<VnPayIpnResponse> handleVnPayIpn(
+            @RequestParam Map<String, String> params) {
+        return ResponseEntity.ok(paymentService.processVnPayIpn(params));
     }
 
     @PostMapping("/escrows/{mappingId}/release")

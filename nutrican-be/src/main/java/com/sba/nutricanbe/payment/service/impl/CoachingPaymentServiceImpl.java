@@ -5,6 +5,7 @@ import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.payment.config.VNPayConfig;
 import com.sba.nutricanbe.payment.dto.CoachingPaymentResult;
 import com.sba.nutricanbe.payment.dto.CreateCoachingPaymentResponse;
+import com.sba.nutricanbe.payment.dto.VnPayIpnResponse;
 import com.sba.nutricanbe.payment.entity.Payment;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentMethod;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentStatus;
@@ -40,6 +41,8 @@ import java.util.UUID;
 public class CoachingPaymentServiceImpl implements CoachingPaymentService {
 
     private static final DateTimeFormatter ORDER_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
+    /** Grace after attempt expiresAt for late browser return / IPN. */
+    private static final int PAYMENT_ATTEMPT_GRACE_MINUTES = 15;
 
     private final CoachingPaymentRepository paymentRepository;
     private final PtClientMappingRepository mappingRepository;
@@ -161,16 +164,24 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         boolean successful = "00".equals(responseCode)
                 && (transactionStatus == null || "00".equals(transactionStatus));
         if (!successful) {
-            if (payment.getStatus() == CoachingPaymentStatus.PENDING) {
+            if (payment.getStatus() == CoachingPaymentStatus.PENDING
+                    || payment.getStatus() == CoachingPaymentStatus.CANCELLED) {
                 payment.setStatus(CoachingPaymentStatus.FAILED);
             }
             paymentRepository.save(payment);
-            return result(payment, mapping, false, "VNPay payment was not successful");
+            return result(payment, mapping, false, failureMessage(responseCode));
         }
 
         if (payment.getStatus() != CoachingPaymentStatus.PENDING
                 && payment.getStatus() != CoachingPaymentStatus.CANCELLED) {
             return result(payment, mapping, false, "Payment attempt is no longer payable");
+        }
+        if (isAttemptExpiredBeyondGrace(payment)) {
+            if (payment.getStatus() == CoachingPaymentStatus.PENDING) {
+                payment.setStatus(CoachingPaymentStatus.CANCELLED);
+                paymentRepository.save(payment);
+            }
+            return result(payment, mapping, false, "Payment attempt has expired");
         }
         if (paymentRepository.existsByMapping_IdAndStatus(
                 mapping.getId(), CoachingPaymentStatus.SUCCESS)) {
@@ -191,6 +202,45 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         mappingRepository.save(mapping);
         notifyPaymentSuccessAfterCommit(mapping, payment);
         return result(payment, mapping, true, "Coaching payment completed");
+    }
+
+    @Override
+    @Transactional
+    public VnPayIpnResponse processVnPayIpn(Map<String, String> params) {
+        try {
+            CoachingPaymentResult result = processVnPayCallback(params);
+            if (result.isSuccess() && "Payment already processed".equals(result.getMessage())) {
+                return VnPayIpnResponse.of("02", "Order already confirmed");
+            }
+            return VnPayIpnResponse.of("00", "Confirm Success");
+        } catch (ResourceNotFoundException exception) {
+            return VnPayIpnResponse.of("01", "Order not found");
+        } catch (BadRequestException exception) {
+            String message = exception.getMessage() == null ? "" : exception.getMessage();
+            if (message.contains("checksum") || message.contains("merchant code")) {
+                return VnPayIpnResponse.of("97", "Invalid Checksum");
+            }
+            return VnPayIpnResponse.of("00", "Confirm Success");
+        } catch (RuntimeException exception) {
+            log.warn("VNPay IPN processing failed", exception);
+            return VnPayIpnResponse.of("99", "Unknown error");
+        }
+    }
+
+    private boolean isAttemptExpiredBeyondGrace(Payment payment) {
+        if (payment.getExpiresAt() == null) {
+            return false;
+        }
+        return payment.getExpiresAt()
+                .plusMinutes(PAYMENT_ATTEMPT_GRACE_MINUTES)
+                .isBefore(LocalDateTime.now());
+    }
+
+    private String failureMessage(String responseCode) {
+        if ("24".equals(responseCode)) {
+            return "Bạn đã hủy thanh toán. Có thể thử lại.";
+        }
+        return "VNPay payment was not successful";
     }
 
     private void notifyPaymentSuccessAfterCommit(PtClientMapping mapping, Payment payment) {

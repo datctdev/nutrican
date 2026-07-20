@@ -106,6 +106,22 @@ export default function PtDetailPage() {
         return () => window.removeEventListener('hire_request_updated', refreshHireState);
     }, [fetchAllData]);
 
+    useEffect(() => {
+        const resetPaying = () => setPaying(false);
+        const onPageShow = (event) => {
+            if (event.persisted) resetPaying();
+        };
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') resetPaying();
+        };
+        window.addEventListener('pageshow', onPageShow);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            window.removeEventListener('pageshow', onPageShow);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, []);
+
     const handleReviewImageSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;

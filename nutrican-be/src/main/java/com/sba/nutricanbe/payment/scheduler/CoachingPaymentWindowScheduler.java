@@ -36,8 +36,8 @@ public class CoachingPaymentWindowScheduler {
                     .findFirstByMapping_IdAndStatusOrderByCreatedAtDesc(
                             mapping.getId(), CoachingPaymentStatus.PENDING);
             boolean callbackStillExpected = pendingPayment
-                    .map(payment -> payment.getExpiresAt().plusMinutes(5)
-                            .isAfter(LocalDateTime.now()))
+                    .map(payment -> payment.getExpiresAt() != null
+                            && payment.getExpiresAt().plusMinutes(5).isAfter(LocalDateTime.now()))
                     .orElse(false);
             if (callbackStillExpected) {
                 continue;
@@ -59,6 +59,21 @@ public class CoachingPaymentWindowScheduler {
                     mapping.getClient().getId(), "HIRE_PAYMENT_EXPIRED", payload);
             webSocketSessionService.sendToUser(
                     mapping.getPt().getId(), "HIRE_PAYMENT_EXPIRED", payload);
+        }
+    }
+
+    /**
+     * Cancels abandoned VNPay attempts after {@code Payment.expiresAt}
+     * (e.g. user opened VNPay then pressed back / closed the tab).
+     */
+    @Scheduled(cron = "${app.payment.attempt-expiry-scan-cron:0 */5 * * * *}")
+    @Transactional
+    public void expireStalePaymentAttempts() {
+        List<Payment> staleAttempts = paymentRepository.findByStatusAndExpiresAtBefore(
+                CoachingPaymentStatus.PENDING, LocalDateTime.now());
+        for (Payment payment : staleAttempts) {
+            payment.setStatus(CoachingPaymentStatus.CANCELLED);
+            paymentRepository.save(payment);
         }
     }
 }

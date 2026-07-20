@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,4 +27,7 @@ public interface CoachingPaymentRepository extends JpaRepository<Payment, UUID> 
 
     Optional<Payment> findFirstByMapping_IdAndStatusOrderByCreatedAtDesc(
             UUID mappingId, CoachingPaymentStatus status);
+
+    List<Payment> findByStatusAndExpiresAtBefore(
+            CoachingPaymentStatus status, LocalDateTime expiresAt);
 }

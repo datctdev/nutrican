@@ -73,8 +73,26 @@ export default function CoachingPage() {
     } else {
       toast.error(searchParams.get('message') || 'Thanh toán chưa thành công. Bạn có thể thử lại.');
     }
+    setStartingPayment(false);
     navigate('/coaching', { replace: true });
   }, [navigate, searchParams]);
+
+  // Reset pay button if user returns via browser back/forward cache from VNPay.
+  useEffect(() => {
+    const resetPaymentUi = () => setStartingPayment(false);
+    const onPageShow = (event) => {
+      if (event.persisted) resetPaymentUi();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') resetPaymentUi();
+    };
+    window.addEventListener('pageshow', onPageShow);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pageshow', onPageShow);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
   
   useWebSocket();
 

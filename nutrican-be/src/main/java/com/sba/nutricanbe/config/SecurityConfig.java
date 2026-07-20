@@ -54,9 +54,10 @@ public class SecurityConfig {
                         // Password reset endpoints — public
                         .requestMatchers("/api/v1/auth/forgot-password").permitAll()
                         .requestMatchers("/api/v1/auth/reset-password").permitAll()
-                        // VNPay redirects the customer's browser here after payment.
+                        // VNPay browser return + server-to-server IPN.
                         .requestMatchers(HttpMethod.GET,
-                                "/api/v1/payment/vnpay/return").permitAll()
+                                "/api/v1/payment/vnpay/return",
+                                "/api/v1/payment/vnpay/ipn").permitAll()
                         // SSE endpoint
                         .requestMatchers("/api/v1/workspace/stream").authenticated()
                         // MỞ KHÓA HOÀN TOÀN ĐƯỜNG TRUYỀN WEBSOCKET TẠI ĐÂY

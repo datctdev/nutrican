@@ -34,6 +34,9 @@ public class CoachingVnPayServiceImpl implements CoachingVnPayService {
         params.put("vnp_OrderType", "other");
         params.put("vnp_Amount", payment.getAmount().multiply(BigDecimal.valueOf(100)).toBigInteger().toString());
         params.put("vnp_ReturnUrl", vnPayConfig.getReturnUrl());
+        if (vnPayConfig.getIpnUrl() != null && !vnPayConfig.getIpnUrl().isBlank()) {
+            params.put("vnp_IpnUrl", vnPayConfig.getIpnUrl());
+        }
         params.put("vnp_IpAddr", "127.0.0.1");
         params.put("vnp_CreateDate", now.format(VNP_TIME));
         params.put("vnp_CurrCode", "VND");
