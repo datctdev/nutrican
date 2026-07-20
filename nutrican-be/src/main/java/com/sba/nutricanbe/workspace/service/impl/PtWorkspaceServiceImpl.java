@@ -471,6 +471,11 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .statusColor(statusColor)
                 .mappingStatus(mapping.getStatus() != null ? mapping.getStatus().name() : null)
                 .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
+                .selectedTrainingMode(mapping.getSelectedTrainingMode() != null
+                        ? mapping.getSelectedTrainingMode().name() : null)
+                .agreedAmount(mapping.getAgreedAmount())
+                .agreedRateUnit(mapping.getAgreedRateUnit())
+                .paymentDueAt(mapping.getPaymentDueAt())
                 .lastLogTime("N/A")
                 .avgCalories(BigDecimal.valueOf(1800.0))
                 .build();
@@ -1047,7 +1052,8 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     }
 
     private void requirePtClientDataAccess(UUID ptId, UUID clientId) {
-        PtClientMapping mapping = mappingRepository.findByPt_IdAndClient_Id(ptId, clientId)
+        PtClientMapping mapping = mappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, clientId)
                 .orElseThrow(() -> new BadRequestException("No mapping with this client"));
         if (mapping.getStatus() == ClientMappingStatus.INACTIVE
                 || mapping.getStatus() == ClientMappingStatus.PENDING) {

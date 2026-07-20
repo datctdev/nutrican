@@ -167,7 +167,9 @@ public class NotificationServiceImpl implements NotificationService {
             case "SOS_ESCALATED" -> "SOS quá hạn";
             case "HIRE_RESULT", "HIRE_ACCEPTED" -> "PT chấp nhận yêu cầu thuê";
             case "HIRE_REJECTED" -> "PT từ chối yêu cầu thuê";
+            case "HIRE_PAYMENT_EXPIRED" -> "Yêu cầu coaching hết hạn thanh toán";
             case "COACHING_END_REQUESTED" -> "Yêu cầu kết thúc coaching";
+            case "COACHING_COMPLETED" -> "Coaching đã hoàn tất";
             case "REFUND_UPDATE" -> "Cập nhật hoàn tiền";
             case "WEEKLY_SUMMARY" -> "Tổng kết tuần";
             case "CHAT_MESSAGE" -> "Tin nhắn mới";
@@ -182,9 +184,10 @@ public class NotificationServiceImpl implements NotificationService {
             case "NEW_DIET_LOG", "DIET_LOG_REVIEWED" -> NotificationLinkType.DIET_LOG;
             case "CHAT_MESSAGE" -> NotificationLinkType.CHAT;
             case "SOS", "SOS_RESOLVED", "SOS_ESCALATED" -> NotificationLinkType.SOS;
-            case "HIRE_RESULT", "HIRE_ACCEPTED", "HIRE_REJECTED" -> NotificationLinkType.HIRE;
+            case "HIRE_RESULT", "HIRE_ACCEPTED", "HIRE_REJECTED", "HIRE_PAYMENT_EXPIRED" ->
+                    NotificationLinkType.HIRE;
             case "REFUND_UPDATE" -> NotificationLinkType.REFUND;
-            case "COACHING_END_REQUESTED" -> NotificationLinkType.OTHER;
+            case "COACHING_END_REQUESTED", "COACHING_COMPLETED" -> NotificationLinkType.HIRE;
             case "BODY_METRIC_REMINDER" -> NotificationLinkType.OTHER;
             case "WEEKLY_SUMMARY" -> NotificationLinkType.WEEKLY_SUMMARY;
             default -> NotificationLinkType.OTHER;

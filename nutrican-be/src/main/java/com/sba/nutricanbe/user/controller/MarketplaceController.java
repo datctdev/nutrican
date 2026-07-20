@@ -8,6 +8,7 @@ import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.dto.PtProfileResponse;
 import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
+import com.sba.nutricanbe.user.dto.HirePtRequest;
 import com.sba.nutricanbe.user.service.MarketplaceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -86,8 +87,15 @@ public class MarketplaceController {
     @PostMapping("/pts/{ptId}/hire")
     public ResponseEntity<ApiResponse<PtClientMappingResponse>> hirePt(
             @PathVariable UUID ptId,
+            @Valid @RequestBody HirePtRequest request,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(marketplaceService.hirePt(ptId, user.getId()));
+        return ResponseEntity.ok(marketplaceService.hirePt(ptId, user.getId(), request));
+    }
+
+    @GetMapping("/hire-requests/open")
+    public ResponseEntity<ApiResponse<PtClientMappingResponse>> getOpenHireRequest(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(marketplaceService.getOpenHireRequest(user.getId()));
     }
 
     @PutMapping(value = "/pts/{ptId}/reviews/{reviewId}", consumes = "multipart/form-data")

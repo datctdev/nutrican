@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -26,6 +27,12 @@ public class PtClientMappingResponse {
     private ClientMappingStatus status;
     private LocalDateTime assignedAt;
     private String endRequestedBy;
+    private String selectedTrainingMode;
+    private BigDecimal agreedAmount;
+    private String agreedRateUnit;
+    private LocalDateTime acceptedAt;
+    private LocalDateTime paymentDueAt;
+    private LocalDateTime coachingStartedAt;
 
 
     public static PtClientMappingResponse toMappingResponse(PtClientMapping mapping) {
@@ -42,6 +49,13 @@ public class PtClientMappingResponse {
                 .status(mapping.getStatus())
                 .assignedAt(mapping.getAssignedAt())
                 .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
+                .selectedTrainingMode(mapping.getSelectedTrainingMode() != null
+                        ? mapping.getSelectedTrainingMode().name() : null)
+                .agreedAmount(mapping.getAgreedAmount())
+                .agreedRateUnit(mapping.getAgreedRateUnit())
+                .acceptedAt(mapping.getAcceptedAt())
+                .paymentDueAt(mapping.getPaymentDueAt())
+                .coachingStartedAt(mapping.getCoachingStartedAt())
                 .build();
     }
 }

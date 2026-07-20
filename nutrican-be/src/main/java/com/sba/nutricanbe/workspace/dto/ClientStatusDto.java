@@ -21,4 +21,8 @@ public class ClientStatusDto {
     private String lastLogTime;
     private java.math.BigDecimal avgCalories;
     private String endRequestedBy;
+    private String selectedTrainingMode;
+    private java.math.BigDecimal agreedAmount;
+    private String agreedRateUnit;
+    private java.time.LocalDateTime paymentDueAt;
 }

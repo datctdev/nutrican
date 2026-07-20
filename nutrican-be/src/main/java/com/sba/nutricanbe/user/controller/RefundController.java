@@ -13,15 +13,16 @@ import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.enums.TerminationReason;
 import com.sba.nutricanbe.user.repository.RefundRequestRepository;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
+import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,24 +35,41 @@ public class RefundController {
     private final RefundRequestRepository refundRepository;
     private final PtClientMappingRepository mappingRepository;
     private final WebSocketSessionService webSocketSessionService;
+    private final CoachingWalletService coachingWalletService;
 
     @PostMapping("/api/v1/refunds")
     @PreAuthorize("hasRole('CUSTOMER')")
+    @Transactional
     public ResponseEntity<ApiResponse<RefundRequest>> requestRefund(
             @AuthenticationPrincipal User customer,
             @RequestBody RefundCreateRequest request) {
-        PtClientMapping mapping = mappingRepository.findById(request.getMappingId())
+        if (request.getMappingId() == null || request.getReason() == null) {
+            throw new BadRequestException("mappingId and refund reason are required");
+        }
+        PtClientMapping mapping = mappingRepository.findByIdForUpdate(request.getMappingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Mapping", request.getMappingId()));
         if (!mapping.getClient().getId().equals(customer.getId())) {
             throw new BadRequestException("Not your mapping");
         }
-        long days = ChronoUnit.DAYS.between(mapping.getCreatedAt(), LocalDateTime.now());
-        if (days > 7) {
+        if (mapping.getStatus() != ClientMappingStatus.ACTIVE
+                && mapping.getStatus() != ClientMappingStatus.END_REQUESTED) {
+            throw new BadRequestException("Only active paid coaching can be refunded");
+        }
+        LocalDateTime refundStart = mapping.getCoachingStartedAt() != null
+                ? mapping.getCoachingStartedAt() : mapping.getCreatedAt();
+        if (LocalDateTime.now().isAfter(refundStart.plusDays(7))) {
             throw new BadRequestException("Refund period expired");
         }
-        RefundStatus status = (request.getReason() == RefundReason.PT_CANCEL
-                || request.getReason() == RefundReason.PT_NO_RESPONSE)
-                ? RefundStatus.AUTO_APPROVED : RefundStatus.PENDING_REVIEW;
+        if (refundRepository.existsByMappingIdAndStatus(
+                mapping.getId(), RefundStatus.PENDING_REVIEW)) {
+            throw new BadRequestException("A refund request is already pending review");
+        }
+        // A customer-selected reason is a claim, not system evidence. Keep the
+        // escrow held until an admin verifies and approves the request.
+        if (!coachingWalletService.markEscrowDisputedIfPresent(mapping.getId())) {
+            throw new BadRequestException("No held coaching payment is available for refund");
+        }
+        RefundStatus status = RefundStatus.PENDING_REVIEW;
         RefundRequest refund = refundRepository.save(RefundRequest.builder()
                 .mappingId(mapping.getId())
                 .customerId(customer.getId())
@@ -60,12 +78,7 @@ public class RefundController {
                 .note(request.getNote())
                 .status(status)
                 .build());
-        if (status == RefundStatus.AUTO_APPROVED) {
-            mapping.setStatus(ClientMappingStatus.INACTIVE);
-            mapping.setTerminationReason(TerminationReason.REFUND);
-            mappingRepository.save(mapping);
-            notifyRefund(mapping.getClient().getId(), mapping.getPt().getId(), refund, "AUTO_APPROVED");
-        }
+        notifyRefund(mapping.getClient().getId(), mapping.getPt().getId(), refund, "PENDING_REVIEW");
         return ResponseEntity.ok(ApiResponse.success(refund, "Refund request submitted"));
     }
 
@@ -77,26 +90,42 @@ public class RefundController {
 
     @PutMapping("/api/v1/admin/refunds/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public ResponseEntity<ApiResponse<RefundRequest>> reviewRefund(
             @PathVariable UUID id,
             @RequestBody RefundReviewRequest request) {
-        RefundRequest refund = refundRepository.findById(id)
+        if (request == null || request.getAction() == null) {
+            throw new BadRequestException("Refund action is required");
+        }
+        RefundRequest refund = refundRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Refund", id));
+        if (refund.getStatus() != RefundStatus.PENDING_REVIEW) {
+            throw new BadRequestException("Only pending refund requests can be reviewed");
+        }
         if ("APPROVE".equalsIgnoreCase(request.getAction())) {
             refund.setStatus(RefundStatus.APPROVED);
-        } else {
+        } else if ("REJECT".equalsIgnoreCase(request.getAction())) {
             refund.setStatus(RefundStatus.REJECTED);
+        } else {
+            throw new BadRequestException("Refund action must be APPROVE or REJECT");
         }
         refund.setAdminNote(request.getAdminNote());
         RefundRequest saved = refundRepository.save(refund);
         if ("APPROVE".equalsIgnoreCase(request.getAction())) {
-            mappingRepository.findById(saved.getMappingId()).ifPresent(m -> {
-                m.setStatus(ClientMappingStatus.INACTIVE);
-                m.setTerminationReason(TerminationReason.REFUND);
-                mappingRepository.save(m);
-                notifyRefund(m.getClient().getId(), m.getPt().getId(), saved, "APPROVED");
-            });
+            PtClientMapping mapping = mappingRepository.findByIdForUpdate(saved.getMappingId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Mapping", saved.getMappingId()));
+            if (!coachingWalletService.refundEscrowIfPresent(mapping.getId())) {
+                throw new BadRequestException("No coaching escrow is available for refund");
+            }
+            mapping.setStatus(ClientMappingStatus.INACTIVE);
+            mapping.setTerminationReason(TerminationReason.REFUND);
+            mappingRepository.save(mapping);
+            notifyRefund(mapping.getClient().getId(), mapping.getPt().getId(), saved, "APPROVED");
         } else {
+            if (!coachingWalletService.rejectEscrowDisputeIfPresent(saved.getMappingId())) {
+                throw new BadRequestException("No coaching escrow dispute was found");
+            }
             notifyRefund(saved.getCustomerId(), saved.getPtId(), saved, "REJECTED");
         }
         return ResponseEntity.ok(ApiResponse.success(saved));

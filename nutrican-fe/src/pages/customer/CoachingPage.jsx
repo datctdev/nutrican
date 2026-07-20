@@ -6,6 +6,8 @@ import { profileExtensionsService } from '../../services/profileExtensionsServic
 import { mealPlanService } from '../../services/mealPlanService';
 import { appointmentService } from '../../services/appointmentService';
 import { refundService } from '../../services/refundService';
+import { marketplaceService } from '../../services/marketplaceService';
+import { coachingPaymentService } from '../../services/coachingPaymentService';
 import { chatService } from '../../services/chatService';
 import { sendWebSocketMessage } from '../../services/websocketService';
 import { useAuthStore } from '../../stores/authStore';
@@ -62,6 +64,17 @@ export default function CoachingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
+
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    if (!paymentStatus) return;
+    if (paymentStatus === 'success') {
+      toast.success('Thanh toán thành công. Coaching đã được kích hoạt và tiền đang được Nutrican giữ an toàn.');
+    } else {
+      toast.error(searchParams.get('message') || 'Thanh toán chưa thành công. Bạn có thể thử lại.');
+    }
+    navigate('/coaching', { replace: true });
+  }, [navigate, searchParams]);
   
   useWebSocket();
 
@@ -117,6 +130,9 @@ export default function CoachingPage() {
   const [refundForm, setRefundForm] = useState({ mappingId: '', reason: 'CUSTOMER_REQUEST', note: '' });
   const [submittingRefund, setSubmittingRefund] = useState(false);
   const [coachingHistory, setCoachingHistory] = useState([]);
+  const [openHireRequest, setOpenHireRequest] = useState(null);
+  const [startingPayment, setStartingPayment] = useState(false);
+  const [coachingWallet, setCoachingWallet] = useState(null);
 
   // Parse URL tab parameter
   useEffect(() => {
@@ -130,10 +146,18 @@ export default function CoachingPage() {
     fetchCoachingStatus();
     const onRefundUpdate = () => {
       profileExtensionsService.getCoachingHistory().then((r) => setCoachingHistory(r.data?.data || [])).catch(() => {});
+      setTimeout(() => {
+        coachingPaymentService.getMyWallet()
+          .then((r) => setCoachingWallet(r.data?.data || null))
+          .catch(() => {});
+      }, 300);
     };
+    const onHireUpdate = () => fetchCoachingStatus();
     window.addEventListener('refund_update', onRefundUpdate);
+    window.addEventListener('hire_request_updated', onHireUpdate);
     return () => {
       window.removeEventListener('refund_update', onRefundUpdate);
+      window.removeEventListener('hire_request_updated', onHireUpdate);
     };
   }, []);
 
@@ -146,6 +170,14 @@ export default function CoachingPage() {
       const endReq = activeThreads.find((t) => t.status === 'END_REQUESTED');
       setMappingStatus(endReq ? 'END_REQUESTED' : activeThreads.length > 0 ? 'ACTIVE' : null);
       setEndRequestedBy(endReq ? endReq.endRequestedBy : null);
+
+      marketplaceService.getOpenHireRequest()
+        .then((response) => setOpenHireRequest(response.data?.data || null))
+        .catch(() => setOpenHireRequest(null));
+
+      coachingPaymentService.getMyWallet()
+        .then((response) => setCoachingWallet(response.data?.data || null))
+        .catch(() => setCoachingWallet(null));
 
       if (activeThreads.length > 0) {
         setApptForm((f) => ({ ...f, ptId: activeThreads[0].participantId }));
@@ -163,6 +195,18 @@ export default function CoachingPage() {
       toast.error('Lỗi khi tải thông tin coaching');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const startCoachingPayment = async () => {
+    if (!openHireRequest?.id) return;
+    try {
+      setStartingPayment(true);
+      const response = await coachingPaymentService.createVnPayPayment(openHireRequest.id);
+      window.location.assign(response.data.data.paymentUrl);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không thể khởi tạo thanh toán VNPay');
+      setStartingPayment(false);
     }
   };
 
@@ -623,10 +667,49 @@ export default function CoachingPage() {
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-fade-in px-4">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Coaching Của Tôi</h1>
-        <p className="text-slate-500 mt-1 font-medium">Tương tác với Huấn luyện viên, xem thực đơn và quản lý lịch hẹn tư vấn.</p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Coaching Của Tôi</h1>
+          <p className="text-slate-500 mt-1 font-medium">Tương tác với Huấn luyện viên, xem thực đơn và quản lý lịch hẹn tư vấn.</p>
+        </div>
+        {coachingWallet && (
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-right">
+            <p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Số dư ví coaching</p>
+            <p className="text-lg font-black text-slate-900">
+              {Number(coachingWallet.availableBalance || 0).toLocaleString('vi-VN')}đ
+            </p>
+          </div>
+        )}
       </div>
+
+      {openHireRequest && (
+        <div className={`mb-6 rounded-3xl border p-5 shadow-sm ${openHireRequest.status === 'AWAITING_PAYMENT' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-slate-500">Yêu cầu coaching</p>
+              <h2 className="mt-1 text-lg font-black text-slate-900">{openHireRequest.ptName}</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-600">
+                Coaching {openHireRequest.selectedTrainingMode === 'OFFLINE' ? 'offline' : 'online'} · {Number(openHireRequest.agreedAmount || 0).toLocaleString('vi-VN')}đ/{openHireRequest.agreedRateUnit}
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                {openHireRequest.status === 'AWAITING_PAYMENT'
+                  ? 'PT đã chấp nhận. Thanh toán để kích hoạt chat, thực đơn và theo dõi tiến độ.'
+                  : 'Đang chờ PT xem xét và phản hồi yêu cầu của bạn.'}
+              </p>
+              {openHireRequest.status === 'AWAITING_PAYMENT' && openHireRequest.paymentDueAt && (
+                <p className="mt-1 text-xs font-bold text-amber-700">
+                  Hạn thanh toán: {new Date(openHireRequest.paymentDueAt).toLocaleString('vi-VN')}
+                </p>
+              )}
+            </div>
+            {openHireRequest.status === 'AWAITING_PAYMENT' && (
+              <Button onClick={startCoachingPayment} disabled={startingPayment} className="h-12 shrink-0 rounded-xl bg-emerald-600 px-6 font-black text-white hover:bg-emerald-700">
+                {startingPayment ? 'Đang chuyển đến VNPay...' : 'Thanh toán ngay'}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {ptThreads.length === 0 ? (
         <div className="text-center py-16 px-4 bg-white border border-slate-200 rounded-3xl shadow-sm max-w-2xl mx-auto">
@@ -1026,6 +1109,20 @@ export default function CoachingPage() {
             {/* TAB 3: CONTRACT & REFUND */}
             {activeTab === 'contract' && (
               <div className="space-y-6 animate-fade-in">
+                <Card className="border-blue-100 shadow-sm rounded-3xl bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <CardContent className="p-6 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-blue-600">Ví coaching của bạn</p>
+                      <p className="mt-1 text-2xl font-black text-slate-900">
+                        {Number(coachingWallet?.availableBalance || 0).toLocaleString('vi-VN')}đ
+                      </p>
+                    </div>
+                    <p className="max-w-md text-xs font-semibold leading-5 text-slate-600">
+                      Khoản hoàn tiền được ghi vào ví sau khi admin duyệt. Tiền đang tranh chấp vẫn được giữ trong escrow và không chuyển cho PT.
+                    </p>
+                  </CardContent>
+                </Card>
+
                 {/* Coaching status */}
                 <Card className="border-slate-200 shadow-sm rounded-3xl bg-white">
                   <CardContent className="p-6 space-y-4">
@@ -1086,7 +1183,7 @@ export default function CoachingPage() {
                   <CardContent className="p-6 space-y-4">
                     <div>
                       <h3 className="text-lg font-bold text-slate-900">Yêu cầu hoàn trả học phí</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">Filing hoàn tiền khi có tranh chấp hoặc vi phạm cam kết cam chỉ số của PT.</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Gửi yêu cầu khi có tranh chấp hoặc PT vi phạm cam kết. Escrow sẽ được khóa để admin xem xét.</p>
                     </div>
 
                     <div className="space-y-4">

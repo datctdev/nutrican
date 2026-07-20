@@ -5,8 +5,16 @@ import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { marketplaceService } from '../../services/marketplaceService';
-import { Star, ShieldCheck, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, ExternalLink, Quote } from 'lucide-react';
+import { coachingPaymentService } from '../../services/coachingPaymentService';
+import Modal from '../../components/common/Modal';
+import { Star, ShieldCheck, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, ExternalLink, Quote, Wifi, MapPin, CreditCard } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+
+const RATE_UNIT_LABEL = {
+    MONTH: 'tháng',
+    SESSION_60: 'buổi 60 phút',
+    SESSION_90: 'buổi 90 phút',
+};
 
 export default function PtDetailPage() {
     const { id } = useParams();
@@ -23,6 +31,9 @@ export default function PtDetailPage() {
 
     const [hireStatus, setHireStatus] = useState('NONE');
     const [hiring, setHiring] = useState(false);
+    const [paying, setPaying] = useState(false);
+    const [showHireModal, setShowHireModal] = useState(false);
+    const [selectedMode, setSelectedMode] = useState(null);
 
     const fetchAllData = useCallback(async () => {
         try {
@@ -54,6 +65,12 @@ export default function PtDetailPage() {
         fetchAllData();
     }, [fetchAllData]);
 
+    useEffect(() => {
+        const refreshHireState = () => fetchAllData();
+        window.addEventListener('hire_request_updated', refreshHireState);
+        return () => window.removeEventListener('hire_request_updated', refreshHireState);
+    }, [fetchAllData]);
+
     const handleSubmitReview = async (e) => {
         e.preventDefault();
         try {
@@ -72,21 +89,60 @@ export default function PtDetailPage() {
         }
     };
 
-    const handleHirePt = async () => {
+    const openHireModal = () => {
         if (!user) {
             toast.error('Bạn cần đăng nhập để thuê Huấn luyện viên');
             return;
         }
 
+        const modes = [];
+        if ((pt.trainingMode === 'ONLINE' || pt.trainingMode === 'BOTH') && pt.onlineRate) modes.push('ONLINE');
+        if ((pt.trainingMode === 'OFFLINE' || pt.trainingMode === 'BOTH') && pt.offlineRate) modes.push('OFFLINE');
+        setSelectedMode(modes.length === 1 ? modes[0] : null);
+        setShowHireModal(true);
+    };
+
+    const handleHirePt = async () => {
+        if (!selectedMode) {
+            toast.error('Vui lòng chọn hình thức coaching');
+            return;
+        }
+
         try {
             setHiring(true);
-            await marketplaceService.hirePt(pt.userId);
+            const response = await marketplaceService.hirePt(pt.userId, selectedMode);
+            const mapping = response.data.data;
             setHireStatus('PENDING');
+            setPt((current) => ({
+                ...current,
+                mappingId: mapping.id,
+                mappingStatus: mapping.status,
+                selectedTrainingMode: mapping.selectedTrainingMode,
+                agreedAmount: mapping.agreedAmount,
+                agreedRateUnit: mapping.agreedRateUnit,
+                paymentDueAt: mapping.paymentDueAt,
+            }));
+            setShowHireModal(false);
             toast.success('Đã gửi yêu cầu thuê PT!');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Lỗi khi thuê PT');
         } finally {
             setHiring(false);
+        }
+    };
+
+    const handlePayment = async () => {
+        if (!pt.mappingId) {
+            toast.error('Không tìm thấy yêu cầu coaching');
+            return;
+        }
+        try {
+            setPaying(true);
+            const response = await coachingPaymentService.createVnPayPayment(pt.mappingId);
+            window.location.assign(response.data.data.paymentUrl);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Không thể khởi tạo thanh toán VNPay');
+            setPaying(false);
         }
     };
 
@@ -160,18 +216,33 @@ export default function PtDetailPage() {
                                 </div>
 
                                 <div className="mt-8 space-y-3">
-                                    {hireStatus === 'ACTIVE' ? (
+                                    {hireStatus === 'ACTIVE' || hireStatus === 'END_REQUESTED' ? (
                                         <Button onClick={() => navigate('/chat', { state: { targetPtId: pt.userId } })} className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-bold rounded-2xl shadow-lg shadow-emerald-500/30 transition-all">
                                             <MessageSquare className="w-5 h-5 mr-2" /> Nhắn tin ngay
                                         </Button>
+                                    ) : hireStatus === 'AWAITING_PAYMENT' ? (
+                                        <div className="space-y-2">
+                                            <Button onClick={handlePayment} disabled={paying} className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-black rounded-2xl shadow-lg shadow-emerald-500/30">
+                                                <CreditCard className="w-5 h-5 mr-2" />
+                                                {paying ? 'Đang chuyển đến VNPay...' : 'Thanh toán để bắt đầu'}
+                                            </Button>
+                                            <p className="text-xs font-semibold text-slate-500">
+                                                PT đã chấp nhận · {Number(pt.agreedAmount || 0).toLocaleString('vi-VN')}đ/{RATE_UNIT_LABEL[pt.agreedRateUnit] || pt.agreedRateUnit}
+                                            </p>
+                                            {pt.paymentDueAt && (
+                                                <p className="text-xs font-semibold text-amber-700">
+                                                    Thanh toán trước {new Date(pt.paymentDueAt).toLocaleString('vi-VN')}
+                                                </p>
+                                            )}
+                                        </div>
                                     ) : hireStatus === 'PENDING' ? (
                                         <Button disabled className="w-full h-14 bg-amber-100 text-amber-700 border-2 border-amber-200 text-lg font-bold rounded-2xl cursor-not-allowed">
                                             <Clock className="w-5 h-5 mr-2" /> Đang chờ duyệt
                                         </Button>
                                     ) : (
-                                        <Button onClick={handleHirePt} disabled={hiring} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-lg font-black rounded-2xl shadow-lg shadow-blue-500/30 transition-all group">
+                                        <Button onClick={openHireModal} disabled={hiring} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-lg font-black rounded-2xl shadow-lg shadow-blue-500/30 transition-all group">
                                             <Send className={`w-5 h-5 mr-2 ${hiring ? 'animate-pulse' : 'group-hover:translate-x-1 transition-transform'}`} />
-                                            {hiring ? 'Đang gửi...' : 'Đăng ký Tập'}
+                                            Đăng ký Coaching
                                         </Button>
                                     )}
                                 </div>
@@ -304,6 +375,59 @@ export default function PtDetailPage() {
                     </div>
                 </div>
             </div>
+
+            <Modal
+                isOpen={showHireModal}
+                onClose={() => !hiring && setShowHireModal(false)}
+                title="Chọn hình thức coaching"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-600">
+                        Giá được giữ nguyên tại thời điểm gửi yêu cầu. Bạn chỉ thanh toán sau khi PT chấp nhận.
+                    </p>
+
+                    {(pt.trainingMode === 'ONLINE' || pt.trainingMode === 'BOTH') && pt.onlineRate && (
+                        <button
+                            type="button"
+                            onClick={() => setSelectedMode('ONLINE')}
+                            className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${selectedMode === 'ONLINE' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-200'}`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="rounded-xl bg-blue-100 p-2 text-blue-700"><Wifi className="h-5 w-5" /></div>
+                                <div className="flex-1">
+                                    <p className="font-black text-slate-900">Coaching online</p>
+                                    <p className="mt-1 text-sm text-slate-500">Theo dõi từ xa qua chat, thực đơn và tiến độ trên Nutrican.</p>
+                                    <p className="mt-2 font-black text-blue-700">{Number(pt.onlineRate).toLocaleString('vi-VN')}đ / {RATE_UNIT_LABEL[pt.onlineRateUnit] || pt.onlineRateUnit}</p>
+                                </div>
+                            </div>
+                        </button>
+                    )}
+
+                    {(pt.trainingMode === 'OFFLINE' || pt.trainingMode === 'BOTH') && pt.offlineRate && (
+                        <button
+                            type="button"
+                            onClick={() => setSelectedMode('OFFLINE')}
+                            className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${selectedMode === 'OFFLINE' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-emerald-200'}`}
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><MapPin className="h-5 w-5" /></div>
+                                <div className="flex-1">
+                                    <p className="font-black text-slate-900">Coaching offline</p>
+                                    <p className="mt-1 text-sm text-slate-500">Tập trực tiếp{pt.location ? ` tại ${pt.location}` : ''}.</p>
+                                    <p className="mt-2 font-black text-emerald-700">{Number(pt.offlineRate).toLocaleString('vi-VN')}đ / {RATE_UNIT_LABEL[pt.offlineRateUnit] || pt.offlineRateUnit}</p>
+                                </div>
+                            </div>
+                        </button>
+                    )}
+
+                    <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+                        <Button variant="outline" onClick={() => setShowHireModal(false)} disabled={hiring}>Hủy</Button>
+                        <Button onClick={handleHirePt} disabled={!selectedMode || hiring} className="bg-blue-600 hover:bg-blue-700">
+                            {hiring ? 'Đang gửi...' : 'Gửi yêu cầu thuê PT'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

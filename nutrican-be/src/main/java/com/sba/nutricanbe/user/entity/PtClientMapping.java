@@ -3,11 +3,14 @@ package com.sba.nutricanbe.user.entity;
 import com.sba.nutricanbe.common.entity.BaseEntity;
 
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.enums.CoachingEndRequestedBy;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "pt_client_mappings")
@@ -32,13 +35,32 @@ public class PtClientMapping extends BaseEntity {
     @Builder.Default
     private ClientMappingStatus status = ClientMappingStatus.PENDING;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "selected_training_mode", length = 20)
+    private TrainingMode selectedTrainingMode;
+
+    @Column(name = "agreed_amount", precision = 15, scale = 2)
+    private BigDecimal agreedAmount;
+
+    @Column(name = "agreed_rate_unit", length = 30)
+    private String agreedRateUnit;
+
+    @Column(name = "accepted_at")
+    private LocalDateTime acceptedAt;
+
+    @Column(name = "payment_due_at")
+    private LocalDateTime paymentDueAt;
+
+    @Column(name = "coaching_started_at")
+    private LocalDateTime coachingStartedAt;
+
     @CreationTimestamp
     @Column(name = "assigned_at", updatable = false)
     private LocalDateTime assignedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "end_requested_by", length = 20)
-    private com.sba.nutricanbe.user.enums.CoachingEndRequestedBy endRequestedBy;
+    private CoachingEndRequestedBy endRequestedBy;
 
     @Column(name = "end_requested_at")
     private LocalDateTime endRequestedAt;

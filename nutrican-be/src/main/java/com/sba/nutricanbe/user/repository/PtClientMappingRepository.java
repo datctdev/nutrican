@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 
 import java.util.List;
 import java.util.Optional;
@@ -24,7 +26,21 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
 
     Page<PtClientMapping> findByClient_Id(UUID clientId, Pageable pageable);
 
-    Optional<PtClientMapping> findByPt_IdAndClient_Id(UUID ptId, UUID clientId);
+    Optional<PtClientMapping> findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(
+            UUID ptId, UUID clientId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<PtClientMapping> findTopByPt_IdAndClient_IdOrderByCreatedAtDesc(
+            UUID ptId, UUID clientId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT m FROM PtClientMapping m
+            JOIN FETCH m.pt
+            JOIN FETCH m.client
+            WHERE m.id = :mappingId
+            """)
+    Optional<PtClientMapping> findByIdForUpdate(@Param("mappingId") UUID mappingId);
 
     boolean existsByPt_IdAndClient_Id(UUID ptId, UUID clientId);
 
@@ -68,7 +84,20 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
 
     Optional<PtClientMapping> findFirstByClient_IdAndStatus(UUID clientId, ClientMappingStatus status);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<PtClientMapping> findTopByClient_IdAndStatusOrderByCreatedAtDesc(
+            UUID clientId, ClientMappingStatus status);
+
     long countByPt_IdAndStatus(UUID ptId, ClientMappingStatus status);
+
+    long countByPt_IdAndStatusIn(UUID ptId, List<ClientMappingStatus> statuses);
+
+    Optional<PtClientMapping> findFirstByClient_IdAndStatusIn(
+            UUID clientId, List<ClientMappingStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<PtClientMapping> findByStatusAndPaymentDueAtBefore(
+            ClientMappingStatus status, java.time.LocalDateTime paymentDueAt);
 
     List<PtClientMapping> findByClient_IdAndStatusOrderByCompletedAtDesc(UUID clientId, ClientMappingStatus status);
 }

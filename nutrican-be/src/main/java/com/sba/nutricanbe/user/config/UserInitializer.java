@@ -220,7 +220,8 @@ public class UserInitializer implements CommandLineRunner {
     }
 
     private void seedMapping(User pt, User customer, ClientMappingStatus status) {
-        ptClientMappingRepository.findByPt_IdAndClient_Id(pt.getId(), customer.getId())
+        ptClientMappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(pt.getId(), customer.getId())
                 .ifPresentOrElse(mapping -> {
                     mapping.setStatus(status);
                     ptClientMappingRepository.save(mapping);

@@ -86,7 +86,8 @@ public class AppointmentController {
 
             @RequestBody AppointmentRequest request) {
 
-        var mapping = mappingRepository.findByPt_IdAndClient_Id(ptId, customer.getId())
+        var mapping = mappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, customer.getId())
 
                 .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
 

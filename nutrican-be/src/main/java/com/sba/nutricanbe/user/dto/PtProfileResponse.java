@@ -37,6 +37,11 @@ public class PtProfileResponse {
     private BigDecimal offlineRate;
     private String offlineRateUnit;
     private String mappingStatus;
+    private UUID mappingId;
+    private String selectedTrainingMode;
+    private BigDecimal agreedAmount;
+    private String agreedRateUnit;
+    private java.time.LocalDateTime paymentDueAt;
     private Integer maxClients;
     private Long activeClientCount;
     private Boolean slotsAvailable;
