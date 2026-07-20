@@ -7,6 +7,7 @@ import com.sba.nutricanbe.user.dto.PtProfileResponse;
 import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
 import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
+import com.sba.nutricanbe.user.dto.HirePtRequest;
 import com.sba.nutricanbe.user.entity.User;
 
 import java.util.UUID;
@@ -21,9 +22,11 @@ public interface MarketplaceService {
 
     ApiResponse<ReviewResponse> createReview(UUID ptId, UUID reviewerId, CreateReviewRequest request, org.springframework.web.multipart.MultipartFile image);
 
-    ApiResponse<PtClientMappingResponse> hirePt(UUID ptId, UUID customerId);
+    ApiResponse<PtClientMappingResponse> hirePt(UUID ptId, UUID customerId, HirePtRequest request);
 
     ApiResponse<PtClientMappingResponse> updateHireRequest(UUID clientId, UUID ptId, String action);
+
+    ApiResponse<PtClientMappingResponse> getOpenHireRequest(UUID customerId);
 
     ApiResponse<ReviewResponse> updateReview(UUID ptId, UUID reviewId, UUID reviewerId, CreateReviewRequest request, org.springframework.web.multipart.MultipartFile image);
 

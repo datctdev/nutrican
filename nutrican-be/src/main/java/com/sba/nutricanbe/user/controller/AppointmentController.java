@@ -28,6 +28,8 @@ import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 
 import com.sba.nutricanbe.user.repository.RefundRequestRepository;
 
+import com.sba.nutricanbe.user.service.AppointmentSlotHelper;
+
 import lombok.Data;
 
 import lombok.RequiredArgsConstructor;
@@ -58,19 +60,13 @@ import java.util.UUID;
 
 public class AppointmentController {
 
-
-
-    private static final long MIN_MINUTES = 30;
-
-    private static final long MAX_MINUTES = 120;
-
-
-
     private final PtAppointmentRepository appointmentRepository;
 
     private final PtClientMappingRepository mappingRepository;
 
     private final RefundRequestRepository refundRepository;
+
+    private final AppointmentSlotHelper appointmentSlotHelper;
 
 
 
@@ -86,7 +82,8 @@ public class AppointmentController {
 
             @RequestBody AppointmentRequest request) {
 
-        var mapping = mappingRepository.findByPt_IdAndClient_Id(ptId, customer.getId())
+        var mapping = mappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, customer.getId())
 
                 .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
 
@@ -98,9 +95,9 @@ public class AppointmentController {
 
         }
 
-        validateSlot(request.getStartTime(), request.getEndTime());
+        appointmentSlotHelper.validateSlot(request.getStartTime(), request.getEndTime());
 
-        assertNoOverlap(ptId, request.getStartTime(), request.getEndTime(), null);
+        appointmentSlotHelper.assertNoOverlap(ptId, request.getStartTime(), request.getEndTime(), null);
 
         PtAppointment appt = appointmentRepository.save(PtAppointment.builder()
 
@@ -259,48 +256,6 @@ public class AppointmentController {
         PtAppointment saved = appointmentRepository.save(appt);
         return ResponseEntity.ok(ApiResponse.success(saved, "Appointment cancelled"));
     }
-
-    private void validateSlot(LocalDateTime start, LocalDateTime end) {
-
-        if (!end.isAfter(start)) {
-
-            throw new BadRequestException("endTime must be after startTime");
-
-        }
-
-        long minutes = Duration.between(start, end).toMinutes();
-
-        if (minutes < MIN_MINUTES || minutes > MAX_MINUTES) {
-
-            throw new BadRequestException("Appointment slot must be between 30 and 120 minutes");
-
-        }
-
-    }
-
-
-
-    private void assertNoOverlap(UUID ptId, LocalDateTime start, LocalDateTime end, UUID excludeId) {
-
-        List<PtAppointment> overlaps = appointmentRepository.findOverlapping(
-
-                ptId, start, end, List.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED));
-
-        if (excludeId != null) {
-
-            overlaps = overlaps.stream().filter(a -> !a.getId().equals(excludeId)).toList();
-
-        }
-
-        if (!overlaps.isEmpty()) {
-
-            throw new BadRequestException("PT has overlapping appointment");
-
-        }
-
-    }
-
-
 
     private void expireStale() {
 

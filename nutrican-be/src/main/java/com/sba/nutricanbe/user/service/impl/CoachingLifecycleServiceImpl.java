@@ -22,6 +22,7 @@ import com.sba.nutricanbe.user.repository.ReviewRepository;
 import com.sba.nutricanbe.user.service.CoachingLifecycleService;
 import com.sba.nutricanbe.user.service.NotificationService;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
+import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,7 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
     private final PtProfileRepository ptProfileRepository;
     private final WebSocketSessionService webSocketSessionService;
     private final ReviewRepository reviewRepository;
+    private final CoachingWalletService coachingWalletService;
     private final SelfPlanSubmissionRepository selfPlanSubmissionRepository;
     private final SelfPlanItemRepository selfPlanItemRepository;
     private final NotificationService notificationService;
@@ -91,7 +93,15 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
         mapping.setCompletedAt(LocalDateTime.now());
         mapping.setTerminationReason(TerminationReason.NORMAL_COMPLETION);
         PtClientMapping saved = mappingRepository.save(mapping);
+        coachingWalletService.releaseEscrowIfPresent(saved.getId());
         autoRejectPendingSubmissions(saved);
+        Map<String, Object> completedPayload = new HashMap<>();
+        completedPayload.put("mappingId", saved.getId());
+        completedPayload.put("clientId", saved.getClient().getId());
+        completedPayload.put("ptId", saved.getPt().getId());
+        completedPayload.put("message", "Coaching đã hoàn tất và tiền escrow đã được quyết toán.");
+        webSocketSessionService.sendToUser(saved.getClient().getId(), "COACHING_COMPLETED", completedPayload);
+        webSocketSessionService.sendToUser(saved.getPt().getId(), "COACHING_COMPLETED", completedPayload);
         return PtClientMappingResponse.toMappingResponse(saved);
     }
 
@@ -136,7 +146,8 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
     private PtClientMapping resolveActiveMapping(UUID actorId, UUID clientId, boolean actorIsPt) {
         PtClientMapping mapping;
         if (actorIsPt) {
-            mapping = mappingRepository.findByPt_IdAndClient_Id(actorId, clientId)
+            mapping = mappingRepository
+                    .findTopByPt_IdAndClient_IdOrderByCreatedAtDesc(actorId, clientId)
                     .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", clientId));
             if (mapping.getStatus() != ClientMappingStatus.ACTIVE
                     && mapping.getStatus() != ClientMappingStatus.END_REQUESTED) {
@@ -146,8 +157,12 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
             if (!actorId.equals(clientId)) {
                 throw new UnauthorizedException("Cannot act on another customer");
             }
-            mapping = mappingRepository.findFirstByClient_IdAndStatus(clientId, ClientMappingStatus.ACTIVE)
-                    .or(() -> mappingRepository.findFirstByClient_IdAndStatus(clientId, ClientMappingStatus.END_REQUESTED))
+            mapping = mappingRepository
+                    .findTopByClient_IdAndStatusOrderByCreatedAtDesc(
+                            clientId, ClientMappingStatus.ACTIVE)
+                    .or(() -> mappingRepository
+                            .findTopByClient_IdAndStatusOrderByCreatedAtDesc(
+                                    clientId, ClientMappingStatus.END_REQUESTED))
                     .orElseThrow(() -> new BadRequestException("No active coaching relationship"));
         }
         return mapping;

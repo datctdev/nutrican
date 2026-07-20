@@ -34,6 +34,7 @@ import com.sba.nutricanbe.diet.repository.MealPlanRepository;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
+import com.sba.nutricanbe.user.dto.MappingSessionResponse;
 import com.sba.nutricanbe.user.service.UserProfileService;
 import com.sba.nutricanbe.user.service.NotificationService;
 import com.sba.nutricanbe.user.dto.NotificationPayload;
@@ -46,6 +47,7 @@ import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.service.UserQueryService;
@@ -99,6 +101,7 @@ import java.util.UUID;
 public class PtWorkspaceServiceImpl implements PtWorkspaceService {
 
     private final PtClientMappingRepository mappingRepository;
+    private final PtMappingSessionRepository mappingSessionRepository;
     private final DietLogRepository dietLogRepository;
     private final BodyMetricRepository bodyMetricRepository;
     private final UserRepository userRepository;
@@ -518,9 +521,29 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .statusColor(statusColor)
                 .mappingStatus(mapping.getStatus() != null ? mapping.getStatus().name() : null)
                 .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
+                .selectedTrainingMode(mapping.getSelectedTrainingMode() != null
+                        ? mapping.getSelectedTrainingMode().name() : null)
+                .agreedAmount(mapping.getAgreedAmount())
+                .agreedRateUnit(mapping.getAgreedRateUnit())
+                .paymentDueAt(mapping.getPaymentDueAt())
+                .venueId(mapping.getVenueId())
+                .venueName(mapping.getVenueName())
+                .venueAddress(mapping.getVenueAddress())
+                .venueMapsUrl(mapping.getVenueMapsUrl())
+                .firstSessionStart(mapping.getFirstSessionStart())
+                .firstSessionEnd(mapping.getFirstSessionEnd())
+                .sessionCount(mapping.getSessionCount())
+                .perSessionAmount(mapping.getPerSessionAmount())
+                .sessions(loadMappingSessions(mapping.getId()))
                 .lastLogTime("N/A")
                 .avgCalories(BigDecimal.valueOf(1800.0))
                 .build();
+    }
+
+    private List<MappingSessionResponse> loadMappingSessions(UUID mappingId) {
+        return mappingSessionRepository.findByMappingIdOrderBySequenceAsc(mappingId).stream()
+                .map(MappingSessionResponse::from)
+                .toList();
     }
 
     private DietLogReviewResponse toReviewResponse(DietLog log) {
@@ -1345,7 +1368,8 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     }
 
     private void requirePtClientDataAccess(UUID ptId, UUID clientId) {
-        PtClientMapping mapping = mappingRepository.findByPt_IdAndClient_Id(ptId, clientId)
+        PtClientMapping mapping = mappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, clientId)
                 .orElseThrow(() -> new BadRequestException("No mapping with this client"));
         if (mapping.getStatus() == ClientMappingStatus.INACTIVE
                 || mapping.getStatus() == ClientMappingStatus.PENDING) {

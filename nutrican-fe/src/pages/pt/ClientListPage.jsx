@@ -8,7 +8,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 import {
     Search, Activity, MessageSquare,
     Users, Clock, ShieldAlert, TrendingUp, Utensils,
-    ChevronDown, UserCheck, UserX, ClipboardCheck
+    ChevronDown, UserCheck, UserX, ClipboardCheck, Wifi, MapPin
 } from 'lucide-react';
 import { workspaceService } from '../../services/workspaceService';
 import { toast } from 'sonner';
@@ -163,12 +163,23 @@ export default function ClientListPage() {
         }, 0);
     }, [fetchClients, fetchPendingCount, fetchPendingSelfPlans]);
 
+    useEffect(() => {
+        const refreshHireRequests = () => {
+            fetchClients();
+            fetchPendingCount();
+        };
+        window.addEventListener('hire_request_updated', refreshHireRequests);
+        return () => window.removeEventListener('hire_request_updated', refreshHireRequests);
+    }, [fetchClients, fetchPendingCount]);
+
     const handleAction = async (clientId, action) => {
         try {
             setProcessingId(clientId);
             await workspaceService.updateHireRequest(clientId, action);
 
-            toast.success(action === 'ACCEPT' ? 'Đã chấp nhận học viên thành công!' : 'Đã từ chối yêu cầu.');
+            toast.success(action === 'ACCEPT'
+                ? 'Đã chấp nhận. Đang chờ học viên thanh toán để kích hoạt coaching.'
+                : 'Đã từ chối yêu cầu.');
             fetchClients();
             fetchPendingCount();
         } catch (error) {
@@ -199,6 +210,7 @@ export default function ClientListPage() {
         if (s === 'YELLOW' || s === 'AMBER') return { label: 'Cần nhắc nhở', color: 'bg-amber-100 text-amber-700 border-amber-200' };
         if (s === 'RED') return { label: 'Báo động', color: 'bg-red-100 text-red-700 border-red-200' };
         if (s === 'PENDING') return { label: 'Chờ duyệt', color: 'bg-blue-100 text-blue-700 border-blue-200' };
+        if (s === 'AWAITING_PAYMENT') return { label: 'Chờ thanh toán', color: 'bg-violet-100 text-violet-700 border-violet-200' };
         return { label: s || 'ACTIVE', color: 'bg-slate-100 text-slate-600 border-slate-200' };
     };
 
@@ -260,6 +272,13 @@ export default function ClientListPage() {
                         </span>
                     )}
                     {activeTab === 'PENDING' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-amber-600 rounded-t-full"></span>}
+                </button>
+                <button
+                    className={`pb-4 px-2 font-bold text-sm transition-colors relative flex items-center gap-2 ${activeTab === 'AWAITING_PAYMENT' ? 'text-violet-600' : 'text-slate-500 hover:text-slate-800'}`}
+                    onClick={() => { setActiveTab('AWAITING_PAYMENT'); setStatusFilter(''); }}
+                >
+                    <Clock className="w-4 h-4" /> Chờ học viên thanh toán
+                    {activeTab === 'AWAITING_PAYMENT' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-violet-600 rounded-t-full"></span>}
                 </button>
             </div>
 
@@ -338,7 +357,9 @@ export default function ClientListPage() {
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredClients.map((client) => {
                         // Nếu đang ở tab PENDING, ghi đè status thành PENDING để load UI màu xanh lơ
-                        const currentStatus = activeTab === 'PENDING' ? 'PENDING' : client.status;
+                        const currentStatus = activeTab === 'PENDING'
+                            ? 'PENDING'
+                            : activeTab === 'AWAITING_PAYMENT' ? 'AWAITING_PAYMENT' : client.status;
                         const badge = getStatusBadge(currentStatus);
 
                         return (
@@ -366,7 +387,11 @@ export default function ClientListPage() {
                                             <div className="flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-slate-500">
                                                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                                                 <span className="truncate">
-                                                    {activeTab === 'PENDING' ? 'Đang chờ phản hồi' : `Log gần nhất: ${formatSafeDate(client.lastLogTime)}`}
+                                                    {activeTab === 'PENDING'
+                                                        ? 'Đang chờ phản hồi'
+                                                        : activeTab === 'AWAITING_PAYMENT'
+                                                            ? 'Đã chấp nhận · chờ thanh toán'
+                                                            : `Log gần nhất: ${formatSafeDate(client.lastLogTime)}`}
                                                 </span>
                                             </div>
                                         </div>
@@ -379,6 +404,59 @@ export default function ClientListPage() {
                                                 {badge.label}
                                             </span>
                                         </div>
+
+                                        {(activeTab === 'PENDING' || activeTab === 'AWAITING_PAYMENT') && (
+                                            <div className="space-y-2 rounded-xl border border-amber-100 bg-white p-3">
+                                                <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                                                    {client.selectedTrainingMode === 'OFFLINE'
+                                                        ? <MapPin className="h-4 w-4 text-emerald-600" />
+                                                        : <Wifi className="h-4 w-4 text-blue-600" />}
+                                                    Coaching {client.selectedTrainingMode === 'OFFLINE' ? 'offline' : 'online'}
+                                                </div>
+                                                <p className="text-sm font-black text-slate-900">
+                                                    {Number(client.agreedAmount || 0).toLocaleString('vi-VN')}đ
+                                                    {client.selectedTrainingMode === 'OFFLINE' && client.sessionCount ? (
+                                                        <span className="ml-1 text-xs font-semibold text-slate-500">· gói {client.sessionCount} buổi</span>
+                                                    ) : (
+                                                        <span className="ml-1 text-xs font-semibold text-slate-500">/ {client.agreedRateUnit}</span>
+                                                    )}
+                                                </p>
+                                                {client.selectedTrainingMode === 'OFFLINE' && client.perSessionAmount && client.sessionCount && (
+                                                    <p className="text-xs text-slate-500">
+                                                        {client.sessionCount} × {Number(client.perSessionAmount).toLocaleString('vi-VN')}đ/buổi
+                                                    </p>
+                                                )}
+                                                <p className="text-xs text-slate-500">Giá đã được chốt tại thời điểm học viên gửi yêu cầu.</p>
+                                                {client.selectedTrainingMode === 'OFFLINE' && client.venueName && (
+                                                    <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-2.5">
+                                                        <p className="text-xs font-black uppercase tracking-wider text-emerald-700">
+                                                            Gói offline {client.sessionCount ? `· ${client.sessionCount} buổi` : ''}
+                                                        </p>
+                                                        <p className="mt-1 text-sm font-bold text-slate-800">{client.venueName}</p>
+                                                        <p className="text-xs text-slate-600">{client.venueAddress}</p>
+                                                        {(client.sessions || []).length > 0 ? (
+                                                            <ul className="mt-1 space-y-0.5">
+                                                                {client.sessions.map((s) => (
+                                                                    <li key={s.id || s.sequence} className="text-xs font-semibold text-slate-700">
+                                                                        #{s.sequence}: {new Date(s.startTime).toLocaleString('vi-VN')}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        ) : client.firstSessionStart && (
+                                                            <p className="mt-1 text-xs font-semibold text-slate-700">
+                                                                {new Date(client.firstSessionStart).toLocaleString('vi-VN')}
+                                                                {client.firstSessionEnd ? ` – ${new Date(client.firstSessionEnd).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {activeTab === 'AWAITING_PAYMENT' && client.paymentDueAt && (
+                                                    <p className="text-xs font-bold text-amber-700">
+                                                        Hạn thanh toán: {new Date(client.paymentDueAt).toLocaleString('vi-VN')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
 
                                         {activeTab === 'ACTIVE' && (
                                             <div className="flex justify-between items-center">
@@ -454,7 +532,7 @@ export default function ClientListPage() {
                                                 </Button>
                                             )}
                                         </div>
-                                    ) : (
+                                    ) : activeTab === 'PENDING' ? (
                                         <div className="flex gap-2">
                                             <Button
                                                 disabled={processingId === client.clientId}
@@ -471,6 +549,10 @@ export default function ClientListPage() {
                                             >
                                                 <UserX className="w-4 h-4 mr-1.5" /> Từ chối
                                             </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-center text-sm font-bold text-violet-700">
+                                            Đang chờ học viên hoàn tất thanh toán VNPay
                                         </div>
                                     )}
                                 </CardContent>

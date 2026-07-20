@@ -5,6 +5,7 @@ export const marketplaceService = {
     getPts: (params) => api.get('/marketplace/pts', { params }),
     getPtDetail: (ptId) => api.get(`/marketplace/pts/${ptId}`),
     getPtReviews: (ptId, params) => api.get(`/marketplace/pts/${ptId}/reviews`, { params }),
+    getOpenHireRequest: () => api.get('/marketplace/hire-requests/open'),
 
     createReview: (ptId, data, imageFile) => {
         const formData = new FormData();
@@ -32,5 +33,8 @@ export const marketplaceService = {
 
     deleteReview: (ptId, reviewId) => api.delete(`/marketplace/pts/${ptId}/reviews/${reviewId}`),
 
-    hirePt: (ptId) => api.post(`/marketplace/pts/${ptId}/hire`),
+    hirePt: (ptId, payload) => api.post(`/marketplace/pts/${ptId}/hire`, payload),
+
+    getPtCalendar: (profileId, { from, to } = {}) =>
+        api.get(`/marketplace/pts/${profileId}/calendar`, { params: { from, to } }),
 };

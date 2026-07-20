@@ -69,8 +69,17 @@ public class PtProfile extends BaseEntity {
     private String location;
 
     /** Đơn vị tính phí: HOUR | SESSION_60 | SESSION_90 | MONTH */
-    @Column(name = "rate_unit", length = 20)
-    private String rateUnit;
+    @Column(name = "online_rate", precision = 12, scale = 2)
+    private BigDecimal onlineRate;
+
+    @Column(name = "online_rate_unit", length = 20)
+    private String onlineRateUnit;
+
+    @Column(name = "offline_rate", precision = 12, scale = 2)
+    private BigDecimal offlineRate;
+
+    @Column(name = "offline_rate_unit", length = 20)
+    private String offlineRateUnit;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "portfolio_showcase", columnDefinition = "jsonb")
@@ -92,9 +101,6 @@ public class PtProfile extends BaseEntity {
     @Column(length = 20)
     @Builder.Default
     private Tier tier = Tier.TIER_2;
-
-    @Column(name = "hourly_rate", precision = 10, scale = 2)
-    private BigDecimal hourlyRate;
 
     /** Danh sách chứng chỉ chuyên môn (JSONB) — mỗi chứng chỉ có ảnh xác minh */
     @JdbcTypeCode(SqlTypes.JSON)

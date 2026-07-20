@@ -2,10 +2,11 @@ package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.user.dto.*;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
 import com.sba.nutricanbe.user.service.UserProfileService;
-import com.sba.nutricanbe.diet.service.DietLogHelper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class UserProfileController {
 
     private final UserProfileService userProfileService;
+    private final PtVenueAvailabilityService venueAvailabilityService;
     private final DietLogHelper dietLogHelper;
 
     @GetMapping("/me")
@@ -40,7 +42,7 @@ public class UserProfileController {
     @PutMapping("/pt")
     public ResponseEntity<ApiResponse<PtProfileSummary>> updateMyPtProfile(
             @AuthenticationPrincipal User user,
-            @RequestBody com.sba.nutricanbe.user.dto.UpdatePtProfileRequest request) {
+            @RequestBody UpdatePtProfileRequest request) {
         return ResponseEntity.ok(userProfileService.updatePtProfile(user.getId(), request));
     }
 
@@ -109,6 +111,47 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.uploadPortfolioImage(user.getId(), file));
     }
 
+    @GetMapping("/pt/venues")
+    public ResponseEntity<ApiResponse<java.util.List<PtVenueResponse>>> listVenues(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(venueAvailabilityService.listVenues(user.getId()));
+    }
+
+    @PostMapping("/pt/venues")
+    public ResponseEntity<ApiResponse<PtVenueResponse>> createVenue(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody PtVenueRequest request) {
+        return ResponseEntity.ok(venueAvailabilityService.createVenue(user.getId(), request));
+    }
+
+    @PutMapping("/pt/venues/{venueId}")
+    public ResponseEntity<ApiResponse<PtVenueResponse>> updateVenue(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID venueId,
+            @Valid @RequestBody PtVenueRequest request) {
+        return ResponseEntity.ok(venueAvailabilityService.updateVenue(user.getId(), venueId, request));
+    }
+
+    @DeleteMapping("/pt/venues/{venueId}")
+    public ResponseEntity<ApiResponse<PtVenueResponse>> deactivateVenue(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID venueId) {
+        return ResponseEntity.ok(venueAvailabilityService.deactivateVenue(user.getId(), venueId));
+    }
+
+    @GetMapping("/pt/availability")
+    public ResponseEntity<ApiResponse<java.util.List<PtAvailabilityWindowResponse>>> getAvailability(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(venueAvailabilityService.getAvailability(user.getId()));
+    }
+
+    @PutMapping("/pt/availability")
+    public ResponseEntity<ApiResponse<java.util.List<PtAvailabilityWindowResponse>>> replaceAvailability(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody UpdatePtAvailabilityRequest request) {
+        return ResponseEntity.ok(venueAvailabilityService.replaceAvailability(user.getId(), request));
+    }
+
     @PostMapping("/pt/update-request")
     public ResponseEntity<ApiResponse<PtUpdateRequestDto>> submitPtUpdateRequest(
             @AuthenticationPrincipal User user,
@@ -122,4 +165,3 @@ public class UserProfileController {
         return ResponseEntity.ok(userProfileService.getPendingPtUpdateRequest(user.getId()));
     }
 }
-

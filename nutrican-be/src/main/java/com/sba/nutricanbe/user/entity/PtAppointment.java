@@ -52,4 +52,13 @@ public class PtAppointment extends BaseEntity {
 
     @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancelReason;
+
+    @Column(name = "venue_name", length = 120)
+    private String venueName;
+
+    @Column(name = "venue_address", length = 500)
+    private String venueAddress;
+
+    @Column(name = "venue_maps_url", length = 500)
+    private String venueMapsUrl;
 }

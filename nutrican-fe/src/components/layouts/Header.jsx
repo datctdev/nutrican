@@ -115,8 +115,11 @@ export default function Header() {
             case 'SOS':
                 return role === 'ADMIN' ? '/admin/sos' : isPtMode ? '/pt/reviews' : '/diet';
             case 'HIRE':
-                return isPtMode ? '/pt/clients' : '/marketplace';
+                return isPtMode ? '/pt/clients' : '/coaching';
             case 'REFUND':
+                return role === 'ADMIN'
+                    ? '/admin/refunds'
+                    : isPtMode ? '/pt/clients' : '/coaching?tab=contract';
             case 'WEEKLY_SUMMARY':
                 return '/profile';
             case 'MEAL_PLAN':

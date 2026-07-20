@@ -32,8 +32,10 @@ public class PendingPtDto {
     private List<String> specializations;
     private TrainingMode trainingMode;
     private String location;
-    private BigDecimal hourlyRate;
-    private String rateUnit;
+    private BigDecimal onlineRate;
+    private String onlineRateUnit;
+    private BigDecimal offlineRate;
+    private String offlineRateUnit;
     private List<CertificationData> certifications;
     private String cvUrl;
     private String instagramUrl;

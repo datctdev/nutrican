@@ -21,4 +21,17 @@ public class ClientStatusDto {
     private String lastLogTime;
     private java.math.BigDecimal avgCalories;
     private String endRequestedBy;
+    private String selectedTrainingMode;
+    private java.math.BigDecimal agreedAmount;
+    private String agreedRateUnit;
+    private java.time.LocalDateTime paymentDueAt;
+    private UUID venueId;
+    private String venueName;
+    private String venueAddress;
+    private String venueMapsUrl;
+    private java.time.LocalDateTime firstSessionStart;
+    private java.time.LocalDateTime firstSessionEnd;
+    private Integer sessionCount;
+    private java.math.BigDecimal perSessionAmount;
+    private java.util.List<com.sba.nutricanbe.user.dto.MappingSessionResponse> sessions;
 }

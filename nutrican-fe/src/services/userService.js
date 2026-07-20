@@ -40,6 +40,12 @@ export const userService = {
             headers: { 'Content-Type': 'multipart/form-data' },
         });
     },
+    listPtVenues: () => api.get('/profile/pt/venues'),
+    createPtVenue: (data) => api.post('/profile/pt/venues', data),
+    updatePtVenue: (venueId, data) => api.put(`/profile/pt/venues/${venueId}`, data),
+    deactivatePtVenue: (venueId) => api.delete(`/profile/pt/venues/${venueId}`),
+    getPtAvailability: () => api.get('/profile/pt/availability'),
+    replacePtAvailability: (windows) => api.put('/profile/pt/availability', { windows }),
     submitPtUpdateRequest: (data) => api.post('/profile/pt/update-request', data),
     getPendingPtUpdateRequest: () => api.get('/profile/pt/update-request/pending'),
 };

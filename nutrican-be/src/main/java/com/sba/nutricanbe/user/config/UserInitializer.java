@@ -80,6 +80,8 @@ public class UserInitializer implements CommandLineRunner {
                 "0902000001",
                 TrainingMode.BOTH,
                 "TP. Hồ Chí Minh",
+                BigDecimal.valueOf(1200000),
+                "MONTH",
                 BigDecimal.valueOf(450000),
                 "SESSION_60",
                 List.of("Giảm cân", "Tăng cơ", "Thể hình"),
@@ -103,6 +105,8 @@ public class UserInitializer implements CommandLineRunner {
                 "Hà Nội",
                 BigDecimal.valueOf(1500000),
                 "MONTH",
+                null,
+                null,
                 List.of("Yoga", "Pilates", "Giảm cân"),
                 List.of("WEIGHT_LOSS", "MAINTAIN"),
                 List.of("VEGAN", "KETO"),
@@ -209,7 +213,8 @@ public class UserInitializer implements CommandLineRunner {
 
     private void seedFullPtProfile(User pt, String bio, String philosophy, LocalDate startDate,
                                    Gender gender, String contactPhone, TrainingMode trainingMode,
-                                   String location, BigDecimal hourlyRate, String rateUnit,
+                                   String location, BigDecimal onlineRate, String onlineRateUnit,
+                                   BigDecimal offlineRate, String offlineRateUnit,
                                    List<String> specializations, List<String> goals, List<String> diets,
                                    List<CertificationData> certs) {
         ptProfileRepository.findByUserId(pt.getId())
@@ -217,6 +222,12 @@ public class UserInitializer implements CommandLineRunner {
                     profile.setIsVerified(true);
                     profile.setVerificationStatus(UserStatus.ACTIVE);
                     profile.setPtRequestStatus(UserStatus.ACTIVE);
+                    profile.setTrainingMode(trainingMode);
+                    profile.setLocation(trainingMode == TrainingMode.ONLINE ? null : location);
+                    profile.setOnlineRate(onlineRate);
+                    profile.setOnlineRateUnit(onlineRateUnit);
+                    profile.setOfflineRate(offlineRate);
+                    profile.setOfflineRateUnit(offlineRateUnit);
                     ptProfileRepository.save(profile);
                 }, () -> ptProfileRepository.save(PtProfile.builder()
                         .user(pt)
@@ -227,9 +238,11 @@ public class UserInitializer implements CommandLineRunner {
                         .gender(gender)
                         .contactPhone(contactPhone)
                         .trainingMode(trainingMode)
-                        .location(location)
-                        .hourlyRate(hourlyRate)
-                        .rateUnit(rateUnit)
+                        .location(trainingMode == TrainingMode.ONLINE ? null : location)
+                        .onlineRate(onlineRate)
+                        .onlineRateUnit(onlineRateUnit)
+                        .offlineRate(offlineRate)
+                        .offlineRateUnit(offlineRateUnit)
                         .specializations(specializations)
                         .preferredGoals(goals)
                         .preferredDietTypes(diets)
@@ -258,7 +271,8 @@ public class UserInitializer implements CommandLineRunner {
     }
 
     private void seedMapping(User pt, User customer, ClientMappingStatus status) {
-        ptClientMappingRepository.findByPt_IdAndClient_Id(pt.getId(), customer.getId())
+        ptClientMappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(pt.getId(), customer.getId())
                 .ifPresentOrElse(mapping -> {
                     mapping.setStatus(status);
                     ptClientMappingRepository.save(mapping);

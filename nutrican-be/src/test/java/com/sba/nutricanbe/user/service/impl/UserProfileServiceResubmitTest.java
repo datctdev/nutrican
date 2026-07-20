@@ -62,9 +62,8 @@ class UserProfileServiceResubmitTest {
                 .gender(Gender.MALE)
                 .experienceStartDate(LocalDate.of(2020, 1, 1))
                 .trainingMode(TrainingMode.ONLINE)
-                .location("Hà Nội")
-                .hourlyRate(BigDecimal.valueOf(200000))
-                .rateUnit("HOUR")
+                .onlineRate(BigDecimal.valueOf(200000))
+                .onlineRateUnit("HOUR")
                 .specializations(List.of("Giảm cân"))
                 .build();
 
@@ -78,6 +77,8 @@ class UserProfileServiceResubmitTest {
         assertEquals(UserStatus.PENDING_APPROVAL, profile.getPtRequestStatus());
         assertEquals(UserStatus.PENDING_APPROVAL, profile.getVerificationStatus());
         assertEquals(null, profile.getAdminRejectNote());
+        assertEquals(BigDecimal.valueOf(200000), profile.getOnlineRate());
+        assertEquals(null, profile.getOfflineRate());
         assertEquals("PT profile resubmitted", response.getMessage());
     }
 
