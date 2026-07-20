@@ -2,3 +2,6 @@
 nutrican-be/src/main/resources/firebase-service-account.json.json
 **/.idea/
 nutritiontrack-module-application/
+.superpowers/
+.e2e/
+.scripts/

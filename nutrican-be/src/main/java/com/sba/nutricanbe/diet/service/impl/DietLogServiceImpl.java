@@ -84,7 +84,8 @@ public class DietLogServiceImpl implements DietLogService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
         LocalDate logDate = DietDates.resolveLogDate(request.getLogDate());
-        MealPeriod mealPeriod = resolveAndValidateMealPeriod(request.getMealPeriod(), request.getMealType(), logDate);
+        MealPeriod mealPeriod = resolveAndValidateMealPeriod(
+                request.getMealPeriod(), request.getMealType(), logDate, request.getLateTickReason());
         MealType mealType = mealPeriod != null ? MealPeriods.toMealType(mealPeriod)
                 : request.getMealType();
         String makeupErr = MealPeriods.validateMakeup(mealPeriod, request.getMakeupForPeriod(), logDate);
@@ -231,7 +232,9 @@ public class DietLogServiceImpl implements DietLogService {
         if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only edit your own diet logs");
         }
-        assertLogDateMutable(dietLog.getLogDate());
+        if (!isReviewSubmissionOnly(request)) {
+            assertLogDateMutable(dietLog.getLogDate());
+        }
 
         if (request.getFoodDescription() != null) dietLog.setFoodDescription(request.getFoodDescription());
         if (request.getMealType() != null) dietLog.setMealType(request.getMealType());
@@ -240,7 +243,7 @@ public class DietLogServiceImpl implements DietLogService {
                     ? DietDates.resolveLogDate(request.getLogDate())
                     : dietLog.getLogDate();
             MealPeriod period = resolveAndValidateMealPeriod(
-                    request.getMealPeriod(), request.getMealType(), effectiveDate);
+                    request.getMealPeriod(), request.getMealType(), effectiveDate, null);
             dietLog.setMealPeriod(period);
             if (period != null) {
                 dietLog.setMealType(MealPeriods.toMealType(period));
@@ -424,6 +427,31 @@ public class DietLogServiceImpl implements DietLogService {
         }
     }
 
+    /** Cho phép gửi PT duyệt log bù ngày cũ mà không sửa nội dung món. */
+    private boolean isReviewSubmissionOnly(CreateDietLogRequest request) {
+        if (!Boolean.TRUE.equals(request.getSendToPt())) {
+            return false;
+        }
+        return request.getFoodDescription() == null
+                && request.getMealType() == null
+                && request.getMealPeriod() == null
+                && request.getMakeupForPeriod() == null
+                && request.getLogDate() == null
+                && request.getLateTickReason() == null
+                && request.getMealSource() == null
+                && request.getMealComplexity() == null
+                && request.getRestaurantName() == null
+                && request.getCalories() == null
+                && request.getProtein() == null
+                && request.getCarb() == null
+                && request.getFat() == null
+                && request.getFoodCode() == null
+                && request.getFoodItemId() == null
+                && request.getPortionGrams() == null
+                && request.getRecipeId() == null
+                && (request.getItems() == null || request.getItems().isEmpty());
+    }
+
     private String normalizeLateTickReason(String value) {
         if (value == null) {
             return null;
@@ -438,17 +466,31 @@ public class DietLogServiceImpl implements DietLogService {
         return trimmed;
     }
 
+    private boolean isValidLateTickReason(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() >= 10;
+    }
+
     /**
-     * Today VN: mealPeriod must equal current window (defaults to current if omitted).
+     * Today VN: mealPeriod must equal current window (defaults to current if omitted),
+     * except same-day late tick with a valid reason for a past period.
      * Past logDate: any period allowed; derive from mealType when unambiguous.
      */
-    private MealPeriod resolveAndValidateMealPeriod(MealPeriod requested, MealType mealType, LocalDate logDate) {
+    private MealPeriod resolveAndValidateMealPeriod(
+            MealPeriod requested, MealType mealType, LocalDate logDate, String lateTickReason) {
         LocalDate today = DietDates.todayVn();
         MealPeriod current = MealPeriods.current();
 
         if (logDate != null && logDate.equals(today)) {
             MealPeriod period = requested != null ? requested : current;
             if (period != current) {
+                if (isValidLateTickReason(lateTickReason)
+                        && MealPeriods.isPastPeriodForLateTick(period)) {
+                    return period;
+                }
                 throw new BadRequestException(
                         "Hôm nay chỉ được ghi nhật ký cho khung giờ hiện tại (" + current + ")");
             }

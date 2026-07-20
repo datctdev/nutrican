@@ -609,10 +609,19 @@ export default function DietTrackerPage() {
                 await dietService.uploadImages(logId, formData);
             }
 
-            await dietService.updateLog(logId, { sendToPt: true });
+            if (hasActivePt) {
+                // updateLog chặn ngày quá khứ — dùng submitForReview cho bù nhật ký
+                if (isPastIso(selectedDate)) {
+                    await dietService.submitForReview(logId);
+                } else {
+                    await dietService.updateLog(logId, { sendToPt: true });
+                }
+            }
             return logId;
         } catch (error) {
-            await dietService.deleteLog(logId).catch(() => undefined);
+            if (!isPastIso(selectedDate)) {
+                await dietService.deleteLog(logId).catch(() => undefined);
+            }
             throw error;
         }
     };
@@ -636,7 +645,7 @@ export default function DietTrackerPage() {
                     quantityG: it.quantityG,
                 })),
             });
-            toast.success('Đã gửi bữa ăn cho PT duyệt!');
+            toast.success(hasActivePt ? 'Đã gửi bữa ăn cho PT duyệt!' : 'Đã lưu bữa ăn!');
             if (newLogId && hasActivePt) schedulePostMealPrompt(newLogId);
             setIngredientItems([]);
             setMakeupForPeriod(null);

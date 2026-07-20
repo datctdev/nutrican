@@ -444,7 +444,7 @@ export default function DayPlanCard({
 
             {isPast && (
                 <div className="rounded-2xl border border-amber-300/80 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 text-sm font-semibold text-amber-900 shadow-sm">
-                    Ngày đã qua — chỉ xem kế hoạch. Bạn vẫn có thể bù nhật ký ở phần bên dưới.
+                    Ngày đã qua — chỉ xem kế hoạch. Bạn vẫn có thể <strong>bù nhật ký</strong> bằng card <strong>Ghi nhật ký</strong> phía trên (AI hoặc nhập tay): chọn buổi còn thiếu và thêm món mới.
                 </div>
             )}
             {isFuture && (

@@ -61,7 +61,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DemoVeteranDataInitializer implements CommandLineRunner {
 
-    public static final String FLAG_KEY = "DEMO_VETERAN_FIXTURES_V2";
+    public static final String FLAG_KEY = "DEMO_VETERAN_FIXTURES_V3";
     private static final String SOLO_EMAIL = "demo.solo@nutrican.com";
     private static final String COACHED_EMAIL = "demo.coached@nutrican.com";
     private static final String PT_EMAIL = "pt.certified@gmail.com";
@@ -119,6 +119,8 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             seedHistoryLogs(solo, food, today, false);
             seedHistoryLogs(coached, food, today, true);
 
+            seedYesterdayBackfillDemo(solo, coached, food, today);
+
             seedSoloPlans(solo, food, today);
             seedCoachedPlans(coached, pt, food, today);
 
@@ -126,9 +128,107 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             log.info("{} seeded — 14d fixtures for {} and {}", FLAG_KEY, SOLO_EMAIL, COACHED_EMAIL);
         }
 
-        // Luôn chạy cuối — kể cả khi flag done (tránh nhật ký buổi tối làm mất đơn PENDING)
-        coachedOpt.ifPresent(coached -> ptOpt.ifPresent(pt ->
-                refreshTodayEveningReviewDemo(coached, pt, food, DietDates.todayVn())));
+        // Luôn chạy cuối — kể cả khi flag done (demo tick trễ + PT duyệt tối)
+        LocalDate today = DietDates.todayVn();
+        soloOpt.ifPresent(solo -> {
+            refreshYesterdayBackfillDemo(solo, food, today);
+            refreshTodayLateTickDemo(solo, food, today);
+        });
+        coachedOpt.ifPresent(coached -> ptOpt.ifPresent(pt -> {
+            refreshYesterdayBackfillDemo(coached, food, today);
+            refreshTodayLateTickDemo(coached, food, today);
+            refreshTodayEveningReviewDemo(coached, pt, food, today);
+        }));
+    }
+
+    /** Idempotent: hôm qua chỉ giữ log sáng (test bù nhật ký). */
+    private void refreshYesterdayBackfillDemo(User user, FoodItem food, LocalDate today) {
+        if (food == null) {
+            return;
+        }
+        LocalDate yesterday = today.minusDays(1);
+        List<DietLog> yesterdayLogs = dietLogRepository.findByCustomerIdAndLogDate(user.getId(), yesterday);
+        boolean onlyMorning = yesterdayLogs.size() == 1
+                && yesterdayLogs.get(0).getMealPeriod() == MealPeriod.MORNING
+                && yesterdayLogs.get(0).getFoodDescription() != null
+                && yesterdayLogs.get(0).getFoodDescription().contains("Demo backfill");
+        if (onlyMorning) {
+            return;
+        }
+        yesterdayLogs.forEach(dietLogRepository::delete);
+        saveLog(user, food, yesterday, MealPeriod.MORNING, null,
+                "Demo backfill · chỉ có sáng — bù trưa/chiều bằng Ghi nhật ký");
+    }
+
+    /**
+     * Hôm qua: chỉ còn log buổi sáng — để test bù nhật ký (Manual/AI) cho trưa/chiều/tối.
+     */
+    private void seedYesterdayBackfillDemo(User solo, User coached, FoodItem food, LocalDate today) {
+        LocalDate yesterday = today.minusDays(1);
+        for (User user : List.of(solo, coached)) {
+            dietLogRepository.findByCustomerIdAndLogDate(user.getId(), yesterday)
+                    .forEach(dietLogRepository::delete);
+            saveLog(user, food, yesterday, MealPeriod.MORNING, null,
+                    "Demo backfill · chỉ có sáng — bù trưa/chiều bằng Ghi nhật ký");
+        }
+        log.info("Yesterday {} backfill demo: {} + {} — only MORNING log", yesterday, SOLO_EMAIL, COACHED_EMAIL);
+    }
+
+    /**
+     * Hôm nay: xóa log các buổi đã qua, reset plan chưa tick — để test tick trễ trong ngày.
+     */
+    private void refreshTodayLateTickDemo(User user, FoodItem food, LocalDate today) {
+        if (food == null) {
+            return;
+        }
+        MealPeriod current = MealPeriods.current();
+        boolean coached = COACHED_EMAIL.equalsIgnoreCase(user.getEmail());
+
+        dietLogRepository.findByCustomerIdAndLogDate(user.getId(), today).stream()
+                .filter(log -> log.getMealPeriod() != null
+                        && log.getMealPeriod().ordinal() < current.ordinal()
+                        && (!coached || log.getMealPeriod() != MealPeriod.AFTERNOON))
+                .forEach(dietLogRepository::delete);
+
+        if (!coached) {
+            selfPlanItemRepository
+                    .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(user.getId(), today)
+                    .stream()
+                    .filter(i -> i.getMealPeriod() != null && i.getMealPeriod().ordinal() < current.ordinal())
+                    .forEach(item -> {
+                        item.setEaten(false);
+                        item.setDietLogId(null);
+                        selfPlanItemRepository.save(item);
+                    });
+            for (MealPeriod period : MealPeriod.values()) {
+                if (period.ordinal() < current.ordinal()
+                        && !hasSelfPlanForPeriod(user.getId(), today, period)) {
+                    saveSelf(user, food, today, period, false, null);
+                }
+            }
+        } else {
+            mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(user.getId()).stream()
+                    .filter(p -> {
+                        LocalDate start = p.getWeekStart();
+                        if (start == null) return false;
+                        LocalDate end = start.plusDays(6);
+                        return !today.isBefore(start) && !today.isAfter(end);
+                    })
+                    .findFirst()
+                    .ifPresent(plan -> mealPlanItemRepository
+                            .findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId()).stream()
+                            .filter(i -> today.equals(i.getPlanDate()))
+                            .filter(i -> i.getSourceType() == MealPlanItemSourceType.PT_ORIGINAL)
+                            .filter(i -> i.getMealPeriod() != null
+                                    && i.getMealPeriod().ordinal() < current.ordinal()
+                                    && i.getMealPeriod() != MealPeriod.AFTERNOON)
+                            .forEach(item -> {
+                                item.setEaten(false);
+                                item.setLateTickReason(null);
+                                mealPlanItemRepository.save(item);
+                            }));
+        }
+        log.debug("Late-tick demo refreshed for {} on {}", user.getEmail(), today);
     }
 
     private FoodItem pickFood() {
