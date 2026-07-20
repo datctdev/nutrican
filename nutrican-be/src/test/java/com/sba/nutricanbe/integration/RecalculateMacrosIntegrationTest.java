@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -25,16 +26,19 @@ class RecalculateMacrosIntegrationTest extends IntegrationTestBase {
         stubAiAndStorage();
     }
 
+    private static final String SOLO_CUSTOMER = "customer2@gmail.com";
+    private static final String COACHED_CUSTOMER = "customer1@gmail.com";
+
     @Test
     void recalculateMacros_savesLevelAndUpdatesTarget_atomically() throws Exception {
-        var user = userRepository.findByEmail("customer1@gmail.com").orElseThrow();
+        var user = userRepository.findByEmail(SOLO_CUSTOMER).orElseThrow();
         user.setHeightCm(170);
         user.setGender("male");
         user.setActivityLevel(ActivityLevel.MODERATE);
         userRepository.save(user);
 
         mockMvc.perform(post("/api/v1/profile/recalculate-macros")
-                        .with(asUser("customer1@gmail.com"))
+                        .with(asUser(SOLO_CUSTOMER))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"activityLevel": "LIGHT", "nutritionGoal": "MAINTAIN"}
@@ -43,15 +47,78 @@ class RecalculateMacrosIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.activityLevel").value("LIGHT"))
                 .andExpect(jsonPath("$.data.macros.dailyCalories").isNumber());
 
-        var refreshed = userRepository.findByEmail("customer1@gmail.com").orElseThrow();
+        var refreshed = userRepository.findByEmail(SOLO_CUSTOMER).orElseThrow();
         assertThat(refreshed.getActivityLevel()).isEqualTo(ActivityLevel.LIGHT);
         assertThat(macroTargetRepository.findByUserId(refreshed.getId())).isPresent();
     }
 
     @Test
+    void recalculateMacros_weightLossVsWeightGain_differentCalories() throws Exception {
+        var user = userRepository.findByEmail(SOLO_CUSTOMER).orElseThrow();
+        user.setHeightCm(170);
+        user.setGender("male");
+        user.setActivityLevel(ActivityLevel.MODERATE);
+        userRepository.save(user);
+
+        mockMvc.perform(post("/api/v1/profile/body-metrics")
+                        .with(asUser(SOLO_CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"weight": 70}
+                                """))
+                .andExpect(status().isOk());
+
+        var lossResult = mockMvc.perform(post("/api/v1/profile/recalculate-macros")
+                        .with(asUser(SOLO_CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"activityLevel": "MODERATE", "nutritionGoal": "WEIGHT_LOSS"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        BigDecimal lossCal = objectMapper.readTree(lossResult.getResponse().getContentAsString())
+                .path("data").path("macros").path("dailyCalories").decimalValue();
+
+        var gainResult = mockMvc.perform(post("/api/v1/profile/recalculate-macros")
+                        .with(asUser(SOLO_CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"activityLevel": "MODERATE", "nutritionGoal": "WEIGHT_GAIN"}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        BigDecimal gainCal = objectMapper.readTree(gainResult.getResponse().getContentAsString())
+                .path("data").path("macros").path("dailyCalories").decimalValue();
+
+        assertThat(gainCal).isGreaterThan(lossCal);
+    }
+
+    @Test
+    void recalculateMacros_rejectsWhenHasActivePt() throws Exception {
+        mockMvc.perform(post("/api/v1/profile/recalculate-macros")
+                        .with(asUser(COACHED_CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"activityLevel": "MODERATE", "nutritionGoal": "MAINTAIN"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void setMacroTarget_rejectsWhenHasActivePt() throws Exception {
+        mockMvc.perform(put("/api/v1/profile/macro-target")
+                        .with(asUser(COACHED_CUSTOMER))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"dailyCalories": 2000, "protein": 120, "carb": 220, "fat": 65}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void recalculateMacros_rejectsInvalidEnum() throws Exception {
         mockMvc.perform(post("/api/v1/profile/recalculate-macros")
-                        .with(asUser("customer1@gmail.com"))
+                        .with(asUser(SOLO_CUSTOMER))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"activityLevel": "ULTRA"}

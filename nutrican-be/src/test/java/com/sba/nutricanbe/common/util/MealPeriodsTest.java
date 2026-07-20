@@ -73,6 +73,24 @@ class MealPeriodsTest {
     }
 
     @Test
+    void isPastPeriodForLateTick_afternoon_eveningAndLate_false() {
+        LocalDateTime afternoon = LocalDateTime.of(2026, 7, 20, 15, 0);
+        assertTrue(MealPeriods.isPastPeriodForLateTick(MealPeriod.MORNING, afternoon));
+        assertTrue(MealPeriods.isPastPeriodForLateTick(MealPeriod.NOON, afternoon));
+        assertFalse(MealPeriods.isPastPeriodForLateTick(MealPeriod.AFTERNOON, afternoon));
+        assertFalse(MealPeriods.isPastPeriodForLateTick(MealPeriod.EVENING, afternoon));
+        assertFalse(MealPeriods.isPastPeriodForLateTick(MealPeriod.LATE, afternoon));
+    }
+
+    @Test
+    void isPastPeriodForLateTick_evening_lateStillFuture() {
+        LocalDateTime evening = LocalDateTime.of(2026, 7, 20, 19, 0);
+        assertTrue(MealPeriods.isPastPeriodForLateTick(MealPeriod.AFTERNOON, evening));
+        assertFalse(MealPeriods.isPastPeriodForLateTick(MealPeriod.EVENING, evening));
+        assertFalse(MealPeriods.isPastPeriodForLateTick(MealPeriod.LATE, evening));
+    }
+
+    @Test
     void fromMinutes_windows() {
         assertEquals(MealPeriod.MORNING, MealPeriods.fromMinutes(4 * 60));
         assertEquals(MealPeriod.NOON, MealPeriods.fromMinutes(11 * 60));

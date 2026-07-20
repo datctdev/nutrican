@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.dto.MacroNutrients;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ConflictException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.DayPlanRules;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MealPeriods;
 import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
@@ -15,6 +16,8 @@ import com.sba.nutricanbe.diet.dto.response.SelfPlanItemResponse;
 import com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.diet.entity.MealPlan;
+import com.sba.nutricanbe.diet.entity.MealPlanItem;
+import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.SelfPlanItem;
 import com.sba.nutricanbe.diet.entity.SelfPlanSubmission;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
@@ -22,6 +25,8 @@ import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.enums.SelfPlanSubmissionStatus;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
+import com.sba.nutricanbe.diet.repository.DietLogRepository;
+import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.SelfPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.SelfPlanSubmissionRepository;
 import com.sba.nutricanbe.diet.service.DayPlanService;
@@ -51,6 +56,8 @@ public class SelfPlanServiceImpl implements SelfPlanService {
     private final SelfPlanItemRepository selfPlanItemRepository;
     private final SelfPlanSubmissionRepository selfPlanSubmissionRepository;
     private final FoodItemRepository foodItemRepository;
+    private final MealPlanItemRepository mealPlanItemRepository;
+    private final DietLogRepository dietLogRepository;
     private final DietLogHelper dietLogHelper;
     private final DietLogService dietLogService;
     private final DayPlanService dayPlanService;
@@ -84,6 +91,9 @@ public class SelfPlanServiceImpl implements SelfPlanService {
             throw new BadRequestException("foodItemId is required");
         }
         LocalDate planDate = DietDates.resolvePlanDate(request.getPlanDate());
+        if (mealPeriod != null) {
+            assertPeriodMutable(customerId, planDate, mealPeriod);
+        }
         if (selfPlanSubmissionRepository.existsByCustomerIdAndPlanDateAndStatus(
                 customerId, planDate, SelfPlanSubmissionStatus.PENDING)) {
             throw new ConflictException("Kế hoạch ngày này đang chờ PT duyệt, không thể thêm món mới");
@@ -116,6 +126,8 @@ public class SelfPlanServiceImpl implements SelfPlanService {
     @Transactional
     public SelfPlanItemResponse update(UUID customerId, UUID id, SelfPlanItemUpdateRequest request) {
         SelfPlanItem item = requireOwned(customerId, id);
+        assertPlanDateMutable(item.getPlanDate());
+        assertPeriodMutable(customerId, item.getPlanDate(), item.getMealPeriod());
         if (Boolean.TRUE.equals(item.getLockedByReview())) {
             throw new ConflictException("Món này đang chờ PT duyệt, không thể sửa");
         }
@@ -123,6 +135,7 @@ public class SelfPlanServiceImpl implements SelfPlanService {
             throw new BadRequestException("Không thể sửa món đã đánh dấu đã ăn");
         }
         if (request.getMealPeriod() != null) {
+            assertPeriodMutable(customerId, item.getPlanDate(), request.getMealPeriod());
             item.setMealPeriod(request.getMealPeriod());
             item.setMealType(MealPeriods.toMealType(request.getMealPeriod()));
         } else if (request.getMealType() != null) {
@@ -156,6 +169,8 @@ public class SelfPlanServiceImpl implements SelfPlanService {
     @Transactional
     public void delete(UUID customerId, UUID id) {
         SelfPlanItem item = requireOwned(customerId, id);
+        assertPlanDateMutable(item.getPlanDate());
+        assertPeriodMutable(customerId, item.getPlanDate(), item.getMealPeriod());
         if (Boolean.TRUE.equals(item.getLockedByReview())) {
             throw new ConflictException("Món này đang chờ PT duyệt, không thể xóa");
         }
@@ -167,11 +182,12 @@ public class SelfPlanServiceImpl implements SelfPlanService {
 
     @Override
     @Transactional
-    public DietLogResponse markEaten(UUID customerId, UUID id) {
+    public DietLogResponse markEaten(UUID customerId, UUID id, String lateTickReason) {
         if (dietLogHelper.hasActivePt(customerId)) {
             throw new BadRequestException("Gửi PT duyệt trước; ghi nhật ký sau khi được duyệt");
         }
         SelfPlanItem item = requireOwned(customerId, id);
+        assertPlanDateMutable(item.getPlanDate());
         if (Boolean.TRUE.equals(item.getEaten())) {
             throw new BadRequestException("Món này đã được ghi nhận ăn rồi");
         }
@@ -179,7 +195,9 @@ public class SelfPlanServiceImpl implements SelfPlanService {
             throw new BadRequestException("Món plan thiếu khung giờ; sửa/thêm lại món");
         }
         if (!MealPeriods.isMealPeriodOpen(item.getPlanDate(), item.getMealPeriod())) {
-            throw new BadRequestException("Chỉ đánh dấu đã ăn trong khung giờ của buổi đó");
+            if (!allowLateTick(item.getPlanDate(), item.getMealPeriod(), lateTickReason)) {
+                throw new BadRequestException("Chỉ đánh dấu đã ăn trong khung giờ của buổi đó");
+            }
         }
         // Reject future plan dates before creating a diet log
         DietDates.resolveLogDate(item.getPlanDate());
@@ -192,6 +210,7 @@ public class SelfPlanServiceImpl implements SelfPlanService {
         logReq.setFoodDescription(item.getItemName());
         logReq.setFoodItemId(item.getFoodItemId());
         logReq.setSendToPt(false);
+        logReq.setLateTickReason(normalizeLateTickReason(lateTickReason));
 
         DietLogItemRequest line = new DietLogItemRequest();
         line.setFoodItemId(item.getFoodItemId());
@@ -228,11 +247,16 @@ public class SelfPlanServiceImpl implements SelfPlanService {
             throw new ConflictException("Đã có yêu cầu duyệt đang chờ xử lý cho ngày này");
         }
 
-        List<SelfPlanItem> items = selfPlanItemRepository
-                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, planDate)
-                .stream()
+        List<SelfPlanItem> allDayItems = selfPlanItemRepository
+                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, planDate);
+        List<MealPlanItem> ptItems = loadPtItemsForDate(customerId, planDate);
+        List<DietLog> logs = dietLogRepository.findByCustomerIdAndLogDate(customerId, planDate);
+
+        List<SelfPlanItem> items = allDayItems.stream()
                 .filter(i -> !Boolean.TRUE.equals(i.getEaten()))
                 .filter(i -> !Boolean.TRUE.equals(i.getApplied()))
+                .filter(i -> i.getMealPeriod() == null
+                        || !DayPlanRules.isMealPeriodSettled(planDate, i.getMealPeriod(), ptItems, allDayItems, logs))
                 .toList();
         if (items.isEmpty()) {
             throw new BadRequestException("Không có món tự chọn nào để gửi duyệt");
@@ -327,6 +351,59 @@ public class SelfPlanServiceImpl implements SelfPlanService {
             throw new ResourceNotFoundException("SelfPlanItem", id);
         }
         return item;
+    }
+
+    private void assertPlanDateMutable(LocalDate planDate) {
+        if (planDate != null && planDate.isBefore(DietDates.todayVn())) {
+            throw new BadRequestException("Ngày đã qua — không thể chỉnh sửa kế hoạch");
+        }
+    }
+
+    private void assertPeriodMutable(UUID customerId, LocalDate planDate, MealPeriod mealPeriod) {
+        if (planDate == null || mealPeriod == null) {
+            return;
+        }
+        List<MealPlanItem> ptItems = loadPtItemsForDate(customerId, planDate);
+        List<SelfPlanItem> selfItems = selfPlanItemRepository
+                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, planDate);
+        List<DietLog> logs = dietLogRepository.findByCustomerIdAndLogDate(customerId, planDate);
+        if (DayPlanRules.isMealPeriodSettled(planDate, mealPeriod, ptItems, selfItems, logs)) {
+            throw new BadRequestException("Buổi này đã chốt — không thể chỉnh sửa đề xuất");
+        }
+    }
+
+    private List<MealPlanItem> loadPtItemsForDate(UUID customerId, LocalDate planDate) {
+        return dayPlanService.getPublishedPlanForDate(customerId, planDate)
+                .map(plan -> mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId())
+                        .stream()
+                        .filter(i -> planDate.equals(i.getPlanDate()))
+                        .toList())
+                .orElse(List.of());
+    }
+
+    private boolean allowLateTick(LocalDate planDate, MealPeriod mealPeriod, String lateTickReason) {
+        String normalized = normalizeLateTickReason(lateTickReason);
+        if (normalized == null || planDate == null || mealPeriod == null) {
+            return false;
+        }
+        if (!planDate.equals(DietDates.todayVn())) {
+            return false;
+        }
+        return MealPeriods.isPastPeriodForLateTick(mealPeriod);
+    }
+
+    private String normalizeLateTickReason(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() < 10) {
+            throw new BadRequestException("lateTickReason phải có ít nhất 10 ký tự");
+        }
+        return trimmed;
     }
 
     private void rescaleFromBase100(SelfPlanItem item, BigDecimal newQty) {

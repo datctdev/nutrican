@@ -17,6 +17,7 @@ import MealPlanSkipModal from './components/MealPlanSkipModal';
 import MealPlanWeekView from './components/MealPlanWeekView';
 import MealPlanWeekPicker from './components/MealPlanWeekPicker';
 import MealReplacementModal from './components/MealReplacementModal';
+import { isMealPeriodOpen, canLateTickMealPeriod, nowInVn, todayLocalIso } from './components/dietUtils';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
 import {
@@ -536,6 +537,7 @@ export default function CoachingPage() {
         await mealPlanService.skipMeal(mealPlan.id, {
           planDate: item.planDate,
           mealType: item.mealType,
+          mealPeriod: item.mealPeriod,
           skipReason,
           skipNote,
         });
@@ -575,11 +577,18 @@ export default function CoachingPage() {
     }
   };
 
-  const handleUndoEntireMeal = async (planDate, mealType) => {
+  const handleUndoEntireMeal = async (planDate, mealPeriod) => {
     try {
-      await mealPlanService.unskipMeal(mealPlan.id, { planDate, mealType });
+      const sample = mealPlanItems.find(
+        (i) => i.planDate === planDate && i.mealPeriod === mealPeriod,
+      );
+      await mealPlanService.unskipMeal(mealPlan.id, {
+        planDate,
+        mealType: sample?.mealType,
+        mealPeriod,
+      });
       setMealPlanItems((currentItems) => currentItems.map((item) => (
-        item.planDate === planDate && item.mealType === mealType
+        item.planDate === planDate && item.mealPeriod === mealPeriod
           ? { ...item, skipReason: null, skipNote: null }
           : item
       )));
@@ -589,12 +598,35 @@ export default function CoachingPage() {
     }
   };
 
-  const handleMarkEaten = async (itemId, eaten) => {
+  const handleMarkEaten = async (itemId, eaten, itemRef) => {
+    const item = itemRef || mealPlanItems.find((i) => i.id === itemId);
     try {
-      await mealPlanService.markEaten(itemId, eaten);
-      setMealPlanItems((items) => items.map((i) => (i.id === itemId ? { ...i, eaten } : i)));
-    } catch {
-      toast.error('Không thể cập nhật món ăn');
+      let lateTickReason;
+      if (
+        eaten
+        && item?.planDate === todayLocalIso()
+        && item?.mealPeriod
+        && canLateTickMealPeriod(item.planDate, item.mealPeriod, nowInVn())
+      ) {
+        lateTickReason = window.prompt('Buổi này đã qua. Hãy nhập lý do tick trễ để PT có thể theo dõi:')?.trim();
+        if (!lateTickReason || lateTickReason.length < 10) {
+          toast.error('Vui lòng nhập lý do tick trễ tối thiểu 10 ký tự');
+          return;
+        }
+      }
+      await mealPlanService.markEaten(itemId, eaten, lateTickReason);
+      setMealPlanItems((items) => items.map((i) => (
+        i.id === itemId ? { ...i, eaten, lateTickReason: lateTickReason || i.lateTickReason } : i
+      )));
+      if (eaten) {
+        if (item?.sourceType === 'SELF_OVERRIDE') {
+          toast.success('Đã ghi vào nhật ký');
+        } else {
+          toast.success('Đã đánh dấu tuân thủ (chưa ghi nhật ký)');
+        }
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không thể cập nhật món ăn');
     }
   };
 
@@ -907,8 +939,17 @@ export default function CoachingPage() {
                     ) : !mealPlanItems.length ? (
                       <div className="text-center py-12 bg-slate-50/50 border border-slate-100 rounded-2xl">
                         <Utensils className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                        <p className="text-sm text-slate-500 font-bold">Huấn luyện viên chưa lên thực đơn</p>
-                        <p className="text-xs text-slate-400 mt-1">Liên hệ với PT qua tin nhắn để nhận được thực đơn tuần mới.</p>
+                        <p className="text-sm text-slate-500 font-bold">
+                          {ptThreads.length === 0 ? 'Bạn chưa có PT đang đồng hành' : 'Huấn luyện viên chưa lên thực đơn'}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {ptThreads.length === 0 ? 'Bạn vẫn có thể tự lên kế hoạch tại Nhật ký → Plan ăn ngày.' : 'Liên hệ với PT qua tin nhắn để nhận được thực đơn tuần mới.'}
+                        </p>
+                        {ptThreads.length === 0 && (
+                          <Link to="/diet" className="mt-3 inline-block text-xs font-bold text-emerald-700 hover:underline">
+                            Mở Plan ăn ngày
+                          </Link>
+                        )}
                       </div>
                     ) : (
                       <MealPlanWeekView

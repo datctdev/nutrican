@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
@@ -9,6 +10,7 @@ import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
 import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
 import com.sba.nutricanbe.user.dto.UserProfileResponse;
 import com.sba.nutricanbe.user.service.UserProfileService;
+import com.sba.nutricanbe.diet.service.DietLogHelper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -25,6 +27,7 @@ import java.util.UUID;
 public class UserProfileController {
 
     private final UserProfileService userProfileService;
+    private final DietLogHelper dietLogHelper;
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
@@ -63,6 +66,10 @@ public class UserProfileController {
     public ResponseEntity<ApiResponse<MacroTargetResponse>> setMacroTarget(
             @AuthenticationPrincipal User user,
             @RequestBody MacroTargetRequest request) {
+        if (dietLogHelper.hasActivePt(user.getId())) {
+            throw new BadRequestException(
+                    "Mục tiêu dinh dưỡng đang do PT quản lý — liên hệ PT để thay đổi macro");
+        }
         return ResponseEntity.ok(userProfileService.setMacroTarget(user.getId(), request));
     }
 

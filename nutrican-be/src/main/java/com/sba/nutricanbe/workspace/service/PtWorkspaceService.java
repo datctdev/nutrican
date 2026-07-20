@@ -83,4 +83,10 @@ public interface PtWorkspaceService {
 
     ApiResponse<SelfPlanSubmissionResponse> reviewSelfPlanSubmission(
             UUID ptId, UUID submissionId, SelfPlanSubmissionReviewRequest request);
+
+    ApiResponse<com.sba.nutricanbe.diet.dto.response.DayPlanResponse> getClientDayPlan(
+            UUID ptId, UUID clientId, LocalDate date);
+
+    ApiResponse<com.sba.nutricanbe.diet.dto.response.DietSummaryResponse> getClientDietSummary(
+            UUID ptId, UUID clientId, LocalDate date);
 }

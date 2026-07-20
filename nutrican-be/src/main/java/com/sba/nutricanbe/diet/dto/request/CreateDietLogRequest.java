@@ -27,6 +27,7 @@ public class CreateDietLogRequest {
     private UUID foodItemId;
     private List<DietLogItemRequest> items;
     private Boolean sendToPt;
+    private String lateTickReason;
     private UUID recipeId;
     private String foodCode;
     private BigDecimal portionGrams;

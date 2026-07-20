@@ -12,8 +12,19 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
+import {
+  MEAL_PERIODS,
+  MEAL_PERIOD_LABELS,
+  isMealPeriodOpen,
+  canLateTickMealPeriod,
+  isFutureMealPeriod,
+  resolvePlanItemPeriod,
+  nowInVn,
+  todayLocalIso,
+} from './dietUtils';
+import { getPlanSourceLabel, stripMealPeriodSuffix, isPlanChoiceRejected, getChoiceRejectedLabel } from './planLabels';
 
-const MEAL_ORDER = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'];
+const PERIOD_ORDER = MEAL_PERIODS;
 
 const SKIP_REASON_LABEL = {
   NO_TIME: 'Không có thời gian',
@@ -22,30 +33,31 @@ const SKIP_REASON_LABEL = {
   OTHER: 'Lý do khác',
 };
 
-const MEAL_META = {
-  BREAKFAST: {
-    label: 'Buổi sáng',
+const PERIOD_META = {
+  MORNING: {
     icon: Coffee,
     headerClass: 'bg-amber-50 text-amber-800 border-amber-100',
     iconClass: 'bg-amber-100 text-amber-700',
   },
-  LUNCH: {
-    label: 'Buổi trưa',
+  NOON: {
     icon: Sun,
     headerClass: 'bg-emerald-50 text-emerald-800 border-emerald-100',
     iconClass: 'bg-emerald-100 text-emerald-700',
   },
-  DINNER: {
-    label: 'Buổi tối',
+  AFTERNOON: {
+    icon: Cookie,
+    headerClass: 'bg-violet-50 text-violet-800 border-violet-100',
+    iconClass: 'bg-violet-100 text-violet-700',
+  },
+  EVENING: {
     icon: Moon,
     headerClass: 'bg-indigo-50 text-indigo-800 border-indigo-100',
     iconClass: 'bg-indigo-100 text-indigo-700',
   },
-  SNACK: {
-    label: 'Buổi chiều / khuya',
+  LATE: {
     icon: Cookie,
-    headerClass: 'bg-violet-50 text-violet-800 border-violet-100',
-    iconClass: 'bg-violet-100 text-violet-700',
+    headerClass: 'bg-slate-100 text-slate-800 border-slate-200',
+    iconClass: 'bg-slate-200 text-slate-700',
   },
 };
 
@@ -113,7 +125,7 @@ export default function MealPlanWeekView({
   }, {}), [items]);
 
   const dates = useMemo(() => Object.keys(itemsByDate).sort(), [itemsByDate]);
-  const todayKey = getLocalDateKey();
+  const todayKey = todayLocalIso();
   const activeDate = dates.includes(selectedDate)
     ? selectedDate
     : (dates.includes(todayKey) ? todayKey : dates[0]);
@@ -141,16 +153,22 @@ export default function MealPlanWeekView({
     return result;
   }, [suggestions]);
 
-  const itemsByMeal = useMemo(() => activeItems.reduce((result, item) => {
-    if (!result[item.mealType]) result[item.mealType] = [];
-    result[item.mealType].push(item);
+  const itemsByPeriod = useMemo(() => {
+    const result = Object.fromEntries(PERIOD_ORDER.map((p) => [p, []]));
+    activeItems.forEach((item) => {
+      const period = resolvePlanItemPeriod(item);
+      if (result[period]) result[period].push(item);
+    });
     return result;
-  }, {}), [activeItems]);
+  }, [activeItems]);
 
   const moveDay = (direction) => {
     const nextDate = dates[activeDateIndex + direction];
     if (nextDate) setSelectedDate(nextDate);
   };
+
+  const dateHasPassed = activeDate < todayKey;
+  const dateIsFuture = activeDate > todayKey;
 
   return (
     <div className="space-y-5">
@@ -201,6 +219,9 @@ export default function MealPlanWeekView({
             <p className="mt-1 text-xs font-medium text-slate-500">
               Đã hoàn thành <span className="font-extrabold text-slate-700">{completedItems}/{activeItems.length} món</span>
             </p>
+            <p className="mt-1 text-[11px] text-slate-400 font-medium">
+              Tick trong khung giờ buổi đó. Nhật ký calo ghi ở Nhật ký ăn uống / Plan ăn ngày.
+            </p>
           </div>
           <div className="flex shrink-0 gap-1.5">
             <Button
@@ -236,46 +257,46 @@ export default function MealPlanWeekView({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {MEAL_ORDER.map((mealType) => {
-          const meta = MEAL_META[mealType];
-          const MealIcon = meta.icon;
-          const mealItems = itemsByMeal[mealType] || [];
-          const eatenCount = mealItems.filter((item) => item.eaten).length;
-          const allSkipped = mealItems.length > 0 && mealItems.every((item) => item.skipReason);
-          const mealHasPending = mealItems.some(
+        {PERIOD_ORDER.map((period) => {
+          const meta = PERIOD_META[period];
+          const PeriodIcon = meta.icon;
+          const periodItems = itemsByPeriod[period] || [];
+          if (!periodItems.length) return null;
+
+          const eatenCount = periodItems.filter((item) => item.eaten).length;
+          const allSkipped = periodItems.every((item) => item.skipReason);
+          const periodHasPending = periodItems.some(
             (item) => latestSuggestionByItem.get(item.id)?.status === 'PENDING',
           );
-          const dateHasPassed = activeDate < todayKey;
-          const dateIsFuture = activeDate > todayKey;
 
           return (
-            <section key={mealType} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <section key={period} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className={`flex items-center justify-between border-b px-4 py-3 ${meta.headerClass}`}>
                 <div className="flex items-center gap-2.5">
                   <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${meta.iconClass}`}>
-                    <MealIcon className="h-4 w-4" />
+                    <PeriodIcon className="h-4 w-4" />
                   </span>
                   <div>
-                    <h5 className="text-sm font-extrabold">{meta.label}</h5>
-                    <p className="text-[10px] font-bold opacity-70">{mealItems.length} món</p>
+                    <h5 className="text-sm font-extrabold">{MEAL_PERIOD_LABELS[period]}</h5>
+                    <p className="text-[10px] font-bold opacity-70">{periodItems.length} món</p>
                   </div>
                 </div>
-                {mealItems.length > 0 && eatenCount === mealItems.length ? (
+                {eatenCount === periodItems.length ? (
                   <span className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-extrabold text-emerald-700">
                     <Check className="h-3 w-3" /> Hoàn thành
                   </span>
                 ) : allSkipped && !dateHasPassed ? (
                   <button
                     type="button"
-                    onClick={() => onUndoEntireMeal(activeDate, mealType)}
+                    onClick={() => onUndoEntireMeal(activeDate, period)}
                     className="flex items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-extrabold text-amber-700 hover:bg-white"
                   >
                     <Undo2 className="h-3 w-3" /> Hoàn tác cả bữa
                   </button>
-                ) : mealItems.length > 1 && eatenCount === 0 && !mealHasPending && !dateHasPassed ? (
+                ) : periodItems.length > 1 && eatenCount === 0 && !periodHasPending && !dateHasPassed ? (
                   <button
                     type="button"
-                    onClick={() => onOpenSkip(mealItems[0], mealItems, 'MEAL')}
+                    onClick={() => onOpenSkip(periodItems[0], periodItems, 'MEAL')}
                     className="rounded-full bg-white/70 px-2 py-1 text-[10px] font-extrabold opacity-75 hover:bg-white hover:opacity-100"
                   >
                     Không ăn cả bữa
@@ -283,119 +304,155 @@ export default function MealPlanWeekView({
                 ) : null}
               </div>
 
-              {mealItems.length === 0 ? (
-                <p className="px-4 py-6 text-center text-xs font-medium text-slate-400">Không có món cho bữa này</p>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {mealItems.map((item) => {
-                    const cheatMeal = isCheatMeal(item);
-                    const preferenceWarning = item.foodCode && warningCodes.has(item.foodCode);
-                    const suggestion = latestSuggestionByItem.get(item.id);
-                    const pendingReplacement = suggestion?.status === 'PENDING';
-                    const skipped = Boolean(item.skipReason);
-                    const locked = dateHasPassed || dateIsFuture || pendingReplacement || skipped;
+              <div className="divide-y divide-slate-100">
+                {periodItems.map((item) => {
+                  const cheatMeal = isCheatMeal(item);
+                  const preferenceWarning = item.foodCode && warningCodes.has(item.foodCode);
+                  const suggestion = latestSuggestionByItem.get(item.id);
+                  const pendingReplacement = suggestion?.status === 'PENDING';
+                  const skipped = Boolean(item.skipReason) && item.skipReason !== 'SUPERSEDED';
+                  const notChosen = isPlanChoiceRejected(item);
+                  const periodOpen = Boolean(item.mealPeriod)
+                    && isMealPeriodOpen(activeDate, item.mealPeriod, nowInVn());
+                  const staleLateStillOpen = item.mealPeriod === 'LATE'
+                    && isMealPeriodOpen(activeDate, 'LATE', nowInVn());
+                  const itemDatePassed = dateHasPassed && !staleLateStillOpen;
+                  const canLateTick = !dateIsFuture && !itemDatePassed
+                    && canLateTickMealPeriod(activeDate, item.mealPeriod, nowInVn());
+                  const periodFuture = !dateIsFuture && !itemDatePassed && item.mealPeriod
+                    && isFutureMealPeriod(item.mealPeriod, nowInVn());
+                  const periodClosed = !dateIsFuture && !itemDatePassed && !periodOpen && !item.eaten
+                    && !canLateTick;
+                  const locked = itemDatePassed || dateIsFuture || pendingReplacement || skipped || notChosen
+                    || !item.mealPeriod || periodClosed;
 
-                    return (
-                      <div
-                        key={item.id}
-                        className={`flex items-start gap-3 px-4 py-3 transition-colors ${
-                          item.eaten
-                            ? 'bg-emerald-50/50'
+                  let checkboxTitle;
+                  if (dateIsFuture) checkboxTitle = 'Chỉ có thể xác nhận đã ăn khi đến ngày';
+                  else if (periodFuture) checkboxTitle = 'Chưa đến khung giờ của buổi này';
+                  else if (canLateTick) checkboxTitle = 'Tick trễ — sẽ yêu cầu ghi lý do';
+                  else if (periodClosed || !item.mealPeriod) {
+                    checkboxTitle = 'Chỉ đánh dấu đã ăn trong khung giờ của buổi đó';
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`flex items-start gap-3 px-4 py-3 transition-colors ${
+                        item.eaten && !notChosen
+                          ? 'bg-emerald-50/50'
+                          : notChosen
+                            ? 'bg-slate-50/70'
                             : skipped
                               ? 'bg-amber-50/45'
                               : pendingReplacement
                                 ? 'bg-violet-50/50'
                                 : 'hover:bg-slate-50/70'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          aria-label={`Đánh dấu đã ăn ${getDisplayName(item)}`}
-                          title={dateIsFuture ? 'Chỉ có thể xác nhận đã ăn khi đến ngày' : undefined}
-                          checked={!!item.eaten}
-                          disabled={locked}
-                          onChange={(event) => onMarkEaten(item.id, event.target.checked)}
-                          className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        />
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`Đánh dấu đã ăn ${getDisplayName(item)}`}
+                        title={checkboxTitle}
+                        checked={!!item.eaten}
+                        disabled={locked}
+                        onChange={(event) => onMarkEaten(item.id, event.target.checked, item)}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      />
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <p className={`text-sm font-extrabold leading-5 ${item.eaten ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
-                              {getDisplayName(item)}
-                            </p>
-                            {cheatMeal && (
-                              <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-700">
-                                Cheat meal
-                              </span>
-                            )}
-                            {preferenceWarning && (
-                              <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-rose-700">
-                                Kỵ sở thích
-                              </span>
-                            )}
-                            {pendingReplacement && (
-                              <span className="rounded-md bg-violet-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-violet-700">
-                                Chờ PT duyệt
-                              </span>
-                            )}
-                            {dateHasPassed && !item.eaten && !skipped && (
-                              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-500">
-                                Đã qua
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] font-medium text-slate-500">
-                            {item.portionGrams && <span>{item.portionGrams}g</span>}
-                            {item.skipReason && (
-                              <span className="font-bold text-amber-700">
-                                Không ăn · {SKIP_REASON_LABEL[item.skipReason] || item.skipReason}
-                              </span>
-                            )}
-                          </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className={`text-sm font-extrabold leading-5 ${
+                            notChosen ? 'text-slate-400 line-through' : 'text-slate-800'
+                          }`}>
+                            {stripMealPeriodSuffix(getDisplayName(item))}
+                          </p>
+                          {item.sourceType === 'SELF_OVERRIDE' && (
+                            <span className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-700">
+                              {getPlanSourceLabel(item)}
+                            </span>
+                          )}
+                          {cheatMeal && (
+                            <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-700">
+                              Cheat meal
+                            </span>
+                          )}
+                          {preferenceWarning && (
+                            <span className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-rose-700">
+                              Kỵ sở thích
+                            </span>
+                          )}
                           {pendingReplacement && (
-                            <p className="mt-1 text-[11px] font-semibold text-violet-700">
-                              Đề nghị: {suggestion.suggestedFoodName} ({suggestion.suggestedGram}g)
-                            </p>
+                            <span className="rounded-md bg-violet-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-violet-700">
+                              Chờ PT duyệt
+                            </span>
                           )}
-                          {suggestion?.status === 'REJECTED' && suggestion.ptNote && (
-                            <p className="mt-1 text-[11px] leading-4 text-rose-600">PT từ chối: {suggestion.ptNote}</p>
-                          )}
-                          {item.note && (
-                            <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{item.note}</p>
+                          {itemDatePassed && !item.eaten && !skipped && (
+                            <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-500">
+                              Đã qua
+                            </span>
                           )}
                         </div>
-
-                        {!dateHasPassed && (
-                          <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
-                            {item.eaten ? (
-                              <Button type="button" size="sm" variant="ghost" onClick={() => onMarkEaten(item.id, false)} className="h-7 gap-1 rounded-lg px-2 text-[10px] font-bold text-slate-600">
-                                <Undo2 className="h-3 w-3" /> Hoàn tác
-                              </Button>
-                            ) : pendingReplacement ? (
-                              <Button type="button" size="sm" variant="ghost" onClick={() => onCancelReplacement(suggestion.id)} className="h-7 gap-1 rounded-lg px-2 text-[10px] font-bold text-rose-600 hover:bg-rose-50">
-                                <XCircle className="h-3 w-3" /> Hủy yêu cầu
-                              </Button>
-                            ) : skipped ? (
-                              <Button type="button" size="sm" variant="ghost" onClick={() => onUndoSkip(item.id)} className="h-7 gap-1 rounded-lg px-2 text-[10px] font-bold text-amber-700 hover:bg-amber-50">
-                                <Undo2 className="h-3 w-3" /> Hoàn tác
-                              </Button>
-                            ) : (
-                              <>
-                                <Button type="button" size="sm" variant="ghost" title="Đề nghị thay thế" onClick={() => onSuggestReplacement(item)} className="h-7 gap-1 rounded-lg px-2 text-[10px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-700">
-                                  <RefreshCw className="h-3 w-3" /><span className="hidden sm:inline">Thay</span>
-                                </Button>
-                                <Button type="button" size="sm" variant="ghost" onClick={() => onOpenSkip(item, mealItems, 'ITEM')} className="h-7 rounded-lg px-2 text-[10px] font-bold text-amber-700 hover:bg-amber-50">
-                                  Không ăn
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] font-medium text-slate-500">
+                          {item.portionGrams && <span>{item.portionGrams}g</span>}
+                          {notChosen && (
+                            <span className="font-bold text-slate-600">
+                              {getChoiceRejectedLabel(item)}
+                            </span>
+                          )}
+                          {item.skipReason && item.skipReason !== 'SUPERSEDED' && (
+                            <span className="font-bold text-amber-700">
+                              Không ăn · {SKIP_REASON_LABEL[item.skipReason] || item.skipReason}
+                            </span>
+                          )}
+                          {item.lateTickReason && (
+                            <span className="font-bold text-orange-700">
+                              Tick trễ: {item.lateTickReason}
+                            </span>
+                          )}
+                        </div>
+                        {pendingReplacement && (
+                          <p className="mt-1 text-[11px] font-semibold text-violet-700">
+                            Đề nghị: {suggestion.suggestedFoodName} ({suggestion.suggestedGram}g)
+                          </p>
+                        )}
+                        {suggestion?.status === 'REJECTED' && suggestion.ptNote && (
+                          <p className="mt-1 text-[11px] leading-4 text-rose-600">PT từ chối: {suggestion.ptNote}</p>
+                        )}
+                        {item.note && (
+                          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{item.note}</p>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+
+                      {!itemDatePassed && (
+                        <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                          {item.eaten ? (
+                            <Button type="button" size="sm" variant="ghost" onClick={() => onMarkEaten(item.id, false, item)} className="h-7 gap-1 rounded-lg px-2 text-[10px] font-bold text-slate-600">
+                              <Undo2 className="h-3 w-3" /> Hoàn tác
+                            </Button>
+                          ) : pendingReplacement ? (
+                            <Button type="button" size="sm" variant="ghost" onClick={() => onCancelReplacement(suggestion.id)} className="h-7 gap-1 rounded-lg px-2 text-[10px] font-bold text-rose-600 hover:bg-rose-50">
+                              <XCircle className="h-3 w-3" /> Hủy yêu cầu
+                            </Button>
+                          ) : skipped ? (
+                            <Button type="button" size="sm" variant="ghost" onClick={() => onUndoSkip(item.id)} className="h-7 gap-1 rounded-lg px-2 text-[10px] font-bold text-amber-700 hover:bg-amber-50">
+                              <Undo2 className="h-3 w-3" /> Hoàn tác
+                            </Button>
+                          ) : (
+                            <>
+                              <Button type="button" size="sm" variant="ghost" title="Đề nghị thay thế" onClick={() => onSuggestReplacement(item)} className="h-7 gap-1 rounded-lg px-2 text-[10px] font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-700">
+                                <RefreshCw className="h-3 w-3" /><span className="hidden sm:inline">Thay</span>
+                              </Button>
+                              <Button type="button" size="sm" variant="ghost" onClick={() => onOpenSkip(item, periodItems, 'ITEM')} className="h-7 rounded-lg px-2 text-[10px] font-bold text-amber-700 hover:bg-amber-50">
+                                Không ăn
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </section>
           );
         })}

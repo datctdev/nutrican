@@ -3,17 +3,17 @@ import { CalendarDays, Check, Loader2, Utensils, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../../ui/button';
 import { workspaceService } from '../../../services/workspaceService';
-
-const MEAL_LABEL = {
-  BREAKFAST: 'Buổi sáng',
-  LUNCH: 'Buổi trưa',
-  DINNER: 'Buổi tối',
-  SNACK: 'Buổi chiều / khuya',
-};
+import { MEAL_PERIOD_LABELS } from '../../../pages/customer/components/dietUtils';
 
 export default function SelfPlanSubmissionReviewList({ submissions, onUpdated }) {
   const [notes, setNotes] = useState({});
   const [reviewingId, setReviewingId] = useState(null);
+  const visibleSubmissions = (submissions || [])
+    .map((submission) => ({
+      ...submission,
+      items: (submission.items || []).filter((item) => !item.eaten),
+    }))
+    .filter((submission) => submission.items.length > 0);
 
   const review = async (submission, action) => {
     const ptNote = notes[submission.id]?.trim();
@@ -34,18 +34,18 @@ export default function SelfPlanSubmissionReviewList({ submissions, onUpdated })
     }
   };
 
-  if (!submissions?.length) return null;
+  if (!visibleSubmissions.length) return null;
 
   return (
     <div className="space-y-3">
       <div>
         <h3 className="text-sm font-extrabold text-slate-800">Kế hoạch ngày đặc biệt chờ duyệt</h3>
         <p className="mt-0.5 text-xs text-slate-500">
-          Duyệt sẽ thay thực đơn PT đúng các bữa học viên đã thêm. Từ chối giữ nguyên thực đơn gốc.
+          Chỉ hiện các buổi học viên <strong>chưa ăn / chưa chốt</strong>. Duyệt sẽ thay thực đơn PT đúng buổi đó; buổi đã tick không xuất hiện ở đây.
         </p>
       </div>
 
-      {submissions.map((submission) => (
+      {visibleSubmissions.map((submission) => (
         <div key={submission.id} className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
           <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold text-slate-500">
             <span className="flex items-center gap-1">
@@ -65,7 +65,7 @@ export default function SelfPlanSubmissionReviewList({ submissions, onUpdated })
                 <Utensils className="h-3.5 w-3.5 shrink-0 text-amber-500" />
                 <span className="min-w-0 flex-1 truncate font-extrabold text-slate-800">{item.itemName}</span>
                 <span className="text-[10px] font-bold uppercase text-slate-400">
-                  {MEAL_LABEL[item.mealType] || item.mealType}
+                  {MEAL_PERIOD_LABELS[item.mealPeriod] || item.mealPeriod || item.mealType}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-500">{item.quantityG}g</span>
               </li>

@@ -20,7 +20,7 @@ public interface SelfPlanService {
 
     void delete(UUID customerId, UUID id);
 
-    DietLogResponse markEaten(UUID customerId, UUID id);
+    DietLogResponse markEaten(UUID customerId, UUID id, String lateTickReason);
 
     SelfPlanSubmissionResponse submit(UUID customerId, LocalDate date);
 

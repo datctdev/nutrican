@@ -84,6 +84,7 @@ function LogCard({
     setIsSosModalOpen,
     hasActivePt,
     renderLogImages,
+    isPast,
 }) {
     const [detailsOpen, setDetailsOpen] = useState(false);
     const macros = log.macrosJson || {};
@@ -118,6 +119,11 @@ function LogCard({
                         {log.makeupForPeriod && MEAL_PERIOD_LABELS[log.makeupForPeriod] && (
                             <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
                                 Bù: {MEAL_PERIOD_LABELS[log.makeupForPeriod]}
+                            </span>
+                        )}
+                        {log.lateTickReason && (
+                            <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">
+                                Tick trễ: {log.lateTickReason}
                             </span>
                         )}
                         {hasAi && (
@@ -212,7 +218,7 @@ function LogCard({
                         </div>
                     )}
 
-                    {(log.status === 'DRAFT' || log.status === 'MANUAL_REQUIRED') && (
+                    {!isPast && (log.status === 'DRAFT' || log.status === 'MANUAL_REQUIRED') && (
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
                             <Button
                                 size="sm"
@@ -240,14 +246,16 @@ function LogCard({
                     )}
                 </div>
 
-                <Button
-                    variant="ghost"
-                    onClick={() => handleDelete(log.id)}
-                    className="text-slate-400 hover:text-danger hover:bg-danger/5 rounded-xl h-9 w-9 p-0 shrink-0"
-                    title="Xóa bữa ăn"
-                >
-                    <Trash2 className="w-4 h-4" />
-                </Button>
+                {!isPast && (
+                    <Button
+                        variant="ghost"
+                        onClick={() => handleDelete(log.id)}
+                        className="text-slate-400 hover:text-danger hover:bg-danger/5 rounded-xl h-9 w-9 p-0 shrink-0"
+                        title="Xóa bữa ăn"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </Button>
+                )}
             </div>
             {renderLogImages(log)}
         </div>
@@ -265,6 +273,7 @@ export default function MealSection({
     setSosMessage,
     setIsSosModalOpen,
     hasActivePt = false,
+    isPast = false,
 }) {
     const renderLogImages = (log) => {
         const primaryUrl = getFullImageUrl(log.imageUrl);
@@ -376,6 +385,7 @@ export default function MealSection({
                                     setIsSosModalOpen={setIsSosModalOpen}
                                     hasActivePt={hasActivePt}
                                     renderLogImages={renderLogImages}
+                                    isPast={isPast}
                                 />
                             ))}
                         </div>

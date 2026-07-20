@@ -130,6 +130,10 @@ public class ProfileExtensionsController {
         if (request.getActivityLevel() == null) {
             throw new BadRequestException("activityLevel is required");
         }
+        if (dietLogHelper.hasActivePt(user.getId())) {
+            throw new BadRequestException(
+                    "Mục tiêu dinh dưỡng đang do PT quản lý — liên hệ PT để thay đổi macro");
+        }
         User fresh = userRepository.findById(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", user.getId()));
         fresh.setActivityLevel(request.getActivityLevel());

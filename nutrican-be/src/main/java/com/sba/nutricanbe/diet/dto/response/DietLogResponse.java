@@ -43,6 +43,7 @@ public class DietLogResponse {
     private String ptNote;
     private PtCorrectionReason ptCorrectionReason;
     private LocalDate logDate;
+    private String lateTickReason;
     private LocalDateTime createdAt;
     private java.util.List<DietLogImageDto> additionalImages;
     private MealSource mealSource;

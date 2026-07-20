@@ -2,6 +2,12 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { workspaceService } from '../../services/workspaceService';
 import { dietService } from '../../services/dietService';
+import {
+  getPendingSelfPeriodsForDate,
+  pickEffectivePlanItemsByPeriod,
+  computePlanProgressBreakdown,
+  MEAL_PERIOD_LABELS,
+} from '../customer/components/dietUtils';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { ArrowLeft, Save, Calendar as CalendarIcon, Copy, Loader2, AlertCircle, FileText, ShoppingCart } from 'lucide-react';
@@ -42,6 +48,8 @@ function toUiMealPlanItem(item, idx, foodsByCode) {
   const baseServingSizeG = Number(food?.servingSizeG) || 100;
   const portionGrams = Number(item.portionGrams) || baseServingSizeG;
   const portionRatio = portionGrams / baseServingSizeG;
+  const apiCal = Number(item.calories);
+  const hasApiMacros = apiCal > 0 || Number(item.protein) > 0 || Number(item.carb) > 0 || Number(item.fat) > 0;
   const baseCalories = Number(food?.calories) || 0;
   const baseProtein = Number(food?.protein) || 0;
   const baseCarb = Number(food?.carb) || 0;
@@ -57,16 +65,19 @@ function toUiMealPlanItem(item, idx, foodsByCode) {
     nameVi: item.freeText || food?.nameVi || item.foodCode || 'Món ăn',
     portionGrams,
     baseServingSizeG,
-    baseCalories,
-    baseProtein,
-    baseCarb,
-    baseFat,
-    calcCalories: Math.round(baseCalories * portionRatio),
-    calcProtein: Math.round(baseProtein * portionRatio),
-    calcCarb: Math.round(baseCarb * portionRatio),
-    calcFat: Math.round(baseFat * portionRatio),
+    baseCalories: hasApiMacros ? apiCal / (portionRatio || 1) : baseCalories,
+    baseProtein: hasApiMacros ? Number(item.protein) / (portionRatio || 1) : baseProtein,
+    baseCarb: hasApiMacros ? Number(item.carb) / (portionRatio || 1) : baseCarb,
+    baseFat: hasApiMacros ? Number(item.fat) / (portionRatio || 1) : baseFat,
+    calcCalories: hasApiMacros ? Math.round(apiCal) : Math.round(baseCalories * portionRatio),
+    calcProtein: hasApiMacros ? Math.round(Number(item.protein) || 0) : Math.round(baseProtein * portionRatio),
+    calcCarb: hasApiMacros ? Math.round(Number(item.carb) || 0) : Math.round(baseCarb * portionRatio),
+    calcFat: hasApiMacros ? Math.round(Number(item.fat) || 0) : Math.round(baseFat * portionRatio),
     note: item.note || '',
     eaten: item.eaten || false,
+    lateTickReason: item.lateTickReason || '',
+    mealPeriod: item.mealPeriod || null,
+    sourceType: item.sourceType || 'PT_ORIGINAL',
   };
 }
 
@@ -90,6 +101,8 @@ export default function PtMealPlanPage() {
   const [prefWarnCodes, setPrefWarnCodes] = useState(new Set());
   const [pendingSuggestions, setPendingSuggestions] = useState([]);
   const [pendingSelfPlans, setPendingSelfPlans] = useState([]);
+  const [clientIntake, setClientIntake] = useState(null);
+  const [clientIntakeLoading, setClientIntakeLoading] = useState(false);
   
   // Modal state
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -193,6 +206,44 @@ export default function PtMealPlanPage() {
     return () => clearTimeout(timer);
   }, [clientId, weekStart, loadData]);
 
+  const loadClientIntake = useCallback(async () => {
+    if (!clientId || !selectedDate) return;
+    setClientIntakeLoading(true);
+    try {
+      const [dayPlanRes, summaryRes] = await Promise.all([
+        workspaceService.getClientDayPlan(clientId, selectedDate),
+        workspaceService.getClientDietSummary(clientId, selectedDate),
+      ]);
+      const dayItems = dayPlanRes.data?.data?.items || [];
+      const summary = summaryRes.data?.data || {};
+      const breakdown = computePlanProgressBreakdown(dayItems, {
+        dateIso: selectedDate,
+        coachedMode: true,
+      });
+      const logCal = Number(summary.totalCalories) || 0;
+      const logPro = Number(summary.totalProtein) || 0;
+      const logCarb = Number(summary.totalCarbs) || 0;
+      const logFat = Number(summary.totalFat) || 0;
+      setClientIntake({
+        consumed: {
+          calories: logCal + (breakdown.compliance?.calories || 0),
+          protein: logPro + (breakdown.compliance?.protein || 0),
+          carb: logCarb + (breakdown.compliance?.carb || 0),
+          fat: logFat + (breakdown.compliance?.fat || 0),
+        },
+        pending: breakdown.pending || {},
+      });
+    } catch {
+      setClientIntake(null);
+    } finally {
+      setClientIntakeLoading(false);
+    }
+  }, [clientId, selectedDate]);
+
+  useEffect(() => {
+    loadClientIntake();
+  }, [loadClientIntake, items, pendingSelfPlans]);
+
   const refreshSuggestions = async () => {
     try {
       const res = await workspaceService.getPendingMealPlanSuggestions(clientId);
@@ -207,6 +258,7 @@ export default function PtMealPlanPage() {
     } catch {
       setPendingSelfPlans([]);
     }
+    await loadClientIntake();
   };
 
   const weekDates = useMemo(() => {
@@ -218,6 +270,19 @@ export default function PtMealPlanPage() {
     }
     return dates;
   }, [weekStart]);
+
+  const currentDayItems = useMemo(
+    () => items.filter((i) => i.planDate === selectedDate),
+    [items, selectedDate],
+  );
+  const pendingSelfPeriods = useMemo(
+    () => getPendingSelfPeriodsForDate(pendingSelfPlans, selectedDate),
+    [pendingSelfPlans, selectedDate],
+  );
+  const effectiveDayItems = useMemo(
+    () => pickEffectivePlanItemsByPeriod(currentDayItems, { pendingSelfPeriods }),
+    [currentDayItems, pendingSelfPeriods],
+  );
 
   const handlePrevWeek = () => {
     const d = new Date(weekStart);
@@ -243,7 +308,8 @@ export default function PtMealPlanPage() {
       tempId: `new-${Date.now()}`,
       planDate: selectedDate,
       mealType: targetMealType,
-      foodCode: food.aliases?.[0] || food.nameEn || food.nameVi,
+      foodCode: food.foodCode || food.aliases?.[0] || food.nameEn || food.nameVi,
+      foodItemId: food.id || null,
       nameVi: food.nameVi,
       freeText: food.nameVi,
       portionGrams: portionGrams,
@@ -425,18 +491,23 @@ export default function PtMealPlanPage() {
     );
   }
 
-  const currentDayItems = items.filter(i => i.planDate === selectedDate);
-  const dayCals = currentDayItems.reduce((acc, i) => acc + (i.calcCalories || 0), 0);
-  const dayPro = currentDayItems.reduce((acc, i) => acc + (i.calcProtein || 0), 0);
-  const dayCarb = currentDayItems.reduce((acc, i) => acc + (i.calcCarb || 0), 0);
-  const dayFat = currentDayItems.reduce((acc, i) => acc + (i.calcFat || 0), 0);
+  const dayCals = effectiveDayItems.reduce((acc, i) => acc + (i.calcCalories || 0), 0);
+  const dayPro = effectiveDayItems.reduce((acc, i) => acc + (i.calcProtein || 0), 0);
+  const dayCarb = effectiveDayItems.reduce((acc, i) => acc + (i.calcCarb || 0), 0);
+  const dayFat = effectiveDayItems.reduce((acc, i) => acc + (i.calcFat || 0), 0);
+  const consumedCals = clientIntake?.consumed?.calories ?? 0;
+  const consumedPro = clientIntake?.consumed?.protein ?? 0;
+  const consumedCarb = clientIntake?.consumed?.carb ?? 0;
+  const consumedFat = clientIntake?.consumed?.fat ?? 0;
+  const pendingPlanCals = clientIntake?.pending?.calories ?? 0;
+  const pendingPeriodLabels = [...pendingSelfPeriods].map((p) => MEAL_PERIOD_LABELS[p] || p);
   
   const targetCals = profile?.tdee || 0;
   const targetPro = profile?.protein || 0;
   const targetCarb = profile?.carb || 0;
   const targetFat = profile?.fat || 0;
 
-  const isOverCal = targetCals > 0 && dayCals > targetCals * 1.1;
+  const isOverCal = targetCals > 0 && consumedCals > targetCals * 1.1;
 
   // Render items with warnings injected
   const itemsWithWarnings = items.map(i => ({
@@ -485,7 +556,7 @@ export default function PtMealPlanPage() {
         </div>
       </div>
 
-      {pendingSelfPlans.length > 0 && (
+      {pendingSelfPlans.length > 0 ? (
         <Card>
           <CardContent className="p-5">
             <SelfPlanSubmissionReviewList
@@ -495,6 +566,15 @@ export default function PtMealPlanPage() {
                 await loadData();
               }}
             />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-dashed border-slate-200 bg-slate-50/50">
+          <CardContent className="p-5">
+            <h3 className="text-sm font-extrabold text-slate-800">Kế hoạch ngày đặc biệt chờ duyệt</h3>
+            <p className="mt-1 text-xs text-slate-500 leading-relaxed">
+              Chưa có buổi nào chờ duyệt — chỉ hiện khi học viên gửi đề xuất cho buổi <strong>chưa ăn</strong>.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -588,7 +668,21 @@ export default function PtMealPlanPage() {
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-xl font-black text-slate-800">Thực đơn ngày {new Date(selectedDate).toLocaleDateString('vi-VN')}</h2>
-                <p className="text-sm text-slate-500 font-medium mt-1">Theo dõi tiến độ và cân đối dinh dưỡng.</p>
+                <p className="text-sm text-slate-500 font-medium mt-1">
+                  <strong className="text-emerald-700">Học viên đã nạp</strong> đồng bộ với màn Diet — gồm nhật ký + tick tuân thủ PT.
+                  {clientIntakeLoading && <span className="ml-1 text-slate-400">(đang tải…)</span>}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Kế hoạch PT còn lại (nếu ăn đúng thực đơn): <strong>{Math.round(dayCals)} kcal</strong>
+                  {pendingPlanCals > 0 && (
+                    <span> · học viên có thể nạp thêm <strong>{Math.round(pendingPlanCals)} kcal</strong> từ plan chưa tick</span>
+                  )}
+                </p>
+                {pendingPeriodLabels.length > 0 && (
+                  <p className="text-xs text-amber-700 font-semibold mt-1">
+                    {pendingPeriodLabels.join(', ')}: có đề xuất chờ duyệt — PT gốc buổi đó chưa tính vào tổng.
+                  </p>
+                )}
               </div>
               <Button variant="outline" size="sm" onClick={handleCopyPrevDay} className="gap-2 rounded-xl text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100">
                 <Copy className="w-4 h-4" /> Sao chép hôm qua
@@ -596,11 +690,14 @@ export default function PtMealPlanPage() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <MacroProgressCard label="Calories" current={dayCals} target={targetCals} unit="kcal" color="blue" />
-              <MacroProgressCard label="Protein" current={dayPro} target={targetPro} unit="g" color="rose" />
-              <MacroProgressCard label="Carb" current={dayCarb} target={targetCarb} unit="g" color="amber" />
-              <MacroProgressCard label="Fat" current={dayFat} target={targetFat} unit="g" color="indigo" />
+              <MacroProgressCard label="kcal" current={consumedCals} target={targetCals} unit="kcal" color="emerald" />
+              <MacroProgressCard label="Protein" current={consumedPro} target={targetPro} unit="g" color="rose" />
+              <MacroProgressCard label="Carb" current={consumedCarb} target={targetCarb} unit="g" color="amber" />
+              <MacroProgressCard label="Fat" current={consumedFat} target={targetFat} unit="g" color="indigo" />
             </div>
+            <p className="text-[11px] text-slate-400 mt-3 font-medium">
+              Tham chiếu kế hoạch đầy đủ 5 buổi: {Math.round(dayCals)} kcal · P {Math.round(dayPro)}g · C {Math.round(dayCarb)}g · F {Math.round(dayFat)}g
+            </p>
           </div>
 
           <MealPlanDayView
@@ -660,6 +757,7 @@ function MacroProgressCard({ label, current, target, unit, color }) {
   
   const colors = {
     blue: 'bg-blue-500',
+    emerald: 'bg-emerald-500',
     rose: 'bg-rose-500',
     amber: 'bg-amber-500',
     indigo: 'bg-indigo-500',

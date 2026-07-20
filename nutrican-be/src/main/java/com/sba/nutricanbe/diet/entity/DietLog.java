@@ -86,6 +86,9 @@ public class DietLog extends BaseEntity {
     @Column(name = "log_date")
     private LocalDate logDate;
 
+    @Column(name = "late_tick_reason", columnDefinition = "TEXT")
+    private String lateTickReason;
+
     @Column(name = "is_pt_notified")
     @Builder.Default
     private Boolean isPtNotified = false;

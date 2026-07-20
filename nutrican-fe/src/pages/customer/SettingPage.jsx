@@ -24,6 +24,10 @@ export default function SettingPage() {
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
   const [targetWeight, setTargetWeight] = useState('');
   const [allergyNotes, setAllergyNotes] = useState('');
+  const [hasActivePt, setHasActivePt] = useState(false);
+  const [activityLevel, setActivityLevel] = useState('MODERATE');
+  const [initialNutritionGoal, setInitialNutritionGoal] = useState('MAINTAIN');
+  const [initialPregnancyTrimester, setInitialPregnancyTrimester] = useState(1);
 
   useEffect(() => {
     fetchPreferences();
@@ -31,18 +35,27 @@ export default function SettingPage() {
 
   const fetchPreferences = async () => {
     try {
-      const [profileRes, allergyRes, goalsRes] = await Promise.all([
+      const [profileRes, allergyRes, goalsRes, ptRes] = await Promise.all([
         userService.getProfile(),
         userService.getAllergies().catch(() => ({ data: { data: [] } })),
-        profileExtensionsService.getGoals().catch(() => ({ data: { data: null } }))
+        profileExtensionsService.getGoals().catch(() => ({ data: { data: null } })),
+        profileExtensionsService.hasActivePt().catch(() => ({ data: { data: { hasActivePt: false } } })),
       ]);
       const data = profileRes.data.data;
       
       setAllergyNotes(allergyRes.data.data?.allergyNotes || data.allergyNotes || '');
+      setHasActivePt(Boolean(ptRes.data?.data?.hasActivePt));
 
       if (data.dietPreference) setDietPreference(data.dietPreference);
-      if (data.nutritionGoal) setNutritionGoal(data.nutritionGoal);
-      if (data.pregnancyTrimester) setPregnancyTrimester(data.pregnancyTrimester);
+      if (data.nutritionGoal) {
+        setNutritionGoal(data.nutritionGoal);
+        setInitialNutritionGoal(data.nutritionGoal);
+      }
+      if (data.pregnancyTrimester) {
+        setPregnancyTrimester(data.pregnancyTrimester);
+        setInitialPregnancyTrimester(data.pregnancyTrimester);
+      }
+      if (data.activityLevel) setActivityLevel(data.activityLevel);
 
       if (goalsRes.data?.data) {
         setTargetWeight(goalsRes.data.data.targetWeight || '');
@@ -63,6 +76,10 @@ export default function SettingPage() {
 
   const handleSaveSettings = async () => {
     setSaving(true);
+    const macroFieldsChanged =
+      nutritionGoal !== initialNutritionGoal
+      || (nutritionGoal === 'PREGNANT' && pregnancyTrimester !== initialPregnancyTrimester);
+
     try {
       await userService.updatePreferences({
         dietPreference,
@@ -86,7 +103,28 @@ export default function SettingPage() {
         });
       }
 
-      toast.success('Đã lưu cấu hình thành công');
+      if (!hasActivePt && macroFieldsChanged) {
+        try {
+          const res = await userService.recalculateMacros({
+            activityLevel,
+            nutritionGoal,
+            pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+          });
+          const kcal = res.data?.data?.macros?.dailyCalories;
+          window.dispatchEvent(new CustomEvent('MACRO_TARGET_UPDATED'));
+          setInitialNutritionGoal(nutritionGoal);
+          setInitialPregnancyTrimester(pregnancyTrimester);
+          if (kcal != null) {
+            toast.success(`Đã lưu — mục tiêu calo: ${Math.round(Number(kcal))} kcal`);
+          } else {
+            toast.success('Đã lưu cấu hình thành công');
+          }
+        } catch {
+          toast.warning('Đã lưu tuỳ chọn, nhưng chưa cập nhật lại mục tiêu calo — vui lòng thử lại');
+        }
+      } else {
+        toast.success('Đã lưu cấu hình thành công');
+      }
     } catch {
       toast.error('Không thể lưu cấu hình');
     } finally {
@@ -216,10 +254,16 @@ export default function SettingPage() {
 
             <div>
               <label className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">Mục tiêu dinh dưỡng</label>
+              {hasActivePt && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-2 font-medium">
+                  Mục tiêu dinh dưỡng đang do PT quản lý — liên hệ PT để thay đổi
+                </p>
+              )}
               <select
                 value={nutritionGoal}
                 onChange={(e) => setNutritionGoal(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+                disabled={hasActivePt}
+                className={`w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium ${hasActivePt ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
               >
                 {[
                   { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
@@ -249,7 +293,8 @@ export default function SettingPage() {
                 <select
                   value={pregnancyTrimester}
                   onChange={(e) => setPregnancyTrimester(Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium"
+                  disabled={hasActivePt}
+                  className={`w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium ${hasActivePt ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                 >
                   <option value={1}>3 tháng đầu (Trimester 1)</option>
                   <option value={2}>3 tháng giữa (Trimester 2)</option>

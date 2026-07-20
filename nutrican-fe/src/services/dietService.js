@@ -41,7 +41,7 @@ export const dietService = {
     saveFeedback: (logId, data) => api.put(`/diet/logs/${logId}/feedback`, data),
     getResNetDishes: () => api.get('/foods/resnet-dishes'),
     searchFoods: (q, params = {}) => api.get('/foods/search', { params: { q, dietFilter: true, ...params } }),
-    getFoodsByCodes: (codes) => api.get('/foods/by-codes', { params: { codes: codes.join(',') } }),
+    getFoodsByCodes: (codes) => api.get('/foods/by-codes', { params: { codes } }),
     getHotpotBroths: () => api.get('/foods/hotpot/broths'),
     getHotpotItems: () => api.get('/foods/hotpot/items'),
 
@@ -50,7 +50,9 @@ export const dietService = {
     createSelfPlanItem: (data) => api.post('/diet/self-plan', data),
     updateSelfPlanItem: (id, data) => api.put(`/diet/self-plan/${id}`, data),
     deleteSelfPlanItem: (id) => api.delete(`/diet/self-plan/${id}`),
-    markSelfPlanEaten: (id) => api.post(`/diet/self-plan/${id}/eaten`),
+    markSelfPlanEaten: (id, lateTickReason) => api.post(`/diet/self-plan/${id}/eaten`, null, {
+        params: lateTickReason ? { lateTickReason } : undefined,
+    }),
     submitSelfPlan: (date) => api.post('/diet/self-plan/submit', null, { params: { date } }),
     cancelSelfPlanSubmission: (id) => api.post(`/diet/self-plan/submissions/${id}/cancel`),
     getSelfPlanSubmission: (date) => api.get('/diet/self-plan/submissions', { params: { date } }),

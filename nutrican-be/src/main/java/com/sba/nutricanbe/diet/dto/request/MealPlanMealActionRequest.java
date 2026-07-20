@@ -8,6 +8,7 @@ import java.time.LocalDate;
 public class MealPlanMealActionRequest {
     private LocalDate planDate;
     private String mealType;
+    private String mealPeriod;
     private String skipReason;
     private String skipNote;
 }

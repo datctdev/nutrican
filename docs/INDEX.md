@@ -11,6 +11,8 @@
 - [API_DOCUMENTATION](./API_DOCUMENTATION.md) - Full API reference
 - [ARCHITECTURE](./ARCHITECTURE.md) - System architecture
 - [FEATURES](./FEATURES.md) - Feature descriptions
+- [FEATURE_MEAL_WINDOWS_SELFPLAN](./FEATURE_MEAL_WINDOWS_SELFPLAN.md) - **Mức vận động + 5 buổi + Plan ăn ngày + Duyệt PT (luồng & biên)**
+- [MANUAL_QA_DEMO_CHECKLIST](./MANUAL_QA_DEMO_CHECKLIST.md) - **Checklist test thủ công (demo.solo / demo.coached / pt.certified)**
 - [FRONTEND](./FRONTEND.md) - Frontend documentation
 - [DATABASE_SCHEMA](./DATABASE_SCHEMA.md) - Database design
 - [DEPLOYMENT](./DEPLOYMENT.md) - Deployment guide

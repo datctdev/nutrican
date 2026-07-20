@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.diet.dto.response;
 
+import com.sba.nutricanbe.common.dto.MacroNutrients;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
@@ -36,8 +37,17 @@ public class MealPlanItemResponse {
     private String skipNote;
     private MealPlanItemSourceType sourceType;
     private UUID foodItemId;
+    private String lateTickReason;
+    private BigDecimal calories;
+    private BigDecimal protein;
+    private BigDecimal carb;
+    private BigDecimal fat;
 
     public static MealPlanItemResponse from(MealPlanItem item) {
+        return from(item, null);
+    }
+
+    public static MealPlanItemResponse from(MealPlanItem item, MacroNutrients macros) {
         return MealPlanItemResponse.builder()
                 .id(item.getId())
                 .createdAt(item.getCreatedAt())
@@ -55,6 +65,11 @@ public class MealPlanItemResponse {
                 .skipNote(item.getSkipNote())
                 .sourceType(item.getSourceType() != null ? item.getSourceType() : MealPlanItemSourceType.PT_ORIGINAL)
                 .foodItemId(item.getFoodItemId())
+                .lateTickReason(item.getLateTickReason())
+                .calories(macros != null ? macros.calories() : null)
+                .protein(macros != null ? macros.protein() : null)
+                .carb(macros != null ? macros.carbs() : null)
+                .fat(macros != null ? macros.fat() : null)
                 .build();
     }
 }

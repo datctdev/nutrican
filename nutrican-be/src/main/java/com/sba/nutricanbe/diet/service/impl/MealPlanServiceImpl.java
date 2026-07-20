@@ -23,6 +23,7 @@ import com.sba.nutricanbe.diet.dto.response.PlanDietPrefWarning;
 import com.sba.nutricanbe.diet.entity.MealPlan;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.entity.MealPlanSuggestion;
+import com.sba.nutricanbe.diet.entity.SelfPlanItem;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
 import com.sba.nutricanbe.diet.enums.MealPlanReplacementReason;
@@ -34,11 +35,13 @@ import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanSuggestionRepository;
+import com.sba.nutricanbe.diet.repository.SelfPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.WeeklySummaryRepository;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
+import com.sba.nutricanbe.diet.service.MealPlanItemMacrosResolver;
 import com.sba.nutricanbe.diet.service.MealPlanService;
 import com.sba.nutricanbe.user.dto.NotificationPayload;
 import com.sba.nutricanbe.user.entity.MacroTarget;
@@ -81,6 +84,8 @@ public class MealPlanServiceImpl implements MealPlanService {
     private final MacroTargetRepository macroTargetRepository;
     private final NotificationService notificationService;
     private final WebSocketSessionService webSocketSessionService;
+    private final MealPlanItemMacrosResolver mealPlanItemMacrosResolver;
+    private final SelfPlanItemRepository selfPlanItemRepository;
 
     @Override
     @Transactional
@@ -92,7 +97,7 @@ public class MealPlanServiceImpl implements MealPlanService {
         MealPlan plan = mealPlanRepository.save(MealPlan.builder()
                 .clientId(request.getClientId())
                 .ptId(ptId)
-                .weekStart(request.getWeekStart() != null ? request.getWeekStart() : LocalDate.now())
+                .weekStart(request.getWeekStart() != null ? request.getWeekStart() : DietDates.todayVn())
                 .notes(request.getNotes())
                 .build());
         return finalizeSave(plan, request.getClientId(), request.getItems());
@@ -109,7 +114,7 @@ public class MealPlanServiceImpl implements MealPlanService {
                 .orElseGet(() -> mealPlanRepository.save(MealPlan.builder()
                         .clientId(clientId)
                         .ptId(ptId)
-                        .weekStart(request.getWeekStart() != null ? request.getWeekStart() : LocalDate.now())
+                        .weekStart(request.getWeekStart() != null ? request.getWeekStart() : DietDates.todayVn())
                         .build()));
         if (!plan.getPtId().equals(ptId)) {
             throw new BadRequestException("You can only update meal plans that you created");
@@ -188,18 +193,22 @@ public class MealPlanServiceImpl implements MealPlanService {
 
     @Override
     @Transactional
-    public MealPlanItemResponse markEaten(UUID customerId, UUID itemId, boolean eaten) {
+    public MealPlanItemResponse markEaten(UUID customerId, UUID itemId, boolean eaten, String lateTickReason) {
         OwnedMealPlanItem owned = requireOwnedPublishedItem(customerId, itemId);
         MealPlanItem item = owned.item();
         if (eaten) {
             if (item.getMealPeriod() == null) {
                 throw new BadRequestException("Món plan thiếu khung giờ; sửa/thêm lại món");
             }
-            if (!MealPeriods.isMealPeriodOpen(item.getPlanDate(), item.getMealPeriod())) {
+            if (!MealPeriods.isMealPeriodOpen(item.getPlanDate(), item.getMealPeriod())
+                    && !allowLateTick(item.getPlanDate(), item.getMealPeriod(), lateTickReason)) {
                 throw new BadRequestException("Chỉ đánh dấu đã ăn trong khung giờ của buổi đó");
             }
             if (item.getPlanDate().isAfter(DietDates.todayVn())) {
                 throw new BadRequestException("Future meal-plan items cannot be marked as eaten");
+            }
+            if (item.getPlanDate().isBefore(DietDates.todayVn())) {
+                throw new BadRequestException("Past meal-plan items can no longer be changed");
             }
         } else {
             assertDateIsActionable(item);
@@ -210,30 +219,44 @@ public class MealPlanServiceImpl implements MealPlanService {
         if (eaten && hasPendingReplacement(itemId)) {
             throw new BadRequestException("Cancel or wait for the pending replacement request first");
         }
-
         MealPlanItemSourceType sourceType = item.getSourceType() != null
                 ? item.getSourceType()
                 : MealPlanItemSourceType.PT_ORIGINAL;
+        if (eaten && sourceType == MealPlanItemSourceType.PT_ORIGINAL && item.getMealPeriod() != null) {
+            assertNoPendingSelfReviewInPeriod(customerId, item.getPlanDate(), item.getMealPeriod());
+        }
 
         if (eaten && sourceType == MealPlanItemSourceType.SELF_OVERRIDE) {
             if (Boolean.TRUE.equals(item.getEaten())) {
                 throw new BadRequestException("Món này đã được ghi nhận ăn rồi");
             }
-            createDietLogFromOverride(customerId, item);
+            createDietLogFromOverride(customerId, item, lateTickReason);
         }
 
         item.setEaten(eaten);
+        String normalizedLateTickReason = eaten ? normalizeLateTickReason(lateTickReason) : null;
+        item.setLateTickReason(normalizedLateTickReason);
         MealPlanItem saved = mealPlanItemRepository.save(item);
+        if (normalizedLateTickReason != null) {
+            notificationService.notify(owned.plan().getPtId(), NotificationPayload.builder()
+                    .type("MEAL_PLAN_LATE_TICK")
+                    .title("Học viên vừa tick trễ một bữa ăn")
+                    .body(foodLabel(item) + " · " + normalizedLateTickReason)
+                    .linkType(NotificationLinkType.MEAL_PLAN)
+                    .linkRefId(owned.plan().getClientId())
+                    .sendEmail(false)
+                    .build());
+        }
         webSocketSessionService.sendToUserOnly(owned.plan().getPtId(), "MEAL_PLAN_PROGRESS_UPDATED",
                 Map.of(
                         "clientId", customerId,
                         "planId", owned.plan().getId(),
                         "weekStart", owned.plan().getWeekStart(),
                         "planDate", item.getPlanDate()));
-        return MealPlanItemResponse.from(saved);
+        return MealPlanItemResponse.from(saved, mealPlanItemMacrosResolver.resolve(saved));
     }
 
-    private void createDietLogFromOverride(UUID customerId, MealPlanItem item) {
+    private void createDietLogFromOverride(UUID customerId, MealPlanItem item, String lateTickReason) {
         CreateDietLogRequest logReq = new CreateDietLogRequest();
         logReq.setMealType(item.getMealType());
         logReq.setMealPeriod(item.getMealPeriod());
@@ -245,6 +268,7 @@ public class MealPlanServiceImpl implements MealPlanService {
         logReq.setFoodDescription(name);
         logReq.setFoodItemId(item.getFoodItemId());
         logReq.setSendToPt(false);
+        logReq.setLateTickReason(normalizeLateTickReason(lateTickReason));
 
         BigDecimal qty = item.getPortionGrams() != null ? item.getPortionGrams() : BigDecimal.valueOf(100);
         DietLogItemRequest line = new DietLogItemRequest();
@@ -344,7 +368,8 @@ public class MealPlanServiceImpl implements MealPlanService {
         if (skipReason == MealPlanSkipReason.ALLERGY) {
             notifyAllergy(plan, foodLabel(item) + " (" + item.getPlanDate() + ")", false);
         }
-        return MealPlanItemResponse.from(mealPlanItemRepository.save(item));
+        MealPlanItem saved = mealPlanItemRepository.save(item);
+        return MealPlanItemResponse.from(saved, mealPlanItemMacrosResolver.resolve(saved));
     }
 
     @Override
@@ -354,7 +379,8 @@ public class MealPlanServiceImpl implements MealPlanService {
         assertDateIsActionable(item);
         item.setSkipReason(null);
         item.setSkipNote(null);
-        return MealPlanItemResponse.from(mealPlanItemRepository.save(item));
+        MealPlanItem saved = mealPlanItemRepository.save(item);
+        return MealPlanItemResponse.from(saved, mealPlanItemMacrosResolver.resolve(saved));
     }
 
     @Override
@@ -362,9 +388,7 @@ public class MealPlanServiceImpl implements MealPlanService {
     public List<MealPlanItemResponse> skipMeal(
             UUID customerId, UUID planId, MealPlanMealActionRequest request) {
         MealPlan plan = requireOwnedPublishedPlan(customerId, planId);
-        MealType mealType = parseMealType(request.getMealType());
-        List<MealPlanItem> items = mealPlanItemRepository.findByMealPlanIdAndPlanDateAndMealType(
-                planId, request.getPlanDate(), mealType);
+        List<MealPlanItem> items = resolveMealActionItems(planId, request);
         if (items.isEmpty()) {
             throw new ResourceNotFoundException("MealPlanMeal", planId);
         }
@@ -384,7 +408,10 @@ public class MealPlanServiceImpl implements MealPlanService {
             item.setSkipNote(request.getSkipNote());
         });
         if (reason == MealPlanSkipReason.ALLERGY) {
-            notifyAllergy(plan, request.getPlanDate() + " · " + mealType.name(), true);
+            String scope = items.get(0).getMealPeriod() != null
+                    ? items.get(0).getMealPeriod().name()
+                    : items.get(0).getMealType().name();
+            notifyAllergy(plan, request.getPlanDate() + " · " + scope, true);
         }
         return mealPlanItemRepository.saveAll(items).stream().map(MealPlanItemResponse::from).toList();
     }
@@ -394,8 +421,7 @@ public class MealPlanServiceImpl implements MealPlanService {
     public List<MealPlanItemResponse> unskipMeal(
             UUID customerId, UUID planId, MealPlanMealActionRequest request) {
         requireOwnedPublishedPlan(customerId, planId);
-        List<MealPlanItem> items = mealPlanItemRepository.findByMealPlanIdAndPlanDateAndMealType(
-                planId, request.getPlanDate(), parseMealType(request.getMealType()));
+        List<MealPlanItem> items = resolveMealActionItems(planId, request);
         if (items.isEmpty()) {
             throw new ResourceNotFoundException("MealPlanMeal", planId);
         }
@@ -652,7 +678,9 @@ public class MealPlanServiceImpl implements MealPlanService {
                 .toList();
         return new MealPlanDetailResponse(
                 MealPlanResponse.from(plan),
-                items.stream().map(MealPlanItemResponse::from).toList(),
+                items.stream()
+                        .map(i -> MealPlanItemResponse.from(i, mealPlanItemMacrosResolver.resolve(i)))
+                        .toList(),
                 dietPrefCheckService.checkPlan(clientId, foodCodes));
     }
 
@@ -691,6 +719,27 @@ public class MealPlanServiceImpl implements MealPlanService {
         }
     }
 
+    private MealPeriod parseMealPeriodOptional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return MealPeriod.valueOf(value.trim().toUpperCase());
+        } catch (RuntimeException exception) {
+            throw new BadRequestException("Invalid mealPeriod");
+        }
+    }
+
+    private List<MealPlanItem> resolveMealActionItems(UUID planId, MealPlanMealActionRequest request) {
+        MealPeriod period = parseMealPeriodOptional(request.getMealPeriod());
+        if (period != null) {
+            return mealPlanItemRepository.findByMealPlanIdAndPlanDateAndMealPeriod(
+                    planId, request.getPlanDate(), period);
+        }
+        return mealPlanItemRepository.findByMealPlanIdAndPlanDateAndMealType(
+                planId, request.getPlanDate(), parseMealType(request.getMealType()));
+    }
+
     private MealPlanSkipReason parseSkipReason(String value, String note) {
         if (value == null || value.isBlank()) {
             throw new BadRequestException("skipReason is required");
@@ -713,6 +762,19 @@ public class MealPlanServiceImpl implements MealPlanService {
         }
     }
 
+    private void assertNoPendingSelfReviewInPeriod(UUID customerId, LocalDate planDate, MealPeriod period) {
+        boolean pendingSelf = selfPlanItemRepository
+                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, planDate)
+                .stream()
+                .anyMatch(i -> period.equals(i.getMealPeriod())
+                        && Boolean.TRUE.equals(i.getLockedByReview())
+                        && !Boolean.TRUE.equals(i.getEaten()));
+        if (pendingSelf) {
+            throw new BadRequestException(
+                    "Buổi này có đề xuất đang chờ PT duyệt. Chờ PT duyệt hoặc hủy đề xuất trước khi tick plan PT.");
+        }
+    }
+
     private boolean hasPendingReplacement(UUID itemId) {
         return mealPlanSuggestionRepository.existsByMealPlanItemIdAndStatus(
                 itemId, MealPlanSuggestionStatus.PENDING);
@@ -721,12 +783,37 @@ public class MealPlanServiceImpl implements MealPlanService {
     private MealPlanSuggestion expireIfStale(MealPlanSuggestion suggestion, MealPlanItem item) {
         if (suggestion.getStatus() == MealPlanSuggestionStatus.PENDING
                 && item != null
-                && item.getPlanDate().isBefore(LocalDate.now())) {
+                && item.getPlanDate().isBefore(DietDates.todayVn())) {
             suggestion.setStatus(MealPlanSuggestionStatus.EXPIRED);
             suggestion.setDecidedAt(LocalDateTime.now());
             return mealPlanSuggestionRepository.save(suggestion);
         }
         return suggestion;
+    }
+
+    private boolean allowLateTick(LocalDate planDate, MealPeriod mealPeriod, String lateTickReason) {
+        String normalized = normalizeLateTickReason(lateTickReason);
+        if (normalized == null || planDate == null || mealPeriod == null) {
+            return false;
+        }
+        if (!planDate.equals(DietDates.todayVn())) {
+            return false;
+        }
+        return MealPeriods.isPastPeriodForLateTick(mealPeriod);
+    }
+
+    private String normalizeLateTickReason(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() < 10) {
+            throw new BadRequestException("lateTickReason phải có ít nhất 10 ký tự");
+        }
+        return trimmed;
     }
 
     private void notifyAllergy(MealPlan plan, String body, boolean wholeMeal) {

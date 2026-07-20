@@ -6,6 +6,7 @@ import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 import com.sba.nutricanbe.user.enums.Tier;
@@ -126,12 +127,13 @@ public class UserInitializer implements CommandLineRunner {
                 LocalDate.of(2000, 2, 20));
         seedCustomerE2eProfile(demoSolo, NutritionGoal.WEIGHT_LOSS, 172, "MALE");
         seedCustomerE2eProfile(demoCoached, NutritionGoal.MAINTAIN, 165, "FEMALE");
-        demoSolo.setActivityLevel(com.sba.nutricanbe.user.enums.ActivityLevel.MODERATE);
-        demoCoached.setActivityLevel(com.sba.nutricanbe.user.enums.ActivityLevel.LIGHT);
+        LocalDateTime onboardedAt = LocalDateTime.now().minusDays(14);
+        demoSolo.setOnboardingCompletedAt(onboardedAt);
+        demoCoached.setOnboardingCompletedAt(onboardedAt);
         userRepository.save(demoSolo);
         userRepository.save(demoCoached);
-        seedMacroTarget(demoSolo, 2100, 130, 230, 70);
-        seedMacroTarget(demoCoached, 1850, 105, 200, 60);
+        seedDemoMacroIfAbsent(demoSolo, ActivityLevel.MODERATE, 2100, 130, 230, 70);
+        seedDemoMacroIfAbsent(demoCoached, ActivityLevel.LIGHT, 1850, 105, 200, 60);
         seedMapping(certifiedPt, demoCoached, ClientMappingStatus.ACTIVE);
         // demoSolo: intentionally NO mapping (no PT)
 
@@ -254,20 +256,32 @@ public class UserInitializer implements CommandLineRunner {
     }
 
     private void seedMacroTarget(User customer, int calories, int protein, int carb, int fat) {
-        macroTargetRepository.findByUserId(customer.getId())
-                .ifPresentOrElse(existing -> {
-                    existing.setDailyCalories(BigDecimal.valueOf(calories));
-                    existing.setProtein(BigDecimal.valueOf(protein));
-                    existing.setCarb(BigDecimal.valueOf(carb));
-                    existing.setFat(BigDecimal.valueOf(fat));
-                    macroTargetRepository.save(existing);
-                }, () -> macroTargetRepository.save(MacroTarget.builder()
-                        .user(customer)
-                        .dailyCalories(BigDecimal.valueOf(calories))
-                        .protein(BigDecimal.valueOf(protein))
-                        .carb(BigDecimal.valueOf(carb))
-                        .fat(BigDecimal.valueOf(fat))
-                        .build()));
+        if (macroTargetRepository.findByUserId(customer.getId()).isPresent()) {
+            return;
+        }
+        macroTargetRepository.save(MacroTarget.builder()
+                .user(customer)
+                .dailyCalories(BigDecimal.valueOf(calories))
+                .protein(BigDecimal.valueOf(protein))
+                .carb(BigDecimal.valueOf(carb))
+                .fat(BigDecimal.valueOf(fat))
+                .build());
+    }
+
+    private void seedDemoMacroIfAbsent(User user, ActivityLevel activityLevel,
+                                       int calories, int protein, int carb, int fat) {
+        if (macroTargetRepository.findByUserId(user.getId()).isPresent()) {
+            return;
+        }
+        user.setActivityLevel(activityLevel);
+        userRepository.save(user);
+        macroTargetRepository.save(MacroTarget.builder()
+                .user(user)
+                .dailyCalories(BigDecimal.valueOf(calories))
+                .protein(BigDecimal.valueOf(protein))
+                .carb(BigDecimal.valueOf(carb))
+                .fat(BigDecimal.valueOf(fat))
+                .build());
     }
 
     private void seedPtMarketplacePrefs(User pt, List<String> goals, List<String> diets) {

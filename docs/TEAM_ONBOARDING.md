@@ -63,7 +63,21 @@ cd nutrican-fe && npm install && npm run dev
 | PT freelance | pt.freelance@gmail.com | 123456 |
 | Admin | admin@nutrican.com | Admin123! |
 
-Seed: `UserInitializer` + `DataInitializer` (chạy khi BE start).
+### Demo visual QA — fixture lâu đời (~14 ngày)
+
+| Vai trò | Email | Mật khẩu | Khi mở app thấy gì |
+|---------|-------|----------|---------------------|
+| Customer **không PT** | demo.solo@nutrican.com | Demo123! | Nhật ký ~14 ngày (5 buổi + vài badge Bù); Plan hôm nay/mai; body metrics; Macro Targets |
+| Customer **có PT** | demo.coached@nutrican.com | Demo123! | Meal plan PT publish 5 buổi (today→+14d); 2 PENDING (ngày +1/+2); lịch sử duyệt APPROVED/REJECTED |
+| PT duyệt demo | pt.certified@gmail.com | 123456 | Học viên → badge *Self-plan chờ duyệt* → `/pt/clients/:id/meal-plan` |
+
+**Full history** seed khi BE start: `DemoVeteranDataInitializer` (flag `DEMO_VETERAN_FIXTURES_V2`).  
+Refresh nhẹ hôm nay: `node scripts/seed-demo-meal-windows.mjs` (full +14d do BE V2).  
+Re-seed full: `DELETE FROM system_settings WHERE setting_key IN ('DEMO_VETERAN_FIXTURES_V1','DEMO_VETERAN_FIXTURES_V2')` rồi restart BE.
+
+Coaching vs Nhật ký: cả hai **5 buổi** theo `mealPeriod`; Coaching week picker (không calendar +14d). PT duyệt checklist: [FEATURE_MEAL_WINDOWS_SELFPLAN.md §4c](./FEATURE_MEAL_WINDOWS_SELFPLAN.md). **Checklist test mắt thường:** [MANUAL_QA_DEMO_CHECKLIST.md](./MANUAL_QA_DEMO_CHECKLIST.md).
+
+Seed: `UserInitializer` + `DataInitializer` + `DemoVeteranDataInitializer`.
 
 ## 5. Regression gate trước khi push PR
 

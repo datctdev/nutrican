@@ -65,4 +65,7 @@ public class MealPlanItem extends BaseEntity {
 
     @Column(name = "food_item_id")
     private UUID foodItemId;
+
+    @Column(name = "late_tick_reason", columnDefinition = "TEXT")
+    private String lateTickReason;
 }

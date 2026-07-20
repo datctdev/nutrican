@@ -5,8 +5,10 @@ export const mealPlanService = {
     params: weekStart ? { weekStart } : undefined,
   }),
   getAvailableWeeks: () => api.get('/meal-plans/weeks'),
-  markEaten: (itemId, eaten = true) =>
-    api.put(`/meal-plans/items/${itemId}/eaten`, null, { params: { eaten } }),
+  markEaten: (itemId, eaten = true, lateTickReason) =>
+    api.put(`/meal-plans/items/${itemId}/eaten`, null, {
+      params: { eaten, ...(lateTickReason ? { lateTickReason } : {}) },
+    }),
   suggestReplacement: (itemId, data) => api.post(`/meal-plans/items/${itemId}/suggest`, data),
   getSuggestions: (weekStart) => api.get('/meal-plans/suggestions', { params: { weekStart } }),
   cancelReplacement: (suggestionId) => api.put(`/meal-plans/suggestions/${suggestionId}/cancel`),

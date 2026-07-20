@@ -27,6 +27,7 @@ import {
     todayLocalIso,
     isFutureIso,
     isTodayIso,
+    isPastIso,
     formatDisplayDate,
     addDaysIso,
     monthKeyFromIso,
@@ -118,6 +119,7 @@ export default function DietTrackerPage() {
 
     const isToday = isTodayIso(selectedDate);
     const isFuture = isFutureIso(selectedDate);
+    const isPast = isPastIso(selectedDate);
     // AI + Manual: hôm nay chỉ khung hiện tại
     const applyAiPeriodLock = isToday;
     const [makeupForPeriod, setMakeupForPeriod] = useState(null);
@@ -282,6 +284,7 @@ export default function DietTrackerPage() {
         window.addEventListener('realtime_update_client', handleRealtimeUpdate);
         window.addEventListener('DIET_LOG_REVIEWED', handleRealtimeUpdate);
         window.addEventListener('SOS_RESOLVED', handleRealtimeUpdate);
+        window.addEventListener('MACRO_TARGET_UPDATED', handleRealtimeUpdate);
 
         return () => {
             isMounted = false;
@@ -290,6 +293,7 @@ export default function DietTrackerPage() {
             window.removeEventListener('realtime_update_client', handleRealtimeUpdate);
             window.removeEventListener('DIET_LOG_REVIEWED', handleRealtimeUpdate);
             window.removeEventListener('SOS_RESOLVED', handleRealtimeUpdate);
+            window.removeEventListener('MACRO_TARGET_UPDATED', handleRealtimeUpdate);
         };
     }, [loadResNetDishes, syncAll]);
 
@@ -916,6 +920,7 @@ export default function DietTrackerPage() {
                             setSosMessage={setSosMessage}
                             setIsSosModalOpen={setIsSosModalOpen}
                             hasActivePt={hasActivePt}
+                            isPast={isPast}
                         />
                     </div>
                 </div>
@@ -927,6 +932,7 @@ export default function DietTrackerPage() {
                         plannedTotals={plannedTotals}
                         isToday={isToday}
                         isFuture={isFuture}
+                        coachedMode={hasActivePt}
                     />
 
                     {sosTickets.length > 0 && (

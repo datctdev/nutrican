@@ -257,4 +257,20 @@ public class PtWorkspaceController {
             @RequestBody ApplyTemplateRequest request) {
         return ResponseEntity.ok(ptWorkspaceService.applyTemplateToClient(user.getId(), templateId, clientId, request));
     }
+
+    @GetMapping("/clients/{clientId}/day-plan")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.diet.dto.response.DayPlanResponse>> getClientDayPlan(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID clientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientDayPlan(user.getId(), clientId, date));
+    }
+
+    @GetMapping("/clients/{clientId}/diet-summary")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.diet.dto.response.DietSummaryResponse>> getClientDietSummary(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID clientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientDietSummary(user.getId(), clientId, date));
+    }
 }

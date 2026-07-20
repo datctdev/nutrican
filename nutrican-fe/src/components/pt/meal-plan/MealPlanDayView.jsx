@@ -90,6 +90,11 @@ export default function MealPlanDayView({ date, items = [], onUpdateItems, onOpe
                             <span>C: {item.calcCarb}g</span>
                             <span>F: {item.calcFat}g</span>
                           </div>
+                          {item.lateTickReason && (
+                            <span className="inline-flex items-center rounded-md bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold text-orange-800">
+                              Tick trễ: {item.lateTickReason}
+                            </span>
+                          )}
                           {item.note && (
                             <p className={`mt-1.5 text-xs ${item.nameVi?.includes('[CHEAT MEAL]') ? 'font-semibold text-amber-700' : 'text-slate-500'}`}>
                               {item.note}

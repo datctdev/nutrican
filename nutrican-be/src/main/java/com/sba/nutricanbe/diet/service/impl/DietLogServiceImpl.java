@@ -113,6 +113,7 @@ public class DietLogServiceImpl implements DietLogService {
                 .recognitionSource(RecognitionSource.MANUAL)
                 .experimentCohort(ExperimentCohort.MANUAL_ENTRY)
                 .foodItemId(request.getFoodItemId())
+                .lateTickReason(normalizeLateTickReason(request.getLateTickReason()))
                 .isPtNotified(false)
                 .build();
 
@@ -230,6 +231,7 @@ public class DietLogServiceImpl implements DietLogService {
         if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only edit your own diet logs");
         }
+        assertLogDateMutable(dietLog.getLogDate());
 
         if (request.getFoodDescription() != null) dietLog.setFoodDescription(request.getFoodDescription());
         if (request.getMealType() != null) dietLog.setMealType(request.getMealType());
@@ -255,7 +257,14 @@ public class DietLogServiceImpl implements DietLogService {
             dietLog.setMakeupForPeriod(
                     effectiveDate != null && effectiveDate.equals(DietDates.todayVn()) ? makeup : null);
         }
-        if (request.getLogDate() != null) dietLog.setLogDate(DietDates.resolveLogDate(request.getLogDate()));
+        if (request.getLogDate() != null) {
+            LocalDate resolvedLogDate = DietDates.resolveLogDate(request.getLogDate());
+            assertLogDateMutable(resolvedLogDate);
+            dietLog.setLogDate(resolvedLogDate);
+        }
+        if (request.getLateTickReason() != null) {
+            dietLog.setLateTickReason(normalizeLateTickReason(request.getLateTickReason()));
+        }
         if (request.getMealSource() != null) dietLog.setMealSource(request.getMealSource());
         if (request.getMealComplexity() != null) dietLog.setMealComplexity(request.getMealComplexity());
         if (request.getRestaurantName() != null) dietLog.setRestaurantName(request.getRestaurantName());
@@ -344,6 +353,7 @@ public class DietLogServiceImpl implements DietLogService {
         if (!dietLog.getCustomerId().equals(userId)) {
             throw new BadRequestException("You can only delete your own diet logs");
         }
+        assertLogDateMutable(dietLog.getLogDate());
 
         List<DietLogImage> additionalImages = dietLogImageRepository.findByDietLogIdOrderBySortOrderAsc(logId);
         Set<String> imageObjectNames = new java.util.LinkedHashSet<>();
@@ -406,6 +416,26 @@ public class DietLogServiceImpl implements DietLogService {
                 .build();
 
         return ApiResponse.success(summary);
+    }
+
+    private void assertLogDateMutable(LocalDate logDate) {
+        if (logDate != null && logDate.isBefore(DietDates.todayVn())) {
+            throw new BadRequestException("Ngày đã qua — không thể sửa hoặc xoá nhật ký");
+        }
+    }
+
+    private String normalizeLateTickReason(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() < 10) {
+            throw new BadRequestException("lateTickReason phải có ít nhất 10 ký tự");
+        }
+        return trimmed;
     }
 
     /**

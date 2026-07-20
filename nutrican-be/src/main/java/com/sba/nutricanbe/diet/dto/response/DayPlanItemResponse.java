@@ -35,4 +35,8 @@ public class DayPlanItemResponse {
     private Boolean lockedByReview;
     private Boolean applied;
     private UUID submissionId;
+    private String reconcileStatus;
+    private String lateTickReason;
+    /** Self đề xuất bị PT từ chối — hiển thị gạch ngang, giữ lịch sử. */
+    private Boolean choiceRejected;
 }

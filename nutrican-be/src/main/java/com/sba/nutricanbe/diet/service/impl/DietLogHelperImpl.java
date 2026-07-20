@@ -302,6 +302,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .ptNote(dietLog.getPtNote())
                 .ptCorrectionReason(dietLog.getPtCorrectionReason())
                 .logDate(dietLog.getLogDate())
+                .lateTickReason(dietLog.getLateTickReason())
                 .createdAt(dietLog.getCreatedAt())
                 .additionalImages(additionalImages)
                 .mealSource(dietLog.getMealSource())

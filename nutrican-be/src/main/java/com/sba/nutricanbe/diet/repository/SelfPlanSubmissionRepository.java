@@ -26,4 +26,7 @@ public interface SelfPlanSubmissionRepository extends JpaRepository<SelfPlanSubm
             UUID customerId, SelfPlanSubmissionStatus status);
 
     List<SelfPlanSubmission> findByCustomerIdOrderBySubmittedAtDesc(UUID customerId);
+
+    List<SelfPlanSubmission> findByCustomerIdAndPtIdAndStatus(
+            UUID customerId, UUID ptId, SelfPlanSubmissionStatus status);
 }

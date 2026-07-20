@@ -104,6 +104,23 @@ public final class MealPeriods {
         return new ArrayList<>(pastPeriods(current));
     }
 
+    public static Set<MealPeriod> pastTodayPeriods() {
+        return pastPeriods(current());
+    }
+
+    /** Ordinal past periods for late tick — excludes future windows (e.g. EVENING during AFTERNOON). */
+    public static boolean isPastPeriodForLateTick(MealPeriod period, LocalDateTime nowVn) {
+        if (period == null) return false;
+        LocalDateTime n = nowVn != null ? nowVn : LocalDateTime.now(DietDates.VN);
+        if (n.getHour() < 4) return false;
+        MealPeriod current = current(n);
+        return period.ordinal() < current.ordinal();
+    }
+
+    public static boolean isPastPeriodForLateTick(MealPeriod period) {
+        return isPastPeriodForLateTick(period, LocalDateTime.now(DietDates.VN));
+    }
+
     /**
      * Validate makeup_for_period: must be past vs current, != mealPeriod, only for today logs.
      * @return null if valid (including when makeup is null); otherwise error message

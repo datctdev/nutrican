@@ -76,9 +76,10 @@ public class DayPlanController {
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<ApiResponse<DietLogResponse>> markSelfPlanEaten(
             @AuthenticationPrincipal User user,
-            @PathVariable UUID id) {
+            @PathVariable UUID id,
+            @RequestParam(required = false) String lateTickReason) {
         return ResponseEntity.ok(ApiResponse.success(
-                selfPlanService.markEaten(user.getId(), id), "Đã ghi vào nhật ký"));
+                selfPlanService.markEaten(user.getId(), id, lateTickReason), "Đã ghi vào nhật ký"));
     }
 
     @PostMapping("/self-plan/submit")

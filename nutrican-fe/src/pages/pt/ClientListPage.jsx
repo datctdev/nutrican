@@ -129,6 +129,23 @@ export default function ClientListPage() {
         }
     }, [activeTab]);
 
+    const [pendingSelfPlanCounts, setPendingSelfPlanCounts] = useState({});
+
+    const fetchPendingSelfPlans = useCallback(async () => {
+        try {
+            const res = await workspaceService.listSelfPlanSubmissions();
+            const all = res.data?.data || [];
+            const counts = {};
+            all.forEach((s) => {
+                const id = String(s.customerId);
+                counts[id] = (counts[id] || 0) + 1;
+            });
+            setPendingSelfPlanCounts(counts);
+        } catch {
+            setPendingSelfPlanCounts({});
+        }
+    }, []);
+
     const fetchPendingCount = useCallback(async () => {
         try {
             const res = await workspaceService.getClients({ page: 0, size: 10, status: 'PENDING' }).catch(() => ({ data: { data: { totalElements: 0 } } }));
@@ -142,8 +159,9 @@ export default function ClientListPage() {
         setTimeout(() => {
             fetchClients();
             fetchPendingCount();
+            fetchPendingSelfPlans();
         }, 0);
-    }, [fetchClients, fetchPendingCount]);
+    }, [fetchClients, fetchPendingCount, fetchPendingSelfPlans]);
 
     const handleAction = async (clientId, action) => {
         try {
@@ -340,6 +358,11 @@ export default function ClientListPage() {
                                             <h3 className="font-extrabold text-lg text-slate-900 truncate" title={client.clientName}>
                                                 {client.clientName}
                                             </h3>
+                                            {activeTab === 'ACTIVE' && pendingSelfPlanCounts[String(client.clientId)] > 0 && (
+                                                <span className="mt-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800">
+                                                    Self-plan chờ duyệt ({pendingSelfPlanCounts[String(client.clientId)]})
+                                                </span>
+                                            )}
                                             <div className="flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-slate-500">
                                                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                                                 <span className="truncate">

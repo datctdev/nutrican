@@ -214,8 +214,16 @@ export function addDaysIso(iso, delta) {
     return formatLocalDate(d);
 }
 
+export function nowInVn() {
+    return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+}
+
 export function todayLocalIso() {
-    return formatLocalDate(new Date());
+    return formatLocalDate(nowInVn());
+}
+
+export function isPastIso(iso) {
+    return iso < todayLocalIso();
 }
 
 export function isFutureIso(iso) {
@@ -272,6 +280,56 @@ export function periodToMealType(period) {
     }
 }
 
+/** Best-effort reverse of periodToMealType when mealPeriod is missing. */
+export function mealTypeToPeriod(mealType, mealPeriod) {
+    if (mealPeriod) return mealPeriod;
+    switch (mealType) {
+        case 'BREAKFAST': return 'MORNING';
+        case 'LUNCH': return 'NOON';
+        case 'DINNER': return 'EVENING';
+        case 'SNACK': return 'AFTERNOON';
+        default: return null;
+    }
+}
+
+/** Buổi có self-plan PENDING chờ PT duyệt (theo ngày). */
+export function getPendingSelfPeriodsForDate(submissions, planDate) {
+    const periods = new Set();
+    (submissions || [])
+        .filter((s) => s.planDate === planDate && s.status === 'PENDING')
+        .forEach((s) => {
+            (s.items || []).forEach((item) => {
+                const p = item.mealPeriod || mealTypeToPeriod(item.mealType);
+                if (p) periods.add(p);
+            });
+        });
+    return periods;
+}
+
+/**
+ * Một món / buổi cho macro hiệu lực:
+ * - override > PT gốc
+ * - buổi có đề xuất PENDING: bỏ PT gốc (chưa thay thế)
+ */
+export function pickEffectivePlanItemsByPeriod(items, { pendingSelfPeriods = new Set() } = {}) {
+    const byPeriod = new Map();
+    (items || []).forEach((item) => {
+        if (item.skipReason === 'SUPERSEDED' || item.choiceRejected) return;
+        const period = resolvePlanItemPeriod(item) || mealTypeToPeriod(item.mealType, item.mealPeriod);
+        const key = period || item.mealType || item.id;
+        const isOverride = item.sourceType === 'SELF_OVERRIDE';
+        const isSelf = item.source === 'SELF';
+        if (period && pendingSelfPeriods.has(period) && !isOverride && !isSelf) {
+            return;
+        }
+        const existing = byPeriod.get(key);
+        if (!existing || isOverride) {
+            byPeriod.set(key, item);
+        }
+    });
+    return [...byPeriod.values()];
+}
+
 /**
  * MORNING 04:00–10:59, NOON 11:00–12:59, AFTERNOON 13:00–17:59,
  * EVENING 18:00–21:59, LATE 22:00–03:59 (wrap).
@@ -285,12 +343,12 @@ export function mealPeriodFromMinutes(minutes) {
     return 'LATE';
 }
 
-export function getCurrentMealPeriod(date = new Date()) {
+export function getCurrentMealPeriod(date = nowInVn()) {
     return mealPeriodFromMinutes(toLocalMinutes(date));
 }
 
 /** Periods whose window has fully ended (AI lock on today). */
-export function getLockedMealPeriods(date = new Date()) {
+export function getLockedMealPeriods(date = nowInVn()) {
     const minutes = toLocalMinutes(date);
     const current = mealPeriodFromMinutes(minutes);
     const order = MEAL_PERIODS;
@@ -348,11 +406,21 @@ export function resolveLogMealPeriod(log) {
     return 'AFTERNOON';
 }
 
+/** Plan item grouping — prefer persisted mealPeriod (SoT). */
+export function resolvePlanItemPeriod(item) {
+    if (item?.mealPeriod && MEAL_PERIODS.includes(item.mealPeriod)) return item.mealPeriod;
+    if (item?.mealType === 'BREAKFAST') return 'MORNING';
+    if (item?.mealType === 'LUNCH') return 'NOON';
+    if (item?.mealType === 'DINNER') return 'EVENING';
+    if (item?.mealType === 'SNACK') return 'AFTERNOON';
+    return 'AFTERNOON';
+}
+
 /**
  * Mark-eaten gate. LATE spans midnight:
  * open for planDate=today when hour>=22, or planDate=yesterday when hour<4.
  */
-export function isMealPeriodOpen(planDate, period, now = new Date()) {
+export function isMealPeriodOpen(planDate, period, now = nowInVn()) {
     if (!planDate || !period) return false;
     const nowDate = now instanceof Date ? now : new Date(now);
     if (Number.isNaN(nowDate.getTime())) return false;
@@ -368,8 +436,48 @@ export function isMealPeriodOpen(planDate, period, now = new Date()) {
     return plan === today && getCurrentMealPeriod(nowDate) === period;
 }
 
+/** Buổi đã qua trong cùng ngày (ordinal), dùng cho tick trễ — không gồm buổi tương lai. */
+export function isMealPeriodPast(planDate, period, now = nowInVn()) {
+    if (!planDate || !period) return false;
+    const plan = typeof planDate === 'string' ? planDate.slice(0, 10) : formatLocalDate(planDate);
+    if (plan !== todayLocalIso()) return false;
+    const nowDate = now instanceof Date ? now : new Date(now);
+    if (Number.isNaN(nowDate.getTime()) || nowDate.getHours() < 4) return false;
+    const currentIdx = MEAL_PERIODS.indexOf(getCurrentMealPeriod(nowDate));
+    const periodIdx = MEAL_PERIODS.indexOf(period);
+    if (currentIdx < 0 || periodIdx < 0) return false;
+    return periodIdx < currentIdx;
+}
+
+/** Tick trễ: hôm nay, buổi đã qua, không phải khung đang mở. */
+export function canLateTickMealPeriod(planDate, period, now = nowInVn()) {
+    if (!planDate || !period) return false;
+    return isTodayIso(typeof planDate === 'string' ? planDate.slice(0, 10) : formatLocalDate(planDate))
+        && !isMealPeriodOpen(planDate, period, now)
+        && isMealPeriodPast(planDate, period, now);
+}
+
+/**
+ * Buổi đã chốt khi: có diet log buổi đó, món PT/override eaten, toàn bộ PT skip, hoặc self eaten.
+ * @param {string} mealPeriod
+ * @param {Array} items day-plan items for the date
+ * @param {Array} [logs] optional diet logs for the date
+ */
+export function isMealPeriodSettled(mealPeriod, items = [], logs = []) {
+    if (!mealPeriod) return false;
+    const inPeriod = (items || []).filter((i) => resolvePlanItemPeriod(i) === mealPeriod);
+    if ((logs || []).some((l) => l.mealPeriod === mealPeriod && (l.status === 'LOGGED' || !l.status))) {
+        return true;
+    }
+    const ptItems = inPeriod.filter((i) => i.source === 'PT' || i.sourceType === 'SELF_OVERRIDE' || i.sourceType === 'PT_ORIGINAL');
+    if (ptItems.some((i) => i.eaten)) return true;
+    if (ptItems.length > 0 && ptItems.every((i) => i.skipReason)) return true;
+    if (inPeriod.some((i) => i.source === 'SELF' && i.eaten)) return true;
+    return false;
+}
+
 /** Periods already past today (for makeup select). Empty when hour < 4 (soft UX). */
-export function getPastMealPeriodsForMakeup(date = new Date()) {
+export function getPastMealPeriodsForMakeup(date = nowInVn()) {
     const minutes = toLocalMinutes(date);
     if (minutes < 4 * 60) return [];
     const current = getCurrentMealPeriod(date);
@@ -415,49 +523,138 @@ export function scaleFoodMacros(food, quantityG) {
 }
 
 /**
- * plannedTotals: mealType with active SELF → only SELF; else include PT.
- * Optional draftItem replaces excludeItemId macros when editing.
+ * Whether eaten plan item macros are already included in diet-log summary totals.
  */
-export function computePlannedTotals(items = [], { draftItem = null, excludeItemId = null } = {}) {
+export function isPlanItemInDietLogTotals(item) {
+    if (!item?.eaten) return false;
+    if (item.source === 'SELF') return true;
+    if (item.sourceType === 'SELF_OVERRIDE') return true;
+    return false;
+}
+
+function periodKey(i) {
+    return resolvePlanItemPeriod(i) || i.mealType || '';
+}
+
+function isPtOriginalPlanItem(i) {
+    return i?.source === 'PT' && i?.sourceType !== 'SELF_OVERRIDE';
+}
+
+function shouldIncludePlanItem(i, activeSelfByPeriod, pastDate, excludeItemId, opts = {}) {
+    const { coachedMode = false, settledPeriods = new Set(), pendingReplacePeriods = new Set() } = opts;
+    if (i.skipReason || i.applied || i.choiceRejected) return false;
+    if (pastDate) return false;
+    if (excludeItemId && String(i.id) === String(excludeItemId)) return false;
+    if (i.lockedByReview) return false;
+
+    const pk = periodKey(i);
+    if (pk && pendingReplacePeriods.has(pk) && i.source === 'SELF' && i.sourceType !== 'SELF_OVERRIDE') {
+        return false;
+    }
+    if (pk && settledPeriods.has(pk) && !i.eaten) return false;
+
+    if (coachedMode && isPtOriginalPlanItem(i) && !i.eaten) return false;
+
+    if (isPtOriginalPlanItem(i) && activeSelfByPeriod.has(pk)) return false;
+    if (i.source === 'SELF' && i.sourceType !== 'SELF_OVERRIDE' && !activeSelfByPeriod.has(pk)) return false;
+    return true;
+}
+
+function addMacros(totals, item) {
+    totals.calories += Number(item.calories) || 0;
+    totals.protein += Number(item.protein) || 0;
+    totals.carb += Number(item.carb ?? item.carbs) || 0;
+    totals.fat += Number(item.fat) || 0;
+}
+
+function roundMacros(totals) {
+    return {
+        calories: Math.round(totals.calories * 100) / 100,
+        protein: Math.round(totals.protein * 100) / 100,
+        carb: Math.round(totals.carb * 100) / 100,
+        fat: Math.round(totals.fat * 100) / 100,
+    };
+}
+
+function emptyMacros() {
+    return { calories: 0, protein: 0, carb: 0, fat: 0 };
+}
+
+/**
+ * Plan progress for nutrition bars:
+ * - pending: uneaten plan counted toward projection (gray)
+ * - compliance: eaten PT tuân thủ chưa có diet log (vivid)
+ * - fullPlan: pending + compliance + eaten đã log (informational)
+ *
+ * Coached mode: PT gốc chưa tick không cộng; self chờ duyệt / buổi đã chốt không cộng.
+ */
+export function computePlanProgressBreakdown(items = [], {
+    draftItem = null,
+    excludeItemId = null,
+    dateIso = null,
+    coachedMode = false,
+} = {}) {
     const list = Array.isArray(items) ? items : [];
-    const activeSelfByMeal = new Set();
+    const pastDate = dateIso ? isPastIso(dateIso) : false;
+    const settledPeriods = new Set(
+        MEAL_PERIODS.filter((p) => isMealPeriodSettled(p, list)),
+    );
+    const pendingReplacePeriods = new Set();
     list.forEach((i) => {
-        if (i.source !== 'SELF') return;
-        if (i.applied || i.eaten || i.skipReason) return;
-        if (excludeItemId && String(i.id) === String(excludeItemId)) return;
-        activeSelfByMeal.add(i.mealType);
+        if (i.source === 'SELF' && i.lockedByReview) {
+            const pk = periodKey(i);
+            if (pk) pendingReplacePeriods.add(pk);
+        }
     });
-    if (draftItem?.mealType) activeSelfByMeal.add(draftItem.mealType);
+    const activeSelfByPeriod = new Set();
+    list.forEach((i) => {
+        if (i.source !== 'SELF' || i.sourceType === 'SELF_OVERRIDE') return;
+        if (i.applied || i.eaten || i.skipReason || i.lockedByReview || i.choiceRejected) return;
+        if (excludeItemId && String(i.id) === String(excludeItemId)) return;
+        const pk = periodKey(i);
+        if (pk && settledPeriods.has(pk)) return;
+        if (pk && pendingReplacePeriods.has(pk)) return;
+        activeSelfByPeriod.add(pk);
+    });
+    if (draftItem?.mealType) activeSelfByPeriod.add(draftItem.mealType);
+    if (draftItem?.mealPeriod) activeSelfByPeriod.add(draftItem.mealPeriod);
 
-    let calories = 0;
-    let protein = 0;
-    let carb = 0;
-    let fat = 0;
+    const includeOpts = { coachedMode, settledPeriods, pendingReplacePeriods };
+    const pending = emptyMacros();
+    const compliance = emptyMacros();
+    const fullPlan = emptyMacros();
 
     list.forEach((i) => {
-        if (i.eaten || i.skipReason || i.applied) return;
-        if (excludeItemId && String(i.id) === String(excludeItemId)) return;
-        if (i.source === 'PT' && activeSelfByMeal.has(i.mealType) && i.sourceType !== 'SELF_OVERRIDE') return;
-        if (i.source === 'SELF' && !activeSelfByMeal.has(i.mealType)) return;
-        calories += Number(i.calories) || 0;
-        protein += Number(i.protein) || 0;
-        carb += Number(i.carb ?? i.carbs) || 0;
-        fat += Number(i.fat) || 0;
+        if (!shouldIncludePlanItem(i, activeSelfByPeriod, pastDate, excludeItemId, includeOpts)) return;
+        addMacros(fullPlan, i);
+        if (i.eaten) {
+            if (!isPlanItemInDietLogTotals(i)) {
+                addMacros(compliance, i);
+            }
+        } else {
+            addMacros(pending, i);
+        }
     });
 
     if (draftItem) {
-        calories += Number(draftItem.calories) || 0;
-        protein += Number(draftItem.protein) || 0;
-        carb += Number(draftItem.carb ?? draftItem.carbs) || 0;
-        fat += Number(draftItem.fat) || 0;
+        addMacros(pending, draftItem);
+        addMacros(fullPlan, draftItem);
     }
 
     return {
-        calories: Math.round(calories * 100) / 100,
-        protein: Math.round(protein * 100) / 100,
-        carb: Math.round(carb * 100) / 100,
-        fat: Math.round(fat * 100) / 100,
+        pending: roundMacros(pending),
+        compliance: roundMacros(compliance),
+        fullPlan: roundMacros(fullPlan),
     };
+}
+
+/**
+ * plannedTotals: mealType with active SELF → only SELF; else include PT.
+ * Optional draftItem replaces excludeItemId macros when editing.
+ * @deprecated Prefer computePlanProgressBreakdown for UI progress.
+ */
+export function computePlannedTotals(items = [], options = {}) {
+    return computePlanProgressBreakdown(items, options).pending;
 }
 
 /** Page size for diet log list fetches (documented contract). */
