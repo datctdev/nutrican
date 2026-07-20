@@ -12,9 +12,11 @@ API Documentation (Swagger UI): `http://localhost:8080/swagger-ui.html`
 2. [User Profile](#2-user-profile)
 3. [Diet Tracker](#3-diet-tracker)
 4. [Marketplace](#4-marketplace)
-5. [PT Workspace](#5-pt-workspace)
-6. [Admin](#6-admin)
-7. [KYC Verification](#7-kyc-verification)
+5. [Payment & Coaching Wallet](#5-payment--coaching-wallet)
+6. [PT Workspace](#6-pt-workspace)
+7. [Admin](#7-admin)
+8. [KYC Verification](#8-kyc-verification)
+9. [Chat](#9-chat)
 
 ---
 
@@ -949,7 +951,86 @@ All endpoints require authentication.
 
 ---
 
-## 5. PT Workspace
+### 4.5 Get PT Calendar (availability & occupied slots)
+
+**Endpoint:** `GET /api/v1/marketplace/pts/{ptId}/calendar`
+
+**Query:** `from`, `to` (ISO date-time, optional — default 7 ngày)
+
+**Response (200 OK):** venues, weekly availability windows, occupied slots (appointments + active holds).
+
+---
+
+### 4.6 Hire PT
+
+**Endpoint:** `POST /api/v1/marketplace/pts/{ptId}/hire`
+
+**Request — ONLINE:**
+```json
+{ "trainingMode": "ONLINE" }
+```
+
+**Request — OFFLINE (gói đa buổi):**
+```json
+{
+  "trainingMode": "OFFLINE",
+  "venueId": "550e8400-e29b-41d4-a716-446655440000",
+  "sessionStarts": [
+    "2026-07-22T08:00:00",
+    "2026-07-24T08:00:00"
+  ]
+}
+```
+
+| Field | Required | Ghi chú |
+|-------|----------|---------|
+| trainingMode | Yes | `ONLINE` \| `OFFLINE` |
+| venueId | OFFLINE | UUID venue của PT |
+| sessionStarts | OFFLINE | ≥1 thời điểm bắt đầu buổi |
+| firstSessionStart | — | Deprecated — dùng `sessionStarts` |
+
+**Response:** `PtClientMapping` với `sessionCount`, `perSessionAmount`, `agreedAmount` (tổng gói offline).
+
+---
+
+### 4.7 PT Venues & Availability (authenticated PT)
+
+| Method | Path | Mô tả |
+|--------|------|--------|
+| GET | `/api/v1/profile/pt/venues` | List venues |
+| POST | `/api/v1/profile/pt/venues` | Create venue |
+| PUT | `/api/v1/profile/pt/venues/{venueId}` | Update venue |
+| DELETE | `/api/v1/profile/pt/venues/{venueId}` | Delete venue |
+| GET | `/api/v1/profile/pt/availability` | Weekly windows |
+| PUT | `/api/v1/profile/pt/availability` | Replace weekly schedule |
+
+---
+
+## 5. Payment & Coaching Wallet
+
+### 5.1 Create VNPay checkout
+
+**Endpoint:** `POST /api/v1/payment/mappings/{mappingId}/vnpay`
+
+Redirect URL trả về cho customer thanh toán gói coaching.
+
+### 5.2 VNPay return / IPN
+
+- `GET /api/v1/payment/vnpay/return` — browser redirect (public)
+- VNPay IPN — cấu hình qua `VNPAY_IPN_URL` trong `.env`
+
+Sau SUCCESS: offline package → materialize appointments; release slot holds.
+
+### 5.3 Coaching wallet
+
+| Method | Path | Role |
+|--------|------|------|
+| GET | `/api/v1/coaching-wallet/me` | PT — balance |
+| GET | `/api/v1/coaching-wallet/me/transactions` | PT — history |
+
+---
+
+## 6. PT Workspace
 
 All endpoints require `PT_CERTIFIED` or `PT_FREELANCE` role.
 
@@ -1248,7 +1329,7 @@ Returns SOS tickets assigned to the authenticated PT.
 
 ---
 
-## 6. Admin
+## 7. Admin
 
 All endpoints require `ADMIN` role. Admin endpoints are organized into: User Management (`/admin/users`), PT Verification (`/admin/pts`), KYC Verification (`/admin/kyc`), SOS Tickets (`/admin/sos-tickets`), and Dashboard (`/admin/stats`).
 
@@ -1668,7 +1749,7 @@ MAE baseline is always `ai_predicted_macros` vs `pt_adjusted_macros` (APPROVE + 
 
 ---
 
-## 7. KYC Verification
+## 8. KYC Verification
 
 All KYC endpoints require authentication. KYC uses VNPT API for OCR and face liveness detection.
 

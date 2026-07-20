@@ -1,6 +1,6 @@
 # NutriCan — Team Onboarding (pull → chạy → test)
 
-> Cập nhật: 2026-07-07 · Addendum v3.1 **Done** (ADD-01..08)  
+> Cập nhật: 2026-07-20 · v3.2 offline package hire · Addendum v3.1 **Done** (ADD-01..08)  
 > Matrix đầy đủ: [`TESTING_E2E_MATRIX.md`](./TESTING_E2E_MATRIX.md)
 
 ## 1. Yêu cầu máy dev
@@ -62,6 +62,10 @@ cd nutrican-fe && npm install && npm run dev
 | PT certified | pt.certified@gmail.com | 123456 |
 | PT freelance | pt.freelance@gmail.com | 123456 |
 | Admin | admin@nutrican.com | Admin123! |
+| PT offline (dev) | pt.offline@gmail.com | 123456 |
+| Customer offline test | customer3@gmail.com | 123456 |
+
+Smoke test offline hire: [FEATURE_OFFLINE_PT_HIRE.md §5](./FEATURE_OFFLINE_PT_HIRE.md).
 
 ### Demo visual QA — fixture lâu đời (~14 ngày)
 
@@ -71,13 +75,13 @@ cd nutrican-fe && npm install && npm run dev
 | Customer **có PT** | demo.coached@nutrican.com | Demo123! | Meal plan PT publish 5 buổi (today→+14d); 2 PENDING (ngày +1/+2); lịch sử duyệt APPROVED/REJECTED |
 | PT duyệt demo | pt.certified@gmail.com | 123456 | Học viên → badge *Self-plan chờ duyệt* → `/pt/clients/:id/meal-plan` |
 
-**Full history** seed khi BE start: `DemoVeteranDataInitializer` (flag `DEMO_VETERAN_FIXTURES_V2`).  
+**Full history** seed khi BE start: `DemoVeteranDataInitializer` (flag `DEMO_VETERAN_FIXTURES_V3`).  
 Refresh nhẹ hôm nay: `node scripts/seed-demo-meal-windows.mjs` (full +14d do BE V2).  
 Re-seed full: `DELETE FROM system_settings WHERE setting_key IN ('DEMO_VETERAN_FIXTURES_V1','DEMO_VETERAN_FIXTURES_V2')` rồi restart BE.
 
 Coaching vs Nhật ký: cả hai **5 buổi** theo `mealPeriod`; Coaching week picker (không calendar +14d). PT duyệt checklist: [FEATURE_MEAL_WINDOWS_SELFPLAN.md §4c](./FEATURE_MEAL_WINDOWS_SELFPLAN.md). **Checklist test mắt thường:** [MANUAL_QA_DEMO_CHECKLIST.md](./MANUAL_QA_DEMO_CHECKLIST.md).
 
-Seed: `UserInitializer` + `DataInitializer` + `DemoVeteranDataInitializer`.
+Seed: `UserInitializer` + `DataInitializer` + `DemoVeteranDataInitializer` + `OfflineHireTestDataInitializer` (dev).
 
 ## 5. Regression gate trước khi push PR
 

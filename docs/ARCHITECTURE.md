@@ -84,11 +84,13 @@ nutrican-be/
     │   ├── entity/                          # EkycSession, EkycDocument (consolidated from common)
     │   ├── repository/                      # KycSessionRepository, KycDocumentRepository
     │   └── service/                         # KYC orchestration & OCR services
-    ├── user/                                # User profile & marketplace module
-    │   ├── entity/                          # User, PtProfile, PtClientMapping, BodyMetric, Review
+    ├── payment/                             # VNPay coaching payments, escrow, coaching wallet
+    ├── chat/                                # PT–client messaging threads
+    ├── user/                                # User profile, marketplace, hire, appointments, venues
+    │   ├── entity/                          # User, PtProfile, PtClientMapping, PtVenue, PtSlotHold, ...
     │   ├── repository/                      # User repositories
-    │   └── service/                         # Profile and UserQueryService (decoupled read service)
-    └── workspace/                           # Personal Trainer Workspace module (PT View, SSE)
+    │   └── service/                         # Profile, marketplace, offline hire, calendar
+    └── workspace/                           # Personal Trainer Workspace module (PT View, WebSocket)
 ```
 
 ### 2.2 Module Dependencies & Boundaries
