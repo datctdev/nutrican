@@ -141,5 +141,9 @@ public class User extends BaseEntity {
                 .passwordSetRequired(false)
                 .build();
     }
+
+    public boolean hasCustomerPrivileges() {
+        return this.role == UserRole.CUSTOMER || this.role == UserRole.PT_CERTIFIED || this.role == UserRole.PT_FREELANCE || this.role == UserRole.ADMIN;
+    }
 }
 

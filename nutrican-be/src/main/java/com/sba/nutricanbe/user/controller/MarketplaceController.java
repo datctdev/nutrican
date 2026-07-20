@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
@@ -72,12 +73,14 @@ public class MarketplaceController {
         return ResponseEntity.ok(marketplaceService.getPtReviews(ptId, page, size));
     }
 
-    @PostMapping("/pts/{ptId}/reviews")
+    @PostMapping(value = "/pts/{ptId}/reviews", consumes = "multipart/form-data")
     public ResponseEntity<ApiResponse<ReviewResponse>> createReview(
             @PathVariable UUID ptId,
             @AuthenticationPrincipal User user,
-            @Valid @RequestBody CreateReviewRequest request) {
-        return ResponseEntity.ok(marketplaceService.createReview(ptId, user.getId(), request));
+            @Valid @ModelAttribute CreateReviewRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+
+        return ResponseEntity.ok(marketplaceService.createReview(ptId, user.getId(), request, image));
     }
 
     @PostMapping("/pts/{ptId}/hire")
@@ -85,5 +88,23 @@ public class MarketplaceController {
             @PathVariable UUID ptId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(marketplaceService.hirePt(ptId, user.getId()));
+    }
+
+    @PutMapping(value = "/pts/{ptId}/reviews/{reviewId}", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<ReviewResponse>> updateReview(
+            @PathVariable UUID ptId,
+            @PathVariable UUID reviewId,
+            @AuthenticationPrincipal User user,
+            @Valid @ModelAttribute CreateReviewRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        return ResponseEntity.ok(marketplaceService.updateReview(ptId, reviewId, user.getId(), request, image));
+    }
+
+    @DeleteMapping("/pts/{ptId}/reviews/{reviewId}")
+    public ResponseEntity<ApiResponse<Void>> deleteReview(
+            @PathVariable UUID ptId,
+            @PathVariable UUID reviewId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(marketplaceService.deleteReview(ptId, reviewId, user.getId()));
     }
 }

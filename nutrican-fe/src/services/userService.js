@@ -1,8 +1,10 @@
+// src/services/userService.js
 import api from './api';
 
 export const userService = {
   getProfile: () => api.get('/profile/me'),
   updateProfile: (data) => api.put('/profile/me', data),
+  updatePtProfile: (data) => api.put('/profile/pt', data),
   uploadAvatar: (formData) => api.put('/profile/avatar', formData),
   getMacroTarget: () => api.get('/profile/macro-target'),
   setMacroTarget: (data) => api.put('/profile/macro-target', data),
@@ -31,4 +33,11 @@ export const userService = {
   },
   getRequireKycSetting: () => api.get('/settings/require-kyc'),
   updateRequireKycSetting: (value) => api.put(`/admin/settings/require-kyc?value=${value}`),
+    uploadPortfolioImage: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/profile/pt/portfolio-image', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
 };

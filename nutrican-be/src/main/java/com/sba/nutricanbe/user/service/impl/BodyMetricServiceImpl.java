@@ -101,7 +101,7 @@ public class BodyMetricServiceImpl implements BodyMetricService {
     @Override
     @Transactional(readOnly = true)
     public boolean shouldRemind(User user) {
-        if (user == null || user.getRole() != com.sba.nutricanbe.common.enums.UserRole.CUSTOMER) {
+        if (user == null || !user.hasCustomerPrivileges()) {
             return false;
         }
         Map<String, Boolean> optIn = user.getNotificationOptIn();

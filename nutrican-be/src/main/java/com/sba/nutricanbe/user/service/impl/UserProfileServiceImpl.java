@@ -17,6 +17,7 @@ import com.sba.nutricanbe.user.dto.MacroTargetResponse;
 import com.sba.nutricanbe.user.dto.PtProfileSummary;
 import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
 import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
+import com.sba.nutricanbe.user.dto.UpdatePtProfileRequest;
 import com.sba.nutricanbe.user.dto.UserProfileResponse;
 import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.service.UserProfileService;
@@ -245,6 +246,28 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     @Override
     @Transactional
+    public ApiResponse<PtProfileSummary> updatePtProfile(UUID userId, UpdatePtProfileRequest request) {
+        PtProfile ptProfile = ptProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("PtProfile", userId));
+
+        if (request.getBio() != null) ptProfile.setBio(request.getBio());
+        if (request.getTrainingPhilosophy() != null) ptProfile.setTrainingPhilosophy(request.getTrainingPhilosophy());
+        if (request.getLocation() != null) ptProfile.setLocation(request.getLocation());
+        if (request.getTrainingMode() != null) ptProfile.setTrainingMode(request.getTrainingMode());
+        if (request.getHourlyRate() != null) ptProfile.setHourlyRate(request.getHourlyRate());
+        if (request.getSpecializations() != null) ptProfile.setSpecializations(request.getSpecializations());
+        if (request.getInstagramUrl() != null) ptProfile.setInstagramUrl(request.getInstagramUrl());
+        if (request.getLinkedinUrl() != null) ptProfile.setLinkedinUrl(request.getLinkedinUrl());
+        if (request.getPortfolioShowcase() != null) ptProfile.setPortfolioShowcase(request.getPortfolioShowcase());
+
+        ptProfile = ptProfileRepository.save(ptProfile);
+        log.info("PT Profile updated for user: {}", userId);
+        
+        return ApiResponse.success(toPtProfileSummary(ptProfile), "PT Profile updated successfully");
+    }
+
+    @Override
+    @Transactional
     public ApiResponse<String> uploadAvatar(UUID userId, MultipartFile file) {
         try {
             String objectName = minioService.uploadFile(file, "avatars");
@@ -356,6 +379,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .totalReviews(ptProfile.getTotalReviews())
                 .tier(ptProfile.getTier() != null ? ptProfile.getTier().name() : null)
                 .hourlyRate(ptProfile.getHourlyRate())
+                .portfolioShowcase(ptProfile.getPortfolioShowcase())
                 .cvUrl(ptProfile.getCvUrl())
                 .instagramUrl(ptProfile.getInstagramUrl())
                 .linkedinUrl(ptProfile.getLinkedinUrl())
@@ -383,5 +407,26 @@ public class UserProfileServiceImpl implements UserProfileService {
             return parts[parts.length - 1].split("\\?")[0];
         }
         return null;
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> uploadPortfolioImage(UUID userId, MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BadRequestException("Chỉ chấp nhận định dạng file ảnh (JPG, PNG)");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BadRequestException("Ảnh không được vượt quá 5MB");
+        }
+        try {
+            String objectName = minioService.uploadFile(file, "portfolio-images");
+            String presignedUrl = minioService.getPresignedUrl(objectName);
+
+            log.info("Portfolio image uploaded for user: {}", userId);
+            return ApiResponse.success(presignedUrl, "Tải ảnh thành công");
+        } catch (Exception e) {
+            throw new BadRequestException("Upload ảnh thất bại: " + e.getMessage());
+        }
     }
 }

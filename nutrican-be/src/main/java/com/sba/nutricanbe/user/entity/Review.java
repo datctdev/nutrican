@@ -1,7 +1,6 @@
 package com.sba.nutricanbe.user.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
-
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -28,5 +27,11 @@ public class Review extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String comment;
-}
 
+    @Column(name = "is_anonymous")
+    @Builder.Default
+    private Boolean isAnonymous = false;
+
+    @Column(name = "image_url")
+    private String imageUrl;
+}

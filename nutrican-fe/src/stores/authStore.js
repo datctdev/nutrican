@@ -12,6 +12,7 @@ export const useAuthStore = create(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      activeRole: null,
 
       login: async (credentials) => {
         set({ isLoading: true, error: null });
@@ -24,6 +25,7 @@ export const useAuthStore = create(
             isAuthenticated: true,
             isLoading: false,
             error: null,
+            activeRole: user?.role,
           });
           return response;
         } catch (error) {
@@ -52,6 +54,7 @@ export const useAuthStore = create(
               isAuthenticated: true,
               isLoading: false,
               error: null,
+              activeRole: user?.role,
             });
             window.location.href = '/set-password';
             return response;
@@ -63,6 +66,7 @@ export const useAuthStore = create(
             isAuthenticated: true,
             isLoading: false,
             error: null,
+            activeRole: user?.role,
           });
 
           const role = user?.role;
@@ -99,6 +103,7 @@ export const useAuthStore = create(
             isAuthenticated: true,
             isLoading: false,
             error: null,
+            activeRole: user?.role,
           });
           return response;
         } catch (error) {
@@ -137,10 +142,13 @@ export const useAuthStore = create(
           accessToken: null,
           isAuthenticated: false,
           error: null,
+          activeRole: null,
         });
       },
 
       clearError: () => set({ error: null }),
+
+      setActiveRole: (role) => set({ activeRole: role }),
 
       setUser: (userData) => set({ user: userData }),
 
@@ -163,6 +171,7 @@ export const useAuthStore = create(
               avatarUrl: profile.avatarUrl,
               isKycVerified: profile.isKycVerified,
             },
+            activeRole: get().activeRole || profile.role,
           });
         } catch (error) {
           if (error.response?.status === 401 || error.response?.status === 403) {

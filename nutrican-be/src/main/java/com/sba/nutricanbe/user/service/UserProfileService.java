@@ -6,6 +6,7 @@ import com.sba.nutricanbe.user.dto.MacroTargetResponse;
 import com.sba.nutricanbe.user.dto.PtProfileSummary;
 import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
 import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
+import com.sba.nutricanbe.user.dto.UpdatePtProfileRequest;
 import com.sba.nutricanbe.user.dto.UserProfileResponse;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.UUID;
@@ -15,6 +16,8 @@ public interface UserProfileService {
     ApiResponse<UserProfileResponse> getProfile(UUID userId);
 
     ApiResponse<UserProfileResponse> updateProfile(UUID userId, UpdateProfileRequest request);
+
+    ApiResponse<PtProfileSummary> updatePtProfile(UUID userId, UpdatePtProfileRequest request);
 
     ApiResponse<String> uploadAvatar(UUID userId, MultipartFile file);
 
@@ -29,5 +32,7 @@ public interface UserProfileService {
     ApiResponse<String> uploadCv(UUID userId, MultipartFile file);
 
     ApiResponse<PtProfileSummary> resubmitPt(UUID userId, PtRegistrationRequest request);
+
+    ApiResponse<String> uploadPortfolioImage(UUID userId, MultipartFile file);
 }
 

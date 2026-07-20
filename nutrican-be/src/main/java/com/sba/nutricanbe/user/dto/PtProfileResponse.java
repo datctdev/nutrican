@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -37,6 +38,11 @@ public class PtProfileResponse {
     private List<String> preferredDietTypes;
     private Boolean goalMatch;
     private Boolean dietMatch;
+    
+    private Map<String, Object> portfolioShowcase;
+    private List<CertificationData> certifications;
+    private String instagramUrl;
+    private String linkedinUrl;
 
     public static PtProfileResponse toPtProfileResponse(PtProfile profile) {
         User user = profile.getUser();
@@ -58,6 +64,10 @@ public class PtProfileResponse {
                 .maxClients(profile.getMaxClients())
                 .preferredGoals(profile.getPreferredGoals())
                 .preferredDietTypes(profile.getPreferredDietTypes())
+                .portfolioShowcase(profile.getPortfolioShowcase())
+                .certifications(profile.getCertifications())
+                .instagramUrl(profile.getInstagramUrl())
+                .linkedinUrl(profile.getLinkedinUrl())
                 .build();
     }
 }
