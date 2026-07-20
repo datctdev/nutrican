@@ -39,4 +39,6 @@ export const userService = {
             headers: { 'Content-Type': 'multipart/form-data' },
         });
     },
+    submitPtUpdateRequest: (data) => api.post('/profile/pt/update-request', data),
+    getPendingPtUpdateRequest: () => api.get('/profile/pt/update-request/pending'),
 };

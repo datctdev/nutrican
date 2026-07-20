@@ -1,13 +1,8 @@
 package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.user.dto.*;
 import com.sba.nutricanbe.user.entity.User;
-import com.sba.nutricanbe.user.dto.MacroTargetRequest;
-import com.sba.nutricanbe.user.dto.MacroTargetResponse;
-import com.sba.nutricanbe.user.dto.PtProfileSummary;
-import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
-import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
-import com.sba.nutricanbe.user.dto.UserProfileResponse;
 import com.sba.nutricanbe.user.service.UserProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -105,6 +100,19 @@ public class UserProfileController {
             @AuthenticationPrincipal User user,
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(userProfileService.uploadPortfolioImage(user.getId(), file));
+    }
+
+    @PostMapping("/pt/update-request")
+    public ResponseEntity<ApiResponse<PtUpdateRequestDto>> submitPtUpdateRequest(
+            @AuthenticationPrincipal User user,
+            @RequestBody SubmitPtUpdateRequest request) {
+        return ResponseEntity.ok(userProfileService.submitPtUpdateRequest(user.getId(), request));
+    }
+
+    @GetMapping("/pt/update-request/pending")
+    public ResponseEntity<ApiResponse<PtUpdateRequestDto>> getPendingPtUpdateRequest(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(userProfileService.getPendingPtUpdateRequest(user.getId()));
     }
 }
 

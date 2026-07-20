@@ -1,12 +1,12 @@
 // src/pages/customer/PtDetailPage.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card } from '../../components/ui/card';
+import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { marketplaceService } from '../../services/marketplaceService';
-import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, Quote, UserCircle, Edit, Trash2, Camera, EyeOff, AlertTriangle } from 'lucide-react';
+import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, Quote, UserCircle, Edit, Trash2, Camera, EyeOff, AlertTriangle, Target, MapPin, Banknote, ShieldCheck, GraduationCap, LinkIcon } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import ImageLightbox from '../../components/common/ImageLightbox';
 
@@ -37,6 +37,12 @@ const LinkedinIcon = ({ className }) => (
         <circle cx="4" cy="4" r="2"/>
     </svg>
 );
+
+// HẰNG SỐ MAPPING TEXT CHO ĐẸP
+const GOAL_LABELS = { 'WEIGHT_LOSS': 'Giảm cân', 'WEIGHT_GAIN': 'Tăng cân', 'MAINTAIN': 'Duy trì', 'PREGNANT': 'Mang thai', 'RECOVERY': 'Phục hồi' };
+const DIET_LABELS = { 'NORMAL': 'Ăn thường', 'VEGETARIAN': 'Ăn chay', 'VEGAN': 'Thuần chay', 'KETO': 'Keto', 'EAT_CLEAN': 'Eat clean' };
+const RATE_UNIT_LABELS = { 'SESSION_60': 'buổi 60 phút', 'SESSION_90': 'buổi 90 phút', 'HOUR': 'giờ', 'MONTH': 'tháng' };
+const TRAINING_MODE_LABELS = { 'OFFLINE': 'Trực tiếp (Offline)', 'ONLINE': 'Online', 'BOTH': 'Cả hai' };
 
 export default function PtDetailPage() {
     const { id } = useParams();
@@ -218,77 +224,81 @@ export default function PtDetailPage() {
     const userReview = reviews.find(r => r.reviewerId === user?.id);
 
     return (
-        <div className="min-h-screen bg-slate-50/50 pb-24 animate-fade-in">
-            <div className="relative h-[320px] md:h-[400px] w-full bg-slate-900 overflow-hidden">
-                <img src={coverPhoto} alt="Cover" className="absolute inset-0 w-full h-full object-cover opacity-80" />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-transparent"></div>
+        <div className="min-h-screen bg-gradient-to-b from-blue-50/40 to-slate-50 pb-24 animate-fade-in relative">
 
+            {/* HERO SECTION */}
+            <div className="relative h-[350px] md:h-[420px] w-full overflow-hidden shadow-inner bg-slate-100">
+                <img src={coverPhoto} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/10"></div>
                 <button onClick={() => navigate(-1)} className="absolute top-6 left-6 z-20 flex items-center gap-2 text-white hover:text-white bg-black/30 hover:bg-black/50 px-5 py-2.5 rounded-full backdrop-blur-md transition-all font-bold border border-white/20 shadow-sm">
                     <ArrowLeft className="w-4 h-4" /> Trở lại
                 </button>
             </div>
 
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 -mt-24 relative z-10">
+            {/* CONTAINER CHÍNH */}
+            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 -mt-32 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
 
+                    {/* CỘT TRÁI: PROFILE CARD CƠ BẢN */}
                     <div className="lg:col-span-4 xl:col-span-3 sticky top-24 pt-16">
-                        <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100 p-6 text-center relative">
+                        <div className="bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 p-8 text-center relative backdrop-blur-xl">
 
-                            <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-20">
-                                <div className="relative w-32 h-32">
-                                    <div className="w-full h-full rounded-full border-[5px] border-white shadow-lg bg-slate-100 overflow-hidden">
+                            <div className="absolute -top-20 left-1/2 -translate-x-1/2 z-20">
+                                <div className="relative w-40 h-40">
+                                    <div className="w-full h-full rounded-full border-[6px] border-white shadow-xl bg-slate-100 overflow-hidden">
                                         <img src={pt.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(pt.fullName)}&size=200&background=random`} alt={pt.fullName} className="w-full h-full object-cover" />
                                     </div>
                                     {pt.isVerified && (
-                                        <div className="absolute bottom-1 right-1 bg-white rounded-full p-0.5 shadow-md border border-slate-50 z-30">
-                                            <CheckCircle2 className="w-7 h-7 text-blue-500 fill-blue-50" />
+                                        <div className="absolute bottom-2 right-2 bg-white rounded-full p-1 shadow-lg border border-slate-50 z-30">
+                                            <CheckCircle2 className="w-8 h-8 text-blue-500 fill-blue-50" />
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="mt-16">
+                            <div className="mt-20">
                                 <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{pt.fullName}</h1>
-                                <p className="text-sm font-bold text-slate-500 mt-1.5 flex items-center justify-center gap-1.5">
-                                    <Briefcase className="w-4 h-4" /> {pt.specialty || 'Huấn luyện viên Cá nhân'}
+
+                                <p className="text-sm font-bold text-blue-600 mt-2 flex items-center justify-center gap-1.5 bg-blue-50 w-fit mx-auto px-3 py-1 rounded-lg">
+                                    <Briefcase className="w-4 h-4" /> {pt.tier === 'TIER_1' ? 'PT Chuyên Nghiệp' : 'PT Tự Do'}
                                 </p>
 
-                                <div className="flex items-center justify-center gap-2 mt-4 bg-amber-50 border border-amber-100 rounded-xl w-fit mx-auto px-4 py-2">
-                                    <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
-                                    <span className="text-lg font-black text-amber-900">{pt.rating ? pt.rating.toFixed(1) : '5.0'}</span>
-                                    <span className="text-xs font-bold text-amber-700/60">({pt.totalReviews || 0} Đánh giá)</span>
+                                <div className="flex items-center justify-center gap-2 mt-5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100/50 rounded-2xl w-fit mx-auto px-5 py-2.5 shadow-sm">
+                                    <Star className="w-5 h-5 fill-amber-400 text-amber-500 drop-shadow-sm" />
+                                    <span className="text-xl font-black text-amber-900">{pt.rating ? pt.rating.toFixed(1) : '5.0'}</span>
+                                    <span className="text-sm font-bold text-amber-700/60">({pt.totalReviews || 0} Đánh giá)</span>
                                 </div>
 
-                                <div className="mt-6 space-y-2.5">
+                                <div className="mt-8 space-y-3">
                                     {hireStatus === 'ACTIVE' ? (
-                                        <Button onClick={() => navigate('/chat', { state: { targetPtId: pt.userId } })} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-bold rounded-xl shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5">
-                                            <MessageSquare className="w-4 h-4 mr-2" /> Nhắn tin ngay
+                                        <Button onClick={() => navigate('/chat', { state: { targetPtId: pt.userId } })} className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-bold rounded-2xl shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5">
+                                            <MessageSquare className="w-5 h-5 mr-2" /> Nhắn tin ngay
                                         </Button>
                                     ) : hireStatus === 'PENDING' ? (
-                                        <Button disabled className="w-full h-12 bg-amber-100 text-amber-700 border-2 border-amber-200 text-base font-bold rounded-xl cursor-not-allowed">
-                                            <Clock className="w-4 h-4 mr-2" /> Đang chờ duyệt
+                                        <Button disabled className="w-full h-14 bg-amber-100 text-amber-700 border-2 border-amber-200 text-base font-bold rounded-2xl cursor-not-allowed">
+                                            <Clock className="w-5 h-5 mr-2" /> Đang chờ duyệt
                                         </Button>
                                     ) : hireStatus === 'COMPLETED' ? (
-                                        <Button disabled className="w-full h-12 bg-slate-100 text-slate-500 border border-slate-200 text-base font-bold rounded-xl cursor-not-allowed">
-                                            <CheckCircle2 className="w-4 h-4 mr-2" /> Đã hoàn thành khóa
+                                        <Button disabled className="w-full h-14 bg-slate-100 text-slate-500 border border-slate-200 text-base font-bold rounded-2xl cursor-not-allowed">
+                                            <CheckCircle2 className="w-5 h-5 mr-2" /> Đã hoàn thành khóa
                                         </Button>
                                     ) : (
-                                        <Button onClick={handleHirePt} disabled={hiring} className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-base font-black rounded-xl shadow-lg shadow-blue-500/20 transition-all group hover:-translate-y-0.5">
-                                            <Send className={`w-4 h-4 mr-2 ${hiring ? 'animate-pulse' : 'group-hover:translate-x-1 transition-transform'}`} />
+                                        <Button onClick={handleHirePt} disabled={hiring} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-base font-black rounded-2xl shadow-lg shadow-blue-500/20 transition-all group hover:-translate-y-0.5">
+                                            <Send className={`w-5 h-5 mr-2 ${hiring ? 'animate-pulse' : 'group-hover:translate-x-1 transition-transform'}`} />
                                             {hiring ? 'Đang gửi...' : 'Đăng ký Tập'}
                                         </Button>
                                     )}
                                 </div>
 
                                 {(pt.instagramUrl || pt.linkedinUrl) && (
-                                    <div className="flex justify-center gap-3 mt-6 pt-6 border-t border-slate-100">
+                                    <div className="flex justify-center gap-4 mt-8 pt-8 border-t border-slate-100">
                                         {pt.instagramUrl && (
-                                            <a href={pt.instagramUrl} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center hover:bg-pink-100 transition-all hover:scale-110 shadow-sm border border-pink-200">
+                                            <a href={pt.instagramUrl} target="_blank" rel="noreferrer" className="w-12 h-12 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center hover:bg-pink-100 transition-all hover:scale-110 shadow-sm border border-pink-200">
                                                 <InstagramIcon className="w-5 h-5" />
                                             </a>
                                         )}
                                         {pt.linkedinUrl && (
-                                            <a href={pt.linkedinUrl} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-all hover:scale-110 shadow-sm border border-blue-200">
+                                            <a href={pt.linkedinUrl} target="_blank" rel="noreferrer" className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100 transition-all hover:scale-110 shadow-sm border border-blue-200">
                                                 <LinkedinIcon className="w-5 h-5" />
                                             </a>
                                         )}
@@ -298,48 +308,151 @@ export default function PtDetailPage() {
                         </div>
                     </div>
 
-                    <div className="lg:col-span-8 xl:col-span-9 space-y-8 lg:mt-16">
+                    {/* CỘT PHẢI: NỘI DUNG CHI TIẾT */}
+                    <div className="lg:col-span-8 xl:col-span-9 space-y-8 lg:mt-24">
 
                         {pt.trainingPhilosophy && (
-                            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 sm:p-10 rounded-[2rem] shadow-lg shadow-blue-500/10 relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 -mr-4 -mt-4 text-white/5 group-hover:text-white/10 transition-colors duration-500">
-                                    <Quote className="w-48 h-48 rotate-180" />
+                            <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 sm:p-10 rounded-[2.5rem] shadow-xl shadow-blue-900/10 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 -mr-8 -mt-8 text-white/5 group-hover:text-white/10 transition-colors duration-700">
+                                    <Quote className="w-64 h-64 rotate-180" />
                                 </div>
                                 <div className="relative z-10">
-                                    <h3 className="text-xs font-black text-blue-200 uppercase tracking-widest mb-3">Triết lý huấn luyện</h3>
-                                    <p className="text-white font-medium text-lg sm:text-2xl leading-relaxed italic">"{pt.trainingPhilosophy}"</p>
+                                    <h3 className="text-sm font-black text-blue-200 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                        <span className="w-8 h-1 bg-blue-400 rounded-full"></span> Triết lý huấn luyện
+                                    </h3>
+                                    <p className="text-white font-medium text-xl sm:text-3xl leading-relaxed italic">"{pt.trainingPhilosophy}"</p>
                                 </div>
                             </div>
                         )}
 
                         {pt.bio && (
-                            <div className="bg-white p-8 sm:p-10 rounded-[2rem] border border-slate-100 shadow-sm">
-                                <h3 className="text-xl font-black text-slate-800 mb-4 flex items-center gap-2">
-                                    <UserCircle className="w-6 h-6 text-blue-500" /> Về bản thân
+                            <div className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                                <h3 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                                    <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><UserCircle className="w-6 h-6" /></div> Về bản thân
                                 </h3>
-                                <p className="text-slate-600 font-medium text-base leading-loose whitespace-pre-wrap">{pt.bio}</p>
+                                <p className="text-slate-600 font-medium text-lg leading-loose whitespace-pre-wrap">{pt.bio}</p>
                             </div>
                         )}
 
+                        {/* MỚI: BẢNG THÔNG TIN CHI TIẾT & CHUYÊN MÔN */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                            {/* Cột 1: Thông tin Dịch vụ */}
+                            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-3">
+                                        <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl"><Target className="w-5 h-5" /></div> Thông tin Dịch vụ
+                                    </h3>
+
+                                    <div className="space-y-5">
+                                        <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+                                            <span className="text-slate-500 font-semibold flex items-center gap-2"><MapPin className="w-4 h-4"/> Hình thức</span>
+                                            <span className="font-bold text-slate-800">{TRAINING_MODE_LABELS[pt.trainingMode] || '—'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+                                            <span className="text-slate-500 font-semibold flex items-center gap-2"><Briefcase className="w-4 h-4"/> Kinh nghiệm</span>
+                                            <span className="font-bold text-slate-800">{pt.yearsOfExperience || 0} năm</span>
+                                        </div>
+                                        <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+                                            <span className="text-slate-500 font-semibold flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/> Max Học viên</span>
+                                            <span className="font-bold text-slate-800">{pt.maxClients || '10'} người</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex justify-between items-center">
+                                    <span className="text-emerald-800 font-bold flex items-center gap-2"><Banknote className="w-5 h-5"/> Phí dịch vụ</span>
+                                    <span className="text-lg font-black text-emerald-600">
+                                        {pt.hourlyRate ? parseInt(pt.hourlyRate).toLocaleString('vi-VN') + 'đ' : 'Liên hệ'}
+                                        <span className="text-xs font-semibold text-slate-500 ml-1">/ {RATE_UNIT_LABELS[pt.rateUnit] || 'buổi'}</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Cột 2: Chuyên môn & Tags */}
+                            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Chuyên môn</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {pt.specializations?.length > 0 ? pt.specializations.map((spec, i) => (
+                                            <span key={i} className="bg-blue-50 text-blue-700 border border-blue-100 text-xs font-bold px-3 py-1.5 rounded-lg">{spec}</span>
+                                        )) : <span className="text-slate-400 text-sm italic">Đang cập nhật</span>}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Mục tiêu hỗ trợ</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {pt.preferredGoals?.length > 0 ? pt.preferredGoals.map((goal, i) => (
+                                            <span key={i} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-bold px-3 py-1.5 rounded-lg">{GOAL_LABELS[goal] || goal}</span>
+                                        )) : <span className="text-slate-400 text-sm italic">Đang cập nhật</span>}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Chế độ ăn khuyến nghị</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {pt.preferredDietTypes?.length > 0 ? pt.preferredDietTypes.map((diet, i) => (
+                                            <span key={i} className="bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs font-bold px-3 py-1.5 rounded-lg">{DIET_LABELS[diet] || diet}</span>
+                                        )) : <span className="text-slate-400 text-sm italic">Đang cập nhật</span>}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Dòng full-width cho Bằng cấp & Chứng chỉ */}
+                            {pt.certifications?.length > 0 && (
+                                <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                                    <h3 className="text-xl font-black text-slate-800 mb-6 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><GraduationCap className="w-5 h-5" /></div> Bằng cấp & Chứng chỉ
+                                        </div>
+                                    </h3>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {pt.certifications.map((cert, i) => (
+                                            <div key={i} className="flex items-start gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors group">
+                                                <div className="w-12 h-12 bg-white rounded-full border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
+                                                    <ShieldCheck className="w-6 h-6 text-amber-500" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className="font-bold text-slate-800 truncate">{cert.name}</h4>
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-1">{cert.issuingOrganization}</p>
+                                                    <p className="text-xs text-slate-500 mt-1">Cấp: {cert.issueDate}</p>
+                                                </div>
+                                                {cert.certificateImageUrl && (
+                                                    <button onClick={() => setLightboxImage(getFullImageUrl(cert.certificateImageUrl))} className="shrink-0 p-2 bg-white border border-slate-200 rounded-xl text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all cursor-zoom-in" title="Xem ảnh chứng chỉ">
+                                                        <ImageIcon className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Transformation Gallery */}
                         {transformations.length > 0 && (
-                            <div className="bg-white p-8 sm:p-10 rounded-[2rem] border border-slate-100 shadow-sm">
-                                <h3 className="text-xl font-black text-slate-800 mb-8 flex items-center gap-2">
-                                    <Award className="w-6 h-6 text-amber-500" /> Kết quả Học viên (Before & After)
+                            <div className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                                <h3 className="text-2xl font-black text-slate-800 mb-8 flex items-center gap-3">
+                                    <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><Award className="w-6 h-6" /></div> Kết quả Học viên (Before & After)
                                 </h3>
 
                                 <div className="grid grid-cols-1 gap-10">
                                     {transformations.map((t, idx) => (
-                                        <div key={t.id || idx} className="rounded-[2rem] border border-slate-100 overflow-hidden group shadow-sm hover:shadow-xl transition-all duration-300 bg-white flex flex-col">
+                                        <div key={t.id || idx} className="rounded-[2rem] border border-slate-100 overflow-hidden group shadow-md hover:shadow-xl transition-all duration-300 bg-white flex flex-col md:flex-row">
 
-                                            <div className="relative w-full h-[300px] sm:h-[400px] lg:h-[500px] flex shrink-0 bg-slate-100 overflow-hidden">
+                                            <div className="relative w-full md:w-5/12 xl:w-2/5 flex shrink-0 bg-slate-100 overflow-hidden min-h-[300px]">
+                                                {/* Before */}
                                                 <div className="w-1/2 h-full border-r-[2px] border-white relative z-10">
                                                     {t.beforeUrl ? (
                                                         <img src={getPermanentUrl(t.beforeUrl)} alt="Before" className="w-full h-full object-cover" />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase">No Image</div>
                                                     )}
-                                                    <div className="absolute bottom-4 left-4 bg-slate-900/70 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm">Before</div>
+                                                    <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm">Before</div>
                                                 </div>
+                                                {/* After */}
                                                 <div className="w-1/2 h-full relative">
                                                     {t.afterUrl ? (
                                                         <img src={getPermanentUrl(t.afterUrl)} alt="After" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -350,8 +463,8 @@ export default function PtDetailPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="p-8 sm:p-10 flex flex-col bg-slate-50/30">
-                                                <h4 className="font-extrabold text-2xl text-slate-900 mb-5">{t.title || 'Hành trình thay đổi'}</h4>
+                                            <div className="p-8 sm:p-10 flex-1 flex flex-col justify-center bg-gradient-to-br from-slate-50 to-white">
+                                                <h4 className="font-extrabold text-2xl text-slate-900 mb-5 leading-tight">{t.title || 'Hành trình thay đổi'}</h4>
                                                 <p className="text-base text-slate-600 font-medium leading-relaxed whitespace-pre-line">{t.story}</p>
                                             </div>
                                         </div>
@@ -360,66 +473,71 @@ export default function PtDetailPage() {
                             </div>
                         )}
 
-                        <div id="review-form-section" className="bg-white p-8 sm:p-10 rounded-[2rem] border border-slate-100 shadow-sm">
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 pb-6 border-b border-slate-100">
+                        {/* Đánh giá (Reviews) */}
+                        <div id="review-form-section" className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-10 pb-8 border-b border-slate-100">
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-800">Đánh giá từ Học viên</h3>
-                                    <p className="text-sm font-medium text-slate-500 mt-1">Khách hàng nói gì về {pt.fullName}?</p>
+                                    <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                                        <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl"><MessageSquare className="w-6 h-6" /></div> Đánh giá từ Học viên
+                                    </h3>
+                                    <p className="text-sm font-medium text-slate-500 mt-2">Khách hàng nói gì về {pt.fullName}?</p>
                                 </div>
                                 {hireStatus === 'COMPLETED' && !userReview && !showReviewForm && (
-                                    <Button onClick={() => setShowReviewForm(true)} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl font-bold h-11 px-6 shadow-sm">
+                                    <Button onClick={() => setShowReviewForm(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-12 px-8 shadow-lg shadow-blue-500/20 transition-all hover:-translate-y-0.5">
                                         Viết đánh giá
                                     </Button>
                                 )}
                             </div>
 
                             {showReviewForm && (
-                                <Card className="p-8 bg-blue-50/50 border-blue-100 rounded-3xl mb-10 animate-fade-in shadow-inner">
-                                    <h4 className="font-extrabold text-blue-900 mb-5">{reviewData.id ? 'Chỉnh sửa đánh giá' : 'Chia sẻ trải nghiệm của bạn'}</h4>
-                                    <form onSubmit={handleSubmitReview} className="space-y-5">
-                                        <div className="bg-white p-4 rounded-2xl border border-slate-100 inline-block shadow-sm">
+                                <Card className="p-8 bg-gradient-to-br from-blue-50/80 to-indigo-50/30 border-blue-100 rounded-3xl mb-12 animate-in slide-in-from-top-4 fade-in duration-300 shadow-sm">
+                                    <h4 className="font-extrabold text-blue-900 mb-6 text-lg">{reviewData.id ? 'Chỉnh sửa đánh giá' : 'Chia sẻ trải nghiệm của bạn'}</h4>
+                                    <form onSubmit={handleSubmitReview} className="space-y-6">
+                                        <div className="bg-white p-4 rounded-2xl border border-blue-100 inline-block shadow-sm">
                                             {renderStars(reviewData.rating, true)}
                                         </div>
                                         <textarea
                                             value={reviewData.comment}
                                             onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
-                                            className="w-full p-5 rounded-2xl border border-slate-200 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-white text-sm font-medium transition-all resize-none min-h-[120px]"
-                                            placeholder="Huấn luyện viên này đã giúp bạn thay đổi thế nào? Sự tận tâm, kiến thức..."
+                                            className="w-full p-5 rounded-2xl border border-blue-100 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 bg-white text-base font-medium transition-all resize-none min-h-[140px] shadow-sm"
+                                            placeholder="Huấn luyện viên này đã giúp bạn thay đổi thế nào? Hãy chia sẻ về sự tận tâm, kiến thức và kết quả nhé..."
                                             required
                                         />
 
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                            <div className="flex items-center gap-6">
-                                                <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 bg-white p-4 rounded-2xl border border-blue-50 shadow-sm">
+                                            <div className="flex items-center gap-8">
+                                                <label className="flex items-center gap-3 cursor-pointer group">
                                                     <input
                                                         type="checkbox"
                                                         checked={reviewData.isAnonymous}
                                                         onChange={e => setReviewData({...reviewData, isAnonymous: e.target.checked})}
-                                                        className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer transition-all"
                                                     />
-                                                    <span className="text-sm font-bold text-slate-600 group-hover:text-blue-600 transition-colors">Đánh giá ẩn danh</span>
+                                                    <span className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Đánh giá ẩn danh</span>
                                                 </label>
 
-                                                <label className="cursor-pointer flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-blue-600 transition-colors">
-                                                    <Camera className="w-5 h-5 text-slate-400" />
+                                                <label className="cursor-pointer flex items-center gap-2.5 text-sm font-bold text-slate-700 hover:text-blue-600 transition-colors">
+                                                    <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-blue-50 transition-colors">
+                                                        <Camera className="w-5 h-5 text-slate-500" />
+                                                    </div>
                                                     {reviewImage ? <span className="text-blue-600 truncate max-w-[150px]">{reviewImage.name}</span> : 'Đính kèm ảnh'}
                                                     <input type="file" accept="image/*" className="hidden" onChange={handleReviewImageSelect} />
                                                 </label>
                                             </div>
 
                                             {reviewImagePreview && (
-                                                <div className="relative">
-                                                    <img src={reviewImagePreview} alt="Preview" className="h-12 w-12 object-cover rounded-lg border border-slate-200 shadow-sm" />
-                                                    <button type="button" onClick={() => {setReviewImage(null); setReviewImagePreview('');}} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-0.5 hover:bg-red-200">
+                                                <div className="relative group">
+                                                    <img src={reviewImagePreview} alt="Preview" className="h-16 w-16 object-cover rounded-xl border-2 border-white shadow-md" />
+                                                    <button type="button" onClick={() => {setReviewImage(null); setReviewImagePreview('');}} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110">
                                                         <Trash2 className="w-3 h-3" />
                                                     </button>
                                                 </div>
                                             )}
                                         </div>
 
-                                        <div className="flex gap-3 justify-end pt-4 border-t border-slate-200/60">
-                                            <Button type="button" variant="ghost" onClick={resetReviewForm} className="text-slate-500 hover:bg-slate-100 rounded-xl font-bold h-11 px-6">Hủy</Button>
-                                            <Button type="submit" disabled={submittingReview} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 h-11 px-8">
+                                        <div className="flex gap-4 justify-end pt-4">
+                                            <Button type="button" variant="ghost" onClick={resetReviewForm} className="text-slate-500 hover:bg-slate-100 rounded-xl font-bold h-12 px-6">Hủy</Button>
+                                            <Button type="submit" disabled={submittingReview} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/30 h-12 px-8 transition-all hover:-translate-y-0.5">
                                                 {submittingReview ? 'Đang lưu...' : (reviewData.id ? 'Lưu Thay Đổi' : 'Gửi Đánh Giá')}
                                             </Button>
                                         </div>
@@ -429,11 +547,11 @@ export default function PtDetailPage() {
 
                             <div className="space-y-6">
                                 {reviews.length > 0 ? reviews.map(r => (
-                                    <div key={r.id} className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md transition-shadow relative group">
+                                    <div key={r.id} className="p-6 sm:p-8 bg-gradient-to-br from-white to-slate-50/50 border border-slate-100 rounded-[2rem] shadow-sm hover:shadow-md transition-shadow relative group">
 
                                         {user?.id === r.reviewerId && !showReviewForm && (
-                                            <div className="absolute top-6 right-6 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleEditClick(r)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-xl transition-colors border border-transparent hover:border-blue-100" title="Sửa đánh giá">
+                                            <div className="absolute top-6 right-6 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-1 group-hover:translate-y-0">
+                                                <button onClick={() => handleEditClick(r)} className="text-blue-500 bg-white hover:bg-blue-50 p-2.5 rounded-xl transition-all shadow-sm border border-slate-100 hover:border-blue-200" title="Sửa đánh giá">
                                                     <Edit className="w-4 h-4"/>
                                                 </button>
                                                 <button onClick={() => promptDeleteReview(r.id)} className="text-red-500 bg-white hover:bg-red-50 p-2.5 rounded-xl transition-all shadow-sm border border-slate-100 hover:border-red-200" title="Xóa đánh giá">
@@ -442,32 +560,36 @@ export default function PtDetailPage() {
                                             </div>
                                         )}
 
-                                        <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-5 pr-20">
+                                        <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6 pr-24">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 flex items-center justify-center font-black text-lg shadow-inner border border-slate-200/60">
-                                                    {r.isAnonymous ? <EyeOff className="w-5 h-5 text-slate-400" /> : (r.reviewerName?.charAt(0) || 'U')}
+                                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 flex items-center justify-center font-black text-xl shadow-inner border border-white">
+                                                    {r.isAnonymous ? <EyeOff className="w-6 h-6 text-blue-400" /> : (r.reviewerName?.charAt(0) || 'U')}
                                                 </div>
                                                 <div>
-                                                    <p className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                                                    <p className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
                                                         {r.reviewerName}
-                                                        {r.isAnonymous && <span className="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-md uppercase tracking-wider font-bold">Ẩn danh</span>}
+                                                        {r.isAnonymous && <span className="bg-slate-800 text-white text-[10px] px-2.5 py-0.5 rounded-md uppercase tracking-wider font-bold shadow-sm">Ẩn danh</span>}
                                                     </p>
-                                                    <div className="text-xs font-semibold text-slate-400 mt-0.5">{new Date(r.createdAt).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                                                    <div className="text-sm font-semibold text-slate-400 mt-1 flex items-center gap-1.5">
+                                                        <Clock className="w-3.5 h-3.5" />
+                                                        {new Date(r.createdAt).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100">
-                                            <div className="flex items-center gap-1.5 mb-3">
+                                        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                                            <div className="flex items-center gap-1.5 mb-4 bg-amber-50 w-fit px-3 py-1.5 rounded-xl border border-amber-100/50">
+                                                <span className="font-black text-amber-700 mr-1">{r.rating}.0</span>
                                                 {renderStars(r.rating)}
                                             </div>
-                                            <p className="text-slate-700 font-medium leading-relaxed text-sm whitespace-pre-line">{r.comment}</p>
+                                            <p className="text-slate-700 font-medium leading-relaxed text-base whitespace-pre-line">{r.comment}</p>
 
                                             {r.imageUrl && (
-                                                <div className="mt-4">
+                                                <div className="mt-5">
                                                     <button
                                                         onClick={() => setLightboxImage(getFullImageUrl(r.imageUrl))}
-                                                        className="block w-24 h-24 rounded-xl border border-slate-200 overflow-hidden cursor-zoom-in hover:opacity-80 transition-opacity shadow-sm"
+                                                        className="block w-32 h-32 rounded-2xl border-4 border-white shadow-md overflow-hidden cursor-zoom-in hover:scale-105 transition-transform"
                                                     >
                                                         <img src={getFullImageUrl(r.imageUrl)} alt="Minh chứng" className="w-full h-full object-cover" />
                                                     </button>
@@ -476,12 +598,12 @@ export default function PtDetailPage() {
                                         </div>
                                     </div>
                                 )) : (
-                                    <div className="text-center py-16 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-slate-100">
-                                            <MessageSquare className="w-8 h-8 text-slate-300" />
+                                    <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-slate-200 shadow-sm">
+                                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-5 shadow-sm border border-slate-100">
+                                            <MessageSquare className="w-10 h-10 text-slate-300" />
                                         </div>
-                                        <h4 className="text-lg font-bold text-slate-700">Chưa có đánh giá nào</h4>
-                                        <p className="text-slate-500 font-medium mt-1 text-sm">Hãy là người đầu tiên để lại nhận xét cho PT này.</p>
+                                        <h4 className="text-xl font-bold text-slate-800">Chưa có đánh giá nào</h4>
+                                        <p className="text-slate-500 font-medium mt-2 text-base">Hãy là người đầu tiên để lại nhận xét cho Huấn luyện viên này nhé.</p>
                                     </div>
                                 )}
                             </div>
@@ -499,13 +621,9 @@ export default function PtDetailPage() {
 
             {deleteModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
-                    <div
-                        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
-                        onClick={closeDeleteModal}
-                    ></div>
-
-                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 fade-in duration-200 relative z-10 border border-slate-100 flex flex-col max-h-[90vh]">
-                        <div className="p-8 text-center overflow-y-auto">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={closeDeleteModal}></div>
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 fade-in duration-200 relative z-10 border border-slate-100">
+                        <div className="p-8 text-center">
                             <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-8 border-white shadow-sm">
                                 <AlertTriangle className="w-10 h-10 text-red-500" />
                             </div>
@@ -514,7 +632,7 @@ export default function PtDetailPage() {
                                 Hành động này không thể hoàn tác. Đánh giá của bạn sẽ bị xóa vĩnh viễn khỏi hệ thống.
                             </p>
                         </div>
-                        <div className="flex bg-slate-50 p-6 gap-4 border-t border-slate-100 shrink-0">
+                        <div className="flex bg-slate-50 p-6 gap-4 border-t border-slate-100">
                             <Button
                                 variant="outline"
                                 onClick={closeDeleteModal}
