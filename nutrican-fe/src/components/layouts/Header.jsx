@@ -177,7 +177,8 @@ export default function Header() {
             { label: 'Học viên của tôi', href: '/pt/clients' },
             { label: 'Lịch hẹn', href: '/pt/appointments' },
             { label: 'Tin nhắn', href: '/pt/chat' },
-            { label: 'Đánh giá', href: '/pt/reviews' },
+            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
+            { label: 'Thống kê đánh giá', href: '/pt/ratings' },
             { label: 'Portfolio', href: '/pt/portfolio' },
         ],
         PT_FREELANCE: [
@@ -185,7 +186,8 @@ export default function Header() {
             { label: 'Học viên của tôi', href: '/pt/clients' },
             { label: 'Lịch hẹn', href: '/pt/appointments' },
             { label: 'Tin nhắn', href: '/pt/chat' },
-            { label: 'Đánh giá', href: '/pt/reviews' },
+            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
+            { label: 'Thống kê đánh giá', href: '/pt/ratings' },
             { label: 'Portfolio', href: '/pt/portfolio' },
         ],
         ADMIN: [
@@ -222,7 +224,7 @@ export default function Header() {
                                             className={`px-3 py-2 text-sm font-semibold rounded-lg transition-all duration-200 flex items-center gap-1.5 ${isActive
                                                 ? 'bg-slate-100 text-blue-600'
                                                 : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                                                }`}
+                                            }`}
                                         >
                                             <span>{item.label}</span>
                                             {showBadge && (
@@ -324,16 +326,16 @@ export default function Header() {
                                                         <LayoutDashboard className="w-4 h-4 text-slate-400" /> Bảng điều khiển
                                                     </Link>
                                                     {user?.role?.startsWith('PT') && (
-                                                        <button 
+                                                        <button
                                                             onClick={() => {
                                                                 setActiveRole(activeRole === 'CUSTOMER' ? user.role : 'CUSTOMER');
                                                                 setProfileMenuOpen(false);
                                                                 navigate(activeRole === 'CUSTOMER' ? '/pt' : '/diet');
-                                                            }} 
+                                                            }}
                                                             className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
                                                         >
                                                             <div className="flex items-center gap-3">
-                                                                <User className="w-4 h-4 text-slate-400" /> 
+                                                                <User className="w-4 h-4 text-slate-400" />
                                                                 {activeRole === 'CUSTOMER' ? 'Chuyển sang Huấn luyện viên' : 'Chuyển sang Khách hàng'}
                                                             </div>
                                                         </button>

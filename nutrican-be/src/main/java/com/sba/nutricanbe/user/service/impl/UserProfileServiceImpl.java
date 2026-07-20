@@ -505,4 +505,25 @@ public class UserProfileServiceImpl implements UserProfileService {
         }
         return null;
     }
+
+    @Override
+    @Transactional
+    public ApiResponse<String> uploadPortfolioImage(UUID userId, MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BadRequestException("Chỉ chấp nhận định dạng file ảnh (JPG, PNG)");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new BadRequestException("Ảnh không được vượt quá 5MB");
+        }
+        try {
+            String objectName = minioService.uploadFile(file, "portfolio-images");
+            String presignedUrl = minioService.getPresignedUrl(objectName);
+
+            log.info("Portfolio image uploaded for user: {}", userId);
+            return ApiResponse.success(presignedUrl, "Tải ảnh thành công");
+        } catch (Exception e) {
+            throw new BadRequestException("Upload ảnh thất bại: " + e.getMessage());
+        }
+    }
 }
