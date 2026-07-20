@@ -1,24 +1,20 @@
 package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.common.enums.RequestStatus;
 import com.sba.nutricanbe.common.enums.UserStatus;
-import com.sba.nutricanbe.user.dto.CertificationData;
+import com.sba.nutricanbe.user.dto.*;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtProfile;
+import com.sba.nutricanbe.user.entity.PtUpdateRequest;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
+import com.sba.nutricanbe.user.repository.PtUpdateRequestRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
-import com.sba.nutricanbe.user.dto.MacroTargetRequest;
-import com.sba.nutricanbe.user.dto.MacroTargetResponse;
-import com.sba.nutricanbe.user.dto.PtProfileSummary;
-import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
-import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
-import com.sba.nutricanbe.user.dto.UpdatePtProfileRequest;
-import com.sba.nutricanbe.user.dto.UserProfileResponse;
 import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.service.UserProfileService;
 import com.sba.nutricanbe.common.repository.SystemSettingRepository;
@@ -42,6 +38,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final PtProfileRepository ptProfileRepository;
     private final StorageService minioService;
     private final SystemSettingRepository systemSettingRepository;
+    private final PtUpdateRequestRepository ptUpdateRequestRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -428,5 +425,32 @@ public class UserProfileServiceImpl implements UserProfileService {
         } catch (Exception e) {
             throw new BadRequestException("Upload ảnh thất bại: " + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<PtUpdateRequestDto> submitPtUpdateRequest(UUID ptId, SubmitPtUpdateRequest request) {
+        boolean hasPending = ptUpdateRequestRepository.existsByPtIdAndStatus(ptId, RequestStatus.PENDING);
+        if (hasPending) {
+            throw new BadRequestException("Bạn đang có 1 yêu cầu cập nhật chờ duyệt. Vui lòng chờ Admin xử lý trước khi gửi yêu cầu mới.");
+        }
+
+        PtUpdateRequest newRequest = PtUpdateRequest.builder()
+                .pt(userRepository.getReferenceById(ptId))
+                .requestedData(request.getRequestedData())
+                .reason(request.getReason())
+                .status(RequestStatus.PENDING)
+                .build();
+
+        newRequest = ptUpdateRequestRepository.save(newRequest);
+        return ApiResponse.success(PtUpdateRequestDto.fromEntity(newRequest), "Đã gửi yêu cầu cập nhật thành công!");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<PtUpdateRequestDto> getPendingPtUpdateRequest(UUID ptId) {
+        return ptUpdateRequestRepository.findFirstByPtIdAndStatusOrderByCreatedAtDesc(ptId, RequestStatus.PENDING)
+                .map(req -> ApiResponse.success(PtUpdateRequestDto.fromEntity(req)))
+                .orElse(ApiResponse.success(null));
     }
 }

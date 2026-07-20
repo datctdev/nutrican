@@ -221,7 +221,7 @@ export default function MarketplacePage() {
                                                 <div className="flex items-center gap-1.5 mt-3 mb-5 bg-slate-50 w-fit px-3 py-1.5 rounded-xl border border-slate-100">
                                                     <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
                                                     <span className="text-sm font-black text-slate-800">{pt.rating ? pt.rating.toFixed(1) : '5.0'}</span>
-                                                    <span className="text-xs font-semibold text-slate-500">({pt.reviewCount || 0})</span>
+                                                    <span className="text-xs text-slate-500">({pt.totalReviews || 0})</span>
                                                 </div>
 
                                                 <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed font-medium">{pt.bio || 'Đam mê giúp bạn đạt được mục tiêu thể hình bằng phương pháp khoa học.'}</p>
