@@ -55,6 +55,21 @@ public class PtProfileResponse {
     private String instagramUrl;
     private String linkedinUrl;
 
+    private List<PtVenueResponse> venues;
+    private List<PtAvailabilityWindowResponse> availability;
+
+    /** Snapshot from open mapping (customer view) */
+    private UUID venueId;
+    private String venueName;
+    private String venueAddress;
+    private String venueMapsUrl;
+    private java.time.LocalDateTime firstSessionStart;
+    private java.time.LocalDateTime firstSessionEnd;
+
+    private Integer sessionCount;
+    private java.math.BigDecimal perSessionAmount;
+    private List<MappingSessionResponse> sessions;
+
     public static PtProfileResponse toPtProfileResponse(PtProfile profile) {
         User user = profile.getUser();
         return PtProfileResponse.builder()

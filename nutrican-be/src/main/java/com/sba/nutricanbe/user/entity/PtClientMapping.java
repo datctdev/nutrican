@@ -71,5 +71,30 @@ public class PtClientMapping extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "termination_reason", length = 30)
     private com.sba.nutricanbe.user.enums.TerminationReason terminationReason;
+
+    /** Offline hire snapshot — immutable after hire */
+    @Column(name = "venue_id")
+    private java.util.UUID venueId;
+
+    @Column(name = "venue_name", length = 120)
+    private String venueName;
+
+    @Column(name = "venue_address", length = 500)
+    private String venueAddress;
+
+    @Column(name = "venue_maps_url", length = 500)
+    private String venueMapsUrl;
+
+    @Column(name = "first_session_start")
+    private LocalDateTime firstSessionStart;
+
+    @Column(name = "first_session_end")
+    private LocalDateTime firstSessionEnd;
+
+    @Column(name = "session_count")
+    private Integer sessionCount;
+
+    @Column(name = "per_session_amount", precision = 15, scale = 2)
+    private BigDecimal perSessionAmount;
 }
 

@@ -23,4 +23,10 @@ public interface PtAppointmentRepository extends JpaRepository<PtAppointment, UU
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
             @Param("statuses") List<AppointmentStatus> statuses);
+
+    boolean existsByMappingId(UUID mappingId);
+
+    boolean existsByMappingIdAndStartTime(UUID mappingId, java.time.LocalDateTime startTime);
+
+    long countByMappingId(UUID mappingId);
 }

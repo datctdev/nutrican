@@ -17,6 +17,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.sba.nutricanbe.user.dto.PtCalendarResponse;
+import com.sba.nutricanbe.user.service.PtCalendarService;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @RestController
@@ -25,6 +30,7 @@ import java.util.UUID;
 public class MarketplaceController {
 
     private final MarketplaceService marketplaceService;
+    private final PtCalendarService ptCalendarService;
 
     @GetMapping("/pts")
     public ResponseEntity<ApiResponse<PageResponse<PtProfileResponse>>> searchPts(
@@ -64,6 +70,14 @@ public class MarketplaceController {
             @PathVariable UUID ptId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(marketplaceService.getPtDetail(ptId, user));
+    }
+
+    @GetMapping("/pts/{ptId}/calendar")
+    public ResponseEntity<ApiResponse<PtCalendarResponse>> getPtCalendar(
+            @PathVariable UUID ptId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        return ResponseEntity.ok(ptCalendarService.getCalendar(ptId, from, to));
     }
 
     @GetMapping("/pts/{ptId}/reviews")

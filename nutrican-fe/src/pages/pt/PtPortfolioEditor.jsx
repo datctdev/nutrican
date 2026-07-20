@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Camera, Plus, Trash2, Save, ImagePlus, Loader2, LayoutTemplate, Link as LinkIcon, Image as ImageIcon } from 'lucide-react';
+import { Camera, Plus, Trash2, Save, ImagePlus, Loader2, LayoutTemplate, Link as LinkIcon, Image as ImageIcon, MapPin, Clock, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { userService } from '../../services/userService';
 import { toast } from 'sonner';
+import { DAY_LABELS } from '../../utils/offlineHireSlots';
 
 // HÀM XỬ LÝ LỖI MẤT ẢNH: Cắt bỏ phần đuôi Token hết hạn của MinIO
 const getPermanentUrl = (url) => {
@@ -18,6 +19,17 @@ export default function PtPortfolioEditor() {
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
     const [uploadingImage, setUploadingImage] = useState(null);
+    const [venues, setVenues] = useState([]);
+    const [availability, setAvailability] = useState([]);
+    const [venueForm, setVenueForm] = useState({ name: '', address: '', mapsUrl: '', note: '' });
+    const [editingVenueId, setEditingVenueId] = useState(null);
+    const [savingVenue, setSavingVenue] = useState(false);
+    const [savingAvailability, setSavingAvailability] = useState(false);
+
+    const trainingMode = user?.ptProfile?.trainingMode;
+    const needsOfflineSetup = trainingMode === 'OFFLINE' || trainingMode === 'BOTH';
+    const activeVenueCount = venues.filter((v) => v.active !== false).length;
+    const offlineSetupIncomplete = needsOfflineSetup && (activeVenueCount === 0 || availability.length === 0);
 
     const [formData, setFormData] = useState({
         bio: '',
@@ -53,7 +65,29 @@ export default function PtPortfolioEditor() {
         fetchLatestProfile();
     }, []);
 
+    const fetchVenueAvailability = async () => {
+        try {
+            const [venueRes, availRes] = await Promise.all([
+                userService.listPtVenues(),
+                userService.getPtAvailability(),
+            ]);
+            setVenues(venueRes.data?.data || []);
+            setAvailability(availRes.data?.data || []);
+        } catch (error) {
+            console.error('Lỗi lấy venue/availability:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (needsOfflineSetup) {
+            fetchVenueAvailability();
+        }
+    }, [needsOfflineSetup]);
+
     const handleSave = async () => {
+        if (offlineSetupIncomplete) {
+            toast.warning('Offline coaching cần ít nhất 1 địa điểm active và 1 khung giờ nhận học viên.');
+        }
         try {
             setLoading(true);
             const response = await userService.updatePtProfile(formData);
@@ -139,6 +173,82 @@ export default function PtPortfolioEditor() {
         }
     };
 
+    const resetVenueForm = () => {
+        setVenueForm({ name: '', address: '', mapsUrl: '', note: '' });
+        setEditingVenueId(null);
+    };
+
+    const handleSaveVenue = async () => {
+        if (!venueForm.name.trim() || !venueForm.address.trim()) {
+            toast.error('Tên và địa chỉ địa điểm là bắt buộc');
+            return;
+        }
+        setSavingVenue(true);
+        try {
+            if (editingVenueId) {
+                await userService.updatePtVenue(editingVenueId, venueForm);
+                toast.success('Cập nhật địa điểm thành công');
+            } else {
+                await userService.createPtVenue(venueForm);
+                toast.success('Thêm địa điểm thành công');
+            }
+            resetVenueForm();
+            fetchVenueAvailability();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể lưu địa điểm');
+        } finally {
+            setSavingVenue(false);
+        }
+    };
+
+    const handleEditVenue = (venue) => {
+        setEditingVenueId(venue.id);
+        setVenueForm({
+            name: venue.name || '',
+            address: venue.address || '',
+            mapsUrl: venue.mapsUrl || '',
+            note: venue.note || '',
+        });
+    };
+
+    const handleDeactivateVenue = async (venueId) => {
+        try {
+            await userService.deactivatePtVenue(venueId);
+            toast.success('Đã ẩn địa điểm');
+            fetchVenueAvailability();
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể ẩn địa điểm');
+        }
+    };
+
+    const addAvailabilityRow = () => {
+        setAvailability((prev) => [
+            ...prev,
+            { dayOfWeek: 2, startTime: '08:00', endTime: '12:00', slotMinutes: 60 },
+        ]);
+    };
+
+    const updateAvailabilityRow = (index, field, value) => {
+        setAvailability((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+    };
+
+    const removeAvailabilityRow = (index) => {
+        setAvailability((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSaveAvailability = async () => {
+        setSavingAvailability(true);
+        try {
+            const res = await userService.replacePtAvailability(availability);
+            setAvailability(res.data?.data || []);
+            toast.success('Đã cập nhật lịch nhận học viên');
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể lưu lịch nhận học viên');
+        } finally {
+            setSavingAvailability(false);
+        }
+    };
+
     if (fetching) {
         return <div className="flex justify-center items-center min-h-[50vh]"><Loader2 className="w-8 h-8 animate-spin text-purple-600" /></div>;
     }
@@ -162,6 +272,18 @@ export default function PtPortfolioEditor() {
                     </Button>
                 </div>
             </div>
+
+            {offlineSetupIncomplete && (
+                <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                    <div>
+                        <p className="font-bold text-amber-900">Thiếu cấu hình coaching offline</p>
+                        <p className="mt-1 text-sm text-amber-800">
+                            Học viên cần chọn địa điểm và buổi tập đầu tiên khi thuê bạn. Hãy thêm ít nhất 1 địa điểm active và 1 khung giờ trong tuần.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
                 <div className="xl:col-span-4 space-y-6 sticky top-[160px]">
@@ -243,6 +365,78 @@ export default function PtPortfolioEditor() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {needsOfflineSetup && (
+                        <>
+                            <Card className="rounded-3xl border-slate-200 shadow-sm">
+                                <CardContent className="p-6 space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <MapPin className="h-5 w-5 text-emerald-600" />
+                                        <h2 className="text-lg font-extrabold text-slate-800">Địa điểm tập</h2>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {venues.filter((v) => v.active !== false).map((venue) => (
+                                            <div key={venue.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                                                <p className="font-bold text-slate-900">{venue.name}</p>
+                                                <p className="mt-1 text-sm text-slate-600">{venue.address}</p>
+                                                <div className="mt-2 flex gap-2">
+                                                    <Button size="sm" variant="outline" onClick={() => handleEditVenue(venue)}>Sửa</Button>
+                                                    <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleDeactivateVenue(venue.id)}>Ẩn</Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="space-y-2 border-t border-slate-100 pt-4">
+                                        <input value={venueForm.name} onChange={(e) => setVenueForm({ ...venueForm, name: e.target.value })} placeholder="Tên phòng gym / studio" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                                        <input value={venueForm.address} onChange={(e) => setVenueForm({ ...venueForm, address: e.target.value })} placeholder="Địa chỉ đầy đủ" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                                        <input value={venueForm.mapsUrl} onChange={(e) => setVenueForm({ ...venueForm, mapsUrl: e.target.value })} placeholder="Link Google Maps (tuỳ chọn)" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                                        <textarea value={venueForm.note} onChange={(e) => setVenueForm({ ...venueForm, note: e.target.value })} placeholder="Ghi chú (tuỳ chọn)" rows={2} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                                        <div className="flex gap-2">
+                                            <Button onClick={handleSaveVenue} disabled={savingVenue} className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                                                {savingVenue ? 'Đang lưu...' : editingVenueId ? 'Cập nhật địa điểm' : 'Thêm địa điểm'}
+                                            </Button>
+                                            {editingVenueId && (
+                                                <Button variant="outline" onClick={resetVenueForm}>Huỷ</Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="rounded-3xl border-slate-200 shadow-sm">
+                                <CardContent className="p-6 space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <Clock className="h-5 w-5 text-blue-600" />
+                                        <h2 className="text-lg font-extrabold text-slate-800">Lịch nhận học viên</h2>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {availability.map((row, index) => (
+                                            <div key={index} className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-5">
+                                                <select value={row.dayOfWeek} onChange={(e) => updateAvailabilityRow(index, 'dayOfWeek', Number(e.target.value))} className="rounded-xl border border-slate-200 px-2 py-2 text-sm sm:col-span-2">
+                                                    {Object.entries(DAY_LABELS).map(([value, label]) => (
+                                                        <option key={value} value={value}>{label}</option>
+                                                    ))}
+                                                </select>
+                                                <input type="time" value={row.startTime?.slice(0, 5) || '08:00'} onChange={(e) => updateAvailabilityRow(index, 'startTime', `${e.target.value}:00`)} className="rounded-xl border border-slate-200 px-2 py-2 text-sm" />
+                                                <input type="time" value={row.endTime?.slice(0, 5) || '12:00'} onChange={(e) => updateAvailabilityRow(index, 'endTime', `${e.target.value}:00`)} className="rounded-xl border border-slate-200 px-2 py-2 text-sm" />
+                                                <Button variant="outline" size="sm" className="text-red-600" onClick={() => removeAvailabilityRow(index)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" onClick={addAvailabilityRow} className="flex-1">
+                                            <Plus className="mr-1 h-4 w-4" /> Thêm khung giờ
+                                        </Button>
+                                        <Button onClick={handleSaveAvailability} disabled={savingAvailability} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                                            {savingAvailability ? 'Đang lưu...' : 'Lưu lịch'}
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </>
+                    )}
                 </div>
 
                 <div className="xl:col-span-8">

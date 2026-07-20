@@ -9,6 +9,11 @@ import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
 import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
 import com.sba.nutricanbe.user.dto.UserProfileResponse;
 import com.sba.nutricanbe.user.service.UserProfileService;
+import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
+import com.sba.nutricanbe.user.dto.PtVenueRequest;
+import com.sba.nutricanbe.user.dto.PtVenueResponse;
+import com.sba.nutricanbe.user.dto.PtAvailabilityWindowResponse;
+import com.sba.nutricanbe.user.dto.UpdatePtAvailabilityRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -25,6 +30,7 @@ import java.util.UUID;
 public class UserProfileController {
 
     private final UserProfileService userProfileService;
+    private final PtVenueAvailabilityService venueAvailabilityService;
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
@@ -105,6 +111,47 @@ public class UserProfileController {
             @AuthenticationPrincipal User user,
             @RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(userProfileService.uploadPortfolioImage(user.getId(), file));
+    }
+
+    @GetMapping("/pt/venues")
+    public ResponseEntity<ApiResponse<java.util.List<PtVenueResponse>>> listVenues(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(venueAvailabilityService.listVenues(user.getId()));
+    }
+
+    @PostMapping("/pt/venues")
+    public ResponseEntity<ApiResponse<PtVenueResponse>> createVenue(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody PtVenueRequest request) {
+        return ResponseEntity.ok(venueAvailabilityService.createVenue(user.getId(), request));
+    }
+
+    @PutMapping("/pt/venues/{venueId}")
+    public ResponseEntity<ApiResponse<PtVenueResponse>> updateVenue(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID venueId,
+            @Valid @RequestBody PtVenueRequest request) {
+        return ResponseEntity.ok(venueAvailabilityService.updateVenue(user.getId(), venueId, request));
+    }
+
+    @DeleteMapping("/pt/venues/{venueId}")
+    public ResponseEntity<ApiResponse<PtVenueResponse>> deactivateVenue(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID venueId) {
+        return ResponseEntity.ok(venueAvailabilityService.deactivateVenue(user.getId(), venueId));
+    }
+
+    @GetMapping("/pt/availability")
+    public ResponseEntity<ApiResponse<java.util.List<PtAvailabilityWindowResponse>>> getAvailability(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(venueAvailabilityService.getAvailability(user.getId()));
+    }
+
+    @PutMapping("/pt/availability")
+    public ResponseEntity<ApiResponse<java.util.List<PtAvailabilityWindowResponse>>> replaceAvailability(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody UpdatePtAvailabilityRequest request) {
+        return ResponseEntity.ok(venueAvailabilityService.replaceAvailability(user.getId(), request));
     }
 }
 

@@ -1,0 +1,52 @@
+{
+  "password": "123456",
+  "accounts": {
+    "ptOffline": {
+      "email": "pt.offline@gmail.com",
+      "fullName": "Tran Van PT Offline",
+      "trainingMode": "OFFLINE",
+      "offlineRate": "500000",
+      "offlineRateUnit": "SESSION_60",
+      "venues": [
+        {
+          "name": "California Fitness Quận 7",
+          "address": "366 Nguyễn Hữu Thọ, Tân Hưng, Quận 7, TP.HCM"
+        },
+        {
+          "name": "Elite Gym Thảo Điền",
+          "address": "40 Xuân Thủy, Thảo Điền, Quận 2, TP.HCM"
+        }
+      ],
+      "availability": "Mon-Fri 07:00-11:00 & 17:00-21:00, Sat 08:00-12:00 (slot 60 phút)"
+    },
+    "ptBoth": {
+      "email": "pt.certified@gmail.com",
+      "fullName": "Le Minh PT Certified",
+      "trainingMode": "BOTH",
+      "note": "customer1@gmail.com đang ACTIVE — dùng customer3 để test hire mới"
+    },
+    "customerClean": {
+      "email": "customer3@gmail.com",
+      "fullName": "Le Thi Test Offline",
+      "note": "Không có mapping sẵn — phù hợp test hire từ đầu"
+    },
+    "customerExisting": {
+      "email": "customer1@gmail.com",
+      "note": "Đang ACTIVE với pt.certified — không dùng để test hire mới"
+    }
+  },
+  "smokeTestSteps": [
+    "Restart backend (dev profile) để chạy seed + tạo bảng pt_venues, pt_availability_windows",
+    "Login customer3@gmail.com / 123456",
+    "Chợ PT → tìm 'Tran Van PT Offline' → mở profile",
+    "Đăng ký Coaching → OFFLINE → chọn venue + buổi #1 → Gửi yêu cầu",
+    "Login pt.offline@gmail.com / 123456 → Clients → tab Chờ duyệt → Accept",
+    "Login customer3 → Thanh toán VNPay trên PT detail hoặc Coaching",
+    "Sau SUCCESS: Coaching → tab Lịch hẹn PT → buổi #1 CONFIRMED + địa chỉ"
+  ],
+  "urls": {
+    "marketplace": "http://localhost:5173/marketplace",
+    "coaching": "http://localhost:5173/coaching",
+    "ptPortfolio": "http://localhost:5173/pt/portfolio"
+  }
+}

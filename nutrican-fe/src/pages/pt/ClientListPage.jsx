@@ -392,9 +392,41 @@ export default function ClientListPage() {
                                                 </div>
                                                 <p className="text-sm font-black text-slate-900">
                                                     {Number(client.agreedAmount || 0).toLocaleString('vi-VN')}đ
-                                                    <span className="ml-1 text-xs font-semibold text-slate-500">/ {client.agreedRateUnit}</span>
+                                                    {client.selectedTrainingMode === 'OFFLINE' && client.sessionCount ? (
+                                                        <span className="ml-1 text-xs font-semibold text-slate-500">· gói {client.sessionCount} buổi</span>
+                                                    ) : (
+                                                        <span className="ml-1 text-xs font-semibold text-slate-500">/ {client.agreedRateUnit}</span>
+                                                    )}
                                                 </p>
+                                                {client.selectedTrainingMode === 'OFFLINE' && client.perSessionAmount && client.sessionCount && (
+                                                    <p className="text-xs text-slate-500">
+                                                        {client.sessionCount} × {Number(client.perSessionAmount).toLocaleString('vi-VN')}đ/buổi
+                                                    </p>
+                                                )}
                                                 <p className="text-xs text-slate-500">Giá đã được chốt tại thời điểm học viên gửi yêu cầu.</p>
+                                                {client.selectedTrainingMode === 'OFFLINE' && client.venueName && (
+                                                    <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-2.5">
+                                                        <p className="text-xs font-black uppercase tracking-wider text-emerald-700">
+                                                            Gói offline {client.sessionCount ? `· ${client.sessionCount} buổi` : ''}
+                                                        </p>
+                                                        <p className="mt-1 text-sm font-bold text-slate-800">{client.venueName}</p>
+                                                        <p className="text-xs text-slate-600">{client.venueAddress}</p>
+                                                        {(client.sessions || []).length > 0 ? (
+                                                            <ul className="mt-1 space-y-0.5">
+                                                                {client.sessions.map((s) => (
+                                                                    <li key={s.id || s.sequence} className="text-xs font-semibold text-slate-700">
+                                                                        #{s.sequence}: {new Date(s.startTime).toLocaleString('vi-VN')}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        ) : client.firstSessionStart && (
+                                                            <p className="mt-1 text-xs font-semibold text-slate-700">
+                                                                {new Date(client.firstSessionStart).toLocaleString('vi-VN')}
+                                                                {client.firstSessionEnd ? ` – ${new Date(client.firstSessionEnd).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 {activeTab === 'AWAITING_PAYMENT' && client.paymentDueAt && (
                                                     <p className="text-xs font-bold text-amber-700">
                                                         Hạn thanh toán: {new Date(client.paymentDueAt).toLocaleString('vi-VN')}

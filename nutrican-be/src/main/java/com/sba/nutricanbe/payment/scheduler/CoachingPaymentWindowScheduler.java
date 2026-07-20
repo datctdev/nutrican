@@ -6,6 +6,7 @@ import com.sba.nutricanbe.payment.repository.CoachingPaymentRepository;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.user.service.SlotHoldService;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,6 +26,7 @@ public class CoachingPaymentWindowScheduler {
     private final PtClientMappingRepository mappingRepository;
     private final CoachingPaymentRepository paymentRepository;
     private final WebSocketSessionService webSocketSessionService;
+    private final SlotHoldService slotHoldService;
 
     @Scheduled(cron = "${app.payment.expiry-scan-cron:0 */15 * * * *}")
     @Transactional
@@ -49,6 +51,7 @@ public class CoachingPaymentWindowScheduler {
             mapping.setStatus(ClientMappingStatus.INACTIVE);
             mapping.setPaymentDueAt(null);
             mappingRepository.save(mapping);
+            slotHoldService.releaseByMapping(mapping.getId());
 
             Map<String, Object> payload = new HashMap<>();
             payload.put("mappingId", mapping.getId());

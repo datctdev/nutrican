@@ -69,4 +69,10 @@ public class PtRegistrationRequest {
     private String linkedinUrl;
     private List<String> preferredGoals;
     private List<String> preferredDietTypes;
+
+    @Valid
+    private List<PtVenueRequest> venues;
+
+    @Valid
+    private List<PtAvailabilityWindowRequest> availabilityWindows;
 }

@@ -23,7 +23,16 @@ import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
 import com.sba.nutricanbe.user.dto.HirePtRequest;
 import com.sba.nutricanbe.user.enums.TrainingMode;
+import com.sba.nutricanbe.user.repository.PtVenueRepository;
+import com.sba.nutricanbe.user.entity.PtVenue;
+import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
+import com.sba.nutricanbe.user.dto.MappingSessionResponse;
+import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
+import com.sba.nutricanbe.user.entity.PtMappingSession;
+import com.sba.nutricanbe.user.service.AppointmentSlotHelper;
 import com.sba.nutricanbe.user.service.MarketplaceService;
+import com.sba.nutricanbe.user.service.OfflineHireSessionService;
+import com.sba.nutricanbe.user.service.SlotHoldService;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +64,12 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     private final PtClientMappingRepository mappingRepository;
     private final WebSocketSessionService webSocketSessionService;
     private final StorageService storageService;
+    private final PtVenueAvailabilityService venueAvailabilityService;
+    private final PtVenueRepository venueRepository;
+    private final AppointmentSlotHelper appointmentSlotHelper;
+    private final OfflineHireSessionService offlineHireSessionService;
+    private final PtMappingSessionRepository mappingSessionRepository;
+    private final SlotHoldService slotHoldService;
 
     @Value("${app.payment.accepted-request-hours:24}")
     private long acceptedRequestHours;
@@ -143,6 +158,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                         response.setAgreedAmount(mapping.getAgreedAmount());
                         response.setAgreedRateUnit(mapping.getAgreedRateUnit());
                         response.setPaymentDueAt(mapping.getPaymentDueAt());
+                        enrichMappingSnapshot(response, mapping);
                     });
         }
         String goalForMatch = request.getGoalFilter() != null
@@ -201,6 +217,12 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
         PtProfileResponse response = PtProfileResponse.toPtProfileResponse(profile);
 
+        if (profile.getTrainingMode() == TrainingMode.OFFLINE
+                || profile.getTrainingMode() == TrainingMode.BOTH) {
+            response.setVenues(venueAvailabilityService.listActiveVenuesForProfile(profile.getId()));
+            response.setAvailability(venueAvailabilityService.listAvailabilityForProfile(profile.getId()));
+        }
+
         if (user != null && user.hasCustomerPrivileges()) {
             mappingRepository.findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(
                             profile.getUser().getId(), user.getId())
@@ -212,6 +234,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                         response.setAgreedAmount(mapping.getAgreedAmount());
                         response.setAgreedRateUnit(mapping.getAgreedRateUnit());
                         response.setPaymentDueAt(mapping.getPaymentDueAt());
+                        enrichMappingSnapshot(response, mapping);
                     });
         }
 
@@ -311,14 +334,76 @@ public class MarketplaceServiceImpl implements MarketplaceService {
             throw new BadRequestException("This PT does not offer the selected coaching mode");
         }
 
-        BigDecimal agreedAmount = selectedMode == TrainingMode.ONLINE
-                ? profile.getOnlineRate() : profile.getOfflineRate();
+        BigDecimal perSessionAmount = null;
+        Integer sessionCount = null;
+        BigDecimal agreedAmount;
         String agreedRateUnit = selectedMode == TrainingMode.ONLINE
                 ? profile.getOnlineRateUnit() : profile.getOfflineRateUnit();
+        if (selectedMode == TrainingMode.ONLINE) {
+            agreedAmount = profile.getOnlineRate();
+        } else {
+            perSessionAmount = profile.getOfflineRate();
+            agreedAmount = perSessionAmount;
+        }
         if (agreedAmount == null || agreedAmount.signum() <= 0 || agreedRateUnit == null
                 || agreedRateUnit.isBlank()) {
             throw new BadRequestException("The selected coaching package does not have a valid price");
         }
+
+        UUID venueId = null;
+        String venueName = null;
+        String venueAddress = null;
+        String venueMapsUrl = null;
+        LocalDateTime firstSessionStart = null;
+        LocalDateTime firstSessionEnd = null;
+        OfflineHireSessionService.ValidatedOfflineHire validatedOffline = null;
+        PtVenue selectedVenue = null;
+
+        if (selectedMode == TrainingMode.OFFLINE) {
+            if (request.getVenueId() == null) {
+                throw new BadRequestException("Please select a training venue");
+            }
+            List<LocalDateTime> sessionStarts = request.resolvedSessionStarts();
+            if (sessionStarts.isEmpty()) {
+                throw new BadRequestException("Please select at least one session");
+            }
+            long activeVenues = venueRepository.countByPtProfile_IdAndActiveTrue(profile.getId());
+            if (activeVenues == 0) {
+                throw new BadRequestException("PT has not configured any training venues");
+            }
+            List<com.sba.nutricanbe.user.dto.PtAvailabilityWindowResponse> availability =
+                    venueAvailabilityService.listAvailabilityForProfile(profile.getId());
+            if (availability.isEmpty()) {
+                throw new BadRequestException("PT has not configured availability");
+            }
+            selectedVenue = venueRepository.findByIdAndPtProfile_Id(request.getVenueId(), profile.getId())
+                    .orElseThrow(() -> new BadRequestException("Selected venue is not valid for this PT"));
+            if (!Boolean.TRUE.equals(selectedVenue.getActive())) {
+                throw new BadRequestException("Selected venue is no longer available");
+            }
+            validatedOffline = offlineHireSessionService.validateOfflineSessions(
+                    ptId, profile.getId(), availability, agreedRateUnit, sessionStarts, null);
+            sessionCount = validatedOffline.sessionCount();
+            agreedAmount = perSessionAmount.multiply(BigDecimal.valueOf(sessionCount));
+            firstSessionStart = validatedOffline.earliestStart();
+            firstSessionEnd = validatedOffline.earliestEnd();
+            venueId = selectedVenue.getId();
+            venueName = selectedVenue.getName();
+            venueAddress = selectedVenue.getAddress();
+            venueMapsUrl = selectedVenue.getMapsUrl();
+        }
+
+        final UUID snapshotVenueId = venueId;
+        final String snapshotVenueName = venueName;
+        final String snapshotVenueAddress = venueAddress;
+        final String snapshotVenueMapsUrl = venueMapsUrl;
+        final LocalDateTime snapshotFirstStart = firstSessionStart;
+        final LocalDateTime snapshotFirstEnd = firstSessionEnd;
+        final BigDecimal snapshotPerSession = perSessionAmount;
+        final Integer snapshotSessionCount = sessionCount;
+        final BigDecimal snapshotAgreedAmount = agreedAmount;
+        final OfflineHireSessionService.ValidatedOfflineHire snapshotValidated = validatedOffline;
+        final PtVenue snapshotVenue = selectedVenue;
 
         mappingRepository.findFirstByClient_IdAndStatusIn(
                         customerId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))
@@ -361,8 +446,16 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                             .client(customer)
                             .status(ClientMappingStatus.PENDING)
                             .selectedTrainingMode(selectedMode)
-                            .agreedAmount(agreedAmount)
+                            .agreedAmount(snapshotAgreedAmount)
                             .agreedRateUnit(agreedRateUnit)
+                            .perSessionAmount(snapshotPerSession)
+                            .sessionCount(snapshotSessionCount)
+                            .venueId(snapshotVenueId)
+                            .venueName(snapshotVenueName)
+                            .venueAddress(snapshotVenueAddress)
+                            .venueMapsUrl(snapshotVenueMapsUrl)
+                            .firstSessionStart(snapshotFirstStart)
+                            .firstSessionEnd(snapshotFirstEnd)
                             .build();
                 })
                 .orElseGet(() -> PtClientMapping.builder()
@@ -370,12 +463,24 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                         .client(customer)
                         .status(ClientMappingStatus.PENDING)
                         .selectedTrainingMode(selectedMode)
-                        .agreedAmount(agreedAmount)
+                        .agreedAmount(snapshotAgreedAmount)
                         .agreedRateUnit(agreedRateUnit)
+                        .perSessionAmount(snapshotPerSession)
+                        .sessionCount(snapshotSessionCount)
+                        .venueId(snapshotVenueId)
+                        .venueName(snapshotVenueName)
+                        .venueAddress(snapshotVenueAddress)
+                        .venueMapsUrl(snapshotVenueMapsUrl)
+                        .firstSessionStart(snapshotFirstStart)
+                        .firstSessionEnd(snapshotFirstEnd)
                         .build());
 
         mapping = mappingRepository.save(mapping);
-        return ApiResponse.success(PtClientMappingResponse.toMappingResponse(mapping), "Hiring request sent");
+        if (selectedMode == TrainingMode.OFFLINE && snapshotValidated != null && snapshotVenue != null) {
+            offlineHireSessionService.persistSessionsAndHolds(
+                    mapping.getId(), ptId, snapshotVenue, snapshotValidated);
+        }
+        return ApiResponse.success(toMappingResponseWithSessions(mapping), "Hiring request sent");
     }
 
     @Override
@@ -392,8 +497,6 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         String normalized = action != null ? action.trim().toUpperCase() : "";
         switch (normalized) {
             case "ACCEPT" -> {
-                // Lock the PT profile while counting/reserving slots so two
-                // simultaneous accepts cannot exceed maxClients.
                 PtProfile profile = ptProfileRepository.findByUserIdForUpdate(ptId)
                         .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
                 int max = profile.getMaxClients() != null ? profile.getMaxClients() : 10;
@@ -406,6 +509,10 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 if (reservedSlots >= max) {
                     throw new BadRequestException("PT đã đủ số client tối đa (" + max + ")");
                 }
+                if (mapping.getSelectedTrainingMode() == TrainingMode.OFFLINE) {
+                    offlineHireSessionService.revalidateForAccept(
+                            ptId, mapping.getId(), mapping.getAgreedRateUnit());
+                }
                 mapping.setStatus(ClientMappingStatus.AWAITING_PAYMENT);
                 mapping.setAcceptedAt(LocalDateTime.now());
                 mapping.setPaymentDueAt(LocalDateTime.now()
@@ -415,6 +522,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 mapping.setStatus(ClientMappingStatus.INACTIVE);
                 mapping.setAcceptedAt(null);
                 mapping.setPaymentDueAt(null);
+                slotHoldService.releaseByMapping(mapping.getId());
             }
             default -> throw new BadRequestException("Invalid action: " + action);
         }
@@ -424,7 +532,16 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 ? "Hiring request accepted. Waiting for customer payment."
                 : "Hiring request rejected";
         notifyHireResult(mapping, mapping.getStatus() == ClientMappingStatus.AWAITING_PAYMENT);
-        return ApiResponse.success(PtClientMappingResponse.toMappingResponse(mapping), message);
+        return ApiResponse.success(toMappingResponseWithSessions(mapping), message);
+    }
+
+    private PtClientMappingResponse toMappingResponseWithSessions(PtClientMapping mapping) {
+        List<MappingSessionResponse> sessions = mappingSessionRepository
+                .findByMappingIdOrderBySequenceAsc(mapping.getId())
+                .stream()
+                .map(MappingSessionResponse::from)
+                .toList();
+        return PtClientMappingResponse.toMappingResponse(mapping, sessions);
     }
 
     private void notifyHireResult(PtClientMapping mapping, boolean accepted) {
@@ -446,7 +563,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         PtClientMappingResponse response = mappingRepository.findFirstByClient_IdAndStatusIn(
                         customerId,
                         List.of(ClientMappingStatus.PENDING, ClientMappingStatus.AWAITING_PAYMENT))
-                .map(PtClientMappingResponse::toMappingResponse)
+                .map(this::toMappingResponseWithSessions)
                 .orElse(null);
         return ApiResponse.success(response);
     }
@@ -500,5 +617,19 @@ public class MarketplaceServiceImpl implements MarketplaceService {
             profile.setTotalReviews((int) reviewRepository.countByPtId(ptId));
             ptProfileRepository.save(profile);
         }
+    }
+
+    private void enrichMappingSnapshot(PtProfileResponse response, PtClientMapping mapping) {
+        response.setVenueId(mapping.getVenueId());
+        response.setVenueName(mapping.getVenueName());
+        response.setVenueAddress(mapping.getVenueAddress());
+        response.setVenueMapsUrl(mapping.getVenueMapsUrl());
+        response.setFirstSessionStart(mapping.getFirstSessionStart());
+        response.setFirstSessionEnd(mapping.getFirstSessionEnd());
+        response.setSessionCount(mapping.getSessionCount());
+        response.setPerSessionAmount(mapping.getPerSessionAmount());
+        response.setSessions(mappingSessionRepository.findByMappingIdOrderBySequenceAsc(mapping.getId()).stream()
+                .map(MappingSessionResponse::from)
+                .toList());
     }
 }

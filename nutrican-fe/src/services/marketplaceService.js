@@ -33,5 +33,8 @@ export const marketplaceService = {
 
     deleteReview: (ptId, reviewId) => api.delete(`/marketplace/pts/${ptId}/reviews/${reviewId}`),
 
-    hirePt: (ptId, trainingMode) => api.post(`/marketplace/pts/${ptId}/hire`, { trainingMode }),
+    hirePt: (ptId, payload) => api.post(`/marketplace/pts/${ptId}/hire`, payload),
+
+    getPtCalendar: (profileId, { from, to } = {}) =>
+        api.get(`/marketplace/pts/${profileId}/calendar`, { params: { from, to } }),
 };

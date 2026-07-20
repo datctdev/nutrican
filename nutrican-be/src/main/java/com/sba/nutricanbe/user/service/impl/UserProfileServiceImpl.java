@@ -13,6 +13,7 @@ import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import com.sba.nutricanbe.user.enums.TrainingMode;
+import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
 import com.sba.nutricanbe.user.service.UserProfileService;
 import com.sba.nutricanbe.common.repository.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final PtProfileRepository ptProfileRepository;
     private final StorageService minioService;
     private final SystemSettingRepository systemSettingRepository;
+    private final PtVenueAvailabilityService venueAvailabilityService;
 
     @Override
     @Transactional
@@ -176,6 +178,14 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .build();
 
         ptProfile = ptProfileRepository.save(ptProfile);
+        if (request.getTrainingMode() == TrainingMode.OFFLINE
+                || request.getTrainingMode() == TrainingMode.BOTH) {
+            venueAvailabilityService.setupOfflineScheduleFromRegistration(
+                    ptProfile,
+                    request.getVenues(),
+                    request.getAvailabilityWindows(),
+                    request.getOfflineRateUnit());
+        }
         log.info("PT profile created for user: {}", userId);
 
         return ApiResponse.success(toPtProfileSummary(ptProfile), "PT registration submitted successfully");
@@ -207,6 +217,14 @@ public class UserProfileServiceImpl implements UserProfileService {
         profile.setVerificationStatus(UserStatus.PENDING_APPROVAL);
         profile.setAdminRejectNote(null);
         profile = ptProfileRepository.save(profile);
+        if (request.getTrainingMode() == TrainingMode.OFFLINE
+                || request.getTrainingMode() == TrainingMode.BOTH) {
+            venueAvailabilityService.setupOfflineScheduleFromRegistration(
+                    profile,
+                    request.getVenues(),
+                    request.getAvailabilityWindows(),
+                    request.getOfflineRateUnit());
+        }
         return ApiResponse.success(toPtProfileSummary(profile), "PT profile resubmitted");
     }
 
@@ -452,39 +470,51 @@ public class UserProfileServiceImpl implements UserProfileService {
         boolean supportsOffline = mode == TrainingMode.OFFLINE || mode == TrainingMode.BOTH;
 
         if (supportsOnline) {
-            request.setOnlineRateUnit(validateRate(
-                    "online", request.getOnlineRate(), request.getOnlineRateUnit()));
+            request.setOnlineRateUnit("MONTH");
+            validateRate("online", request.getOnlineRate(), request.getOnlineRateUnit());
         } else {
             request.setOnlineRate(null);
             request.setOnlineRateUnit(null);
         }
 
         if (supportsOffline) {
-            request.setOfflineRateUnit(validateRate(
-                    "offline", request.getOfflineRate(), request.getOfflineRateUnit()));
+            String offlineUnit = request.getOfflineRateUnit();
+            if (offlineUnit == null || offlineUnit.isBlank()) {
+                request.setOfflineRateUnit("SESSION_60");
+            } else {
+                offlineUnit = offlineUnit.trim().toUpperCase(Locale.ROOT);
+                if (!offlineUnit.equals("SESSION_60") && !offlineUnit.equals("SESSION_90")) {
+                    throw new BadRequestException("Offline price must be per session (60 or 90 minutes)");
+                }
+                request.setOfflineRateUnit(offlineUnit);
+            }
+            validateRate("offline", request.getOfflineRate(), request.getOfflineRateUnit());
             if (request.getLocation() == null || request.getLocation().isBlank()) {
                 throw new BadRequestException("Vui lòng chọn địa điểm huấn luyện offline");
             }
             request.setLocation(request.getLocation().trim());
+            if (request.getVenues() == null || request.getVenues().isEmpty()) {
+                throw new BadRequestException("Vui lòng thêm ít nhất một địa điểm tập");
+            }
+            if (request.getAvailabilityWindows() == null || request.getAvailabilityWindows().isEmpty()) {
+                throw new BadRequestException("Vui lòng thiết lập lịch nhận học viên trong tuần");
+            }
         } else {
             request.setOfflineRate(null);
             request.setOfflineRateUnit(null);
             request.setLocation(null);
+            request.setVenues(null);
+            request.setAvailabilityWindows(null);
         }
     }
 
-    private String validateRate(String mode, BigDecimal rate, String rateUnit) {
+    private void validateRate(String mode, BigDecimal rate, String rateUnit) {
         if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0) {
             throw new BadRequestException("Phí huấn luyện " + mode + " phải lớn hơn 0");
         }
         if (rateUnit == null || rateUnit.isBlank()) {
             throw new BadRequestException("Vui lòng chọn đơn vị tính cho hình thức " + mode);
         }
-        String normalizedUnit = rateUnit.trim().toUpperCase(Locale.ROOT);
-        if (!ALLOWED_RATE_UNITS.contains(normalizedUnit)) {
-            throw new BadRequestException("Đơn vị tính cho hình thức " + mode + " không hợp lệ");
-        }
-        return normalizedUnit;
     }
 
     private MacroTargetResponse toMacroResponse(MacroTarget target) {

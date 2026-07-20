@@ -1,5 +1,5 @@
 // src/pages/customer/PtDetailPage.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -11,12 +11,48 @@ import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, A
 import { useAuthStore } from '../../stores/authStore';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import Modal from '../../components/common/Modal';
+import { formatSessionRange, computePackageTotal } from '../../utils/offlineHireSlots';
+import PtWeeklyCalendarPicker from '../../components/pt/PtWeeklyCalendarPicker';
 
 const RATE_UNIT_LABEL = {
     MONTH: 'tháng',
-    SESSION_60: 'buổi 60 phút',
-    SESSION_90: 'buổi 90 phút',
+    SESSION_60: 'buổi',
+    SESSION_90: 'buổi',
 };
+
+function OfflinePackageSummary({ pt, tone = 'emerald' }) {
+    if (!pt?.venueName) return null;
+    const border = tone === 'amber' ? 'border-amber-100 bg-amber-50' : 'border-emerald-100 bg-emerald-50';
+    const labelColor = tone === 'amber' ? 'text-amber-700' : 'text-emerald-700';
+    const sessions = pt.sessions || [];
+    return (
+        <div className={`rounded-xl border p-3 text-left ${border}`}>
+            <p className={`text-xs font-black uppercase tracking-wider ${labelColor}`}>
+                Gói offline {pt.sessionCount ? `· ${pt.sessionCount} buổi` : ''}
+            </p>
+            <p className="mt-1 text-sm font-bold text-slate-800">{pt.venueName}</p>
+            <p className="text-xs text-slate-600">{pt.venueAddress}</p>
+            {pt.sessionCount && pt.perSessionAmount && (
+                <p className="mt-2 text-xs font-semibold text-slate-700">
+                    {pt.sessionCount} buổi × {Number(pt.perSessionAmount).toLocaleString('vi-VN')}đ = {Number(pt.agreedAmount || 0).toLocaleString('vi-VN')}đ
+                </p>
+            )}
+            {sessions.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                    {sessions.map((s) => (
+                        <li key={s.id || s.sequence} className="text-xs font-semibold text-slate-700">
+                            #{s.sequence}: {formatSessionRange(s.startTime, s.endTime)}
+                        </li>
+                    ))}
+                </ul>
+            ) : pt.firstSessionStart && (
+                <p className="mt-2 text-xs font-semibold text-slate-700">
+                    {formatSessionRange(pt.firstSessionStart, pt.firstSessionEnd)}
+                </p>
+            )}
+        </div>
+    );
+}
 
 const getPermanentUrl = (url) => {
     if (!url) return '';
@@ -67,6 +103,10 @@ export default function PtDetailPage() {
     const [paying, setPaying] = useState(false);
     const [showHireModal, setShowHireModal] = useState(false);
     const [selectedMode, setSelectedMode] = useState(null);
+    const [selectedVenueId, setSelectedVenueId] = useState(null);
+    const [selectedSessions, setSelectedSessions] = useState([]);
+    const [calendarData, setCalendarData] = useState(null);
+    const [loadingCalendar, setLoadingCalendar] = useState(false);
 
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [reviewToDelete, setReviewToDelete] = useState(null);
@@ -209,17 +249,68 @@ export default function PtDetailPage() {
         if ((pt.trainingMode === 'ONLINE' || pt.trainingMode === 'BOTH') && pt.onlineRate) modes.push('ONLINE');
         if ((pt.trainingMode === 'OFFLINE' || pt.trainingMode === 'BOTH') && pt.offlineRate) modes.push('OFFLINE');
         setSelectedMode(modes.length === 1 ? modes[0] : null);
+        setSelectedVenueId(null);
+        setSelectedSessions([]);
+        setCalendarData(null);
         setShowHireModal(true);
     };
+
+    useEffect(() => {
+        if (selectedMode !== 'OFFLINE' || !pt?.id || !showHireModal) return;
+        let cancelled = false;
+        const loadCalendar = async () => {
+            setLoadingCalendar(true);
+            try {
+                const res = await marketplaceService.getPtCalendar(pt.id);
+                if (!cancelled) setCalendarData(res.data?.data || null);
+            } catch (err) {
+                if (!cancelled) {
+                    setCalendarData(null);
+                    toast.error('Không thể tải lịch PT');
+                }
+            } finally {
+                if (!cancelled) setLoadingCalendar(false);
+            }
+        };
+        loadCalendar();
+        return () => { cancelled = true; };
+    }, [selectedMode, pt?.id, showHireModal]);
+
+    const offlinePackageTotal = useMemo(() => {
+        if (selectedMode !== 'OFFLINE') return 0;
+        return computePackageTotal(selectedSessions.length, pt?.offlineRate);
+    }, [selectedMode, selectedSessions.length, pt?.offlineRate]);
+
+    const selectedOfflineSummary = useMemo(() => {
+        if (selectedMode !== 'OFFLINE') return null;
+        const venue = (calendarData?.venues || pt?.venues)?.find((v) => v.id === selectedVenueId);
+        if (!venue || selectedSessions.length === 0) return null;
+        return { venue, sessionCount: selectedSessions.length, total: offlinePackageTotal };
+    }, [selectedMode, selectedVenueId, selectedSessions.length, calendarData?.venues, pt?.venues, offlinePackageTotal]);
 
     const handleHirePt = async () => {
         if (!selectedMode) {
             toast.error('Vui lòng chọn hình thức coaching');
             return;
         }
+        if (selectedMode === 'OFFLINE') {
+            if (!selectedVenueId) {
+                toast.error('Vui lòng chọn địa điểm tập');
+                return;
+            }
+            if (!selectedSessions.length) {
+                toast.error('Vui lòng chọn ít nhất một buổi tập');
+                return;
+            }
+        }
         try {
             setHiring(true);
-            const response = await marketplaceService.hirePt(pt.userId, selectedMode);
+            const payload = { trainingMode: selectedMode };
+            if (selectedMode === 'OFFLINE') {
+                payload.venueId = selectedVenueId;
+                payload.sessionStarts = selectedSessions;
+            }
+            const response = await marketplaceService.hirePt(pt.userId, payload);
             const mapping = response.data.data;
             setHireStatus('PENDING');
             setPt((current) => ({
@@ -230,6 +321,15 @@ export default function PtDetailPage() {
                 agreedAmount: mapping.agreedAmount,
                 agreedRateUnit: mapping.agreedRateUnit,
                 paymentDueAt: mapping.paymentDueAt,
+                venueId: mapping.venueId,
+                venueName: mapping.venueName,
+                venueAddress: mapping.venueAddress,
+                venueMapsUrl: mapping.venueMapsUrl,
+                firstSessionStart: mapping.firstSessionStart,
+                firstSessionEnd: mapping.firstSessionEnd,
+                sessionCount: mapping.sessionCount,
+                perSessionAmount: mapping.perSessionAmount,
+                sessions: mapping.sessions,
             }));
             setShowHireModal(false);
             toast.success('Đã gửi yêu cầu thuê PT!');
@@ -343,8 +443,14 @@ export default function PtDetailPage() {
                                                 {paying ? 'Đang chuyển đến VNPay...' : 'Thanh toán để bắt đầu'}
                                             </Button>
                                             <p className="text-xs font-semibold text-slate-500">
-                                                PT đã chấp nhận · {Number(pt.agreedAmount || 0).toLocaleString('vi-VN')}đ/{RATE_UNIT_LABEL[pt.agreedRateUnit] || pt.agreedRateUnit}
+                                                PT đã chấp nhận · {Number(pt.agreedAmount || 0).toLocaleString('vi-VN')}đ
+                                                {pt.selectedTrainingMode === 'OFFLINE' && pt.sessionCount
+                                                    ? ` (gói ${pt.sessionCount} buổi)`
+                                                    : `/${RATE_UNIT_LABEL[pt.agreedRateUnit] || pt.agreedRateUnit}`}
                                             </p>
+                                            {pt.selectedTrainingMode === 'OFFLINE' && (
+                                                <OfflinePackageSummary pt={pt} />
+                                            )}
                                             {pt.paymentDueAt && (
                                                 <p className="text-xs font-semibold text-amber-700">
                                                     Thanh toán trước {new Date(pt.paymentDueAt).toLocaleString('vi-VN')}
@@ -352,9 +458,14 @@ export default function PtDetailPage() {
                                             )}
                                         </div>
                                     ) : hireStatus === 'PENDING' ? (
-                                        <Button disabled className="w-full h-12 bg-amber-100 text-amber-700 border-2 border-amber-200 text-base font-bold rounded-xl cursor-not-allowed">
-                                            <Clock className="w-4 h-4 mr-2" /> Đang chờ duyệt
-                                        </Button>
+                                        <div className="space-y-2">
+                                            <Button disabled className="w-full h-12 bg-amber-100 text-amber-700 border-2 border-amber-200 text-base font-bold rounded-xl cursor-not-allowed">
+                                                <Clock className="w-4 h-4 mr-2" /> Đang chờ duyệt
+                                            </Button>
+                                            {pt.selectedTrainingMode === 'OFFLINE' && (
+                                                <OfflinePackageSummary pt={pt} tone="amber" />
+                                            )}
+                                        </div>
                                     ) : hireStatus === 'COMPLETED' ? (
                                         <Button disabled className="w-full h-12 bg-slate-100 text-slate-500 border border-slate-200 text-base font-bold rounded-xl cursor-not-allowed">
                                             <CheckCircle2 className="w-4 h-4 mr-2" /> Đã hoàn thành khóa
@@ -608,23 +719,88 @@ export default function PtDetailPage() {
                     {(pt.trainingMode === 'OFFLINE' || pt.trainingMode === 'BOTH') && pt.offlineRate && (
                         <button
                             type="button"
-                            onClick={() => setSelectedMode('OFFLINE')}
+                            onClick={() => {
+                                setSelectedMode('OFFLINE');
+                                setSelectedVenueId(null);
+                                setSelectedSessions([]);
+                            }}
                             className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${selectedMode === 'OFFLINE' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-emerald-200'}`}
                         >
                             <div className="flex items-start gap-3">
                                 <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><MapPin className="h-5 w-5" /></div>
                                 <div className="flex-1">
                                     <p className="font-black text-slate-900">Coaching offline</p>
-                                    <p className="mt-1 text-sm text-slate-500">Tập trực tiếp{pt.location ? ` tại ${pt.location}` : ''}.</p>
-                                    <p className="mt-2 font-black text-emerald-700">{Number(pt.offlineRate).toLocaleString('vi-VN')}đ / {RATE_UNIT_LABEL[pt.offlineRateUnit] || pt.offlineRateUnit}</p>
+                                    <p className="mt-1 text-sm text-slate-500">Chọn địa điểm và nhiều buổi tập trên lịch tuần.</p>
+                                    <p className="mt-2 font-black text-emerald-700">{Number(pt.offlineRate).toLocaleString('vi-VN')}đ / buổi</p>
                                 </div>
                             </div>
                         </button>
                     )}
 
+                    {selectedMode === 'OFFLINE' && (
+                        <div className="space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4">
+                            {loadingCalendar ? (
+                                <p className="text-sm text-slate-500">Đang tải lịch...</p>
+                            ) : !(calendarData?.venues || pt.venues)?.length ? (
+                                <p className="text-sm font-semibold text-amber-700">PT chưa cấu hình địa điểm tập. Vui lòng thử lại sau.</p>
+                            ) : (
+                                <>
+                                    <div>
+                                        <p className="text-xs font-black uppercase tracking-wider text-slate-500">Chọn địa điểm</p>
+                                        <div className="mt-2 space-y-2">
+                                            {(calendarData?.venues || pt.venues).map((venue) => (
+                                                <button
+                                                    key={venue.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedVenueId(venue.id)}
+                                                    className={`w-full rounded-xl border p-3 text-left ${selectedVenueId === venue.id ? 'border-emerald-500 bg-white' : 'border-slate-200 bg-white/70'}`}
+                                                >
+                                                    <p className="font-bold text-slate-900">{venue.name}</p>
+                                                    <p className="text-xs text-slate-600">{venue.address}</p>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {selectedVenueId && (
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-wider text-slate-500">Chọn buổi tập (có thể chọn nhiều tuần)</p>
+                                            <div className="mt-2">
+                                                <PtWeeklyCalendarPicker
+                                                    availability={calendarData?.availability || pt.availability || []}
+                                                    occupiedSlots={calendarData?.occupiedSlots || []}
+                                                    rateUnit={calendarData?.offlineRateUnit || pt.offlineRateUnit}
+                                                    perSessionRate={calendarData?.offlineRate || pt.offlineRate}
+                                                    selectedSessions={selectedSessions}
+                                                    onSelectedSessionsChange={setSelectedSessions}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {selectedOfflineSummary && (
+                                        <div className="rounded-xl border border-emerald-200 bg-white p-3">
+                                            <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Tóm tắt</p>
+                                            <p className="mt-1 text-sm font-bold text-slate-900">
+                                                {selectedOfflineSummary.venue.name} · {selectedOfflineSummary.sessionCount} buổi
+                                            </p>
+                                            <p className="text-sm font-black text-emerald-700">{selectedOfflineSummary.total.toLocaleString('vi-VN')}đ</p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
                         <Button variant="outline" onClick={() => setShowHireModal(false)} disabled={hiring}>Hủy</Button>
-                        <Button onClick={handleHirePt} disabled={!selectedMode || hiring} className="bg-blue-600 hover:bg-blue-700">
+                        <Button
+                            onClick={handleHirePt}
+                            disabled={
+                                !selectedMode
+                                || hiring
+                                || (selectedMode === 'OFFLINE' && (!selectedVenueId || selectedSessions.length === 0))
+                            }
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
                             {hiring ? 'Đang gửi...' : 'Gửi yêu cầu thuê PT'}
                         </Button>
                     </div>

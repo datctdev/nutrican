@@ -5,6 +5,7 @@ import { userService } from '../../services/userService';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 import { mealPlanService } from '../../services/mealPlanService';
 import { appointmentService } from '../../services/appointmentService';
+import { formatSessionRange } from '../../utils/offlineHireSlots';
 import { refundService } from '../../services/refundService';
 import { marketplaceService } from '../../services/marketplaceService';
 import { coachingPaymentService } from '../../services/coachingPaymentService';
@@ -707,13 +708,43 @@ export default function CoachingPage() {
               <p className="text-xs font-black uppercase tracking-wider text-slate-500">Yêu cầu coaching</p>
               <h2 className="mt-1 text-lg font-black text-slate-900">{openHireRequest.ptName}</h2>
               <p className="mt-1 text-sm font-semibold text-slate-600">
-                Coaching {openHireRequest.selectedTrainingMode === 'OFFLINE' ? 'offline' : 'online'} · {Number(openHireRequest.agreedAmount || 0).toLocaleString('vi-VN')}đ/{openHireRequest.agreedRateUnit}
+                Coaching {openHireRequest.selectedTrainingMode === 'OFFLINE' ? 'offline' : 'online'} ·{' '}
+                {openHireRequest.selectedTrainingMode === 'OFFLINE' && openHireRequest.sessionCount
+                  ? `Gói ${openHireRequest.sessionCount} buổi · ${Number(openHireRequest.agreedAmount || 0).toLocaleString('vi-VN')}đ`
+                  : `${Number(openHireRequest.agreedAmount || 0).toLocaleString('vi-VN')}đ/${openHireRequest.agreedRateUnit}`}
               </p>
               <p className="mt-2 text-sm text-slate-600">
                 {openHireRequest.status === 'AWAITING_PAYMENT'
                   ? 'PT đã chấp nhận. Thanh toán để kích hoạt chat, thực đơn và theo dõi tiến độ.'
                   : 'Đang chờ PT xem xét và phản hồi yêu cầu của bạn.'}
               </p>
+              {openHireRequest.selectedTrainingMode === 'OFFLINE' && openHireRequest.venueName && (
+                <div className="mt-3 rounded-2xl border border-emerald-200 bg-white/70 p-3">
+                  <p className="text-xs font-black uppercase tracking-wider text-emerald-700">
+                    Gói offline {openHireRequest.sessionCount ? `· ${openHireRequest.sessionCount} buổi` : ''}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-slate-900">{openHireRequest.venueName}</p>
+                  <p className="text-xs text-slate-600">{openHireRequest.venueAddress}</p>
+                  {openHireRequest.perSessionAmount && openHireRequest.sessionCount && (
+                    <p className="mt-2 text-xs font-semibold text-slate-700">
+                      {openHireRequest.sessionCount} buổi × {Number(openHireRequest.perSessionAmount).toLocaleString('vi-VN')}đ
+                    </p>
+                  )}
+                  {(openHireRequest.sessions || []).length > 0 ? (
+                    <ul className="mt-2 space-y-1">
+                      {openHireRequest.sessions.map((s) => (
+                        <li key={s.id || s.sequence} className="text-xs font-semibold text-slate-700">
+                          #{s.sequence}: {formatSessionRange(s.startTime, s.endTime)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : openHireRequest.firstSessionStart && (
+                    <p className="mt-2 text-xs font-semibold text-slate-700">
+                      {formatSessionRange(openHireRequest.firstSessionStart, openHireRequest.firstSessionEnd)}
+                    </p>
+                  )}
+                </div>
+              )}
               {openHireRequest.status === 'AWAITING_PAYMENT' && openHireRequest.paymentDueAt && (
                 <p className="mt-1 text-xs font-bold text-amber-700">
                   Hạn thanh toán: {new Date(openHireRequest.paymentDueAt).toLocaleString('vi-VN')}
@@ -1064,6 +1095,11 @@ export default function CoachingPage() {
                               <p className="text-sm font-bold text-slate-800">
                                 {new Date(a.startTime).toLocaleString('vi-VN')}
                               </p>
+                              {a.type === 'OFFLINE' && a.venueName && (
+                                <p className="text-xs font-semibold text-emerald-700 mt-0.5">
+                                  {a.venueName} · {a.venueAddress}
+                                </p>
+                              )}
                               {a.note && <p className="text-xs text-slate-500 mt-0.5">{a.note}</p>}
                               {a.cancelType && <p className="text-xs text-slate-400 mt-0.5">Hủy: {a.cancelType}</p>}
                             </div>

@@ -19,6 +19,7 @@ import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.NotificationLinkType;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.service.NotificationService;
+import com.sba.nutricanbe.user.service.OfflinePackageAppointmentService;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
     private final VNPayConfig vnPayProperties;
     private final NotificationService notificationService;
     private final WebSocketSessionService webSocketSessionService;
+    private final OfflinePackageAppointmentService offlinePackageAppointmentService;
 
     @Override
     @Transactional
@@ -200,6 +202,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         mapping.setCoachingStartedAt(LocalDateTime.now());
         mapping.setPaymentDueAt(null);
         mappingRepository.save(mapping);
+        offlinePackageAppointmentService.materializeOfflinePackageIfNeeded(mapping);
         notifyPaymentSuccessAfterCommit(mapping, payment);
         return result(payment, mapping, true, "Coaching payment completed");
     }
