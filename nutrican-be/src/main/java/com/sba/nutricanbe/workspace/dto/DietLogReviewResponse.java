@@ -61,6 +61,8 @@ public class DietLogReviewResponse {
     private PtReviewAction ptAction;
     private PtCorrectionReason ptCorrectionReason;
     private Boolean blindSubmitted;
+    private String lateTickReason;
+    private String mealPeriod;
 
     @Data
     @Builder

@@ -24,8 +24,11 @@ test.describe('AC-SOS SLA', () => {
 
     test('PT review page loads SOS section', async ({ page }) => {
       await uiLogin(page, 'pt.certified@gmail.com', '123456');
+      // SOS queue is surfaced on PT dashboard; reviews page is meal approvals
+      await page.goto('/pt');
+      await expect(page.getByText(/yêu cầu sos|sos/i).first()).toBeVisible({ timeout: 15_000 });
       await page.goto('/pt/reviews');
-      await expect(page.getByText(/sos/i).first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/duyệt bữa ăn|làm mới dữ liệu/i).first()).toBeVisible({ timeout: 15_000 });
     });
   });
 

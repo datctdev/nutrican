@@ -4,12 +4,20 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
+import FoodSearchInput from './FoodSearchInput';
+import {
+    MEAL_PERIODS,
+    MEAL_PERIOD_LABELS,
+    getLockedMealPeriods,
+    getPastMealPeriodsForMakeup,
+    getCurrentMealPeriod,
+} from './dietUtils';
 
 export default function FoodInputCard({
     inputMode,
     setInputMode,
-    aiMealType,
-    setAiMealType,
+    aiMealPeriod,
+    setAiMealPeriod,
     dragActive,
     setDragActive,
     selectedFile,
@@ -17,11 +25,10 @@ export default function FoodInputCard({
     handleAnalyze,
     fileInputRef,
     handleFileSelect,
-    manualMealType,
-    setManualMealType,
-    foodSearchQuery,
-    foodSearchResults,
-    searchFoods,
+    manualMealPeriod,
+    setManualMealPeriod,
+    makeupForPeriod,
+    setMakeupForPeriod,
     addIngredientFromSearch,
     ingredientItems,
     updateIngredientQty,
@@ -37,9 +44,43 @@ export default function FoodInputCard({
     uploading,
     dietFilterOn,
     setDietFilterOn,
+    applyAiPeriodLock = false,
+    hasActivePt = false,
 }) {
+    const lockedPeriods = applyAiPeriodLock ? getLockedMealPeriods() : new Set();
+    const currentPeriod = getCurrentMealPeriod();
+    const pastForMakeup = applyAiPeriodLock ? getPastMealPeriodsForMakeup() : [];
+    const renderPeriodOptions = (lockedMode) => MEAL_PERIODS.map((period) => {
+        const isLocked = lockedMode && (lockedPeriods.has(period) || period !== currentPeriod);
+        return (
+            <option key={period} value={period} disabled={isLocked}>
+                {MEAL_PERIOD_LABELS[period]}{isLocked ? ' — chỉ khung hiện tại' : ''}
+            </option>
+        );
+    });
+    const renderMakeupSelect = () => {
+        if (!applyAiPeriodLock || pastForMakeup.length === 0) return null;
+        return (
+            <div className="mt-3">
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Bù cho buổi đã quên (tuỳ chọn)</label>
+                <select
+                    value={makeupForPeriod || ''}
+                    onChange={(e) => setMakeupForPeriod?.(e.target.value || null)}
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 bg-white"
+                >
+                    <option value="">Không</option>
+                    {pastForMakeup.map((p) => (
+                        <option key={p} value={p}>{MEAL_PERIOD_LABELS[p]}</option>
+                    ))}
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
+                    Quên ghi bữa trước? Vẫn ghi ở khung hiện tại và chọn buổi cần bù.
+                </p>
+            </div>
+        );
+    };
     return (
-        <Card className="overflow-hidden border-slate-200 shadow-sm bg-white">
+        <Card className="border-slate-200 shadow-sm bg-white rounded-3xl">
             <CardContent className="p-8">
 
                 <div className="flex p-1 bg-slate-100 rounded-xl w-full sm:w-max mb-8 border border-slate-200/50">
@@ -62,21 +103,25 @@ export default function FoodInputCard({
                 {inputMode === 'ai' && (
                     <div className="mb-4">
                         <select 
-                            value={aiMealType} 
-                            onChange={(e) => setAiMealType(e.target.value)} 
+                            value={aiMealPeriod} 
+                            onChange={(e) => setAiMealPeriod(e.target.value)} 
                             className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700"
+                            disabled={applyAiPeriodLock}
                         >
-                            <option value="BREAKFAST">Bữa sáng</option>
-                            <option value="LUNCH">Bữa trưa</option>
-                            <option value="DINNER">Bữa tối</option>
-                            <option value="SNACK">Bữa phụ</option>
+                            {renderPeriodOptions(true)}
                         </select>
+                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
+                            {applyAiPeriodLock
+                                ? 'Hôm nay chỉ ghi được khung giờ hiện tại'
+                                : 'Chọn buổi cho ngày đang xem'}
+                        </p>
+                        {renderMakeupSelect()}
                     </div>
                 )}
 
                 {inputMode === 'ai' ? (
                     <div
-                        className={`relative border-2 border-dashed rounded-3xl p-10 text-center transition-all duration-300 cursor-pointer ${dragActive ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-slate-355 hover:border-primary/60 hover:bg-slate-55'}`}
+                        className={`relative border-2 border-dashed rounded-3xl p-10 text-center transition-all duration-300 cursor-pointer ${dragActive ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-slate-300 hover:border-primary/60 hover:bg-slate-50'}`}
                         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
                         onDragLeave={() => setDragActive(false)}
                         onDrop={(e) => { e.preventDefault(); setDragActive(false); handleFileSelect(e); }}
@@ -105,15 +150,19 @@ export default function FoodInputCard({
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1.5">Bữa ăn</label>
                             <select 
-                                value={manualMealType} 
-                                onChange={(e) => setManualMealType(e.target.value)} 
+                                value={manualMealPeriod} 
+                                onChange={(e) => setManualMealPeriod(e.target.value)} 
                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                disabled={applyAiPeriodLock}
                             >
-                                <option value="BREAKFAST">Bữa sáng</option>
-                                <option value="LUNCH">Bữa trưa</option>
-                                <option value="DINNER">Bữa tối</option>
-                                <option value="SNACK">Bữa phụ</option>
+                                {renderPeriodOptions(!!applyAiPeriodLock)}
                             </select>
+                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
+                            {applyAiPeriodLock
+                                ? 'Hôm nay chỉ ghi được khung giờ hiện tại'
+                                : 'Chọn buổi cho ngày đang xem'}
+                        </p>
+                        {renderMakeupSelect()}
                         </div>
 
                         <label className="flex items-center gap-2 text-sm text-slate-600 mb-2">
@@ -126,38 +175,10 @@ export default function FoodInputCard({
                             Lọc theo chế độ ăn của tôi
                         </label>
 
-                        <div className="relative">
-                            <label className="block text-sm font-bold text-slate-700 mb-1.5">Tìm thực phẩm</label>
-                            <input
-                                type="text"
-                                value={foodSearchQuery}
-                                onChange={(e) => searchFoods(e.target.value)}
-                                placeholder="Gạo, thịt bò, trứng, rau muống... (≥ 2 ký tự)"
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                            />
-                            {foodSearchResults.length > 0 && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-56 overflow-auto">
-                                    {foodSearchResults.map((food) => (
-                                        <button
-                                            key={food.id}
-                                            type="button"
-                                            onClick={() => addIngredientFromSearch(food)}
-                                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-primary/5 text-slate-700 flex items-center justify-between gap-3 border-none outline-none"
-                                        >
-                                            <span className="font-semibold flex items-center gap-2">
-                                                {food.nameVi}
-                                                {food.prefMismatch && (
-                                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">!PREF</span>
-                                                )}
-                                            </span>
-                                            <span className="text-slate-400 text-xs">
-                                                {parseFloat(food.calories || 0).toFixed(0)} kcal / {parseFloat(food.servingSizeG || 100).toFixed(0)}g
-                                            </span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        <FoodSearchInput
+                            dietFilter={dietFilterOn ?? true}
+                            onSelect={addIngredientFromSearch}
+                        />
 
                         {ingredientItems.length > 0 && (
                             <div className="space-y-2">
@@ -175,7 +196,7 @@ export default function FoodInputCard({
                                                 className="w-20 px-2 py-1.5 rounded-lg border border-slate-200 text-right text-sm font-semibold focus:border-primary outline-none"
                                             />
                                             <span className="text-xs text-slate-400 w-3">g</span>
-                                            <span className="text-xs text-slate-550 w-16 text-right font-semibold">{Math.round(it.calories)} kcal</span>
+                                            <span className="text-xs text-slate-500 w-16 text-right font-semibold">{Math.round(it.calories)} kcal</span>
                                             <button
                                                 type="button"
                                                 onClick={() => removeIngredient(idx)}
@@ -194,8 +215,14 @@ export default function FoodInputCard({
                             <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
-                                        <p className="text-sm font-bold text-slate-700">Hình ảnh gửi cho PT</p>
-                                        <p className="mt-0.5 text-xs text-slate-500">Có thể chọn nhiều ảnh, tối đa 5MB mỗi ảnh.</p>
+                                        <p className="text-sm font-bold text-slate-700">
+                                            {hasActivePt ? 'Hình ảnh gửi cho PT' : 'Hình ảnh bữa ăn'}
+                                        </p>
+                                        <p className="mt-0.5 text-xs text-slate-500">
+                                            {hasActivePt
+                                                ? 'Có thể chọn nhiều ảnh, tối đa 5MB mỗi ảnh.'
+                                                : 'Lưu kèm nhật ký của bạn. Có thể chọn nhiều ảnh, tối đa 5MB mỗi ảnh.'}
+                                        </p>
                                     </div>
                                     <input
                                         ref={mealImageInputRef}

@@ -40,6 +40,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,20 +77,26 @@ class ProgressAdherenceTest {
         LocalDate end = LocalDate.now();
 
         when(dietLogRepository.findByCustomerIdAndLogDateBetween(
-                clientId, start, end, PageRequest.of(0, 1000)))
+                eq(clientId), any(LocalDate.class), any(LocalDate.class), any()))
                 .thenReturn(new PageImpl<>(List.of()));
         when(bodyMetricRepository.findByUserIdAndDateRange(clientId, start, end)).thenReturn(List.of());
         when(userQueryService.findMacroTargetByUserId(clientId)).thenReturn(Optional.empty());
-        MealPlan plan = MealPlan.builder().clientId(clientId).build();
+        LocalDate weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+        MealPlan plan = MealPlan.builder()
+                .clientId(clientId)
+                .ptId(ptId)
+                .weekStart(weekStart)
+                .isPublished(true)
+                .build();
         ReflectionTestUtils.setField(plan, "id", planId);
-        when(mealPlanRepository.findByClientIdOrderByWeekStartDesc(clientId))
+        when(mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(clientId))
                 .thenReturn(List.of(plan));
         when(mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(planId))
                 .thenReturn(List.of(
-                        MealPlanItem.builder().eaten(true).build(),
-                        MealPlanItem.builder().eaten(false).build(),
-                        MealPlanItem.builder().eaten(true).build(),
-                        MealPlanItem.builder().eaten(false).build()
+                        MealPlanItem.builder().planDate(weekStart).eaten(true).build(),
+                        MealPlanItem.builder().planDate(weekStart).eaten(false).build(),
+                        MealPlanItem.builder().planDate(weekStart).eaten(true).build(),
+                        MealPlanItem.builder().planDate(weekStart).eaten(false).build()
                 ));
         User client = User.builder().fullName("Test Client").build();
         ReflectionTestUtils.setField(client, "id", clientId);

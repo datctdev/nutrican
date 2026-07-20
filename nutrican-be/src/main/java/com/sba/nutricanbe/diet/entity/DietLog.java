@@ -7,6 +7,7 @@ import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
 import com.sba.nutricanbe.diet.enums.MealSource;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.enums.PtCorrectionReason;
 import com.sba.nutricanbe.diet.enums.PtReviewAction;
@@ -51,6 +52,15 @@ public class DietLog extends BaseEntity {
     private MealType mealType;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "meal_period", length = 20)
+    private MealPeriod mealPeriod;
+
+    /** Optional catch-up tag: period already past today; log still belongs to {@link #mealPeriod}. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "makeup_for_period", length = 20)
+    private MealPeriod makeupForPeriod;
+
+    @Enumerated(EnumType.STRING)
     @Column(length = 50)
     @Builder.Default
     private DietLogStatus status = DietLogStatus.PENDING_AI;
@@ -75,6 +85,9 @@ public class DietLog extends BaseEntity {
 
     @Column(name = "log_date")
     private LocalDate logDate;
+
+    @Column(name = "late_tick_reason", columnDefinition = "TEXT")
+    private String lateTickReason;
 
     @Column(name = "is_pt_notified")
     @Builder.Default

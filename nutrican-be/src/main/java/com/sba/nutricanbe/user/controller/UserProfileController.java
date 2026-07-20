@@ -1,19 +1,12 @@
 package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.diet.service.DietLogHelper;
+import com.sba.nutricanbe.user.dto.*;
 import com.sba.nutricanbe.user.entity.User;
-import com.sba.nutricanbe.user.dto.MacroTargetRequest;
-import com.sba.nutricanbe.user.dto.MacroTargetResponse;
-import com.sba.nutricanbe.user.dto.PtProfileSummary;
-import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
-import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
-import com.sba.nutricanbe.user.dto.UserProfileResponse;
-import com.sba.nutricanbe.user.service.UserProfileService;
 import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
-import com.sba.nutricanbe.user.dto.PtVenueRequest;
-import com.sba.nutricanbe.user.dto.PtVenueResponse;
-import com.sba.nutricanbe.user.dto.PtAvailabilityWindowResponse;
-import com.sba.nutricanbe.user.dto.UpdatePtAvailabilityRequest;
+import com.sba.nutricanbe.user.service.UserProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -31,6 +24,7 @@ public class UserProfileController {
 
     private final UserProfileService userProfileService;
     private final PtVenueAvailabilityService venueAvailabilityService;
+    private final DietLogHelper dietLogHelper;
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMyProfile(
@@ -48,7 +42,7 @@ public class UserProfileController {
     @PutMapping("/pt")
     public ResponseEntity<ApiResponse<PtProfileSummary>> updateMyPtProfile(
             @AuthenticationPrincipal User user,
-            @RequestBody com.sba.nutricanbe.user.dto.UpdatePtProfileRequest request) {
+            @RequestBody UpdatePtProfileRequest request) {
         return ResponseEntity.ok(userProfileService.updatePtProfile(user.getId(), request));
     }
 
@@ -69,6 +63,10 @@ public class UserProfileController {
     public ResponseEntity<ApiResponse<MacroTargetResponse>> setMacroTarget(
             @AuthenticationPrincipal User user,
             @RequestBody MacroTargetRequest request) {
+        if (dietLogHelper.hasActivePt(user.getId())) {
+            throw new BadRequestException(
+                    "Mục tiêu dinh dưỡng đang do PT quản lý — liên hệ PT để thay đổi macro");
+        }
         return ResponseEntity.ok(userProfileService.setMacroTarget(user.getId(), request));
     }
 
@@ -153,5 +151,17 @@ public class UserProfileController {
             @Valid @RequestBody UpdatePtAvailabilityRequest request) {
         return ResponseEntity.ok(venueAvailabilityService.replaceAvailability(user.getId(), request));
     }
-}
 
+    @PostMapping("/pt/update-request")
+    public ResponseEntity<ApiResponse<PtUpdateRequestDto>> submitPtUpdateRequest(
+            @AuthenticationPrincipal User user,
+            @RequestBody SubmitPtUpdateRequest request) {
+        return ResponseEntity.ok(userProfileService.submitPtUpdateRequest(user.getId(), request));
+    }
+
+    @GetMapping("/pt/update-request/pending")
+    public ResponseEntity<ApiResponse<PtUpdateRequestDto>> getPendingPtUpdateRequest(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(userProfileService.getPendingPtUpdateRequest(user.getId()));
+    }
+}

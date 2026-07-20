@@ -7,6 +7,11 @@ import { profileExtensionsService } from '../../services/profileExtensionsServic
 import { userService } from '../../services/userService';
 import { toast } from 'sonner';
 import { Loader2, ChevronRight, Sparkles } from 'lucide-react';
+import {
+  ACTIVITY_LEVEL_OPTIONS,
+  DEFAULT_ACTIVITY_LEVEL,
+  ActivityLevelInfoTooltip,
+} from './components/activityLevelOptions';
 
 const getGoalsByGender = (gender) => {
   const base = [
@@ -67,17 +72,9 @@ export default function OnboardingPage() {
     nutritionGoal: 'MAINTAIN',
     dietPreference: 'NORMAL',
     allergyNotes: '',
-    activityLevel: 'moderate',
+    activityLevel: DEFAULT_ACTIVITY_LEVEL,
     pregnancyTrimester: 1,
   });
-
-  const activityMultipliers = {
-    sedentary: 1.2,
-    light: 1.375,
-    moderate: 1.55,
-    active: 1.725,
-    veryActive: 1.9,
-  };
 
   useEffect(() => {
     profileExtensionsService.getOnboardingStatus()
@@ -145,7 +142,7 @@ export default function OnboardingPage() {
         step: 2,
         nutritionGoal: step2.nutritionGoal,
         dietPreference: step2.dietPreference,
-        activityFactor: activityMultipliers[step2.activityLevel],
+        activityLevel: step2.activityLevel,
         pregnancyTrimester: step2.nutritionGoal === 'PREGNANT' ? step2.pregnancyTrimester : null,
         weightKg: Number(step1.weightKg) || undefined,
       });
@@ -261,15 +258,16 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500">Mức độ vận động hàng ngày</label>
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs font-bold text-slate-500">Mức độ vận động hàng ngày</label>
+                  <ActivityLevelInfoTooltip />
+                </div>
                 <select value={step2.activityLevel}
                   onChange={(e) => setStep2((s) => ({ ...s, activityLevel: e.target.value }))}
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
-                  <option value="sedentary">Ít vận động (1.2)</option>
-                  <option value="light">Vận động nhẹ (1.375)</option>
-                  <option value="moderate">Vận động vừa (1.55)</option>
-                  <option value="active">Vận động nhiều (1.725)</option>
-                  <option value="veryActive">Vận động rất nặng (1.9)</option>
+                  {ACTIVITY_LEVEL_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
               </div>
 

@@ -30,7 +30,7 @@ public interface MealPlanService {
 
     void publishPlan(UUID ptId, UUID planId);
 
-    MealPlanItemResponse markEaten(UUID customerId, UUID itemId, boolean eaten);
+    MealPlanItemResponse markEaten(UUID customerId, UUID itemId, boolean eaten, String lateTickReason);
 
     MealPlanSuggestionResponse suggestReplacement(
             UUID customerId, UUID itemId, MealPlanSuggestionRequest request);

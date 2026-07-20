@@ -106,9 +106,10 @@ public class MealPlanController {
     public ResponseEntity<ApiResponse<MealPlanItemResponse>> markEaten(
             @AuthenticationPrincipal User user,
             @PathVariable UUID itemId,
-            @RequestParam(defaultValue = "true") boolean eaten) {
+            @RequestParam(defaultValue = "true") boolean eaten,
+            @RequestParam(required = false) String lateTickReason) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.markEaten(user.getId(), itemId, eaten)));
+                mealPlanService.markEaten(user.getId(), itemId, eaten, lateTickReason)));
     }
 
     @PostMapping("/api/v1/meal-plans/items/{itemId}/suggest")

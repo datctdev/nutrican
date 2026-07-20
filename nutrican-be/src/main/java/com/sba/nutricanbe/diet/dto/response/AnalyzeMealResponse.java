@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.diet.dto.response;
 
+import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,6 +30,8 @@ public class AnalyzeMealResponse {
     private Boolean needsConfirmation;
     private String message;
     private MealType mealType;
+    private MealPeriod mealPeriod;
+    private MealPeriod makeupForPeriod;
     private Boolean suggestSos;
     private List<FoodItemResponse> suggestedFoodMatches;
     private List<FoodPredictionResponse> topPredictions;

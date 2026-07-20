@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.diet.dto.request;
 
 import com.sba.nutricanbe.diet.enums.MealComplexity;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
 import lombok.Data;
@@ -12,6 +13,8 @@ import java.util.UUID;
 @Data
 public class CreateDietLogRequest {
     private MealType mealType;
+    private MealPeriod mealPeriod;
+    private MealPeriod makeupForPeriod;
     private String foodDescription;
     private BigDecimal calories;
     private BigDecimal protein;
@@ -24,6 +27,7 @@ public class CreateDietLogRequest {
     private UUID foodItemId;
     private List<DietLogItemRequest> items;
     private Boolean sendToPt;
+    private String lateTickReason;
     private UUID recipeId;
     private String foodCode;
     private BigDecimal portionGrams;

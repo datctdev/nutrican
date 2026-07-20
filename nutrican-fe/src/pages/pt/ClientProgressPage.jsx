@@ -11,6 +11,7 @@ import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlan
 import MealPlanWeekPicker from '../customer/components/MealPlanWeekPicker';
 import { toast } from 'sonner';
 import { ArrowLeft, TrendingUp, Utensils, Camera, Loader2 } from 'lucide-react';
+import { MEAL_PERIOD_LABELS } from '../customer/components/dietUtils';
 
 function AdherenceDonut({ percent }) {
   const hasValue = percent !== null && percent !== undefined && Number.isFinite(Number(percent));
@@ -912,6 +913,27 @@ export default function ClientProgressPage() {
                   <div key={w.weekStart} className="flex justify-between text-sm border-b border-slate-100 pb-2">
                     <span className="text-slate-500">Tuần {w.weekStart}</span>
                     <span>Năng lượng: <strong>{w.avgEnergy}</strong> · No: <strong>{w.avgHunger}</strong> ({w.sampleCount} mẫu)</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {data?.lateTickReasons?.length > 0 && (
+            <Card>
+              <CardContent className="p-5 space-y-2">
+                <p className="text-sm font-bold text-slate-600">Tick trễ trong tuần</p>
+                {data.lateTickReasons.map((t) => (
+                  <div key={`${t.itemId}-${t.planDate}-${t.mealPeriod}`} className="text-sm p-2 rounded-lg bg-orange-50 border border-orange-100">
+                    <strong>{t.foodLabel}</strong>
+                    {' · '}
+                    {t.planDate}
+                    {t.mealPeriod && MEAL_PERIOD_LABELS[t.mealPeriod] ? ` · ${MEAL_PERIOD_LABELS[t.mealPeriod]}` : ''}
+                    {' — '}
+                    {t.lateTickReason}
+                    {t.source && (
+                      <span className="text-slate-500 text-xs block mt-0.5">Nguồn: {t.source}</span>
+                    )}
                   </div>
                 ))}
               </CardContent>

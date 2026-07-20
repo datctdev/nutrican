@@ -12,10 +12,22 @@ import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.diet.entity.DietLogFeedback;
 import com.sba.nutricanbe.diet.entity.MealPlanSuggestion;
+import com.sba.nutricanbe.diet.entity.SelfPlanItem;
+import com.sba.nutricanbe.diet.entity.SelfPlanSubmission;
 import com.sba.nutricanbe.diet.entity.WeeklySummary;
+import com.sba.nutricanbe.diet.dto.response.SelfPlanItemResponse;
+import com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse;
+import com.sba.nutricanbe.diet.dto.request.SelfPlanSubmissionReviewRequest;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
+import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
+import com.sba.nutricanbe.diet.enums.MealPlanSkipReason;
 import com.sba.nutricanbe.diet.enums.MealPlanSuggestionStatus;
+import com.sba.nutricanbe.diet.enums.MealType;
+import com.sba.nutricanbe.diet.enums.SelfPlanSubmissionStatus;
 import com.sba.nutricanbe.diet.repository.DietLogFeedbackRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanSuggestionRepository;
+import com.sba.nutricanbe.diet.repository.SelfPlanItemRepository;
+import com.sba.nutricanbe.diet.repository.SelfPlanSubmissionRepository;
 import com.sba.nutricanbe.diet.repository.WeeklySummaryRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
@@ -47,6 +59,8 @@ import com.sba.nutricanbe.diet.enums.PtCorrectionReason;
 import com.sba.nutricanbe.diet.enums.PtReviewAction;
 import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.dto.response.SosTicketResponse;
+import com.sba.nutricanbe.common.util.DayPlanRules;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.RblDatasetFilter;
 import com.sba.nutricanbe.common.util.RblMetricsUtil;
@@ -109,6 +123,10 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final MealPlanTemplateItemRepository mealPlanTemplateItemRepository;
     private final StorageService storageService;
     private final NotificationService notificationService;
+    private final SelfPlanItemRepository selfPlanItemRepository;
+    private final SelfPlanSubmissionRepository selfPlanSubmissionRepository;
+    private final com.sba.nutricanbe.diet.service.DayPlanService dayPlanService;
+    private final com.sba.nutricanbe.diet.service.DayTimelineService dayTimelineService;
 
     @Override
     @Transactional(readOnly = true)
@@ -270,8 +288,8 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     public ApiResponse<ProgressDataDto> getClientProgress(
             UUID ptId, UUID clientId, LocalDate startDate, LocalDate endDate, LocalDate mealPlanWeekStart) {
         requirePtClientDataAccess(ptId, clientId);
-        if (startDate == null) startDate = LocalDate.now().minusMonths(1);
-        if (endDate == null) endDate = LocalDate.now();
+        if (startDate == null) startDate = DietDates.todayVn().minusMonths(1);
+        if (endDate == null) endDate = DietDates.todayVn();
 
         List<DietLog> logs = dietLogRepository.findByCustomerIdAndLogDateBetween(
                 clientId, startDate, endDate, PageRequest.of(0, 1000)).getContent();
@@ -282,10 +300,10 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 ? macroTarget.getDailyCalories() : BigDecimal.valueOf(2000);
 
         MealPlanProgressContext mealPlanContext = resolveMealPlanProgress(
-                ptId, clientId, mealPlanWeekStart, LocalDate.now());
+                ptId, clientId, mealPlanWeekStart, DietDates.todayVn());
         LocalDate summaryWeekStart = mealPlanContext.selectedPlan() != null
                 ? mealPlanContext.selectedPlan().getWeekStart()
-                : LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+                : DietDates.todayVn().with(java.time.DayOfWeek.MONDAY);
         LocalDate summaryWeekEnd = summaryWeekStart.plusDays(6);
         List<DietLog> summaryLogs = dietLogRepository.findByCustomerIdAndLogDateBetween(
                 clientId, summaryWeekStart, summaryWeekEnd, PageRequest.of(0, 1000)).getContent();
@@ -301,7 +319,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .toList();
 
         ProgressDataDto.MealPlanAdherenceSummary mealPlanAdherence = buildMealPlanAdherence(
-                mealPlanContext.selectedPlan(), summaryLogs, LocalDate.now());
+                mealPlanContext.selectedPlan(), summaryLogs, DietDates.todayVn());
         Map<LocalDate, MacroNutrients> summaryMacrosByDay = aggregateLoggedMacrosByDay(summaryLogs);
         ProgressDataDto.MacroSummary macroSummary = buildMacroSummary(
                 summaryMacrosByDay,
@@ -355,6 +373,35 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                             .build()));
         }
         response.setSkipReasons(skips);
+
+        List<MealPlanLateTickItemDto> lateTicks = new ArrayList<>();
+        if (selectedPlan != null) {
+            mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(selectedPlan.getId())
+                    .stream()
+                    .filter(i -> i.getLateTickReason() != null && !i.getLateTickReason().isBlank())
+                    .filter(i -> !i.getPlanDate().isBefore(startDate) && !i.getPlanDate().isAfter(endDate))
+                    .forEach(i -> lateTicks.add(MealPlanLateTickItemDto.builder()
+                            .itemId(i.getId())
+                            .planDate(i.getPlanDate())
+                            .mealType(i.getMealType() != null ? i.getMealType().name() : null)
+                            .mealPeriod(i.getMealPeriod() != null ? i.getMealPeriod().name() : null)
+                            .foodLabel(i.getFreeText() != null ? i.getFreeText() : i.getFoodCode())
+                            .lateTickReason(i.getLateTickReason())
+                            .source(i.getSourceType() != null ? i.getSourceType().name() : "PT_ORIGINAL")
+                            .build()));
+        }
+        logs.stream()
+                .filter(log -> log.getLateTickReason() != null && !log.getLateTickReason().isBlank())
+                .forEach(log -> lateTicks.add(MealPlanLateTickItemDto.builder()
+                        .itemId(log.getId())
+                        .planDate(log.getLogDate())
+                        .mealType(log.getMealType() != null ? log.getMealType().name() : null)
+                        .mealPeriod(log.getMealPeriod() != null ? log.getMealPeriod().name() : null)
+                        .foodLabel(log.getFoodDescription())
+                        .lateTickReason(log.getLateTickReason())
+                        .source("DIET_LOG")
+                        .build()));
+        response.setLateTickReasons(lateTicks);
 
         List<MealPlanSuggestionDto> pending = mealPlanSuggestionRepository
                 .findByCustomerIdAndStatus(clientId, MealPlanSuggestionStatus.PENDING)
@@ -547,6 +594,8 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .ptAction(log.getPtAction())
                 .ptCorrectionReason(log.getPtCorrectionReason())
                 .blindSubmitted(log.getPtBlindMacros() != null)
+                .lateTickReason(log.getLateTickReason())
+                .mealPeriod(log.getMealPeriod() != null ? log.getMealPeriod().name() : null)
                 .build();
     }
 
@@ -615,7 +664,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(ptId, clientId, ClientMappingStatus.ACTIVE)) {
             throw new BadRequestException("No active mapping for this client");
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = DietDates.todayVn();
         var summary = dietLogService.getSummary(clientId, today).getData();
         return ApiResponse.success(com.sba.nutricanbe.chat.dto.ChatContextSummaryDto.builder()
                 .date(today)
@@ -658,8 +707,8 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<PtRblStatsDto> getRblStats(UUID ptId) {
-        LocalDate start = LocalDate.now().minusMonths(1);
-        LocalDate end = LocalDate.now();
+        LocalDate start = DietDates.todayVn().minusMonths(1);
+        LocalDate end = DietDates.todayVn();
         List<UUID> clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
                 .map(m -> m.getClient().getId()).toList();
         List<DietLog> reviewed = clientIds.isEmpty()
@@ -862,7 +911,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .filter(m -> m.getStatus() == com.sba.nutricanbe.user.enums.ClientMappingStatus.ACTIVE)
                 .toList();
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = DietDates.todayVn();
         LocalDate thisMonday = today.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
 
         for (com.sba.nutricanbe.user.entity.PtClientMapping mapping : activeMappings) {
@@ -928,7 +977,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         if (!ptId.equals(plan.getPtId())) {
             throw new UnauthorizedException("You can only review requests for your own meal plans");
         }
-        if (item.getPlanDate().isBefore(LocalDate.now())) {
+        if (item.getPlanDate().isBefore(DietDates.todayVn())) {
             suggestion.setStatus(MealPlanSuggestionStatus.EXPIRED);
             suggestion.setDecidedAt(LocalDateTime.now());
             return ApiResponse.success(toSuggestionDto(mealPlanSuggestionRepository.save(suggestion)),
@@ -1024,6 +1073,255 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<List<SelfPlanSubmissionResponse>> listPendingSelfPlanSubmissions(UUID ptId) {
+        List<SelfPlanSubmissionResponse> result = selfPlanSubmissionRepository
+                .findByPtIdAndStatusOrderBySubmittedAtDesc(ptId, SelfPlanSubmissionStatus.PENDING)
+                .stream()
+                .map(s -> SelfPlanSubmissionResponse.from(s, reviewableSubmissionItems(s.getId())
+                        .stream().map(SelfPlanItemResponse::from).toList()))
+                .filter(s -> s.getItems() != null && !s.getItems().isEmpty())
+                .toList();
+        return ApiResponse.success(result);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<SelfPlanSubmissionResponse> reviewSelfPlanSubmission(
+            UUID ptId, UUID submissionId, SelfPlanSubmissionReviewRequest request) {
+        SelfPlanSubmission submission = selfPlanSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("SelfPlanSubmission", submissionId));
+        assertActiveMapping(ptId, submission.getCustomerId());
+        if (!ptId.equals(submission.getPtId())) {
+            throw new UnauthorizedException("Bạn không có quyền duyệt yêu cầu này");
+        }
+        if (submission.getStatus() != SelfPlanSubmissionStatus.PENDING) {
+            throw new BadRequestException("Chỉ có thể duyệt yêu cầu đang chờ");
+        }
+        List<SelfPlanItem> items = selfPlanItemRepository.findBySubmissionId(submissionId);
+        List<SelfPlanItem> reviewableItems = reviewableSubmissionItems(submissionId);
+        if (reviewableItems.isEmpty()) {
+            throw new BadRequestException("Không còn buổi nào cần duyệt — học viên có thể đã ăn / buổi đã chốt");
+        }
+        String action = request.getAction() != null ? request.getAction().toUpperCase() : "";
+
+        if ("REJECT".equals(action)) {
+            if (request.getPtNote() == null || request.getPtNote().isBlank()) {
+                throw new BadRequestException("ptNote là bắt buộc khi từ chối");
+            }
+            reviewableItems.forEach(item -> item.setLockedByReview(false));
+            selfPlanItemRepository.saveAll(items);
+            submission.setStatus(SelfPlanSubmissionStatus.REJECTED);
+        } else if ("APPROVE".equals(action)) {
+            applySelfPlanSubmission(submission, reviewableItems);
+            submission.setStatus(SelfPlanSubmissionStatus.APPROVED);
+        } else {
+            throw new BadRequestException("action phải là APPROVE hoặc REJECT");
+        }
+        submission.setPtNote(request.getPtNote());
+        submission.setDecidedAt(LocalDateTime.now());
+        submission.setPendingUniqueKey(null);
+        SelfPlanSubmission saved = selfPlanSubmissionRepository.save(submission);
+
+        notificationService.notify(submission.getCustomerId(), NotificationPayload.builder()
+                .type("SELF_PLAN_" + submission.getStatus().name())
+                .title(submission.getStatus() == SelfPlanSubmissionStatus.APPROVED
+                        ? "PT đã duyệt kế hoạch tự chọn" : "PT từ chối kế hoạch tự chọn")
+                .body(submission.getStatus() == SelfPlanSubmissionStatus.APPROVED
+                        ? "Ngày " + submission.getPlanDate()
+                        : request.getPtNote())
+                .linkType(NotificationLinkType.MEAL_PLAN)
+                .linkRefId(submission.getCustomerId())
+                .sendEmail(false)
+                .build());
+
+        return ApiResponse.success(SelfPlanSubmissionResponse.from(saved,
+                reviewableItems.stream().map(SelfPlanItemResponse::from).toList()));
+    }
+
+    private List<SelfPlanItem> reviewableSubmissionItems(UUID submissionId) {
+        List<SelfPlanItem> items = selfPlanItemRepository.findBySubmissionId(submissionId);
+        if (items.isEmpty()) {
+            return items;
+        }
+        SelfPlanSubmission submission = selfPlanSubmissionRepository.findById(submissionId).orElse(null);
+        if (submission == null) {
+            return items.stream()
+                    .filter(item -> !Boolean.TRUE.equals(item.getEaten()))
+                    .toList();
+        }
+        LocalDate planDate = submission.getPlanDate();
+        UUID customerId = submission.getCustomerId();
+        List<MealPlanItem> ptItems = mealPlanRepository
+                .findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(customerId).stream()
+                .filter(p -> {
+                    LocalDate start = p.getWeekStart();
+                    if (start == null) return false;
+                    LocalDate end = start.plusDays(6);
+                    return !planDate.isBefore(start) && !planDate.isAfter(end);
+                })
+                .findFirst()
+                .map(plan -> mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId())
+                        .stream()
+                        .filter(i -> planDate.equals(i.getPlanDate()))
+                        .toList())
+                .orElse(List.of());
+        List<DietLog> logs = dietLogRepository.findByCustomerIdAndLogDate(customerId, planDate).stream()
+                .filter(log -> log.getStatus() == DietLogStatus.LOGGED)
+                .toList();
+        return items.stream()
+                .filter(item -> !Boolean.TRUE.equals(item.getEaten()))
+                .filter(item -> isReviewableSubmissionItem(planDate, item, ptItems, items, logs))
+                .toList();
+    }
+
+    /** Chỉ buổi chưa ăn / chưa chốt — tránh hiểu nhầm PT duyệt sẽ đổi món đã tick. */
+    private boolean isReviewableSubmissionItem(
+            LocalDate planDate,
+            SelfPlanItem item,
+            List<MealPlanItem> ptItems,
+            List<SelfPlanItem> submissionItems,
+            List<DietLog> logs) {
+        if (item.getMealPeriod() == null) {
+            return true;
+        }
+        return !DayPlanRules.isMealPeriodSettled(
+                planDate, item.getMealPeriod(), ptItems, submissionItems, logs);
+    }
+
+    private void applySelfPlanSubmission(SelfPlanSubmission submission, List<SelfPlanItem> items) {
+        if (items.isEmpty()) {
+            return;
+        }
+        List<DietLog> dayLogs = dietLogRepository.findByCustomerIdAndLogDate(
+                submission.getCustomerId(), submission.getPlanDate()).stream()
+                .filter(log -> log.getStatus() == DietLogStatus.LOGGED)
+                .toList();
+        MealPlan plan = mealPlanRepository
+                .findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(submission.getCustomerId())
+                .stream()
+                .filter(p -> {
+                    LocalDate start = p.getWeekStart();
+                    if (start == null) return false;
+                    LocalDate end = start.plusDays(6);
+                    return !submission.getPlanDate().isBefore(start) && !submission.getPlanDate().isAfter(end);
+                })
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy thực đơn PT đang áp dụng cho ngày này"));
+
+        Map<MealPeriod, List<SelfPlanItem>> byPeriod = items.stream()
+                .filter(i -> i.getMealPeriod() != null)
+                .collect(java.util.stream.Collectors.groupingBy(SelfPlanItem::getMealPeriod));
+        if (byPeriod.isEmpty()) {
+            throw new BadRequestException("Self plan items thiếu khung giờ (mealPeriod)");
+        }
+
+        for (Map.Entry<MealPeriod, List<SelfPlanItem>> entry : byPeriod.entrySet()) {
+            MealPeriod period = entry.getKey();
+            List<MealPlanItem> oldItems = mealPlanItemRepository.findByMealPlanIdAndPlanDateAndMealPeriod(
+                    plan.getId(), submission.getPlanDate(), period);
+            for (MealPlanItem oldItem : oldItems) {
+                List<MealPlanSuggestion> pending = mealPlanSuggestionRepository
+                        .findByMealPlanItemIdAndStatus(oldItem.getId(), MealPlanSuggestionStatus.PENDING);
+                pending.forEach(s -> {
+                    s.setStatus(MealPlanSuggestionStatus.CANCELLED);
+                    s.setDecidedAt(LocalDateTime.now());
+                });
+                mealPlanSuggestionRepository.saveAll(pending);
+            }
+            if (!oldItems.isEmpty()) {
+                for (MealPlanItem oldItem : oldItems) {
+                    if (oldItem.getSourceType() == MealPlanItemSourceType.SELF_OVERRIDE) {
+                        continue;
+                    }
+                    oldItem.setSkipReason(MealPlanSkipReason.SUPERSEDED);
+                    oldItem.setSkipNote("Thay bằng đề xuất học viên đã duyệt");
+                    oldItem.setEaten(false);
+                    mealPlanItemRepository.save(oldItem);
+                }
+            }
+            List<MealPlanItem> newItems = entry.getValue().stream()
+                    .map(selfItem -> {
+                        DietLog matchedLog = findMatchingLog(selfItem, dayLogs);
+                        boolean hasLoggedPeriod = dayLogs.stream().anyMatch(log ->
+                                selfItem.getMealPeriod() != null && selfItem.getMealPeriod().equals(log.getMealPeriod()));
+                        return MealPlanItem.builder()
+                                .mealPlanId(plan.getId())
+                                .planDate(selfItem.getPlanDate())
+                                .mealType(selfItem.getMealType())
+                                .mealPeriod(selfItem.getMealPeriod())
+                                .freeText(selfItem.getItemName())
+                                .portionGrams(selfItem.getQuantityG())
+                                .eaten(Boolean.TRUE.equals(selfItem.getEaten()) || matchedLog != null)
+                                .note(matchedLog == null && hasLoggedPeriod
+                                        ? "ALREADY_LOGGED"
+                                        : null)
+                                .sourceType(MealPlanItemSourceType.SELF_OVERRIDE)
+                                .foodItemId(selfItem.getFoodItemId())
+                                .build();
+                    })
+                    .toList();
+            mealPlanItemRepository.saveAll(newItems);
+        }
+
+        items.forEach(item -> {
+            item.setApplied(true);
+            item.setLockedByReview(false);
+        });
+        selfPlanItemRepository.saveAll(items);
+    }
+
+    private DietLog findMatchingLog(SelfPlanItem selfItem, List<DietLog> dayLogs) {
+        if (selfItem == null || selfItem.getMealPeriod() == null) {
+            return null;
+        }
+        return dayLogs.stream()
+                .filter(log -> selfItem.getMealPeriod().equals(log.getMealPeriod()))
+                .filter(log -> matchesSelfPlanItem(selfItem, log))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean matchesSelfPlanItem(SelfPlanItem selfItem, DietLog log) {
+        if (selfItem.getFoodItemId() != null && log.getFoodItemId() != null) {
+            return selfItem.getFoodItemId().equals(log.getFoodItemId());
+        }
+        if (selfItem.getFoodItemId() != null || log.getFoodItemId() != null) {
+            return false;
+        }
+        String left = normalizeFoodLabel(selfItem.getItemName());
+        String right = normalizeFoodLabel(log.getFoodDescription());
+        if (left == null || right == null || !left.equals(right)) {
+            return false;
+        }
+        return withinTolerance(selfItem.getCalories(), log.getMacrosJson() != null ? log.getMacrosJson().calories() : null, 0.10, 30)
+                && withinTolerance(selfItem.getProtein(), log.getMacrosJson() != null ? log.getMacrosJson().protein() : null, 0.15, 5)
+                && withinTolerance(selfItem.getCarb(), log.getMacrosJson() != null ? log.getMacrosJson().carbs() : null, 0.15, 5)
+                && withinTolerance(selfItem.getFat(), log.getMacrosJson() != null ? log.getMacrosJson().fat() : null, 0.15, 5);
+    }
+
+    private String normalizeFoodLabel(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value
+                .replaceAll("\\s*\\((MORNING|NOON|AFTERNOON|EVENING|LATE)\\)\\s*$", "")
+                .trim()
+                .toLowerCase();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private boolean withinTolerance(BigDecimal expected, BigDecimal actual, double pct, int absolute) {
+        if (expected == null || actual == null) {
+            return false;
+        }
+        BigDecimal diff = expected.subtract(actual).abs();
+        BigDecimal pctTolerance = expected.abs().multiply(BigDecimal.valueOf(pct));
+        BigDecimal allowed = pctTolerance.min(BigDecimal.valueOf(absolute));
+        return diff.compareTo(allowed) <= 0;
+    }
+
     private MealPlanSuggestionDto toSuggestionDto(MealPlanSuggestion s) {
         MealPlanItem item = mealPlanItemRepository.findById(s.getMealPlanItemId()).orElse(null);
         return MealPlanSuggestionDto.builder()
@@ -1055,7 +1353,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
 
     private MealPlanSuggestion expireSuggestionIfStale(MealPlanSuggestion suggestion) {
         MealPlanItem item = mealPlanItemRepository.findById(suggestion.getMealPlanItemId()).orElse(null);
-        if (item != null && item.getPlanDate().isBefore(LocalDate.now())) {
+        if (item != null && item.getPlanDate().isBefore(DietDates.todayVn())) {
             suggestion.setStatus(MealPlanSuggestionStatus.EXPIRED);
             suggestion.setDecidedAt(LocalDateTime.now());
             return mealPlanSuggestionRepository.save(suggestion);
@@ -1212,7 +1510,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         if (request.getWeight() != null) {
             BodyMetric metric = BodyMetric.builder()
                     .user(client)
-                    .recordDate(LocalDate.now())
+                    .recordDate(DietDates.todayVn())
                     .weight(request.getWeight())
                     .bodyFatPercent(request.getBodyFatPercent())
                     .build();
@@ -1322,5 +1620,32 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         }
         
         return ApiResponse.success(null, "Template applied successfully");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<com.sba.nutricanbe.diet.dto.response.DayPlanResponse> getClientDayPlan(
+            UUID ptId, UUID clientId, LocalDate date) {
+        requirePtClientDataAccess(ptId, clientId);
+        LocalDate planDate = date != null ? date : DietDates.todayVn();
+        return ApiResponse.success(dayPlanService.getDayPlan(clientId, planDate));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<com.sba.nutricanbe.diet.dto.response.DietSummaryResponse> getClientDietSummary(
+            UUID ptId, UUID clientId, LocalDate date) {
+        requirePtClientDataAccess(ptId, clientId);
+        LocalDate summaryDate = date != null ? date : DietDates.todayVn();
+        return dietLogService.getSummary(clientId, summaryDate);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<com.sba.nutricanbe.diet.dto.response.DayTimelineResponse> getClientDayTimeline(
+            UUID ptId, UUID clientId, LocalDate date) {
+        requirePtClientDataAccess(ptId, clientId);
+        LocalDate planDate = date != null ? date : DietDates.todayVn();
+        return ApiResponse.success(dayTimelineService.getDayTimeline(clientId, planDate));
     }
 }

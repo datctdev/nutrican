@@ -1,18 +1,24 @@
 package com.sba.nutricanbe.user.config;
 
+import com.sba.nutricanbe.common.enums.RequestStatus;
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
+import com.sba.nutricanbe.user.dto.CertificationData;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.PtProfile;
+import com.sba.nutricanbe.user.entity.PtUpdateRequest;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.enums.Gender;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 import com.sba.nutricanbe.user.enums.Tier;
 import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
+import com.sba.nutricanbe.user.repository.PtUpdateRequestRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -39,69 +46,94 @@ public class UserInitializer implements CommandLineRunner {
     private final PtProfileRepository ptProfileRepository;
     private final PtClientMappingRepository ptClientMappingRepository;
     private final MacroTargetRepository macroTargetRepository;
+    private final PtUpdateRequestRepository ptUpdateRequestRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
     public void run(String... args) {
+        // 1. Tạo Customer
         User customerOne = seedUser(
-                "customer1@gmail.com",
-                DEFAULT_PASSWORD,
-                "Nguyen Van Customer",
-                UserRole.CUSTOMER,
-                "0901000001",
-                "12 Nguyen Trai, Quan 1, TP.HCM",
-                LocalDate.of(1998, 3, 12));
+                "customer1@gmail.com", DEFAULT_PASSWORD, "Nguyen Van Customer",
+                UserRole.CUSTOMER, "0901000001", "12 Nguyen Trai, Quan 1, TP.HCM", LocalDate.of(1998, 3, 12));
 
         User customerTwo = seedUser(
-                "customer2@gmail.com",
-                DEFAULT_PASSWORD,
-                "Tran Thi Hoc Vien",
-                UserRole.CUSTOMER,
-                "0901000002",
-                "45 Le Loi, Quan 3, TP.HCM",
-                LocalDate.of(2000, 8, 20));
+                "customer2@gmail.com", DEFAULT_PASSWORD, "Tran Thi Hoc Vien",
+                UserRole.CUSTOMER, "0901000002", "45 Le Loi, Quan 3, TP.HCM", LocalDate.of(2000, 8, 20));
 
+        // 2. Tạo PT
         User certifiedPt = seedUser(
-                "pt.certified@gmail.com",
-                DEFAULT_PASSWORD,
-                "Le Minh PT Certified",
-                UserRole.PT_CERTIFIED,
-                "0902000001",
-                "Fitness Hub, Quan 7, TP.HCM",
-                LocalDate.of(1992, 5, 6));
+                "pt.certified@gmail.com", DEFAULT_PASSWORD, "Le Minh PT Certified",
+                UserRole.PT_CERTIFIED, "0902000001", "Fitness Hub, Quan 7, TP.HCM", LocalDate.of(1992, 5, 6));
 
         User freelancePt = seedUser(
-                "pt.freelance@gmail.com",
-                DEFAULT_PASSWORD,
-                "Pham Anh PT Freelance",
-                UserRole.PT_FREELANCE,
-                "0902000002",
-                "Online Coaching, TP.HCM",
-                LocalDate.of(1990, 11, 18));
+                "pt.freelance@gmail.com", DEFAULT_PASSWORD, "Pham Anh PT Freelance",
+                UserRole.PT_FREELANCE, "0902000002", "Online Coaching, TP.HCM", LocalDate.of(1990, 11, 18));
 
-        seedPtProfile(
+        // 3. Seed Full Data cho PT 1 (Chuyên nghiệp)
+        seedFullPtProfile(
                 certifiedPt,
-                "Chào bạn, mình là PT chuyên nghiệp với hơn 5 năm kinh nghiệm. Mình tin rằng mọi sự thay đổi đều bắt đầu từ thói quen nhỏ nhất. Hãy để mình đồng hành cùng bạn trên con đường chinh phục vóc dáng trong mơ.",
+                "Chào bạn, mình là PT chuyên nghiệp với hơn 5 năm kinh nghiệm. Mình tin rằng mọi sự thay đổi đều bắt đầu từ thói quen nhỏ nhất. Việc kết hợp giữa dinh dưỡng khoa học và tập luyện bài bản sẽ mang lại kết quả bền vững.",
                 "Kỷ luật là cầu nối giữa mục tiêu và thành tựu. Tập luyện không chỉ thay đổi cơ thể mà còn rèn giũa ý chí.",
                 LocalDate.of(2016, 3, 1),
-                List.of("Fat loss", "Muscle gain", "Meal planning"),
-                Tier.TIER_1,
+                Gender.MALE,
+                "0902000001",
                 TrainingMode.BOTH,
+                "TP. Hồ Chí Minh",
                 BigDecimal.valueOf(1200000),
-                BigDecimal.valueOf(450000));
+                "MONTH",
+                BigDecimal.valueOf(450000),
+                "SESSION_60",
+                List.of("Giảm cân", "Tăng cơ", "Thể hình"),
+                List.of("WEIGHT_LOSS", "MUSCLE_GAIN"),
+                List.of("NORMAL", "EAT_CLEAN"),
+                List.of(
+                        CertificationData.builder().name("NASM Certified Personal Trainer").issuingOrganization("NASM").issueDate("2018-05").neverExpires(false).expiryDate("2028-05").certificateImageUrl("https://placehold.co/600x400/e2e8f0/64748b?text=NASM+Certificate").build(),
+                        CertificationData.builder().name("Nutrition Specialist").issuingOrganization("Precision Nutrition").issueDate("2019-08").neverExpires(true).certificateImageUrl("https://placehold.co/600x400/e2e8f0/64748b?text=Nutrition+Certificate").build()
+                )
+        );
 
-        seedPtProfile(
+        // 4. Seed Full Data cho PT 2 (Tự do)
+        seedFullPtProfile(
                 freelancePt,
-                "Freelance PT specializing in busy professional meal routines.",
-                "Simple tracking, honest feedback, and practical adjustments.",
+                "Freelance PT chuyên hướng dẫn lịch tập tại nhà và chế độ ăn dành cho người bận rộn. Phương pháp của mình tập trung vào tính thực tế, linh hoạt nhưng vẫn đảm bảo hiệu quả.",
+                "Tập luyện phải là niềm vui, không phải là gánh nặng. Chậm mà chắc luôn tốt hơn nhanh mà bỏ cuộc.",
                 LocalDate.of(2019, 6, 1),
-                List.of("Lifestyle coaching", "Home workout", "Vietnamese diet"),
-                Tier.TIER_2,
+                Gender.FEMALE,
+                "0902000002",
                 TrainingMode.ONLINE,
-                BigDecimal.valueOf(900000),
-                null);
+                "Hà Nội",
+                BigDecimal.valueOf(1500000),
+                "MONTH",
+                null,
+                null,
+                List.of("Yoga", "Pilates", "Giảm cân"),
+                List.of("WEIGHT_LOSS", "MAINTAIN"),
+                List.of("VEGAN", "KETO"),
+                List.of(
+                        CertificationData.builder().name("200H Yoga Teacher Training").issuingOrganization("Yoga Alliance").issueDate("2020-01").neverExpires(true).certificateImageUrl("https://placehold.co/600x400/e2e8f0/64748b?text=Yoga+Certificate").build()
+                )
+        );
 
+        // 5. Tạo dữ liệu giả lập cho Yêu cầu Cập nhật (Update Request)
+        if (!ptUpdateRequestRepository.existsByPtIdAndStatus(certifiedPt.getId(), RequestStatus.PENDING)) {
+            PtUpdateRequest updateReq = PtUpdateRequest.builder()
+                    .pt(certifiedPt)
+                    .requestedData(Map.of(
+                            "bio", "Bản cập nhật bio mới: Mình vừa thi đậu thêm chứng chỉ NASM cấp cao quốc tế.",
+                            "trainingMode", "HYBRID",
+                            "contactPhone", "0988123456",
+                            "hourlyRate", 500000,
+                            "rateUnit", "SESSION_90"
+                    ))
+                    .reason("Tôi muốn cập nhật lại SĐT liên hệ mới và tăng nhẹ mức phí dịch vụ cho các buổi tập 90 phút.")
+                    .status(RequestStatus.PENDING)
+                    .build();
+            ptUpdateRequestRepository.save(updateReq);
+            log.info("✅ Seeded PENDING PtUpdateRequest for: {}", certifiedPt.getEmail());
+        }
+
+        // 6. Seed Mappings & Macro Targets
         seedMapping(certifiedPt, customerOne, ClientMappingStatus.ACTIVE);
         seedMapping(freelancePt, customerTwo, ClientMappingStatus.PENDING);
 
@@ -109,20 +141,43 @@ public class UserInitializer implements CommandLineRunner {
         seedCustomerE2eProfile(customerTwo, NutritionGoal.WEIGHT_LOSS, 165, "FEMALE");
         seedMacroTarget(customerOne, 2000, 120, 220, 65);
         seedMacroTarget(customerTwo, 1900, 110, 200, 60);
-        seedPtMarketplacePrefs(certifiedPt, List.of("WEIGHT_LOSS", "WEIGHT_GAIN"), List.of("NORMAL", "VEGETARIAN"));
-        seedPtMarketplacePrefs(freelancePt, List.of("WEIGHT_LOSS", "MAINTAIN"), List.of("NORMAL", "KETO"));
 
-        log.info("Seeded default users for hiring/chat test: {}, {}, {}, {}",
+        // Demo visual QA — meal-windows / self-plan (password Demo123!)
+        User demoSolo = seedUser(
+                "demo.solo@nutrican.com",
+                "Demo123!",
+                "Demo Solo (Khong PT)",
+                UserRole.CUSTOMER,
+                "0911000001",
+                "Demo Solo, TP.HCM",
+                LocalDate.of(1998, 5, 15));
+        User demoCoached = seedUser(
+                "demo.coached@nutrican.com",
+                "Demo123!",
+                "Demo Coached (Co PT)",
+                UserRole.CUSTOMER,
+                "0911000002",
+                "Demo Coached, TP.HCM",
+                LocalDate.of(2000, 2, 20));
+        seedCustomerE2eProfile(demoSolo, NutritionGoal.WEIGHT_LOSS, 172, "MALE");
+        seedCustomerE2eProfile(demoCoached, NutritionGoal.MAINTAIN, 165, "FEMALE");
+        LocalDateTime onboardedAt = LocalDateTime.now().minusDays(14);
+        demoSolo.setOnboardingCompletedAt(onboardedAt);
+        demoCoached.setOnboardingCompletedAt(onboardedAt);
+        userRepository.save(demoSolo);
+        userRepository.save(demoCoached);
+        seedDemoMacroIfAbsent(demoSolo, ActivityLevel.MODERATE, 2100, 130, 230, 70);
+        seedDemoMacroIfAbsent(demoCoached, ActivityLevel.LIGHT, 1850, 105, 200, 60);
+        seedMapping(certifiedPt, demoCoached, ClientMappingStatus.ACTIVE);
+        // demoSolo: intentionally NO mapping (no PT)
+
+        log.info("Seeded full data for users: {}, {}, {}, {}",
                 customerOne.getEmail(), customerTwo.getEmail(), certifiedPt.getEmail(), freelancePt.getEmail());
+        log.info("Seeded demo visual accounts: {} (no PT), {} (ACTIVE with {})",
+                demoSolo.getEmail(), demoCoached.getEmail(), certifiedPt.getEmail());
     }
 
-    private User seedUser(String email,
-                          String rawPassword,
-                          String fullName,
-                          UserRole role,
-                          String phone,
-                          String address,
-                          LocalDate dateOfBirth) {
+    private User seedUser(String email, String rawPassword, String fullName, UserRole role, String phone, String address, LocalDate dateOfBirth) {
         return userRepository.findByEmail(email)
                 .map(existing -> {
                     boolean changed = false;
@@ -156,63 +211,59 @@ public class UserInitializer implements CommandLineRunner {
                         .build()));
     }
 
-    private void seedPtProfile(User pt,
-                               String bio,
-                               String philosophy,
-                               LocalDate experienceStartDate,
-                               List<String> specializations,
-                               Tier tier,
-                               TrainingMode trainingMode,
-                               BigDecimal onlineRate,
-                               BigDecimal offlineRate) {
+    private void seedFullPtProfile(User pt, String bio, String philosophy, LocalDate startDate,
+                                   Gender gender, String contactPhone, TrainingMode trainingMode,
+                                   String location, BigDecimal onlineRate, String onlineRateUnit,
+                                   BigDecimal offlineRate, String offlineRateUnit,
+                                   List<String> specializations, List<String> goals, List<String> diets,
+                                   List<CertificationData> certs) {
         ptProfileRepository.findByUserId(pt.getId())
                 .ifPresentOrElse(profile -> {
                     profile.setIsVerified(true);
                     profile.setVerificationStatus(UserStatus.ACTIVE);
                     profile.setPtRequestStatus(UserStatus.ACTIVE);
                     profile.setTrainingMode(trainingMode);
-                    profile.setLocation(trainingMode == TrainingMode.ONLINE ? null : pt.getAddress());
+                    profile.setLocation(trainingMode == TrainingMode.ONLINE ? null : location);
                     profile.setOnlineRate(onlineRate);
-                    profile.setOnlineRateUnit(onlineRate == null ? null : "MONTH");
+                    profile.setOnlineRateUnit(onlineRateUnit);
                     profile.setOfflineRate(offlineRate);
-                    profile.setOfflineRateUnit(offlineRate == null ? null : "SESSION_60");
+                    profile.setOfflineRateUnit(offlineRateUnit);
                     ptProfileRepository.save(profile);
                 }, () -> ptProfileRepository.save(PtProfile.builder()
                         .user(pt)
                         .isVerified(true)
                         .bio(bio)
                         .trainingPhilosophy(philosophy)
-                        .experienceStartDate(experienceStartDate)
-                        .specializations(specializations)
-                        .tier(tier)
+                        .experienceStartDate(startDate)
+                        .gender(gender)
+                        .contactPhone(contactPhone)
                         .trainingMode(trainingMode)
-                        .location(trainingMode == TrainingMode.ONLINE ? null : pt.getAddress())
+                        .location(trainingMode == TrainingMode.ONLINE ? null : location)
                         .onlineRate(onlineRate)
-                        .onlineRateUnit(onlineRate == null ? null : "MONTH")
+                        .onlineRateUnit(onlineRateUnit)
                         .offlineRate(offlineRate)
-                        .offlineRateUnit(offlineRate == null ? null : "SESSION_60")
+                        .offlineRateUnit(offlineRateUnit)
+                        .specializations(specializations)
+                        .preferredGoals(goals)
+                        .preferredDietTypes(diets)
+                        .certifications(certs)
+                        .tier(Tier.TIER_1)
                         .rating(BigDecimal.valueOf(5.0))
                         .totalReviews(0)
                         .verificationStatus(UserStatus.ACTIVE)
                         .ptRequestStatus(UserStatus.ACTIVE)
                         .instagramUrl("https://instagram.com/pt.nutrican")
                         .linkedinUrl("https://linkedin.com/in/pt-nutrican")
-                        .portfolioShowcase(java.util.Map.of(
+                        .cvUrl("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf")
+                        .portfolioShowcase(Map.of(
                                 "coverPhotoUrl", "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=1470&auto=format&fit=crop",
-                                "transformations", java.util.List.of(
-                                        java.util.Map.of(
-                                                "id", 1,
+                                "transformations", List.of(
+                                        Map.of(
+                                                "id", "1",
                                                 "title", "Giảm 15kg mỡ thừa trong 3 tháng",
-                                                "story", "Học viên Nguyễn Văn A đã kiên trì theo lịch tập tạ 4 buổi/tuần và chế độ ăn Low-Carb. Kết quả sau 12 tuần thực sự ngoài sức mong đợi. Cơ thể nhẹ nhàng hơn và các chỉ số sức khỏe đều trở về mức tuyệt vời.",
-                                                "beforeUrl", "https://placehold.co/600x400/eeeeee/999999?text=Before+Image",
-                                                "afterUrl", "https://placehold.co/600x400/d1fae5/065f46?text=After+Image"
-                                        ),
-                                        java.util.Map.of(
-                                                "id", 2,
-                                                "title", "Tăng 8kg cơ bắp, thay đổi vóc dáng",
-                                                "story", "Từ một người gầy gò 55kg, bạn B đã áp dụng chế độ Bulk an toàn. Chú trọng các bài tập Compound như Squat, Deadlift, Bench Press. Giờ đây tự tin diện những bộ quần áo body.",
-                                                "beforeUrl", "https://placehold.co/600x400/eeeeee/999999?text=Before+Image+2",
-                                                "afterUrl", "https://placehold.co/600x400/d1fae5/065f46?text=After+Image+2"
+                                                "story", "Học viên đã kiên trì theo lịch tập tạ 4 buổi/tuần và chế độ ăn Low-Carb. Kết quả sau 12 tuần thực sự ngoài sức mong đợi.",
+                                                "beforeUrl", "https://images.unsplash.com/photo-1603233720066-237cb1017838?q=80&w=600&auto=format&fit=crop",
+                                                "afterUrl", "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?q=80&w=600&auto=format&fit=crop"
                                         )
                                 )
                         ))
@@ -243,27 +294,31 @@ public class UserInitializer implements CommandLineRunner {
     }
 
     private void seedMacroTarget(User customer, int calories, int protein, int carb, int fat) {
-        macroTargetRepository.findByUserId(customer.getId())
-                .ifPresentOrElse(existing -> {
-                    existing.setDailyCalories(BigDecimal.valueOf(calories));
-                    existing.setProtein(BigDecimal.valueOf(protein));
-                    existing.setCarb(BigDecimal.valueOf(carb));
-                    existing.setFat(BigDecimal.valueOf(fat));
-                    macroTargetRepository.save(existing);
-                }, () -> macroTargetRepository.save(MacroTarget.builder()
-                        .user(customer)
-                        .dailyCalories(BigDecimal.valueOf(calories))
-                        .protein(BigDecimal.valueOf(protein))
-                        .carb(BigDecimal.valueOf(carb))
-                        .fat(BigDecimal.valueOf(fat))
-                        .build()));
+        if (macroTargetRepository.findByUserId(customer.getId()).isPresent()) {
+            return;
+        }
+        macroTargetRepository.save(MacroTarget.builder()
+                .user(customer)
+                .dailyCalories(BigDecimal.valueOf(calories))
+                .protein(BigDecimal.valueOf(protein))
+                .carb(BigDecimal.valueOf(carb))
+                .fat(BigDecimal.valueOf(fat))
+                .build());
     }
 
-    private void seedPtMarketplacePrefs(User pt, List<String> goals, List<String> diets) {
-        ptProfileRepository.findByUserId(pt.getId()).ifPresent(profile -> {
-            profile.setPreferredGoals(goals);
-            profile.setPreferredDietTypes(diets);
-            ptProfileRepository.save(profile);
-        });
+    private void seedDemoMacroIfAbsent(User user, ActivityLevel activityLevel,
+                                       int calories, int protein, int carb, int fat) {
+        if (macroTargetRepository.findByUserId(user.getId()).isPresent()) {
+            return;
+        }
+        user.setActivityLevel(activityLevel);
+        userRepository.save(user);
+        macroTargetRepository.save(MacroTarget.builder()
+                .user(user)
+                .dailyCalories(BigDecimal.valueOf(calories))
+                .protein(BigDecimal.valueOf(protein))
+                .carb(BigDecimal.valueOf(carb))
+                .fat(BigDecimal.valueOf(fat))
+                .build());
     }
 }

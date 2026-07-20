@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.diet.repository;
 
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -14,5 +15,7 @@ public interface MealPlanItemRepository extends JpaRepository<MealPlanItem, UUID
     List<MealPlanItem> findByMealPlanIdOrderByPlanDateAscMealTypeAsc(UUID mealPlanId);
     List<MealPlanItem> findByMealPlanIdAndPlanDateAndMealType(
             UUID mealPlanId, LocalDate planDate, MealType mealType);
+    List<MealPlanItem> findByMealPlanIdAndPlanDateAndMealPeriod(
+            UUID mealPlanId, LocalDate planDate, MealPeriod mealPeriod);
     void deleteByMealPlanId(UUID mealPlanId);
 }

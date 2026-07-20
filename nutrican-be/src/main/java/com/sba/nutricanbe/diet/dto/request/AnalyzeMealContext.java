@@ -1,11 +1,13 @@
 package com.sba.nutricanbe.diet.dto.request;
 
 import com.sba.nutricanbe.diet.enums.MealComplexity;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,6 +15,9 @@ import java.util.UUID;
 @Builder
 public class AnalyzeMealContext {
     private String mealType;
+    private MealPeriod mealPeriod;
+    private MealPeriod makeupForPeriod;
+    private LocalDate logDate;
     private MealSource mealSource;
     private MealComplexity mealComplexity;
     private String restaurantName;

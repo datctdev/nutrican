@@ -89,6 +89,14 @@ Dev profile dùng `spring.jpa.hibernate.ddl-auto=update` trong [`application.pro
 
 Nếu entity đổi mạnh và schema lệch: `docker compose down -v` rồi `docker compose up -d` + restart BE (một lần). Production cần Flyway migration — chưa có trong repo.
 
+**`users.activity_level` (2026-07):** cột enum `SEDENTARY|LIGHT|MODERATE|ACTIVE|VERY_ACTIVE` (default `MODERATE`). Dev: Hibernate `update` tự thêm. Prod nên chạy:
+
+```sql
+ALTER TABLE users ADD COLUMN IF NOT EXISTS activity_level VARCHAR(20) DEFAULT 'MODERATE';
+```
+
+Forward-only: user cũ chưa có lựa chọn lưu → mặc định `MODERATE` (R=1.55); không khôi phục mức đã chọn lúc onboarding trước khi có cột này.
+
 ### 1.5 Start AI Service (ResNet50 — bắt buộc cho Analyze ảnh)
 
 Chụp ảnh món trên `/diet` cần **FastAPI** chạy song song với Spring Boot.

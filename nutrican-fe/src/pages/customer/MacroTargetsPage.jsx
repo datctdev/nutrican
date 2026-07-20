@@ -9,8 +9,13 @@ import { Link } from 'react-router-dom';
 import {
   Loader2, ArrowLeft, Target, Beef, Wheat, Droplet,
   Upload, CheckCircle2, Zap, Scale, Heart, TrendingUp,
-  Pencil, X
+  Pencil, X, Activity, AlertTriangle, RefreshCw
 } from 'lucide-react';
+import {
+  ACTIVITY_LEVEL_OPTIONS,
+  DEFAULT_ACTIVITY_LEVEL,
+  ActivityLevelInfoTooltip,
+} from './components/activityLevelOptions';
 
 export default function MacroTargetsPage() {
   const fileInputRef = useRef(null);
@@ -20,7 +25,9 @@ export default function MacroTargetsPage() {
   const [macros, setMacros] = useState({ dailyCalories: 0, protein: 0, carb: 0, fat: 0 });
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
-  
+  const [activityLevel, setActivityLevel] = useState(DEFAULT_ACTIVITY_LEVEL);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [hasActivePt, setHasActivePt] = useState(false);
   const [progressGoals, setProgressGoals] = useState(null);
   const [bodyMetricHistory, setBodyMetricHistory] = useState([]);
   const [milestones, setMilestones] = useState([]);
@@ -36,6 +43,9 @@ export default function MacroTargetsPage() {
     lbm: ''
   });
   const [inBodyPreview, setInBodyPreview] = useState(null);
+
+  // Confirm Recalculate Modal State
+  const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
 
   // Edit Goal Modal State
   const [showGoalModal, setShowGoalModal] = useState(false);
@@ -57,6 +67,7 @@ export default function MacroTargetsPage() {
   const handleSaveGoal = async () => {
     const currentWeight = bodyMetricHistory[0]?.weight || 0;
     const target = Number(editGoalForm.targetWeight);
+    const previousGoal = progressGoals?.nutritionGoal || nutritionGoal;
     
     if (editGoalForm.nutritionGoal === 'WEIGHT_LOSS' && currentWeight && target >= currentWeight) {
       return toast.error('Lỗi: Cân nặng mục tiêu (Giảm cân) phải NHỎ HƠN cân nặng hiện tại!');
@@ -73,7 +84,6 @@ export default function MacroTargetsPage() {
         targetDate: editGoalForm.targetDate || null
       });
       
-      // Update User Preferences for consistency
       await userService.updatePreferences({
         nutritionGoal: editGoalForm.nutritionGoal
       });
@@ -81,8 +91,31 @@ export default function MacroTargetsPage() {
       const goalsRes = await profileExtensionsService.getGoals();
       setProgressGoals(goalsRes.data.data);
       setNutritionGoal(editGoalForm.nutritionGoal);
-      
-      toast.success('Đã cập nhật mục tiêu thành công');
+
+      if (!hasActivePt && editGoalForm.nutritionGoal !== previousGoal) {
+        try {
+          const res = await userService.recalculateMacros({
+            activityLevel,
+            nutritionGoal: editGoalForm.nutritionGoal,
+            pregnancyTrimester: editGoalForm.nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+          });
+          const data = res.data?.data;
+          if (data?.macros) {
+            setMacros({
+              dailyCalories: data.macros.dailyCalories || 0,
+              protein: data.macros.protein || 0,
+              carb: data.macros.carb || data.macros.carbs || 0,
+              fat: data.macros.fat || 0,
+            });
+          }
+          window.dispatchEvent(new CustomEvent('MACRO_TARGET_UPDATED'));
+          toast.success('Đã cập nhật mục tiêu và tính lại macro');
+        } catch (e) {
+          toast.warning('Đã lưu mục tiêu, nhưng chưa cập nhật lại macro — vui lòng thử lại');
+        }
+      } else {
+        toast.success('Đã cập nhật mục tiêu thành công');
+      }
       setShowGoalModal(false);
     } catch (err) {
       toast.error('Lỗi khi lưu mục tiêu');
@@ -97,12 +130,13 @@ export default function MacroTargetsPage() {
 
   const fetchData = async () => {
     try {
-      const [macrosRes, profileRes, goalsRes, metricsRes, milestonesRes] = await Promise.all([
+      const [macrosRes, profileRes, goalsRes, metricsRes, milestonesRes, ptRes] = await Promise.all([
         userService.getMacroTarget().catch(() => ({ data: { data: null } })),
         userService.getProfile().catch(() => ({ data: { data: null } })),
         profileExtensionsService.getGoals().catch(() => ({ data: { data: null } })),
         profileExtensionsService.getBodyMetrics({ page: 0, size: 20 }).catch(() => ({ data: { data: [] } })),
-        profileExtensionsService.getMilestones().catch(() => ({ data: { data: [] } }))
+        profileExtensionsService.getMilestones().catch(() => ({ data: { data: [] } })),
+        profileExtensionsService.hasActivePt().catch(() => ({ data: { data: { hasActivePt: false } } })),
       ]);
 
       if (macrosRes.data?.data) {
@@ -117,6 +151,7 @@ export default function MacroTargetsPage() {
       if (profileRes.data?.data) {
         setNutritionGoal(profileRes.data.data.nutritionGoal || 'MAINTAIN');
         setPregnancyTrimester(profileRes.data.data.pregnancyTrimester || 1);
+        setActivityLevel(profileRes.data.data.activityLevel || DEFAULT_ACTIVITY_LEVEL);
       }
 
       if (goalsRes.data?.data) {
@@ -125,6 +160,7 @@ export default function MacroTargetsPage() {
 
       setBodyMetricHistory(metricsRes.data?.data?.content || metricsRes.data?.data || []);
       setMilestones(milestonesRes.data?.data || []);
+      setHasActivePt(Boolean(ptRes.data?.data?.hasActivePt));
       
     } catch (error) {
       toast.error('Không thể tải dữ liệu tiến độ');
@@ -173,7 +209,6 @@ export default function MacroTargetsPage() {
 
     setIsSaving(true);
     try {
-      // 1. Save new Body Metric
       await profileExtensionsService.recordBodyMetric({
         weight: Number(updateForm.weight),
         bodyFatPercent: updateForm.bodyFatPercent ? Number(updateForm.bodyFatPercent) : null,
@@ -181,30 +216,33 @@ export default function MacroTargetsPage() {
         lbm: updateForm.lbm ? Number(updateForm.lbm) : null,
       });
 
-      // 2. Fetch Macro Suggestion based on new weight (backend automatically uses latest BodyMetric)
-      const suggestionRes = await userService.getMacroSuggestion({
-        nutritionGoal,
-        pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
-      });
+      if (!hasActivePt) {
+        const suggestionRes = await userService.getMacroSuggestion({
+          nutritionGoal,
+          pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+          activityLevel,
+        });
 
-      const newMacros = suggestionRes.data?.data;
-      if (newMacros) {
-        const payload = {
-          dailyCalories: newMacros.dailyCalories,
-          protein: newMacros.protein,
-          carb: newMacros.carb || newMacros.carbs,
-          fat: newMacros.fat
-        };
-        // 3. Save new Macro Targets to profile
-        await userService.setMacroTarget(payload);
-        setMacros(payload);
+        const newMacros = suggestionRes.data?.data;
+        if (newMacros) {
+          const payload = {
+            dailyCalories: newMacros.dailyCalories,
+            protein: newMacros.protein,
+            carb: newMacros.carb || newMacros.carbs,
+            fat: newMacros.fat
+          };
+          await userService.setMacroTarget(payload);
+          setMacros(payload);
+          window.dispatchEvent(new CustomEvent('MACRO_TARGET_UPDATED'));
+        }
       }
 
-      // 4. Refresh History
       const metricsRes = await profileExtensionsService.getBodyMetrics({ page: 0, size: 20 });
       setBodyMetricHistory(metricsRes.data?.data?.content || metricsRes.data?.data || []);
 
-      toast.success('Tiến độ và Mục tiêu Dinh dưỡng đã được cập nhật!');
+      toast.success(hasActivePt
+        ? 'Đã ghi nhận tiến độ cơ thể'
+        : 'Tiến độ và Mục tiêu Dinh dưỡng đã được cập nhật!');
       setUpdateForm({ weight: '', bodyFatPercent: '', muscleMass: '', lbm: '' });
       setInBodyPreview(null);
 
@@ -212,6 +250,34 @@ export default function MacroTargetsPage() {
       toast.error('Có lỗi xảy ra khi cập nhật tiến độ');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleRecalculateMacros = async () => {
+    setShowRecalcConfirm(false);
+    setIsRecalculating(true);
+    try {
+      const res = await userService.recalculateMacros({
+        activityLevel,
+        nutritionGoal,
+        pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+      });
+      const data = res.data?.data;
+      if (data?.activityLevel) setActivityLevel(data.activityLevel);
+      if (data?.macros) {
+        setMacros({
+          dailyCalories: data.macros.dailyCalories || 0,
+          protein: data.macros.protein || 0,
+          carb: data.macros.carb || data.macros.carbs || 0,
+          fat: data.macros.fat || 0,
+        });
+      }
+      toast.success('Đã cập nhật mức vận động và tính lại macro');
+      window.dispatchEvent(new CustomEvent('MACRO_TARGET_UPDATED'));
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Không tính lại được macro');
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -252,6 +318,13 @@ export default function MacroTargetsPage() {
         <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Tiến độ & Mục tiêu Dinh dưỡng</h1>
         <p className="text-slate-500 font-medium">Theo dõi sự thay đổi cơ thể và tự động tối ưu hóa khẩu phần ăn.</p>
       </div>
+
+      {hasActivePt && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800 font-medium">
+          <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
+          Mục tiêu dinh dưỡng và mức vận động đang do PT quản lý — liên hệ PT để thay đổi. Bạn vẫn có thể ghi nhận tiến độ cân nặng.
+        </div>
+      )}
 
       {/* DASHBOARD CARD */}
       <Card className="bg-slate-900 border-0 text-white shadow-xl overflow-hidden rounded-3xl relative">
@@ -303,6 +376,43 @@ export default function MacroTargetsPage() {
               <p className="text-xl font-bold">{macros.fat}g</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ACTIVITY LEVEL → recalculate macros */}
+      <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl">
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Activity className="w-5 h-5 text-blue-600" />
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Mức độ vận động</h3>
+              <p className="text-xs text-slate-500 mt-0.5">TDEE = BMR × R — áp dụng sẽ tính lại mục tiêu macro</p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Mức độ vận động hàng ngày</label>
+              <ActivityLevelInfoTooltip />
+            </div>
+            <select
+              value={activityLevel}
+              onChange={(e) => setActivityLevel(e.target.value)}
+              disabled={hasActivePt}
+              className={`w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white text-slate-800 font-medium ${hasActivePt ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+            >
+              {ACTIVITY_LEVEL_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <Button
+            onClick={() => setShowRecalcConfirm(true)}
+            disabled={hasActivePt || isRecalculating || isSaving}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-5 font-bold text-sm disabled:opacity-60"
+          >
+            {isRecalculating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Áp dụng & tính lại macro
+          </Button>
         </CardContent>
       </Card>
 
@@ -370,7 +480,7 @@ export default function MacroTargetsPage() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-5 font-bold text-sm mt-2"
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
-                Ghi nhận Tiến độ & Tự động Tính Macro
+                {hasActivePt ? 'Ghi nhận tiến độ' : 'Ghi nhận Tiến độ & Tự động Tính Macro'}
               </Button>
             </div>
           </div>
@@ -381,7 +491,12 @@ export default function MacroTargetsPage() {
       <div className="pt-2">
         <div className="flex justify-between items-center mb-4 px-2">
           <h3 className="text-lg font-bold text-slate-900">Biểu Đồ Theo Dõi</h3>
-          <Button onClick={openGoalModal} variant="outline" className="text-xs font-bold border-slate-300 text-slate-700 bg-white hover:bg-slate-50 h-8 px-3 rounded-lg">
+          <Button
+            onClick={openGoalModal}
+            variant="outline"
+            disabled={hasActivePt}
+            className="text-xs font-bold border-slate-300 text-slate-700 bg-white hover:bg-slate-50 h-8 px-3 rounded-lg disabled:opacity-60"
+          >
             <Pencil className="w-3.5 h-3.5 mr-1.5" /> Sửa Mục Tiêu
           </Button>
         </div>
@@ -392,6 +507,75 @@ export default function MacroTargetsPage() {
           compact={false} 
         />
       </div>
+
+      {/* MODAL: CONFIRM RECALCULATE MACROS */}
+      {showRecalcConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up relative">
+            <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 p-6 text-white relative overflow-hidden">
+              <div className="absolute -top-4 -right-4 opacity-20 pointer-events-none">
+                <RefreshCw className="w-28 h-28" />
+              </div>
+              <div className="flex items-center gap-3 relative z-10">
+                <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black">Tính lại mục tiêu macro?</h3>
+                  <p className="text-indigo-100 text-xs font-medium mt-0.5">
+                    {ACTIVITY_LEVEL_OPTIONS.find((o) => o.value === activityLevel)?.label || 'Mức vận động mới'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 font-medium leading-relaxed">
+                  Áp dụng mức vận động mới sẽ <span className="font-bold">ghi đè</span> mục tiêu Calo / Đạm / Tinh bột / Chất béo hiện tại của bạn.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Calo</p>
+                  <p className="text-sm font-bold text-slate-800">{macros.dailyCalories.toLocaleString()}</p>
+                </div>
+                <div className="bg-rose-50 border border-rose-100 rounded-xl py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-rose-400">Đạm</p>
+                  <p className="text-sm font-bold text-rose-600">{macros.protein}g</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-400">Tinh bột</p>
+                  <p className="text-sm font-bold text-amber-600">{macros.carb}g</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl py-2.5">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-400">Béo</p>
+                  <p className="text-sm font-bold text-indigo-600">{macros.fat}g</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400 text-center font-medium">Các giá trị hiện tại ở trên sẽ được thay thế bằng kết quả tính mới.</p>
+            </div>
+
+            <div className="p-6 pt-0 flex gap-3">
+              <Button
+                onClick={() => setShowRecalcConfirm(false)}
+                variant="ghost"
+                className="flex-1 font-bold text-slate-600 hover:bg-slate-100 rounded-xl py-5"
+              >
+                Huỷ
+              </Button>
+              <Button
+                onClick={handleRecalculateMacros}
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold rounded-xl py-5 shadow-lg shadow-indigo-500/30"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> Áp dụng ngay
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: EDIT GOAL */}
       {showGoalModal && (

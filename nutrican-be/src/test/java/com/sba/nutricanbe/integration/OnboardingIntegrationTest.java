@@ -53,6 +53,7 @@ class OnboardingIntegrationTest extends IntegrationTestBase {
                                   "step": 2,
                                   "nutritionGoal": "WEIGHT_LOSS",
                                   "dietPreference": "NORMAL",
+                                  "activityLevel": "ACTIVE",
                                   "weightKg": 65
                                 }
                                 """))

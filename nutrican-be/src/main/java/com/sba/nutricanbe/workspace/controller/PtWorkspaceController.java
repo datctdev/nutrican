@@ -170,6 +170,20 @@ public class PtWorkspaceController {
         return ResponseEntity.ok(ptWorkspaceService.getPendingMealPlanSuggestions(user.getId(), clientId));
     }
 
+    @GetMapping("/self-plan-submissions")
+    public ResponseEntity<ApiResponse<java.util.List<com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse>>> listSelfPlanSubmissions(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.listPendingSelfPlanSubmissions(user.getId()));
+    }
+
+    @PutMapping("/self-plan-submissions/{id}")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse>> reviewSelfPlanSubmission(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
+            @RequestBody com.sba.nutricanbe.diet.dto.request.SelfPlanSubmissionReviewRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.reviewSelfPlanSubmission(user.getId(), id, request));
+    }
+
     @PostMapping("/weekly-summary")
     public ResponseEntity<ApiResponse<WeeklySummaryDto>> createWeeklySummary(
             @AuthenticationPrincipal User user,
@@ -242,5 +256,29 @@ public class PtWorkspaceController {
             @AuthenticationPrincipal User user,
             @RequestBody ApplyTemplateRequest request) {
         return ResponseEntity.ok(ptWorkspaceService.applyTemplateToClient(user.getId(), templateId, clientId, request));
+    }
+
+    @GetMapping("/clients/{clientId}/day-plan")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.diet.dto.response.DayPlanResponse>> getClientDayPlan(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID clientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientDayPlan(user.getId(), clientId, date));
+    }
+
+    @GetMapping("/clients/{clientId}/diet-summary")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.diet.dto.response.DietSummaryResponse>> getClientDietSummary(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID clientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientDietSummary(user.getId(), clientId, date));
+    }
+
+    @GetMapping("/clients/{clientId}/day-timeline")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.diet.dto.response.DayTimelineResponse>> getClientDayTimeline(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID clientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientDayTimeline(user.getId(), clientId, date));
     }
 }

@@ -62,6 +62,8 @@ class DietLogManualSendToPtTest {
                 .reviewStatus(DietLogReviewStatus.PENDING)
                 .build();
         when(dietLogRepository.save(any(DietLog.class))).thenReturn(saved);
+        when(dietLogHelper.resolveReviewStatus(eq(customerId), eq(true)))
+                .thenReturn(DietLogReviewStatus.PENDING);
         when(dietLogHelper.toResponse(any())).thenReturn(DietLogResponse.builder().reviewStatus(DietLogReviewStatus.PENDING).build());
         when(intakeControlLoopService.evaluateAfterLog(eq(customerId), any(), eq(false)))
                 .thenReturn(IntakeControlResult.builder().intakeStatus(IntakeStatus.OK).build());
@@ -83,6 +85,8 @@ class DietLogManualSendToPtTest {
                 .build();
         when(dietLogRepository.findById(logId)).thenReturn(Optional.of(existing));
         when(dietLogRepository.save(any(DietLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dietLogHelper.resolveReviewStatus(eq(customerId), eq(true)))
+                .thenReturn(DietLogReviewStatus.PENDING);
         when(dietLogHelper.toResponse(any())).thenAnswer(invocation -> {
             DietLog saved = invocation.getArgument(0);
             return DietLogResponse.builder().reviewStatus(saved.getReviewStatus()).build();

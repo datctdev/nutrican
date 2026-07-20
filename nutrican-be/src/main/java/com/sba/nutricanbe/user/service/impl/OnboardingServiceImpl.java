@@ -10,6 +10,7 @@ import com.sba.nutricanbe.user.dto.OnboardingRequest;
 import com.sba.nutricanbe.user.dto.OnboardingStatusDto;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.BodyMetricService;
@@ -104,14 +105,15 @@ public class OnboardingServiceImpl implements OnboardingService {
         if (request.getPregnancyTrimester() != null) {
             user.setPregnancyTrimester(request.getPregnancyTrimester());
         }
-        BigDecimal activityFactor = request.getActivityFactor() != null ? request.getActivityFactor() : BigDecimal.valueOf(1.55);
+        ActivityLevel level = resolveActivityLevel(request);
+        user.setActivityLevel(level);
         MacroSuggestionResponse suggestion = MacroSuggestionCalculator.calculate(
                 user,
                 request.getWeightKg(),
                 user.getHeightCm() != null ? BigDecimal.valueOf(user.getHeightCm()) : null,
                 null,
                 user.getGender(),
-                activityFactor,
+                level.toFactor(),
                 request.getNutritionGoal(),
                 request.getPregnancyTrimester());
         MacroTargetRequest macroReq = new MacroTargetRequest();
@@ -121,6 +123,23 @@ public class OnboardingServiceImpl implements OnboardingService {
         macroReq.setFat(suggestion.getFat());
         userProfileService.setMacroTarget(user.getId(), macroReq);
         user.setOnboardingStep(3);
+    }
+
+    static ActivityLevel resolveActivityLevel(OnboardingRequest request) {
+        if (request.getActivityLevel() != null) {
+            return request.getActivityLevel();
+        }
+        BigDecimal factor = request.getActivityFactor();
+        if (factor != null) {
+            for (ActivityLevel level : ActivityLevel.values()) {
+                if (level.toFactor().compareTo(factor) == 0) {
+                    return level;
+                }
+            }
+            throw new BadRequestException("Unsupported activityFactor: " + factor
+                    + " — use activityLevel enum SEDENTARY|LIGHT|MODERATE|ACTIVE|VERY_ACTIVE");
+        }
+        return ActivityLevel.defaultLevel();
     }
 
     private void applyStep3(User user) {

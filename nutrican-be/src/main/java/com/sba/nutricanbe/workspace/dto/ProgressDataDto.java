@@ -29,6 +29,7 @@ public class ProgressDataDto {
     private RegressionAlertDto regressionAlert;
     private List<WeeklyAdherenceDto> weeklyAdherence;
     private List<MealPlanSkipItemDto> skipReasons;
+    private List<MealPlanLateTickItemDto> lateTickReasons;
     private List<MealPlanSuggestionDto> pendingSuggestions;
     private List<PostMealWeekAggregateDto> postMealAggregate;
     private List<WeeklySummaryDto> weeklySummaries;
