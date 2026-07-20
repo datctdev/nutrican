@@ -1,7 +1,7 @@
 # NutriCan — Tổng hợp dự án FE + BE (Workflow & Logic nghiệp vụ)
 
 > **Vai trò:** Tài liệu kỹ thuật triển khai — đồng bộ Master Spec v3 + Addendum v3.1.  
-> **Cập nhật:** 2026-07-07 · **v3 + v3.1** gate green (120 BE · 58 E2E · 34 layers)  
+> **Cập nhật:** 2026-07-20 · **v3 + v3.1 + v3.2** (offline package hire)  
 > **Spec:** [NUTRICAN_PT_MASTER_SPEC_v3.md](./NUTRICAN_PT_MASTER_SPEC_v3.md) · Addendum: [NUTRICAN_PT_GAP_ADDENDUM_v3_1.md](./NUTRICAN_PT_GAP_ADDENDUM_v3_1.md) · v2: [NUTRICAN_PT_MASTER_SPEC_v2.md](./NUTRICAN_PT_MASTER_SPEC_v2.md)
 
 **PRD chứa:** BR, FR, AC, Constraints đầy đủ · **File này chứa:** code map, workflow chi tiết, logic module, chạy local.
@@ -128,6 +128,14 @@
 | `pages/pt/ChatPage.jsx` | Context sidebar, PDF attach |
 | `services/profileExtensionsService.js` | Body metrics + onboarding API |
 | `services/notificationService.js` | Notification center |
+
+### 1.6 Offline package hire (2026-07-20)
+
+**Backend:** `PtVenue`, `PtAvailabilityWindow`, `PtMappingSession`, `PtSlotHold`, `OfflineHireSessionService`, `SlotHoldService`, `OfflinePackageAppointmentService`, `PtCalendarService`, `OfflineHireTestDataInitializer`.
+
+**Frontend:** `PtVenueAvailabilityEditor`, `PtWeeklyCalendarPicker`, `offlineHireSlots.js`, `PtDetailPage` hire modal, `marketplaceService.getPtCalendar/hirePt`.
+
+Chi tiết: [FEATURE_OFFLINE_PT_HIRE.md](./FEATURE_OFFLINE_PT_HIRE.md)
 
 ---
 
@@ -784,6 +792,9 @@ Chi tiết: [`RBL_METHODOLOGY.md`](./RBL_METHODOLOGY.md) · [`research/TONG_HOP_
 | GET | `/api/v1/workspace/clients/{id}/chat-context` | PT sidebar macro summary |
 | POST | `/api/v1/chat/threads/{id}/attachments` | PDF ≤5MB |
 | GET | `/api/v1/marketplace/pts?goalFilter&sort=compatibility&search=` | Marketplace filter + text search |
+| GET | `/api/v1/marketplace/pts/{id}/calendar` | PT calendar (venues, availability, occupied) |
+| POST | `/api/v1/marketplace/pts/{id}/hire` | Hire ONLINE/OFFLINE (`sessionStarts[]` offline) |
+| GET/PUT | `/api/v1/profile/pt/venues`, `/availability` | PT venue & weekly schedule |
 | GET | `/api/v1/foods/search` | +`dietFilter` (default theo user pref) |
 
 ---
@@ -795,6 +806,7 @@ Chi tiết: [`RBL_METHODOLOGY.md`](./RBL_METHODOLOGY.md) · [`research/TONG_HOP_
 | GAP-01..05, GATE-01 | v2 closed | Xem PRD §13 |
 | **v3-A..K** | Diet pref, control loop, progress, recipe, meal plan, post-meal, RBL cohort | **✅ Closed** (audit QA 2026-07-06) |
 | **ADD-01..08** | Onboarding, body metric, chat context, marketplace, SOS SLA, notifications, lifecycle, BR-17 | **✅ Closed** (Addendum v3.1, 2026-07-07) |
+| **Offline package hire** | Multi-session offline hire, slot holds, VNPay materialize | **✅ Done** (2026-07-20) — [FEATURE_OFFLINE_PT_HIRE.md](./FEATURE_OFFLINE_PT_HIRE.md) |
 | GAP-02 | Không auto PT_REVIEWING trên `status` | Dual-state đủ; auto-review khi confidence cao — chưa làm |
 | GAP-06 | `create-drop` | **✅ Mitigated (dev)** — `ddl-auto=update`; test profile vẫn create-drop |
 | GAP-07 | 199-class softmax % thấp | **✅ Closed** — UX label trong `dietUtils` (không hiện % raw) |

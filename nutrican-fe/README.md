@@ -1,16 +1,53 @@
-# React + Vite
+# NutriCan PT — Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 SPA cho nền tảng NutriCan PT (customer, PT workspace, admin).
 
-Currently, two official plugins are available:
+## Tech stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React 19 + Vite 8
+- Tailwind CSS 3 + Radix UI + Lucide icons
+- Zustand (auth persist), TanStack React Query
+- Axios + JWT refresh interceptor
+- Firebase (Google OAuth)
+- WebSocket realtime (`/ws/workspace`)
 
-## React Compiler
+## Cấu trúc
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+src/
+├── pages/          # customer/, pt/, admin/, auth/
+├── components/     # ui/, common/, diet/, pt/, layouts/
+├── services/       # API modules (15+ files)
+├── stores/         # authStore, notificationStore
+├── hooks/          # useWebSocket, useToast
+└── App.jsx         # React Router v7
+```
 
-## Expanding the ESLint configuration
+## Chạy local
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+cp .env.example .env
+# VITE_API_URL=http://localhost:8080/api/v1
+
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # dist/
+npm run lint
+```
+
+**Yêu cầu:** Backend chạy tại `:8080`. Firebase có thể bỏ trống nếu chỉ dùng email/password.
+
+## Routes chính
+
+| Prefix | Vai trò |
+|--------|---------|
+| `/diet`, `/coaching`, `/marketplace` | Customer |
+| `/pt/*` | PT workspace |
+| `/admin/*` | Admin |
+| `/kyc` | Đăng ký PT + eKYC |
+
+## Tài liệu
+
+- [docs/FRONTEND.md](../docs/FRONTEND.md) — routing, services, guards
+- [docs/TEAM_ONBOARDING.md](../docs/TEAM_ONBOARDING.md) — seed users, E2E
+- [docs/FEATURE_OFFLINE_PT_HIRE.md](../docs/FEATURE_OFFLINE_PT_HIRE.md) — hire offline UI

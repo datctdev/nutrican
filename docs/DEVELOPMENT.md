@@ -9,7 +9,7 @@ Before starting development, ensure you have:
 | Software | Version | Installation |
 |----------|---------|--------------|
 | Java JDK | 17+ | [Adoptium](https://adoptium.net/) |
-| Node.js | 18+ | [Node.js](https://nodejs.org/) |
+| Node.js | 20+ | [Node.js](https://nodejs.org/) |
 | Maven | 3.9+ | [Maven](https://maven.apache.org/) |
 | Git | 2.40+ | [Git](https://git-scm.com/) |
 | Docker | 24+ | [Docker](https://docker.com/) |
@@ -19,10 +19,10 @@ Before starting development, ensure you have:
 ```bash
 # Clone repository
 git clone <repository-url>
-cd nutrican
+cd nutrican-pt-workspace
 
 # Install frontend dependencies
-cd nutican-fe
+cd nutrican-fe
 npm install
 ```
 
@@ -60,9 +60,10 @@ EOF
 #### Frontend (.env)
 
 ```bash
-cd nutican-fe
+cd nutrican-fe
 cat > .env << EOF
 VITE_API_URL=http://localhost:8080/api/v1
+VITE_WS_URL=ws://localhost:8080
 EOF
 ```
 
@@ -158,7 +159,7 @@ Backend runs at `http://localhost:8080`
 ### 1.7 Run Frontend
 
 ```bash
-cd nutican-fe
+cd nutrican-fe
 npm run dev
 ```
 
@@ -172,6 +173,11 @@ Frontend runs at `http://localhost:5173`
 | 2 | AI | `.\research\scripts\start_ai_service.ps1` |
 | 3 | BE | `cd nutrican-be && ./mvnw spring-boot:run` |
 | 4 | FE | `cd nutrican-fe && npm run dev` |
+
+### 1.9 Test offline PT hire (dev)
+
+Tài khoản seed: `pt.offline@gmail.com` / `customer3@gmail.com` (mật khẩu `123456`).  
+Chi tiết luồng: [FEATURE_OFFLINE_PT_HIRE.md](./FEATURE_OFFLINE_PT_HIRE.md).
 
 Mở `http://localhost:5173` → đăng nhập → `/diet` → upload ảnh phở/bánh mì (1 trong 10 món) → Analyze.
 
@@ -193,17 +199,19 @@ nutrican-be/
     │   ├── util/
     │   └── dto/
     ├── auth/                        # Auth module
-    ├── user/                        # User module
+    ├── user/                        # User, marketplace, hire, appointments, venues
     ├── diet/                        # Diet tracker module
     ├── ai/                          # AI gateway module
     ├── kyc/                         # KYC module
+    ├── payment/                     # VNPay, escrow, coaching wallet
+    ├── chat/                        # PT–client messaging
     ├── workspace/                   # PT management / workspace module
     └── admin/                       # Admin module
 ```
 ### 2.2 Frontend (React)
 
 ```
-nutican-fe/
+nutrican-fe/
 ├── src/
 │   ├── components/     # Reusable components
 │   ├── pages/          # Page components
@@ -1123,5 +1131,5 @@ print('MAE kcal:', (labeled['ai_cal'] - labeled['pt_cal']).abs().mean())
 
 ---
 
-*Document Version: 2.1.0*
-*Last Updated: 2026-06-20*
+*Document Version: 2.2.0*
+*Last Updated: 2026-07-20*

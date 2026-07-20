@@ -30,6 +30,15 @@ This document describes the complete database schema for NutriCan PT application
 | `body_metrics` | id (UUID) | user_id | Body measurements |
 | `reviews` | id (UUID) | pt_id, reviewer_id | PT reviews |
 | `notifications` | id (UUID) | user_id | User notifications |
+| `pt_venues` | id (UUID) | pt_profile_id | Offline training venues |
+| `pt_availability_windows` | id (UUID) | pt_profile_id | Weekly availability slots |
+| `pt_mapping_sessions` | id (UUID) | mapping_id | Sessions in offline package |
+| `pt_slot_holds` | id (UUID) | pt_id, mapping_id | Temporary slot reservations |
+| `pt_appointments` | id (UUID) | mapping_id, pt_id, client_id | Confirmed coaching sessions |
+| `coaching_payments` | id (UUID) | mapping_id | VNPay payment records |
+| `coaching_escrows` | id (UUID) | mapping_id | Escrow until coaching ends |
+| `chat_messages` | id (UUID) | thread participants | PT–client chat |
+| `meal_plans` / `self_plan_*` | id (UUID) | user/mapping | Meal planning & self-plan |
 
 ---
 
@@ -798,6 +807,23 @@ VALUES (
 
 ---
 
+## 8. Offline Hire & Coaching Payment (2026-07)
+
+| Table | Key columns | Description |
+|-------|-------------|-------------|
+| `pt_venues` | pt_profile_id, name, address, maps_url | Địa điểm tập offline |
+| `pt_availability_windows` | pt_profile_id, day_of_week, start_time, end_time | Lịch rảnh theo tuần |
+| `pt_mapping_sessions` | mapping_id, sequence, start_time, end_time, venue_* | Buổi trong gói hire |
+| `pt_slot_holds` | pt_id, mapping_id, start_time, end_time, status | Giữ slot (ACTIVE → released) |
+| `pt_appointments` | mapping_id, start_time, status | Buổi CONFIRMED sau thanh toán |
+| `pt_client_mappings` | + session_count, per_session_amount | Metadata gói offline |
+| `coaching_payments` | mapping_id, amount, vnpay_* | Thanh toán VNPay |
+| `coaching_escrows` | mapping_id, amount, status | Escrow đến khi COMPLETED |
+
+Luồng: [FEATURE_OFFLINE_PT_HIRE.md](./FEATURE_OFFLINE_PT_HIRE.md)
+
+---
+
 ## 9. Maintenance
 
 ### 9.1 Vacuum & Analyze
@@ -821,5 +847,5 @@ spring.datasource.hikari.max-lifetime=1800000
 
 ---
 
-*Document Version: 2.0.0*
-*Last Updated: 2026-06-04*
+*Document Version: 2.1.0*
+*Last Updated: 2026-07-20*

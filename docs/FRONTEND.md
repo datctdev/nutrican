@@ -2,7 +2,9 @@
 
 ## 1. Overview
 
-The NutriCan PT frontend is a React 19 application built with Vite, providing a modern, responsive user interface for the AI-powered nutrition tracking platform.
+The NutriCan PT frontend is a React 19 application built with Vite 8, providing a modern, responsive user interface for the AI-powered nutrition tracking platform.
+
+**Cập nhật 2026-07-20:** Thêm hire PT offline (calendar picker), coaching/VNPay, chat WebSocket, meal windows (5 buổi), self-plan PT review.
 
 ---
 
@@ -78,10 +80,19 @@ nutrican-fe/
 │   │   ├── authService.js             # Auth API calls
 │   │   ├── userService.js             # Profile API calls
 │   │   ├── dietService.js             # Diet log API calls
-│   │   ├── marketplaceService.js      # Marketplace API calls
-│   │   ├── workspaceService.js        # PT workspace API calls
-│   │   ├── adminService.js            # Admin API calls
-│   │   └── sseService.js              # Server-Sent Events
+│   │   ├── marketplaceService.js      # Marketplace, hire, calendar
+│   │   ├── coachingPaymentService.js  # VNPay, coaching wallet
+│   │   ├── appointmentService.js      # Appointments
+│   │   ├── dietService.js             # Diet log, self-plan, SOS
+│   │   ├── mealPlanService.js         # Meal plans, weekly summaries
+│   │   ├── workspaceService.js        # PT workspace API
+│   │   ├── chatService.js             # Chat threads & attachments
+│   │   ├── profileExtensionsService.js # Onboarding, body metrics
+│   │   ├── notificationService.js     # Notifications
+│   │   ├── adminService.js            # Admin API
+│   │   ├── refundService.js           # Refunds
+│   │   ├── recipeService.js           # User recipes
+│   │   └── websocketService.js        # WebSocket /ws/workspace
 │   │
 │   ├── stores/                        # Zustand state stores
 │   │   ├── authStore.js               # Auth state + persist
@@ -119,20 +130,30 @@ Routes are configured in `src/App.jsx` using React Router v7 (createBrowserRoute
 | `/` | LandingPage | Public | Landing/home page |
 | `/login` | LoginPage | Public | User login |
 | `/register` | RegisterPage | Public | Customer registration |
-| `/register/pt` | PtRegistrationPage | Public | PT registration |
+| `/onboarding` | OnboardingPage | CUSTOMER | Onboarding wizard |
 | `/marketplace` | MarketplacePage | CUSTOMER | Browse PTs |
-| `/pt-profile/:id` | PtDetailPage | CUSTOMER | PT profile + reviews |
-| `/diet` | DietTrackerPage | CUSTOMER | Meal logging + AI |
-| `/profile` | ProfilePage | All authenticated | User profile + macros |
-| `/kyc` | KycPage | All authenticated | KYC submission (CCCD) |
-| `/pt` | PtDashboardPage | PT | PT overview + stats |
-| `/pt/clients` | ClientListPage | PT | Client list + status |
-| `/pt/reviews` | ReviewDietLogPage | PT | Review diet logs |
-| `/admin` | AdminDashboardPage | ADMIN | Dashboard + statistics |
+| `/pt-profile/:id` | PtDetailPage | CUSTOMER | PT profile, hire online/offline |
+| `/diet` | DietTrackerPage | CUSTOMER | Meal logging, 5 meal windows, AI |
+| `/coaching` | CoachingPage | CUSTOMER | Meal plan, contract, VNPay |
+| `/chat` | CustomerChatPage | CUSTOMER | Chat with PT |
+| `/profile` | ProfilePage | Authenticated | Profile, macros, body metrics |
+| `/macro-targets` | MacroTargetsPage | CUSTOMER | Macro targets |
+| `/kyc` | KycPage | Authenticated | PT registration + VNPT eKYC + venue/schedule |
+| `/settings` | SettingPage | Authenticated | Settings |
+| `/pt` | PtDashboardPage | PT | PT overview |
+| `/pt/clients` | ClientListPage | PT | Clients + offline package info |
+| `/pt/clients/:id/meal-plan` | PtMealPlanPage | PT | Meal plan editor |
+| `/pt/clients/dietlog` | ClientDietLogPage | PT | Client diet logs |
+| `/pt/appointments` | PtAppointmentsPage | PT | Appointments |
+| `/pt/reviews` | ReviewDietLogPage | PT | Review diet logs + blind estimate |
+| `/pt/chat` | ChatPage | PT | Chat + context sidebar |
+| `/pt/portfolio` | PtPortfolioEditor | PT | Portfolio + update request |
+| `/admin` | AdminDashboardPage | ADMIN | Dashboard, RBL, require-kyc toggle |
 | `/admin/pts` | PtVerificationPage | ADMIN | PT verification |
-| `/admin/kyc` | KycAdminPage | ADMIN | KYC verification |
 | `/admin/users` | UserManagementPage | ADMIN | User management |
-| `/admin/sos` | SosTicketsPage | ADMIN | SOS ticket management |
+| `/admin/sos` | SosTicketsPage | ADMIN | SOS tickets |
+| `/admin/refunds` | RefundReviewPage | ADMIN | Refund approval |
+| `/admin/food-tags` | FoodTagsPage | ADMIN | Food diet tags |
 
 ### 3.3 Protected Routes
 

@@ -16,7 +16,7 @@
 | Software | Version | Purpose |
 |----------|---------|---------|
 | Java JDK | 17+ | Backend runtime |
-| Node.js | 18+ | Frontend build |
+| Node.js | 20+ | Frontend build |
 | Maven | 3.9+ | Backend build |
 | Docker | 24+ | Container runtime |
 | Docker Compose | 2.20+ | Service orchestration |

@@ -15,6 +15,9 @@ This document describes the key features of the NutriCan PT application in detai
 5. [Marketplace](#6-marketplace)
 6. [Admin Management](#7-admin-management)
 7. [KYC Verification](#8-kyc-verification)
+8. [User Interactions](#9-user-interactions)
+9. [Coaching & Payment](#10-coaching--payment)
+10. [Meal Windows & Self-Plan](#11-meal-windows--self-plan)
 
 ---
 
@@ -382,6 +385,21 @@ The Marketplace allows customers to discover and connect with Personal Trainers.
 
 Customers can leave reviews for PTs with rating (1-5) and comments.
 
+### 6.6 Online vs Offline Hire
+
+| Mode | Pricing | Hire payload | Sau thanh toán |
+|------|---------|--------------|----------------|
+| ONLINE | `onlineRate` / tháng | `{ "trainingMode": "ONLINE" }` | Mapping ACTIVE, không tạo appointment tự động |
+| OFFLINE | `offlineRate` / buổi × N buổi | `{ "trainingMode": "OFFLINE", "venueId", "sessionStarts": [...] }` | N `PtAppointment` CONFIRMED |
+
+**Offline flow:** Customer chọn slot trên calendar → `PtSlotHold` ACTIVE khi PENDING → PT accept + VNPay SUCCESS → `OfflinePackageAppointmentService` materialize appointments → release holds.
+
+Chi tiết: [FEATURE_OFFLINE_PT_HIRE.md](./FEATURE_OFFLINE_PT_HIRE.md)
+
+### 6.7 PT Venue & Availability
+
+PT offline cấu hình **venue** (tên, địa chỉ, maps URL) và **availability windows** (thứ trong tuần + giờ). API: `/api/v1/profile/pt/venues`, `/api/v1/profile/pt/availability`. Calendar công khai: `GET /api/v1/marketplace/pts/{id}/calendar`.
+
 ---
 
 ## 7. Admin Management
@@ -489,5 +507,31 @@ Login → View Dashboard → Verify PT (KYC + docs) → Assign SOS Tickets → M
 
 ---
 
-*Document Version: 2.1.0*
-*Last Updated: 2026-06-20*
+## 10. Coaching & Payment
+
+### 10.1 Hire lifecycle
+
+Customer hire PT (online hoặc offline) → mapping `PENDING` → PT accept/reject → customer thanh toán VNPay trong cửa sổ `COACHING_PAYMENT_WINDOW_HOURS` → mapping `ACTIVE` → coaching kết thúc (`END_REQUESTED` → `COMPLETED`) → release escrow.
+
+### 10.2 Offline package
+
+Gói N buổi offline: slot holds khi PENDING, materialize `PtAppointment` sau payment SUCCESS. Chi tiết: [FEATURE_OFFLINE_PT_HIRE.md](./FEATURE_OFFLINE_PT_HIRE.md).
+
+### 10.3 VNPay & wallet
+
+- Customer: `POST /payment/mappings/{id}/vnpay` → redirect sandbox VNPay
+- PT: coaching wallet balance + transaction history
+- Admin: refund approval
+
+---
+
+## 11. Meal Windows & Self-Plan
+
+Hệ thống **5 buổi ăn** (MORNING → LATE), late-tick có lý do, self-plan customer submit → PT duyệt override meal plan.
+
+Tài liệu đầy đủ: [FEATURE_MEAL_WINDOWS_SELFPLAN.md](./FEATURE_MEAL_WINDOWS_SELFPLAN.md)
+
+---
+
+*Document Version: 2.2.0*
+*Last Updated: 2026-07-20*

@@ -1,5 +1,7 @@
 # NutriCan PT - Documentation Index
 
+> Cập nhật: 2026-07-20 · v3.2 (offline package hire)
+
 ## Quick Links
 
 - [README](../README.md) - Project overview
@@ -12,6 +14,7 @@
 - [ARCHITECTURE](./ARCHITECTURE.md) - System architecture
 - [FEATURES](./FEATURES.md) - Feature descriptions
 - [FEATURE_MEAL_WINDOWS_SELFPLAN](./FEATURE_MEAL_WINDOWS_SELFPLAN.md) - **Mức vận động + 5 buổi + Plan ăn ngày + Duyệt PT (luồng & biên)**
+- [FEATURE_OFFLINE_PT_HIRE](./FEATURE_OFFLINE_PT_HIRE.md) - **Hire PT offline — gói đa buổi, slot hold, VNPay**
 - [MANUAL_QA_DEMO_CHECKLIST](./MANUAL_QA_DEMO_CHECKLIST.md) - **Checklist test thủ công (demo.solo / demo.coached / pt.certified)**
 - [FRONTEND](./FRONTEND.md) - Frontend documentation
 - [DATABASE_SCHEMA](./DATABASE_SCHEMA.md) - Database design
@@ -53,6 +56,15 @@ admin@nutrican.com / Admin123!
 - [TESTING_E2E_MATRIX](./TESTING_E2E_MATRIX.md) - AC → test matrix (Happy/Bad)
 - [TESTING_V2_FLOWS](./TESTING_V2_FLOWS.md) - Manual flows + regression gate
 - [TEAM_ONBOARDING](./TEAM_ONBOARDING.md) - Dev onboarding + seed users
+
+## Tài khoản dev bổ sung (offline hire)
+
+| Vai trò | Email | Mật khẩu |
+|---------|-------|----------|
+| PT offline | pt.offline@gmail.com | 123456 |
+| Customer test offline | customer3@gmail.com | 123456 |
+
+Seed: `OfflineHireTestDataInitializer` (profile `dev`).
 
 ## Regression gate (2026-07-07)
 
