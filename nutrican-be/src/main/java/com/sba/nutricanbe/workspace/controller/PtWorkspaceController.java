@@ -273,4 +273,12 @@ public class PtWorkspaceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ptWorkspaceService.getClientDietSummary(user.getId(), clientId, date));
     }
+
+    @GetMapping("/clients/{clientId}/day-timeline")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.diet.dto.response.DayTimelineResponse>> getClientDayTimeline(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID clientId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ptWorkspaceService.getClientDayTimeline(user.getId(), clientId, date));
+    }
 }

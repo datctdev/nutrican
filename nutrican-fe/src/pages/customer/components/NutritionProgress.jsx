@@ -1,7 +1,7 @@
 // src/pages/customer/components/NutritionProgress.jsx
 import { Activity } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/card';
-import { calculateProgress, computeIntakeStatus } from './dietUtils';
+import { calculateProgress, computeIntakeStatus, formatMacroDisplay } from './dietUtils';
 
 const MacroRing = ({
     label,
@@ -49,7 +49,7 @@ const MacroRing = ({
                     )}
                 </svg>
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
-                    <span className="text-sm font-black text-slate-800">{Math.round(consumedN)}</span>
+                    <span className="text-sm font-black text-slate-800">{formatMacroDisplay(consumedN)}</span>
                 </div>
             </div>
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
@@ -120,7 +120,7 @@ export default function NutritionProgress({
                     <div className="flex justify-between items-end mb-2.5">
                         <span className="text-slate-500 font-bold uppercase tracking-wider text-xs">Đã nạp hôm nay</span>
                         <div className="text-right">
-                            <span className="text-3xl font-black text-slate-800">{Math.round(consumedCal)}</span>
+                            <span className="text-3xl font-black text-slate-800">{formatMacroDisplay(consumedCal)}</span>
                             <span className="text-sm font-semibold text-slate-400"> / {targetCal} kcal</span>
                             {hasPlanPending && (
                                 <p className="text-[10px] text-slate-500 font-medium mt-0.5">

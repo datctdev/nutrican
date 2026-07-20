@@ -89,4 +89,7 @@ public interface PtWorkspaceService {
 
     ApiResponse<com.sba.nutricanbe.diet.dto.response.DietSummaryResponse> getClientDietSummary(
             UUID ptId, UUID clientId, LocalDate date);
+
+    ApiResponse<com.sba.nutricanbe.diet.dto.response.DayTimelineResponse> getClientDayTimeline(
+            UUID ptId, UUID clientId, LocalDate date);
 }

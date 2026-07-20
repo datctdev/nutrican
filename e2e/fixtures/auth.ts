@@ -3,6 +3,8 @@ import { APIRequestContext, Page, expect } from '@playwright/test';
 export const USERS = {
   customer: { email: 'customer1@gmail.com', password: '123456' },
   customer2: { email: 'customer2@gmail.com', password: '123456' },
+  demoSolo: { email: 'demo.solo@nutrican.com', password: 'Demo123!' },
+  demoCoached: { email: 'demo.coached@nutrican.com', password: 'Demo123!' },
   pt: { email: 'pt.certified@gmail.com', password: '123456' },
   ptFreelance: { email: 'pt.freelance@gmail.com', password: '123456' },
   admin: { email: 'admin@nutrican.com', password: 'Admin123!' },

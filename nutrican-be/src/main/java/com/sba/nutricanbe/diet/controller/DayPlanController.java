@@ -4,11 +4,13 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.diet.dto.request.SelfPlanItemRequest;
 import com.sba.nutricanbe.diet.dto.request.SelfPlanItemUpdateRequest;
 import com.sba.nutricanbe.diet.dto.response.DayPlanResponse;
+import com.sba.nutricanbe.diet.dto.response.DayTimelineResponse;
 import com.sba.nutricanbe.diet.dto.response.DietLogResponse;
 import com.sba.nutricanbe.diet.dto.response.SelfPlanItemResponse;
 import com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse;
 import com.sba.nutricanbe.diet.enums.SelfPlanSubmissionStatus;
 import com.sba.nutricanbe.diet.service.DayPlanService;
+import com.sba.nutricanbe.diet.service.DayTimelineService;
 import com.sba.nutricanbe.diet.service.SelfPlanService;
 import com.sba.nutricanbe.user.entity.User;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class DayPlanController {
 
     private final SelfPlanService selfPlanService;
     private final DayPlanService dayPlanService;
+    private final DayTimelineService dayTimelineService;
 
     @GetMapping("/day-plan")
     @PreAuthorize("hasRole('CUSTOMER')")
@@ -36,6 +39,14 @@ public class DayPlanController {
             @AuthenticationPrincipal User user,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(dayPlanService.getDayPlan(user.getId(), date)));
+    }
+
+    @GetMapping("/day-timeline")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponse<DayTimelineResponse>> getDayTimeline(
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(ApiResponse.success(dayTimelineService.getDayTimeline(user.getId(), date)));
     }
 
     @GetMapping("/self-plan")

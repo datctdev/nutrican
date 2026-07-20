@@ -123,6 +123,7 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final SelfPlanItemRepository selfPlanItemRepository;
     private final SelfPlanSubmissionRepository selfPlanSubmissionRepository;
     private final com.sba.nutricanbe.diet.service.DayPlanService dayPlanService;
+    private final com.sba.nutricanbe.diet.service.DayTimelineService dayTimelineService;
 
     @Override
     @Transactional(readOnly = true)
@@ -1613,5 +1614,14 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
         requirePtClientDataAccess(ptId, clientId);
         LocalDate summaryDate = date != null ? date : DietDates.todayVn();
         return dietLogService.getSummary(clientId, summaryDate);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<com.sba.nutricanbe.diet.dto.response.DayTimelineResponse> getClientDayTimeline(
+            UUID ptId, UUID clientId, LocalDate date) {
+        requirePtClientDataAccess(ptId, clientId);
+        LocalDate planDate = date != null ? date : DietDates.todayVn();
+        return ApiResponse.success(dayTimelineService.getDayTimeline(clientId, planDate));
     }
 }

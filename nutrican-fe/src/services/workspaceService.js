@@ -30,6 +30,7 @@ export const workspaceService = {
     getClientProfile: (clientId) => api.get(`/workspace/clients/${clientId}/profile`),
     getClientDayPlan: (clientId, date) => api.get(`/workspace/clients/${clientId}/day-plan`, { params: { date } }),
     getClientDietSummary: (clientId, date) => api.get(`/workspace/clients/${clientId}/diet-summary`, { params: { date } }),
+    getClientDayTimeline: (clientId, date) => api.get(`/workspace/clients/${clientId}/day-timeline`, { params: { date } }),
     updateClientProfile: (clientId, data) => api.put(`/workspace/clients/${clientId}/profile`, data),
     createClient: (data) => api.post('/workspace/clients', data),
     saveAsTemplate: (data) => api.post('/workspace/templates', data),

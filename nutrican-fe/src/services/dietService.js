@@ -46,6 +46,7 @@ export const dietService = {
     getHotpotItems: () => api.get('/foods/hotpot/items'),
 
     getDayPlan: (date) => api.get('/diet/day-plan', { params: { date } }),
+    getDayTimeline: (date) => api.get('/diet/day-timeline', { params: { date } }),
     listSelfPlan: (date) => api.get('/diet/self-plan', { params: { date } }),
     createSelfPlanItem: (data) => api.post('/diet/self-plan', data),
     updateSelfPlanItem: (id, data) => api.put(`/diet/self-plan/${id}`, data),

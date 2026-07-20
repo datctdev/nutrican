@@ -7,6 +7,7 @@ import {
   pickEffectivePlanItemsByPeriod,
   computePlanProgressBreakdown,
   MEAL_PERIOD_LABELS,
+  formatMacroDisplay,
 } from '../customer/components/dietUtils';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
@@ -18,6 +19,7 @@ import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlan
 import SelfPlanSubmissionReviewList from '../../components/pt/meal-plan/SelfPlanSubmissionReviewList';
 import TemplateModal from '../../components/pt/meal-plan/TemplateModal';
 import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
+import ClientDayTimelinePanel from '../../components/pt/ClientDayTimelinePanel';
 
 const DAYS_OF_WEEK = [
   { id: 1, name: 'Thứ 2' },
@@ -103,6 +105,7 @@ export default function PtMealPlanPage() {
   const [pendingSelfPlans, setPendingSelfPlans] = useState([]);
   const [clientIntake, setClientIntake] = useState(null);
   const [clientIntakeLoading, setClientIntakeLoading] = useState(false);
+  const [clientTimeline, setClientTimeline] = useState(null);
   
   // Modal state
   const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -210,12 +213,14 @@ export default function PtMealPlanPage() {
     if (!clientId || !selectedDate) return;
     setClientIntakeLoading(true);
     try {
-      const [dayPlanRes, summaryRes] = await Promise.all([
+      const [dayPlanRes, summaryRes, timelineRes] = await Promise.all([
         workspaceService.getClientDayPlan(clientId, selectedDate),
         workspaceService.getClientDietSummary(clientId, selectedDate),
+        workspaceService.getClientDayTimeline(clientId, selectedDate),
       ]);
       const dayItems = dayPlanRes.data?.data?.items || [];
       const summary = summaryRes.data?.data || {};
+      setClientTimeline(timelineRes.data?.data || null);
       const breakdown = computePlanProgressBreakdown(dayItems, {
         dateIso: selectedDate,
         coachedMode: true,
@@ -232,9 +237,11 @@ export default function PtMealPlanPage() {
           fat: logFat + (breakdown.compliance?.fat || 0),
         },
         pending: breakdown.pending || {},
+        logs: summary.logs || [],
       });
     } catch {
       setClientIntake(null);
+      setClientTimeline(null);
     } finally {
       setClientIntakeLoading(false);
     }
@@ -714,6 +721,21 @@ export default function PtMealPlanPage() {
             }}
             onOpenSearch={handleOpenSearch}
           />
+
+          <ClientDayTimelinePanel
+            timeline={clientTimeline}
+            loading={clientIntakeLoading}
+            clientId={clientId}
+            clientName={profile?.fullName || profile?.name}
+            onReviewLog={({ log, clientId: cid, clientName }) => {
+              const params = new URLSearchParams({
+                clientId: cid,
+                ...(clientName ? { clientName } : {}),
+                ...(log?.id ? { logId: log.id } : {}),
+              });
+              navigate(`/pt/reviews?${params.toString()}`);
+            }}
+          />
         </div>
       </div>
 
@@ -753,8 +775,8 @@ function UtensilsIcon(props) {
 }
 
 function MacroProgressCard({ label, current, target, unit, color }) {
-  const p = target > 0 ? Math.min((current / target) * 100, 100) : 0;
-  
+  const p = target > 0 ? Math.min((Number(current) / Number(target)) * 100, 100) : 0;
+
   const colors = {
     blue: 'bg-blue-500',
     emerald: 'bg-emerald-500',
@@ -768,8 +790,8 @@ function MacroProgressCard({ label, current, target, unit, color }) {
       <div className="flex justify-between items-end mb-2">
         <span className="text-xs font-bold text-slate-500 uppercase">{label}</span>
         <div className="text-right">
-          <span className="text-lg font-black text-slate-800">{current}</span>
-          <span className="text-xs font-semibold text-slate-400 ml-1">/ {target || 0} {unit}</span>
+          <span className="text-lg font-black text-slate-800">{formatMacroDisplay(current)}</span>
+          <span className="text-xs font-semibold text-slate-400 ml-1">/ {formatMacroDisplay(target || 0)} {unit}</span>
         </div>
       </div>
       <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">

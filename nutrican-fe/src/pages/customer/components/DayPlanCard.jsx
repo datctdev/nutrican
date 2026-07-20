@@ -1,6 +1,6 @@
 // src/pages/customer/components/DayPlanCard.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Lock, Plus, Trash2, Check, Pencil, X, Send, Ban, CalendarDays, Clock } from 'lucide-react';
+import { Plus, X, Send, Ban, CalendarDays, Lock, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { dietService } from '../../../services/dietService';
 import { mealPlanService } from '../../../services/mealPlanService';
@@ -25,19 +25,43 @@ import {
     isTodayIso,
 } from './dietUtils';
 import {
-    getPlanSourceLabel,
     getSubmissionStatusLabel,
-    getReconcileStatusLabel,
-    getChoiceRejectedLabel,
     isPlanChoiceRejected,
-    stripMealPeriodSuffix,
-    MEAL_PERIOD_THEMES,
-    getSourceBadgeClass,
 } from './planLabels';
 import LateTickReasonModal from './LateTickReasonModal';
+import MealPeriodBlock from '../../../components/diet/timeline/MealPeriodBlock';
 
 /** Display plan items by 5 UI periods. */
 const PERIOD_ORDER = MEAL_PERIODS;
+
+function dayPlanFromTimeline(timeline) {
+    if (!timeline) return null;
+    const items = (timeline.periods || []).flatMap((p) => p.plannedItems || []);
+    let totalCalories = 0;
+    let totalProtein = 0;
+    let totalCarb = 0;
+    let totalFat = 0;
+    items.forEach((i) => {
+        if (i.skipReason || i.choiceRejected) return;
+        totalCalories += Number(i.calories) || 0;
+        totalProtein += Number(i.protein) || 0;
+        totalCarb += Number(i.carb) || 0;
+        totalFat += Number(i.fat) || 0;
+    });
+    return {
+        date: timeline.date,
+        hasPtPlan: timeline.hasPtPlan,
+        items,
+        totalCalories,
+        totalProtein,
+        totalCarb,
+        totalFat,
+    };
+}
+
+function getPeriodBlock(timeline, period) {
+    return (timeline?.periods || []).find((p) => p.mealPeriod === period) || null;
+}
 export default function DayPlanCard({
     selectedDate,
     dietFilterOn = true,
@@ -47,6 +71,10 @@ export default function DayPlanCard({
     isFuture = false,
     onLogged,
     onPlannedTotalsChange,
+    timeline = null,
+    timelineLoading = false,
+    onRefreshTimeline,
+    logHandlers = {},
 }) {
     const [dayPlan, setDayPlan] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -67,6 +95,10 @@ export default function DayPlanCard({
 
     const refresh = useCallback(async () => {
         if (!selectedDate) return;
+        if (onRefreshTimeline) {
+            await onRefreshTimeline();
+            return;
+        }
         setLoading(true);
         try {
             const [planRes, subRes] = await Promise.all([
@@ -88,13 +120,24 @@ export default function DayPlanCard({
         } finally {
             setLoading(false);
         }
-    }, [selectedDate, hasActivePt]);
+    }, [selectedDate, hasActivePt, onRefreshTimeline]);
 
     useEffect(() => {
+        if (timeline) {
+            setDayPlan(dayPlanFromTimeline(timeline));
+            setSubmission(timeline.selfPlanSubmission || null);
+            setLoading(false);
+        }
+    }, [timeline]);
+
+    useEffect(() => {
+        if (timeline) return;
         refresh();
-    }, [refresh]);
+    }, [refresh, timeline]);
 
     const pendingLocked = submission?.status === 'PENDING';
+    /** PT coaching: API flag or published plan on this day (timeline may load before hasActivePt). */
+    const coachedMode = hasActivePt || Boolean(timeline?.hasPtPlan ?? dayPlan?.hasPtPlan);
 
     const draftMacros = useMemo(() => {
         if (!pendingFood) return null;
@@ -233,7 +276,11 @@ export default function DayPlanCard({
             setLateTickTarget(item);
             return;
         }
-        if (item.source === 'SELF' && hasActivePt) {
+        if (item.lockedByReview) {
+            toast.error('Món đang chờ PT duyệt — không thể xác nhận đã ăn');
+            return;
+        }
+        if (item.source === 'SELF' && coachedMode) {
             toast.error('Gửi PT duyệt trước; ghi nhật ký sau khi được duyệt');
             return;
         }
@@ -295,7 +342,7 @@ export default function DayPlanCard({
         }
     };
 
-    if (loading && !dayPlan) {
+    if ((loading || timelineLoading) && !dayPlan) {
         return (
             <div className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/40 p-5 shadow-md animate-pulse">
                 <div className="h-5 w-40 bg-emerald-100 rounded mb-4" />
@@ -357,14 +404,17 @@ export default function DayPlanCard({
                             <p className="text-[10px] text-slate-500 mt-0.5 font-medium">{kcalProgress}% mục tiêu calo</p>
                         </div>
                     )}
-                    {hasActivePt && (
-                        <p className="text-[11px] text-slate-500 mt-1 pl-11">
-                            Thực đơn PT luôn hiển thị ở trên. Món bạn đề xuất sẽ nằm bên dưới để PT duyệt.
+                    {hasActivePt ? (
+                        <p className="text-[11px] text-slate-500 mt-1 pl-11 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-0.5"><Lock className="h-3 w-3 text-blue-600" /> Kế hoạch</span>
+                            <span className="inline-flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3 text-emerald-600" /> Thực tế</span>
+                            <span className="text-slate-400">· gộp theo buổi</span>
                         </p>
-                    )}
-                    {!hasActivePt && (
-                        <p className="text-[11px] text-slate-500 mt-1 pl-11">
-                            Tick món tự lên kế hoạch sẽ ghi ngay vào nhật ký. Nếu còn món PT cũ, tick đó chỉ là đánh dấu tuân thủ.
+                    ) : (
+                        <p className="text-[11px] text-slate-500 mt-1 pl-11 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-0.5"><Lock className="h-3 w-3 text-blue-600" /> Plan</span>
+                            <span className="inline-flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3 text-emerald-600" /> Nhật ký</span>
+                            <span className="text-slate-400">· tick plan → ghi log</span>
                         </p>
                     )}
                 </div>
@@ -410,15 +460,19 @@ export default function DayPlanCard({
             )}
 
             {submission?.status && (
-                <div className={`text-xs font-bold px-4 py-2.5 rounded-2xl border shadow-sm ${
-                    submission.status === 'PENDING' ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-300 text-amber-900'
-                        : submission.status === 'REJECTED' ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-300 text-red-900'
-                            : submission.status === 'APPROVED' ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-300 text-emerald-900'
+                <div className={`flex items-start gap-2 text-xs font-bold px-3 py-2 rounded-xl border ${
+                    submission.status === 'PENDING' ? 'bg-amber-50 border-amber-300 text-amber-900'
+                        : submission.status === 'REJECTED' ? 'bg-red-50 border-red-300 text-red-900'
+                            : submission.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                                 : 'bg-slate-50 border-slate-200 text-slate-600'
                 }`}
                 >
-                    Trạng thái: {getSubmissionStatusLabel(submission.status)}
-                    {submission.ptNote && <span className="block mt-1 font-medium opacity-90">PT: {submission.ptNote}</span>}
+                    <span className="shrink-0">{getSubmissionStatusLabel(submission.status)}</span>
+                    {submission.ptNote && (
+                        <span className="font-medium opacity-90 truncate" title={submission.ptNote}>
+                            · {submission.ptNote}
+                        </span>
+                    )}
                 </div>
             )}
 
@@ -468,199 +522,52 @@ export default function DayPlanCard({
 
             {PERIOD_ORDER.map((period) => {
                 const items = visibleItems.filter((i) => resolvePlanItemPeriod(i) === period);
-                if (!items.length) return null;
+                const periodBlock = getPeriodBlock(timeline, period);
+                const actualLogs = periodBlock?.actualLogs || [];
+                if (!items.length && !actualLogs.length) return null;
                 const periodSettled = isMealPeriodSettled(period, planItems);
-                const theme = MEAL_PERIOD_THEMES[period] || MEAL_PERIOD_THEMES.AFTERNOON;
                 const isCurrentPeriod = isToday && period === currentPeriod;
                 const isPastPeriod = isToday && isMealPeriodPast(selectedDate, period, vnNow);
                 const isFuturePeriod = isToday && isFutureMealPeriod(period, vnNow);
+                const periodHasPendingSelfReview = planItems.some(
+                    (i) => i.source === 'SELF' && i.lockedByReview && resolvePlanItemPeriod(i) === period,
+                );
+
                 return (
-                    <div
+                    <MealPeriodBlock
                         key={period}
-                        className={`rounded-2xl border bg-gradient-to-br p-3 space-y-2 shadow-sm ${theme.section} ${isCurrentPeriod ? 'ring-2 ring-offset-1 ring-violet-400/60' : ''}`}
-                    >
-                        <div className="flex items-center justify-between gap-2 px-1">
-                            <h4 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider ring-1 ${theme.badge}`}>
-                                {MEAL_PERIOD_LABELS[period]}
-                            </h4>
-                            {isCurrentPeriod && (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
-                                    <Clock className="h-3 w-3" /> Đang diễn ra
-                                </span>
-                            )}
-                            {isFuturePeriod && (
-                                <span className="text-[10px] font-semibold text-slate-500">Sắp tới</span>
-                            )}
-                            {isPastPeriod && (
-                                <span className="text-[10px] font-semibold text-amber-700">Đã qua</span>
-                            )}
-                        </div>
-                        <ul className="space-y-2">
-                            {items.map((item) => {
-                                const skipped = Boolean(item.skipReason) && item.skipReason !== 'SUPERSEDED';
-                                const busy = pendingId === item.id;
-                                const isSelf = item.source === 'SELF';
-                                const isOverride = item.sourceType === 'SELF_OVERRIDE';
-                                const editing = editId === item.id;
-                                const canEditSelf = !isPast && isSelf && !item.eaten && !item.lockedByReview && !pendingLocked
-                                    && !periodSettled && !isPlanChoiceRejected(item);
-                                const notChosen = isPlanChoiceRejected(item);
-                                const periodOpen = Boolean(item.mealPeriod)
-                                    && isMealPeriodOpen(selectedDate, item.mealPeriod, vnNow);
-                                const canLateTick = canLateTickMealPeriod(selectedDate, item.mealPeriod, vnNow);
-                                const showSelfEat = isSelf && !hasActivePt && !item.eaten && !isFuture && !isPast && (periodOpen || canLateTick);
-                                const showOverrideEat = !isSelf && isOverride && !item.eaten && !skipped && !isFuture && !isPast && (periodOpen || canLateTick);
-                                const showPtMark = !isSelf && !isOverride && !item.eaten && !skipped && !notChosen
-                                    && !isFuture && !isPast && (periodOpen || canLateTick);
-                                const showFutureWait = isToday && !item.eaten && !skipped && !isFuture && !isPast
-                                    && item.mealPeriod && isFutureMealPeriod(item.mealPeriod, vnNow);
-
-                                return (
-                                    <li
-                                        key={`${item.source}-${item.id}`}
-                                        className={`flex flex-wrap items-center gap-2 rounded-xl border-l-4 px-3 py-2.5 shadow-sm transition-all ${
-                                            theme.stripe
-                                        } ${
-                                            item.eaten && !notChosen
-                                                ? 'bg-emerald-50/80 border-emerald-200'
-                                                : notChosen
-                                                    ? 'bg-slate-50/90 border-slate-200 opacity-80'
-                                                    : 'bg-white/90 border-slate-200 hover:shadow-md'
-                                        } ${skipped && skipped !== 'SUPERSEDED' ? 'opacity-50' : ''}`}
-                                    >
-                                        <div className="min-w-0 flex-1">
-                                            <p className={`text-sm font-bold truncate ${
-                                                notChosen
-                                                    ? 'line-through text-slate-400'
-                                                    : item.eaten
-                                                        ? 'text-slate-800'
-                                                        : 'text-slate-800'
-                                            }`}>
-                                                {stripMealPeriodSuffix(item.name)}
-                                            </p>
-                                            <p className="text-[11px] text-slate-600 flex flex-wrap items-center gap-1.5 mt-1">
-                                                <span className={`inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 font-semibold ${getSourceBadgeClass(item)}`}>
-                                                    {!isSelf && <Lock className="w-3 h-3" />} {getPlanSourceLabel(item)}
-                                                </span>
-                                                {item.quantityG != null && <span className="font-medium">{Math.round(Number(item.quantityG))}g</span>}
-                                                {item.calories != null && <span className="font-semibold text-emerald-700">{Math.round(Number(item.calories))} kcal</span>}
-                                                {skipped && item.skipReason !== 'SUPERSEDED' && (
-                                                    <span className="text-slate-500">· đã bỏ qua</span>
-                                                )}
-                                                {notChosen && (
-                                                    <span className="inline-flex items-center rounded-md bg-slate-200 px-1.5 py-0.5 font-bold text-slate-600">
-                                                        {getChoiceRejectedLabel(item)}
-                                                    </span>
-                                                )}
-                                                {item.eaten && (isSelf || isOverride) && (
-                                                    <span className="inline-flex items-center rounded-md bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800">
-                                                        ✓ đã ghi nhật ký
-                                                    </span>
-                                                )}
-                                                {item.eaten && !isSelf && !isOverride && !notChosen && (
-                                                    <span className="inline-flex items-center rounded-md bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800">
-                                                        ✓ đã ăn
-                                                    </span>
-                                                )}
-                                                {item.lockedByReview && !notChosen && (
-                                                    <span className="inline-flex items-center rounded-md bg-amber-100 px-1.5 py-0.5 font-bold text-amber-800">· chờ duyệt</span>
-                                                )}
-                                                {item.lateTickReason && (
-                                                    <span className="inline-flex items-center rounded-md bg-orange-100 px-1.5 py-0.5 font-medium text-orange-800">
-                                                        tick trễ: {item.lateTickReason}
-                                                    </span>
-                                                )}
-                                                {getReconcileStatusLabel(item.reconcileStatus) && (
-                                                    <span className="inline-flex items-center rounded-md bg-blue-100 px-1.5 py-0.5 font-medium text-blue-800">
-                                                        {getReconcileStatusLabel(item.reconcileStatus)}
-                                                    </span>
-                                                )}
-                                            </p>
-                                        </div>
-
-                                        {canEditSelf && editing && (
-                                            <div className="flex items-center gap-1">
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={editQty}
-                                                    onChange={(e) => setEditQty(e.target.value)}
-                                                    className="w-16 px-2 py-1 rounded-lg border text-sm text-right"
-                                                />
-                                                <button type="button" disabled={busy} onClick={() => handleSaveQty(item)} className="p-1.5 text-emerald-600">
-                                                    <Check className="w-4 h-4" />
-                                                </button>
-                                                <button type="button" onClick={() => setEditId(null)} className="p-1.5 text-slate-400">
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {canEditSelf && !editing && (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    disabled={busy}
-                                                    onClick={() => {
-                                                        setEditId(item.id);
-                                                        setEditQty(String(Math.round(Number(item.quantityG) || 100)));
-                                                    }}
-                                                    className="p-1.5 text-slate-400 hover:text-teal-600"
-                                                >
-                                                    <Pencil className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    disabled={busy}
-                                                    onClick={() => handleDelete(item)}
-                                                    className="p-1.5 text-slate-400 hover:text-red-500"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </>
-                                        )}
-
-                                        {(showSelfEat || showOverrideEat) && (
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                disabled={busy}
-                                                onClick={() => handleMark(item)}
-                                                className={`rounded-lg h-8 text-xs font-bold shadow-sm ${
-                                                    periodOpen
-                                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700'
-                                                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600'
-                                                }`}
-                                            >
-                                                {periodOpen ? 'Đã ăn ✓' : 'Tick trễ'}
-                                            </Button>
-                                        )}
-                                        {showPtMark && (
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                disabled={busy}
-                                                onClick={() => handleMark(item)}
-                                                title="Ghi nhận đã ăn theo plan PT"
-                                                className={`rounded-lg h-8 text-xs font-bold shadow-sm ${
-                                                    periodOpen
-                                                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
-                                                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600'
-                                                }`}
-                                            >
-                                                {periodOpen ? 'Đã ăn ✓' : 'Tick trễ'}
-                                            </Button>
-                                        )}
-                                        {showFutureWait && (
-                                            <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[10px] font-bold text-slate-500">
-                                                <Clock className="h-3 w-3" /> Chưa đến giờ
-                                            </span>
-                                        )}
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </div>
+                        period={period}
+                        label={MEAL_PERIOD_LABELS[period]}
+                        plannedItems={items}
+                        actualLogs={actualLogs}
+                        reconciliation={periodBlock?.reconciliation}
+                        coachedMode={coachedMode}
+                        hasActivePt={hasActivePt}
+                        readOnly={false}
+                        isCurrentPeriod={isCurrentPeriod}
+                        isPastPeriod={isPastPeriod}
+                        isFuturePeriod={isFuturePeriod}
+                        selectedDate={selectedDate}
+                        isFuture={isFuture}
+                        isPast={isPast}
+                        vnNow={vnNow}
+                        pendingLocked={pendingLocked}
+                        periodSettled={periodSettled}
+                        periodHasPendingSelfReview={periodHasPendingSelfReview}
+                        pendingId={pendingId}
+                        editId={editId}
+                        editQty={editQty}
+                        onEditQtyChange={setEditQty}
+                        onStartEdit={(item) => {
+                            setEditId(item.id);
+                            setEditQty(String(Math.round(Number(item.quantityG) || 100)));
+                        }}
+                        onCancelEdit={() => setEditId(null)}
+                        onSaveQty={handleSaveQty}
+                        onDelete={handleDelete}
+                        onMark={handleMark}
+                        logHandlers={logHandlers}
+                    />
                 );
             })}
 

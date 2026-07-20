@@ -7,6 +7,16 @@ export const getFullImageUrl = (url) => {
     return `${minioUrl}/${url}`;
 };
 
+/** Display macro numbers — max 2 decimals, no float artifacts (975.8700000000001 → 975.87). */
+export function formatMacroDisplay(value, maxDecimals = 2) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0';
+    const factor = 10 ** maxDecimals;
+    const rounded = Math.round(n * factor) / factor;
+    if (Number.isInteger(rounded)) return String(rounded);
+    return rounded.toFixed(maxDecimals);
+}
+
 export const FOOD_CODE_LABELS = {
     banh_chung: 'Bánh Chưng',
     banh_khot: 'Bánh Khọt',

@@ -12,7 +12,6 @@ import { profileExtensionsService } from '../../services/profileExtensionsServic
 
 // Import subcomponents
 import NutritionProgress from './components/NutritionProgress';
-import MealSection from './components/MealSection';
 import FoodInputCard from './components/FoodInputCard';
 import DayPlanCard from './components/DayPlanCard';
 import ConfirmFoodModal from './components/ConfirmFoodModal';
@@ -82,7 +81,8 @@ export default function DietTrackerPage() {
     useEffect(() => { viewingMonthRef.current = viewingMonth; }, [viewingMonth]);
     useEffect(() => { calendarOpenRef.current = calendarOpen; }, [calendarOpen]);
 
-    const [logs, setLogs] = useState([]);
+    const [timeline, setTimeline] = useState(null);
+    const [timelineLoading, setTimelineLoading] = useState(true);
     const [summary, setSummary] = useState(null);
     const [loading, setLoading] = useState(true);
     const [analyzing, setAnalyzing] = useState(false);
@@ -151,8 +151,8 @@ export default function DietTrackerPage() {
         const clamped = clampDateParam(nextIso);
         setConfirmModal(null);
         setSelectedFile(null);
-        setLogs([]);
         setSummary(null);
+        setTimeline(null);
         setSelectedDate(clamped);
         setViewingMonth(monthKeyFromIso(clamped));
         setSearchParams((prev) => {
@@ -196,21 +196,23 @@ export default function DietTrackerPage() {
         const seq = ++dayFetchSeq.current;
         selectedDateRef.current = dateIso;
         setLoading(true);
+        setTimelineLoading(true);
         try {
             const tasks = [
-                fetchAllDietLogsForRange(dietService, { startDate: dateIso, endDate: dateIso }),
+                dietService.getDayTimeline(dateIso),
                 dietService.getSummary({ date: dateIso }),
+                profileExtensionsService.hasActivePt().catch(() => ({ data: { data: { hasActivePt: false } } })),
             ];
             if (withMeta) {
                 tasks.push(dietService.getSosTickets().catch(() => ({ data: { data: [] } })));
-                tasks.push(profileExtensionsService.hasActivePt().catch(() => ({ data: { data: { hasActivePt: false } } })));
             }
             const results = await Promise.all(tasks);
             if (seq !== dayFetchSeq.current || selectedDateRef.current !== dateIso) return;
 
-            const dayLogs = results[0];
+            const timelineRes = results[0];
             const summaryRes = results[1];
-            setLogs(dayLogs);
+            setTimeline(timelineRes.data?.data || null);
+            setHasActivePt(Boolean(results[2]?.data?.data?.hasActivePt));
             const rawData = summaryRes.data?.data || {};
             setSummary({
                 date: rawData.date,
@@ -226,13 +228,15 @@ export default function DietTrackerPage() {
                 controlLoopMessage: rawData.controlLoopMessage || null,
             });
             if (withMeta) {
-                setSosTickets(results[2]?.data?.data || []);
-                setHasActivePt(Boolean(results[3]?.data?.data?.hasActivePt));
+                setSosTickets(results[3]?.data?.data || []);
             }
         } catch (err) {
             console.error('Error fetching diet data:', err);
         } finally {
-            if (seq === dayFetchSeq.current) setLoading(false);
+            if (seq === dayFetchSeq.current) {
+                setLoading(false);
+                setTimelineLoading(false);
+            }
         }
     }, []);
 
@@ -900,29 +904,18 @@ export default function DietTrackerPage() {
                         isFuture={isFuture}
                         onLogged={() => fetchDay(selectedDate)}
                         onPlannedTotalsChange={setPlannedTotals}
+                        timeline={timeline}
+                        timelineLoading={timelineLoading}
+                        onRefreshTimeline={() => fetchDay(selectedDate)}
+                        logHandlers={{
+                            handleEditLog,
+                            handleDelete,
+                            onPreviewImage: setLightboxImage,
+                            setSosDietLogId,
+                            setSosMessage,
+                            setIsSosModalOpen,
+                        }}
                     />
-
-                    <div className="space-y-5">
-                        <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <Clock className="w-5 h-5 text-slate-400" />
-                            {isToday ? 'Nhật ký hôm nay' : `Nhật ký ngày ${formatDisplayDate(selectedDate)}`}
-                        </h3>
-                        <MealSection
-                            logs={logs}
-                            loading={loading}
-                            emptyMessage={isToday
-                                ? 'Hôm nay chưa có bữa ăn nào được ghi nhận.'
-                                : 'Ngày này chưa có bữa ăn nào được ghi nhận.'}
-                            handleEditLog={handleEditLog}
-                            handleDelete={handleDelete}
-                            onPreviewImage={setLightboxImage}
-                            setSosDietLogId={setSosDietLogId}
-                            setSosMessage={setSosMessage}
-                            setIsSosModalOpen={setIsSosModalOpen}
-                            hasActivePt={hasActivePt}
-                            isPast={isPast}
-                        />
-                    </div>
                 </div>
 
                 {/* Cột phải: Thống kê calo & Yêu cầu SOS */}

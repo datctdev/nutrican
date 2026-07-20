@@ -11,10 +11,13 @@
 | Lớp | Là gì | Ví dụ |
 |-----|--------|--------|
 | **Plan ăn ngày** | Kế hoạch “sẽ ăn” trong ngày (self + PT) | Card *Plan ăn ngày* trên Diet Tracker |
-| **Nhật ký (DietLog)** | Đã ghi nhận ăn thật | Tab AI / Manual → log dưới |
-| **Meal plan tuần (PT)** | Thực đơn publish theo tuần | Workspace PT |
+| **Nhật ký (DietLog)** | Đã ghi nhận ăn thật (AI / manual / tick self) | Phần *Thực tế đã ghi* trong từng buổi |
+| **Meal plan tuần (PT)** | Thực đơn publish theo tuần | Workspace PT editor |
+| **Day timeline (read-model)** | Gộp plan + log theo buổi (additive) | `GET /diet/day-timeline`, PT `GET /workspace/clients/{id}/day-timeline` |
 
-**Không cộng đôi macro:** thanh mục tiêu = **đã ghi (actual)** + **phần plan chưa ăn (planned)**. Slot đã có món self/override đã tick → không cộng lại phần plan trùng.
+**UI B1:** Mỗi buổi trong *Plan ăn ngày* = **Kế hoạch** (plan items) + **Thực tế đã ghi** (logs). PT xem cùng cấu trúc trên `PtMealPlanPage` (read-only).
+
+**Không cộng đôi macro:** thanh mục tiêu = **đã ghi (actual)** + **phần plan chưa ăn (planned)** + tick PT tuân thủ (compliance). Badge reconciliation (A3): *Ngoài plan* / *Tick PT — chưa có log chi tiết*.
 
 ---
 
