@@ -16,4 +16,6 @@ public interface MealPlanSuggestionRepository extends JpaRepository<MealPlanSugg
             UUID mealPlanItemId, MealPlanSuggestionStatus status);
     List<MealPlanSuggestion> findByCustomerIdAndMealPlanItemIdInOrderByCreatedAtDesc(
             UUID customerId, List<UUID> mealPlanItemIds);
+
+    List<MealPlanSuggestion> findByMealPlanItemIdAndStatus(UUID mealPlanItemId, MealPlanSuggestionStatus status);
 }

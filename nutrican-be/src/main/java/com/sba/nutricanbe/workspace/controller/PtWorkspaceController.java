@@ -170,6 +170,20 @@ public class PtWorkspaceController {
         return ResponseEntity.ok(ptWorkspaceService.getPendingMealPlanSuggestions(user.getId(), clientId));
     }
 
+    @GetMapping("/self-plan-submissions")
+    public ResponseEntity<ApiResponse<java.util.List<com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse>>> listSelfPlanSubmissions(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ptWorkspaceService.listPendingSelfPlanSubmissions(user.getId()));
+    }
+
+    @PutMapping("/self-plan-submissions/{id}")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse>> reviewSelfPlanSubmission(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user,
+            @RequestBody com.sba.nutricanbe.diet.dto.request.SelfPlanSubmissionReviewRequest request) {
+        return ResponseEntity.ok(ptWorkspaceService.reviewSelfPlanSubmission(user.getId(), id, request));
+    }
+
     @PostMapping("/weekly-summary")
     public ResponseEntity<ApiResponse<WeeklySummaryDto>> createWeeklySummary(
             @AuthenticationPrincipal User user,

@@ -56,9 +56,11 @@ class OnboardingServiceTest {
         req.setStep(2);
         req.setNutritionGoal(NutritionGoal.WEIGHT_LOSS);
         req.setDietPreference(DietPreference.NORMAL);
+        req.setActivityLevel(com.sba.nutricanbe.user.enums.ActivityLevel.ACTIVE);
 
         var status = service.submitStep(userId, req);
         assertEquals(3, status.getStep());
+        assertEquals(com.sba.nutricanbe.user.enums.ActivityLevel.ACTIVE, user.getActivityLevel());
         verify(userProfileService).setMacroTarget(eq(userId), any());
     }
 

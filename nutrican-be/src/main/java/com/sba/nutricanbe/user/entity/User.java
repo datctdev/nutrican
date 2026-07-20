@@ -6,6 +6,7 @@ import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.DietPreference;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -92,6 +93,12 @@ public class User extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "nutrition_goal", length = 20)
     private NutritionGoal nutritionGoal;
+
+    /** TDEE activity multiplier level (forward-only; null → MODERATE). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "activity_level", length = 20)
+    @Builder.Default
+    private ActivityLevel activityLevel = ActivityLevel.MODERATE;
 
     @Column(name = "pregnancy_trimester")
     private Integer pregnancyTrimester;

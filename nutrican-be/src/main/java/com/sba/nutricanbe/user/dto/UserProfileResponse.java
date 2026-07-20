@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.DietPreference;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 
@@ -32,6 +33,7 @@ public class UserProfileResponse {
     private String allergyNotes;
     private DietPreference dietPreference;
     private NutritionGoal nutritionGoal;
+    private ActivityLevel activityLevel;
     private Integer pregnancyTrimester;
     private Integer heightCm;
     private String gender;

@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.user.dto;
 
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.DietPreference;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 import lombok.Data;
@@ -10,6 +11,7 @@ import java.util.Map;
 public class UserPreferencesRequest {
     private DietPreference dietPreference;
     private NutritionGoal nutritionGoal;
+    private ActivityLevel activityLevel;
     private Integer pregnancyTrimester;
     private Map<String, Boolean> notificationOptIn;
 }

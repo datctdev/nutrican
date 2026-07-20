@@ -18,6 +18,7 @@ import com.sba.nutricanbe.user.dto.PtProfileSummary;
 import com.sba.nutricanbe.user.dto.PtRegistrationRequest;
 import com.sba.nutricanbe.user.dto.UpdateProfileRequest;
 import com.sba.nutricanbe.user.dto.UserProfileResponse;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.service.UserProfileService;
 import com.sba.nutricanbe.common.repository.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -327,6 +328,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .allergyNotes(user.getAllergyNotes())
                 .dietPreference(user.getDietPreference())
                 .nutritionGoal(user.getNutritionGoal())
+                .activityLevel(ActivityLevel.orDefault(user.getActivityLevel()))
                 .pregnancyTrimester(user.getPregnancyTrimester())
                 .heightCm(user.getHeightCm())
                 .gender(user.getGender())

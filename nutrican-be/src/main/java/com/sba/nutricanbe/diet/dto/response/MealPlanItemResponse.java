@@ -1,6 +1,8 @@
 package com.sba.nutricanbe.diet.dto.response;
 
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
+import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
 import com.sba.nutricanbe.diet.enums.MealPlanSkipReason;
 import com.sba.nutricanbe.diet.enums.MealType;
 import lombok.AllArgsConstructor;
@@ -24,6 +26,7 @@ public class MealPlanItemResponse {
     private UUID mealPlanId;
     private LocalDate planDate;
     private MealType mealType;
+    private MealPeriod mealPeriod;
     private String foodCode;
     private String freeText;
     private BigDecimal portionGrams;
@@ -31,6 +34,8 @@ public class MealPlanItemResponse {
     private Boolean eaten;
     private MealPlanSkipReason skipReason;
     private String skipNote;
+    private MealPlanItemSourceType sourceType;
+    private UUID foodItemId;
 
     public static MealPlanItemResponse from(MealPlanItem item) {
         return MealPlanItemResponse.builder()
@@ -40,6 +45,7 @@ public class MealPlanItemResponse {
                 .mealPlanId(item.getMealPlanId())
                 .planDate(item.getPlanDate())
                 .mealType(item.getMealType())
+                .mealPeriod(item.getMealPeriod())
                 .foodCode(item.getFoodCode())
                 .freeText(item.getFreeText())
                 .portionGrams(item.getPortionGrams())
@@ -47,6 +53,8 @@ public class MealPlanItemResponse {
                 .eaten(item.getEaten())
                 .skipReason(item.getSkipReason())
                 .skipNote(item.getSkipNote())
+                .sourceType(item.getSourceType() != null ? item.getSourceType() : MealPlanItemSourceType.PT_ORIGINAL)
+                .foodItemId(item.getFoodItemId())
                 .build();
     }
 }

@@ -12,6 +12,7 @@ import com.sba.nutricanbe.workspace.dto.PtStatsDto;
 import com.sba.nutricanbe.workspace.dto.ReviewActionRequest;
 import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionDto;
 import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionReviewRequest;
+import com.sba.nutricanbe.diet.dto.request.SelfPlanSubmissionReviewRequest;
 import com.sba.nutricanbe.workspace.dto.WeeklySummaryDto;
 import com.sba.nutricanbe.workspace.dto.WeeklySummaryRequest;
 import com.sba.nutricanbe.workspace.dto.*;
@@ -19,6 +20,7 @@ import com.sba.nutricanbe.workspace.dto.*;
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
 import com.sba.nutricanbe.diet.dto.response.SosTicketResponse;
+import com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 
 import java.time.LocalDate;
@@ -76,4 +78,9 @@ public interface PtWorkspaceService {
     ApiResponse<List<TemplateResponse>> getTemplatesByPt(UUID ptId);
 
     ApiResponse<Void> applyTemplateToClient(UUID ptId, UUID templateId, UUID clientId, ApplyTemplateRequest request);
+
+    ApiResponse<List<SelfPlanSubmissionResponse>> listPendingSelfPlanSubmissions(UUID ptId);
+
+    ApiResponse<SelfPlanSubmissionResponse> reviewSelfPlanSubmission(
+            UUID ptId, UUID submissionId, SelfPlanSubmissionReviewRequest request);
 }

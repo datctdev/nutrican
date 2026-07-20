@@ -6,6 +6,8 @@ import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.dto.response.FoodItemResponse;
+import com.sba.nutricanbe.diet.enums.FoodCategoryGroup;
+import com.sba.nutricanbe.diet.util.FoodCategoryGroups;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
 import com.sba.nutricanbe.user.entity.User;
@@ -40,31 +42,60 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
     @Override
     @Transactional(readOnly = true)
     public List<FoodItemResponse> search(String query, String category, boolean dietFilter, UUID userId) {
+        return search(query, category, null, dietFilter, userId, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FoodItemResponse> search(String query, String category, boolean dietFilter, UUID userId, Integer limit) {
+        return search(query, category, null, dietFilter, userId, limit);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FoodItemResponse> search(
+            String query, String category, String categoryGroup, boolean dietFilter, UUID userId, Integer limit) {
         DietPreference preference = resolvePreference(userId);
         boolean applyFilter = dietFilter && preference != null && preference != DietPreference.NORMAL;
+        FoodCategoryGroup group = FoodCategoryGroups.parseParam(categoryGroup);
 
         List<FoodItemResponse> results;
         if (query == null || query.isBlank()) {
             List<FoodItem> items = category != null
                     ? foodItemRepository.findByCategoryOrderByNameViAsc(category)
                     : foodItemRepository.findAll();
-            results = items.stream().map(this::toResponse).collect(Collectors.toList());
+            results = items.stream()
+                    .filter(f -> group == null || FoodCategoryGroups.resolve(f.getCategory()) == group)
+                    .sorted(Comparator.comparing(FoodItem::getNameVi, Comparator.nullsLast(String::compareToIgnoreCase)))
+                    .map(this::toResponse)
+                    .collect(Collectors.toList());
+            if (applyFilter) {
+                DietPreference pref = preference;
+                results = results.stream()
+                        .filter(r -> dietPrefCheckService.matchesPreference(pref, r.getDietTags()))
+                        .collect(Collectors.toList());
+            }
+            if (limit != null && limit > 0) {
+                results = results.stream().limit(limit).collect(Collectors.toList());
+            }
         } else {
             String normalizedQuery = normalize(query);
             List<FoodItem> items = foodItemRepository.searchByName(query.trim());
+            int cap = (limit != null && limit > 0) ? Math.min(limit, 20) : 20;
             results = items.stream()
                     .filter(f -> category == null || category.equals(f.getCategory()))
+                    .filter(f -> group == null || FoodCategoryGroups.resolve(f.getCategory()) == group)
                     .filter(f -> matchesQuery(f, normalizedQuery))
                     .sorted(Comparator.comparing(FoodItem::getNameVi))
-                    .limit(20)
+                    .limit(cap)
                     .map(this::toResponse)
                     .collect(Collectors.toList());
-        }
-        if (applyFilter) {
-            DietPreference pref = preference;
-            results = results.stream()
-                    .filter(r -> dietPrefCheckService.matchesPreference(pref, r.getDietTags()))
-                    .collect(Collectors.toList());
+            if (applyFilter) {
+                DietPreference pref = preference;
+                results = results.stream()
+                        .filter(r -> dietPrefCheckService.matchesPreference(pref, r.getDietTags()))
+                        .collect(Collectors.toList());
+            }
         }
         if (preference != null && preference != DietPreference.NORMAL) {
             DietPreference pref = preference;
@@ -197,7 +228,10 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
                     return FoodItemResponse.builder()
                             .nameVi(ResNetFoodCodeMapping.catalogNameViOrDisplay(code, code))
                             .nameEn(code.replace('_', ' '))
+                            .foodCode(code)
                             .category("Món ResNet50")
+                            .categoryGroup(FoodCategoryGroup.OTHER.name())
+                            .categoryGroupLabel(FoodCategoryGroup.OTHER.getLabelVi())
                             .servingSizeG(ResNetFoodDefaults.defaultServingG(code))
                             .calories(macros.get("calories"))
                             .protein(macros.get("protein"))
@@ -264,12 +298,16 @@ public class FoodCatalogServiceImpl implements FoodCatalogService {
     }
 
     private FoodItemResponse toResponse(FoodItem item, Integer matchScore) {
+        FoodCategoryGroup group = FoodCategoryGroups.resolve(item.getCategory());
         return FoodItemResponse.builder()
                 .id(item.getId())
                 .nameVi(item.getNameVi())
                 .nameEn(item.getNameEn())
+                .foodCode(item.getFoodCode())
                 .aliases(item.getAliases())
                 .category(item.getCategory())
+                .categoryGroup(group.name())
+                .categoryGroupLabel(group.getLabelVi())
                 .servingSizeG(item.getServingSizeG())
                 .calories(item.getCalories())
                 .protein(item.getProtein())

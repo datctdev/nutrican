@@ -10,6 +10,10 @@ public interface FoodCatalogService {
 
     List<FoodItemResponse> search(String query, String category, boolean dietFilter, UUID userId);
 
+    List<FoodItemResponse> search(String query, String category, boolean dietFilter, UUID userId, Integer limit);
+
+    List<FoodItemResponse> search(String query, String category, String categoryGroup, boolean dietFilter, UUID userId, Integer limit);
+
     FoodItemResponse getById(UUID id);
 
     List<FoodItemResponse> getHotpotBroths();

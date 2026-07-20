@@ -12,10 +12,20 @@ import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.diet.entity.DietLogFeedback;
 import com.sba.nutricanbe.diet.entity.MealPlanSuggestion;
+import com.sba.nutricanbe.diet.entity.SelfPlanItem;
+import com.sba.nutricanbe.diet.entity.SelfPlanSubmission;
 import com.sba.nutricanbe.diet.entity.WeeklySummary;
+import com.sba.nutricanbe.diet.dto.response.SelfPlanItemResponse;
+import com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse;
+import com.sba.nutricanbe.diet.dto.request.SelfPlanSubmissionReviewRequest;
+import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
 import com.sba.nutricanbe.diet.enums.MealPlanSuggestionStatus;
+import com.sba.nutricanbe.diet.enums.MealType;
+import com.sba.nutricanbe.diet.enums.SelfPlanSubmissionStatus;
 import com.sba.nutricanbe.diet.repository.DietLogFeedbackRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanSuggestionRepository;
+import com.sba.nutricanbe.diet.repository.SelfPlanItemRepository;
+import com.sba.nutricanbe.diet.repository.SelfPlanSubmissionRepository;
 import com.sba.nutricanbe.diet.repository.WeeklySummaryRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
@@ -106,6 +116,8 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
     private final MealPlanTemplateItemRepository mealPlanTemplateItemRepository;
     private final StorageService storageService;
     private final NotificationService notificationService;
+    private final SelfPlanItemRepository selfPlanItemRepository;
+    private final SelfPlanSubmissionRepository selfPlanSubmissionRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -999,6 +1011,125 @@ public class PtWorkspaceServiceImpl implements PtWorkspaceService {
                 .filter(suggestion -> suggestion.getStatus() == MealPlanSuggestionStatus.PENDING)
                 .map(this::toSuggestionDto)
                 .toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<List<SelfPlanSubmissionResponse>> listPendingSelfPlanSubmissions(UUID ptId) {
+        List<SelfPlanSubmissionResponse> result = selfPlanSubmissionRepository
+                .findByPtIdAndStatusOrderBySubmittedAtDesc(ptId, SelfPlanSubmissionStatus.PENDING)
+                .stream()
+                .map(s -> SelfPlanSubmissionResponse.from(s, selfPlanItemRepository.findBySubmissionId(s.getId())
+                        .stream().map(SelfPlanItemResponse::from).toList()))
+                .toList();
+        return ApiResponse.success(result);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<SelfPlanSubmissionResponse> reviewSelfPlanSubmission(
+            UUID ptId, UUID submissionId, SelfPlanSubmissionReviewRequest request) {
+        SelfPlanSubmission submission = selfPlanSubmissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ResourceNotFoundException("SelfPlanSubmission", submissionId));
+        if (!ptId.equals(submission.getPtId())) {
+            throw new UnauthorizedException("Bạn không có quyền duyệt yêu cầu này");
+        }
+        if (submission.getStatus() != SelfPlanSubmissionStatus.PENDING) {
+            throw new BadRequestException("Chỉ có thể duyệt yêu cầu đang chờ");
+        }
+        List<SelfPlanItem> items = selfPlanItemRepository.findBySubmissionId(submissionId);
+        String action = request.getAction() != null ? request.getAction().toUpperCase() : "";
+
+        if ("REJECT".equals(action)) {
+            if (request.getPtNote() == null || request.getPtNote().isBlank()) {
+                throw new BadRequestException("ptNote là bắt buộc khi từ chối");
+            }
+            items.forEach(item -> item.setLockedByReview(false));
+            selfPlanItemRepository.saveAll(items);
+            submission.setStatus(SelfPlanSubmissionStatus.REJECTED);
+        } else if ("APPROVE".equals(action)) {
+            applySelfPlanSubmission(submission, items);
+            submission.setStatus(SelfPlanSubmissionStatus.APPROVED);
+        } else {
+            throw new BadRequestException("action phải là APPROVE hoặc REJECT");
+        }
+        submission.setPtNote(request.getPtNote());
+        submission.setDecidedAt(LocalDateTime.now());
+        submission.setPendingUniqueKey(null);
+        SelfPlanSubmission saved = selfPlanSubmissionRepository.save(submission);
+
+        notificationService.notify(submission.getCustomerId(), NotificationPayload.builder()
+                .type("SELF_PLAN_" + submission.getStatus().name())
+                .title(submission.getStatus() == SelfPlanSubmissionStatus.APPROVED
+                        ? "PT đã duyệt kế hoạch tự chọn" : "PT từ chối kế hoạch tự chọn")
+                .body(submission.getStatus() == SelfPlanSubmissionStatus.APPROVED
+                        ? "Ngày " + submission.getPlanDate()
+                        : request.getPtNote())
+                .linkType(NotificationLinkType.MEAL_PLAN)
+                .linkRefId(submission.getCustomerId())
+                .sendEmail(false)
+                .build());
+
+        return ApiResponse.success(SelfPlanSubmissionResponse.from(saved,
+                items.stream().map(SelfPlanItemResponse::from).toList()));
+    }
+
+    private void applySelfPlanSubmission(SelfPlanSubmission submission, List<SelfPlanItem> items) {
+        if (items.isEmpty()) {
+            return;
+        }
+        MealPlan plan = mealPlanRepository
+                .findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(submission.getCustomerId())
+                .stream()
+                .filter(p -> {
+                    LocalDate start = p.getWeekStart();
+                    if (start == null) return false;
+                    LocalDate end = start.plusDays(6);
+                    return !submission.getPlanDate().isBefore(start) && !submission.getPlanDate().isAfter(end);
+                })
+                .findFirst()
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy thực đơn PT đang áp dụng cho ngày này"));
+
+        Map<MealType, List<SelfPlanItem>> byMealType = items.stream()
+                .collect(java.util.stream.Collectors.groupingBy(SelfPlanItem::getMealType));
+
+        for (Map.Entry<MealType, List<SelfPlanItem>> entry : byMealType.entrySet()) {
+            MealType mealType = entry.getKey();
+            List<MealPlanItem> oldItems = mealPlanItemRepository.findByMealPlanIdAndPlanDateAndMealType(
+                    plan.getId(), submission.getPlanDate(), mealType);
+            for (MealPlanItem oldItem : oldItems) {
+                List<MealPlanSuggestion> pending = mealPlanSuggestionRepository
+                        .findByMealPlanItemIdAndStatus(oldItem.getId(), MealPlanSuggestionStatus.PENDING);
+                pending.forEach(s -> {
+                    s.setStatus(MealPlanSuggestionStatus.CANCELLED);
+                    s.setDecidedAt(LocalDateTime.now());
+                });
+                mealPlanSuggestionRepository.saveAll(pending);
+            }
+            if (!oldItems.isEmpty()) {
+                mealPlanItemRepository.deleteAll(oldItems);
+            }
+            List<MealPlanItem> newItems = entry.getValue().stream()
+                    .map(selfItem -> MealPlanItem.builder()
+                            .mealPlanId(plan.getId())
+                            .planDate(selfItem.getPlanDate())
+                            .mealType(selfItem.getMealType())
+                            .mealPeriod(selfItem.getMealPeriod())
+                            .freeText(selfItem.getItemName())
+                            .portionGrams(selfItem.getQuantityG())
+                            .eaten(Boolean.TRUE.equals(selfItem.getEaten()))
+                            .sourceType(MealPlanItemSourceType.SELF_OVERRIDE)
+                            .foodItemId(selfItem.getFoodItemId())
+                            .build())
+                    .toList();
+            mealPlanItemRepository.saveAll(newItems);
+        }
+
+        items.forEach(item -> {
+            item.setApplied(true);
+            item.setLockedByReview(false);
+        });
+        selfPlanItemRepository.saveAll(items);
     }
 
     private MealPlanSuggestionDto toSuggestionDto(MealPlanSuggestion s) {

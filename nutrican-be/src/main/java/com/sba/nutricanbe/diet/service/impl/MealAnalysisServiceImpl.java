@@ -19,11 +19,14 @@ import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.FoodGateResult;
 import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.enums.RecognitionSource;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.DietDates;
+import com.sba.nutricanbe.common.util.MealPeriods;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.user.service.UserQueryService;
@@ -86,6 +89,15 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
     public ApiResponse<AnalyzeMealResponse> analyzeMeal(UUID customerId, MultipartFile file, AnalyzeMealContext context) {
         try {
             AnalyzeMealContext ctx = context != null ? context : AnalyzeMealContext.builder().build();
+            LocalDate logDate = DietDates.resolveLogDate(ctx.getLogDate());
+            MealPeriod mealPeriod = resolveAnalyzeMealPeriod(ctx.getMealPeriod(), ctx.getMealType(), logDate);
+            MealType mealTypeFromPeriod = mealPeriod != null ? MealPeriods.toMealType(mealPeriod)
+                    : dietLogHelper.parseMealType(ctx.getMealType());
+            String makeupErr = MealPeriods.validateMakeup(mealPeriod, ctx.getMakeupForPeriod(), logDate);
+            if (makeupErr != null) {
+                throw new BadRequestException(makeupErr);
+            }
+            MealPeriod makeup = logDate.equals(DietDates.todayVn()) ? ctx.getMakeupForPeriod() : null;
             MealSource mealSource = ctx.getMealSource() != null ? ctx.getMealSource() : MealSource.HOME_COOKED;
             MealComplexity mealComplexity = ctx.getMealComplexity() != null ? ctx.getMealComplexity() : MealComplexity.SIMPLE;
 
@@ -104,15 +116,17 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                 if (gateResult == FoodGateResult.OUT_OF_CLASS) {
                     String objectName = minioService.uploadFile(file, "diet-logs/" + customerId);
                     String imageUrl = minioService.getPresignedUrl(objectName);
-                    MealType mealType = dietLogHelper.parseMealType(ctx.getMealType());
+                    MealType mealType = mealTypeFromPeriod;
                     DietLog manualLog = DietLog.builder()
                             .customerId(customerId)
                             .imageUrl(imageUrl)
                             .imageObjectName(objectName)
                             .mealType(mealType)
+                            .mealPeriod(mealPeriod)
+                            .makeupForPeriod(makeup)
                             .status(DietLogStatus.MANUAL_REQUIRED)
                             .reviewStatus(DietLogReviewStatus.NOT_REQUIRED)
-                            .logDate(LocalDate.now())
+                            .logDate(logDate)
                             .mealSource(mealSource)
                             .mealComplexity(mealComplexity)
                             .restaurantName(ctx.getRestaurantName())
@@ -128,6 +142,8 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                             .manualRequired(true)
                             .gateResult("OUT_OF_CLASS")
                             .mealType(mealType)
+                            .mealPeriod(mealPeriod)
+                            .makeupForPeriod(makeup)
                             .build();
                     return ApiResponse.success(outOfClass, outOfClass.getMessage());
                 }
@@ -147,7 +163,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             User customer = userQueryService.findUserById(customerId)
                     .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
-            MealType mealType = dietLogHelper.parseMealType(ctx.getMealType());
+            MealType mealType = mealTypeFromPeriod;
             BigDecimal portionRatio = aiResult.getPortionRatio() != null
                     ? aiResult.getPortionRatio() : BigDecimal.ONE;
 
@@ -263,6 +279,8 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                     .imageUrl(imageUrl)
                     .imageObjectName(objectName)
                     .mealType(mealType)
+                    .mealPeriod(mealPeriod)
+                    .makeupForPeriod(makeup)
                     .foodDescription(aiResult.getFoodName())
                     .aiConfidenceScore(aiResult.getConfidenceScore())
                     .macrosJson(macros)
@@ -274,7 +292,7 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                     .experimentCohort(cohort)
                     .status(status)
                     .reviewStatus(DietLogReviewStatus.NOT_REQUIRED)
-                    .logDate(LocalDate.now())
+                    .logDate(logDate)
                     .mealSource(mealSource)
                     .mealComplexity(mealComplexity)
                     .restaurantName(ctx.getRestaurantName())
@@ -319,6 +337,8 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                     .needsConfirmation(aiResult.getNeedsConfirmation())
                     .message(aiResult.getMessage())
                     .mealType(mealType)
+                    .mealPeriod(mealPeriod)
+                    .makeupForPeriod(makeup)
                     .suggestSos(suggestSos)
                     .suggestedFoodMatches(suggestedMatches)
                     .topPredictions(topPredictions)
@@ -340,19 +360,35 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
     @Override
     @Transactional
     public ApiResponse<DietLogResponse> confirmRecognition(UUID logId, UUID customerId, ConfirmRecognitionRequest request) {
-        if (request == null || request.getFoodCode() == null || request.getFoodCode().isBlank()) {
-            throw new BadRequestException("foodCode is required");
+        if (request == null) {
+            throw new BadRequestException("Request body is required");
         }
+        boolean hasCode = request.getFoodCode() != null && !request.getFoodCode().isBlank();
+        boolean hasId = request.getFoodItemId() != null;
+        if (!hasCode && !hasId) {
+            throw new BadRequestException("foodItemId or foodCode is required");
+        }
+
         DietLog dietLog = dietLogRepository.findById(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
         if (!dietLog.getCustomerId().equals(customerId)) {
             throw new BadRequestException("You can only confirm your own diet logs");
         }
 
-        String foodCode = request.getFoodCode().trim().toLowerCase();
-        FoodItem food = foodCatalogService.findByResNetFoodCode(foodCode)
-                .flatMap(f -> foodItemRepository.findById(f.getId()))
-                .orElseThrow(() -> new BadRequestException("Unknown food code: " + foodCode));
+        FoodItem food;
+        String foodCode;
+        if (hasId) {
+            food = foodItemRepository.findById(request.getFoodItemId())
+                    .orElseThrow(() -> new BadRequestException("Food item not found: " + request.getFoodItemId()));
+            foodCode = food.getFoodCode() != null && !food.getFoodCode().isBlank()
+                    ? food.getFoodCode().trim().toLowerCase()
+                    : null;
+        } else {
+            foodCode = request.getFoodCode().trim().toLowerCase();
+            food = foodCatalogService.findByResNetFoodCode(foodCode)
+                    .flatMap(f -> foodItemRepository.findById(f.getId()))
+                    .orElseThrow(() -> new BadRequestException("Unknown food code: " + foodCode));
+        }
 
         BigDecimal serving = food.getServingSizeG() != null && food.getServingSizeG().compareTo(BigDecimal.ZERO) > 0
                 ? food.getServingSizeG() : BigDecimal.valueOf(100);
@@ -373,24 +409,42 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             portionG = serving.multiply(portionRatio).setScale(2, RoundingMode.HALF_UP);
         }
         MacroNutrients macros = dietLogHelper.macrosForFood(food, portionG);
-        MacroNutrients a10Macros = dietLog.getAiPredictedMacros() != null
-                ? dietLog.getAiPredictedMacros()
-                : A1_0FixedMacros.forCode(foodCode);
 
-        String foodName = ResNetFoodCodeMapping.catalogNameVi(foodCode).orElse(food.getNameVi());
+        String predictedCode = dietLog.getAiRawJson() != null && dietLog.getAiRawJson().get("foodCode") != null
+                ? String.valueOf(dietLog.getAiRawJson().get("foodCode")).toLowerCase()
+                : null;
+        boolean userCorrected = foodCode == null
+                || predictedCode == null
+                || !foodCode.equals(predictedCode)
+                || (hasId && dietLog.getFoodItemId() != null && !food.getId().equals(dietLog.getFoodItemId()));
+
+        MacroNutrients a10Macros = dietLog.getAiPredictedMacros();
+        if (a10Macros == null && foodCode != null) {
+            a10Macros = A1_0FixedMacros.forCode(foodCode);
+        }
+
+        String foodName = foodCode != null
+                ? ResNetFoodCodeMapping.catalogNameVi(foodCode).orElse(food.getNameVi())
+                : food.getNameVi();
         dietLog.setFoodDescription(foodName);
         dietLog.setMatchedFoodName(food.getNameVi());
         dietLog.setFoodItemId(food.getId());
         dietLog.setMacrosJson(macros);
-        dietLog.setAiPredictedMacros(a10Macros);
+        if (a10Macros != null) {
+            dietLog.setAiPredictedMacros(a10Macros);
+        }
         dietLog.setDbMatchedMacros(macros);
         dietLog.setRecognitionSource(RecognitionSource.HYBRID);
 
         Map<String, Object> aiRaw = dietLog.getAiRawJson() != null
                 ? new HashMap<>(dietLog.getAiRawJson()) : new HashMap<>();
-        aiRaw.put("foodCode", foodCode);
+        if (foodCode != null) {
+            aiRaw.put("foodCode", foodCode);
+        }
         aiRaw.put("foodName", foodName);
+        aiRaw.put("foodItemId", food.getId().toString());
         aiRaw.put("userConfirmed", true);
+        aiRaw.put("userCorrected", userCorrected);
         aiRaw.put("userAdjustedGrams", portionG);
         aiRaw.put("portionRatio", portionRatio);
         aiRaw.put("portionSize", portionG);
@@ -401,24 +455,25 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
         aiRaw.put("needsConfirmation", false);
         dietLog.setStatus(DietLogStatus.LOGGED);
         boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
-        dietLog.setReviewStatus(sendToPt ? DietLogReviewStatus.PENDING : DietLogReviewStatus.NOT_REQUIRED);
+        var reviewStatus = dietLogHelper.resolveReviewStatus(customerId, sendToPt);
+        dietLog.setReviewStatus(reviewStatus);
         dietLog.setAiRawJson(aiRaw);
         dietLog = dietLogRepository.save(dietLog);
-        if (sendToPt) {
+        boolean pendingReview = reviewStatus == DietLogReviewStatus.PENDING;
+        if (pendingReview) {
             dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
             dietLogHelper.notifyPtOfNewLog(dietLog);
         }
         DietLogResponse response = dietLogHelper.toResponse(dietLog);
 
         User customer = userQueryService.findUserById(customerId).orElse(null);
-        if (customer != null && dietPrefCheckService.hasMismatch(customerId, foodCode)) {
+        if (customer != null && foodCode != null && dietPrefCheckService.hasMismatch(customerId, foodCode)) {
             response.setDietPrefWarning(dietPrefCheckService.buildWarningMessage(
                     customer.getDietPreference(),
                     ResNetFoodCodeMapping.catalogNameViOrDisplay(foodCode, foodName)));
         }
-        boolean reviewNotRequired = !sendToPt;
         IntakeControlResult loop = intakeControlLoopService.evaluateAfterLog(
-                customerId, dietLog.getLogDate(), reviewNotRequired);
+                customerId, dietLog.getLogDate(), !pendingReview);
         applyControlLoop(response, loop);
         return ApiResponse.success(response, "Recognition confirmed");
     }
@@ -578,5 +633,22 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             }
         });
         return builder.build();
+    }
+
+    private MealPeriod resolveAnalyzeMealPeriod(MealPeriod requested, String mealTypeStr, LocalDate logDate) {
+        LocalDate today = DietDates.todayVn();
+        MealPeriod current = MealPeriods.current();
+        if (logDate != null && logDate.equals(today)) {
+            MealPeriod period = requested != null ? requested : current;
+            if (period != current) {
+                throw new BadRequestException(
+                        "Hôm nay chỉ được ghi nhật ký cho khung giờ hiện tại (" + current + ")");
+            }
+            return period;
+        }
+        if (requested != null) {
+            return requested;
+        }
+        return MealPeriods.deriveFromMealType(dietLogHelper.parseMealType(mealTypeStr));
     }
 }

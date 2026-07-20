@@ -29,7 +29,6 @@ import com.sba.nutricanbe.user.service.UserQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -129,6 +128,19 @@ public class DietLogHelperImpl implements DietLogHelper {
     }
 
     @Override
+    public DietLogReviewStatus resolveReviewStatus(UUID customerId, boolean sendToPt) {
+        if (sendToPt && hasActivePt(customerId)) {
+            return DietLogReviewStatus.PENDING;
+        }
+        return DietLogReviewStatus.NOT_REQUIRED;
+    }
+
+    @Override
+    public boolean hasActivePt(UUID customerId) {
+        return ptClientMappingRepository.existsByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE);
+    }
+
+    @Override
     public void assignPtReviewerIfNeeded(DietLog dietLog, UUID customerId) {
         if (dietLog.getReviewStatus() != DietLogReviewStatus.PENDING) return;
         findActivePt(customerId).ifPresent(mapping -> dietLog.setPtReviewerId(mapping.getPt().getId()));
@@ -136,10 +148,7 @@ public class DietLogHelperImpl implements DietLogHelper {
 
     @Override
     public Optional<PtClientMapping> findActivePt(UUID customerId) {
-        return ptClientMappingRepository.findByClient_Id(customerId, PageRequest.of(0, 1))
-                .getContent().stream()
-                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
-                .findFirst();
+        return ptClientMappingRepository.findFirstByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE);
     }
 
     @Override
@@ -224,7 +233,49 @@ public class DietLogHelperImpl implements DietLogHelper {
 
         String aiFoodCode = null;
         if (dietLog.getAiRawJson() != null && dietLog.getAiRawJson().get("foodCode") != null) {
-            aiFoodCode = String.valueOf(dietLog.getAiRawJson().get("foodCode"));
+            try {
+                aiFoodCode = String.valueOf(dietLog.getAiRawJson().get("foodCode"));
+            } catch (Exception ignored) {
+                aiFoodCode = null;
+            }
+        }
+
+        BigDecimal totalGrams = null;
+        try {
+            if (items != null && !items.isEmpty()) {
+                BigDecimal sum = BigDecimal.ZERO;
+                boolean any = false;
+                for (DietLogItemResponse item : items) {
+                    if (item.getQuantityG() != null) {
+                        sum = sum.add(item.getQuantityG());
+                        any = true;
+                    }
+                }
+                if (any) {
+                    totalGrams = sum;
+                }
+            }
+            if (totalGrams == null && dietLog.getAiRawJson() != null) {
+                Object raw = dietLog.getAiRawJson().get("userAdjustedGrams");
+                if (raw == null) {
+                    raw = dietLog.getAiRawJson().get("portionSize");
+                }
+                if (raw != null) {
+                    if (raw instanceof Number n) {
+                        totalGrams = BigDecimal.valueOf(n.doubleValue());
+                    } else {
+                        String s = String.valueOf(raw).trim();
+                        if (!s.isEmpty() && !"null".equalsIgnoreCase(s)) {
+                            totalGrams = new BigDecimal(s);
+                        }
+                    }
+                    if (totalGrams != null && totalGrams.compareTo(BigDecimal.ZERO) <= 0) {
+                        totalGrams = null;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            totalGrams = null;
         }
 
         String customerName = userQueryService.findUserById(dietLog.getCustomerId())
@@ -239,6 +290,8 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .aiConfidenceScore(dietLog.getAiConfidenceScore())
                 .macrosJson(dietLog.getMacrosJson())
                 .mealType(dietLog.getMealType())
+                .mealPeriod(dietLog.getMealPeriod())
+                .makeupForPeriod(dietLog.getMakeupForPeriod())
                 .status(dietLog.getStatus())
                 .reviewStatus(dietLog.getReviewStatus())
                 .foodDescription(dietLog.getFoodDescription())
@@ -266,6 +319,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                         dietLog.getFoodItemId() != null))
                 .suggestedFoodMatches(suggestedMatches)
                 .items(items)
+                .totalGrams(totalGrams)
                 .build();
     }
 

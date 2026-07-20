@@ -68,6 +68,8 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
 
     Optional<PtClientMapping> findFirstByClient_IdAndStatus(UUID clientId, ClientMappingStatus status);
 
+    boolean existsByClient_IdAndStatus(UUID clientId, ClientMappingStatus status);
+
     long countByPt_IdAndStatus(UUID ptId, ClientMappingStatus status);
 
     List<PtClientMapping> findByClient_IdAndStatusOrderByCompletedAtDesc(UUID clientId, ClientMappingStatus status);

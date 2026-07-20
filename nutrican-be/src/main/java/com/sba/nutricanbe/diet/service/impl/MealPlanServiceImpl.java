@@ -2,7 +2,11 @@ package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MacroUtils;
+import com.sba.nutricanbe.common.util.MealPeriods;
+import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
+import com.sba.nutricanbe.diet.dto.request.DietLogItemRequest;
 import com.sba.nutricanbe.diet.dto.request.MealPlanItemRequest;
 import com.sba.nutricanbe.diet.dto.request.MealPlanMealActionRequest;
 import com.sba.nutricanbe.diet.dto.request.MealPlanRequest;
@@ -19,9 +23,12 @@ import com.sba.nutricanbe.diet.dto.response.PlanDietPrefWarning;
 import com.sba.nutricanbe.diet.entity.MealPlan;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.entity.MealPlanSuggestion;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
+import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
 import com.sba.nutricanbe.diet.enums.MealPlanReplacementReason;
 import com.sba.nutricanbe.diet.enums.MealPlanSkipReason;
 import com.sba.nutricanbe.diet.enums.MealPlanSuggestionStatus;
+import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
@@ -29,6 +36,7 @@ import com.sba.nutricanbe.diet.repository.MealPlanRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanSuggestionRepository;
 import com.sba.nutricanbe.diet.repository.WeeklySummaryRepository;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
+import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
 import com.sba.nutricanbe.diet.service.MealPlanService;
@@ -69,6 +77,7 @@ public class MealPlanServiceImpl implements MealPlanService {
     private final FoodCatalogService foodCatalogService;
     private final FoodItemRepository foodItemRepository;
     private final DietLogHelper dietLogHelper;
+    private final DietLogService dietLogService;
     private final MacroTargetRepository macroTargetRepository;
     private final NotificationService notificationService;
     private final WebSocketSessionService webSocketSessionService;
@@ -182,9 +191,18 @@ public class MealPlanServiceImpl implements MealPlanService {
     public MealPlanItemResponse markEaten(UUID customerId, UUID itemId, boolean eaten) {
         OwnedMealPlanItem owned = requireOwnedPublishedItem(customerId, itemId);
         MealPlanItem item = owned.item();
-        assertDateIsActionable(item);
-        if (eaten && item.getPlanDate().isAfter(LocalDate.now())) {
-            throw new BadRequestException("Future meal-plan items cannot be marked as eaten");
+        if (eaten) {
+            if (item.getMealPeriod() == null) {
+                throw new BadRequestException("Món plan thiếu khung giờ; sửa/thêm lại món");
+            }
+            if (!MealPeriods.isMealPeriodOpen(item.getPlanDate(), item.getMealPeriod())) {
+                throw new BadRequestException("Chỉ đánh dấu đã ăn trong khung giờ của buổi đó");
+            }
+            if (item.getPlanDate().isAfter(DietDates.todayVn())) {
+                throw new BadRequestException("Future meal-plan items cannot be marked as eaten");
+            }
+        } else {
+            assertDateIsActionable(item);
         }
         if (eaten && item.getSkipReason() != null) {
             throw new BadRequestException("Undo the skipped state before marking this item as eaten");
@@ -192,6 +210,18 @@ public class MealPlanServiceImpl implements MealPlanService {
         if (eaten && hasPendingReplacement(itemId)) {
             throw new BadRequestException("Cancel or wait for the pending replacement request first");
         }
+
+        MealPlanItemSourceType sourceType = item.getSourceType() != null
+                ? item.getSourceType()
+                : MealPlanItemSourceType.PT_ORIGINAL;
+
+        if (eaten && sourceType == MealPlanItemSourceType.SELF_OVERRIDE) {
+            if (Boolean.TRUE.equals(item.getEaten())) {
+                throw new BadRequestException("Món này đã được ghi nhận ăn rồi");
+            }
+            createDietLogFromOverride(customerId, item);
+        }
+
         item.setEaten(eaten);
         MealPlanItem saved = mealPlanItemRepository.save(item);
         webSocketSessionService.sendToUserOnly(owned.plan().getPtId(), "MEAL_PLAN_PROGRESS_UPDATED",
@@ -201,6 +231,37 @@ public class MealPlanServiceImpl implements MealPlanService {
                         "weekStart", owned.plan().getWeekStart(),
                         "planDate", item.getPlanDate()));
         return MealPlanItemResponse.from(saved);
+    }
+
+    private void createDietLogFromOverride(UUID customerId, MealPlanItem item) {
+        CreateDietLogRequest logReq = new CreateDietLogRequest();
+        logReq.setMealType(item.getMealType());
+        logReq.setMealPeriod(item.getMealPeriod());
+        logReq.setLogDate(item.getPlanDate());
+        logReq.setMealSource(MealSource.HOME_COOKED);
+        String name = item.getFreeText() != null && !item.getFreeText().isBlank()
+                ? item.getFreeText()
+                : (item.getFoodCode() != null ? item.getFoodCode() : "Món plan");
+        logReq.setFoodDescription(name);
+        logReq.setFoodItemId(item.getFoodItemId());
+        logReq.setSendToPt(false);
+
+        BigDecimal qty = item.getPortionGrams() != null ? item.getPortionGrams() : BigDecimal.valueOf(100);
+        DietLogItemRequest line = new DietLogItemRequest();
+        line.setFoodItemId(item.getFoodItemId());
+        line.setItemName(name);
+        line.setQuantityG(qty);
+        if (item.getFoodItemId() != null) {
+            foodItemRepository.findById(item.getFoodItemId()).ifPresent(food -> {
+                var macros = dietLogHelper.macrosForFood(food, qty);
+                line.setCalories(macros.calories());
+                line.setProtein(macros.protein());
+                line.setCarb(macros.carbs());
+                line.setFat(macros.fat());
+            });
+        }
+        logReq.setItems(List.of(line));
+        dietLogService.createLog(customerId, logReq);
     }
 
     @Override
@@ -479,10 +540,13 @@ public class MealPlanServiceImpl implements MealPlanService {
     }
 
     private MealPlanItem toNewItem(UUID mealPlanId, MealPlanItemRequest request) {
+        MealPeriod period = resolveMealPeriod(request.getMealPeriod(), request.getMealType());
+        MealType mealType = period != null ? MealPeriods.toMealType(period) : request.getMealType();
         return MealPlanItem.builder()
                 .mealPlanId(mealPlanId)
                 .planDate(request.getPlanDate())
-                .mealType(request.getMealType())
+                .mealType(mealType)
+                .mealPeriod(period)
                 .foodCode(request.getFoodCode())
                 .freeText(request.getFreeText())
                 .portionGrams(request.getPortionGrams())
@@ -491,17 +555,28 @@ public class MealPlanServiceImpl implements MealPlanService {
     }
 
     private void applyEditableContent(MealPlanItem item, MealPlanItemRequest request) {
+        MealPeriod period = resolveMealPeriod(request.getMealPeriod(), request.getMealType());
+        MealType mealType = period != null ? MealPeriods.toMealType(period) : request.getMealType();
         item.setPlanDate(request.getPlanDate());
-        item.setMealType(request.getMealType());
+        item.setMealType(mealType);
+        item.setMealPeriod(period);
         item.setFoodCode(request.getFoodCode());
         item.setFreeText(request.getFreeText());
         item.setPortionGrams(request.getPortionGrams());
         item.setNote(request.getNote());
     }
 
+    private MealPeriod resolveMealPeriod(MealPeriod requested, MealType mealType) {
+        if (requested != null) return requested;
+        return MealPeriods.deriveFromMealType(mealType);
+    }
+
     private boolean hasSameEditableContent(MealPlanItem item, MealPlanItemRequest request) {
+        MealPeriod period = resolveMealPeriod(request.getMealPeriod(), request.getMealType());
         return Objects.equals(item.getPlanDate(), request.getPlanDate())
-                && Objects.equals(item.getMealType(), request.getMealType())
+                && Objects.equals(item.getMealType(),
+                    period != null ? MealPeriods.toMealType(period) : request.getMealType())
+                && Objects.equals(item.getMealPeriod(), period)
                 && sameText(item.getFoodCode(), request.getFoodCode())
                 && sameText(item.getFreeText(), request.getFreeText())
                 && sameDecimal(item.getPortionGrams(), request.getPortionGrams())
@@ -633,7 +708,7 @@ public class MealPlanServiceImpl implements MealPlanService {
     }
 
     private void assertDateIsActionable(MealPlanItem item) {
-        if (item.getPlanDate().isBefore(LocalDate.now())) {
+        if (item.getPlanDate().isBefore(DietDates.todayVn())) {
             throw new BadRequestException("Past meal-plan items can no longer be changed");
         }
     }

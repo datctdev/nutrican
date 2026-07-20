@@ -17,8 +17,12 @@ public class FoodItemResponse {
     private UUID id;
     private String nameVi;
     private String nameEn;
+    private String foodCode;
     private List<String> aliases;
     private String category;
+    /** SoT group: PROTEIN | CARB | FAT | VEG | FRUIT | OTHER */
+    private String categoryGroup;
+    private String categoryGroupLabel;
     private BigDecimal servingSizeG;
     private BigDecimal calories;
     private BigDecimal protein;

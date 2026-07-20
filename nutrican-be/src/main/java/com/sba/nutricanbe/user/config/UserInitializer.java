@@ -107,8 +107,38 @@ public class UserInitializer implements CommandLineRunner {
         seedPtMarketplacePrefs(certifiedPt, List.of("WEIGHT_LOSS", "WEIGHT_GAIN"), List.of("NORMAL", "VEGETARIAN"));
         seedPtMarketplacePrefs(freelancePt, List.of("WEIGHT_LOSS", "MAINTAIN"), List.of("NORMAL", "KETO"));
 
+        // Demo visual QA — meal-windows / self-plan (password Demo123!)
+        User demoSolo = seedUser(
+                "demo.solo@nutrican.com",
+                "Demo123!",
+                "Demo Solo (Khong PT)",
+                UserRole.CUSTOMER,
+                "0911000001",
+                "Demo Solo, TP.HCM",
+                LocalDate.of(1998, 5, 15));
+        User demoCoached = seedUser(
+                "demo.coached@nutrican.com",
+                "Demo123!",
+                "Demo Coached (Co PT)",
+                UserRole.CUSTOMER,
+                "0911000002",
+                "Demo Coached, TP.HCM",
+                LocalDate.of(2000, 2, 20));
+        seedCustomerE2eProfile(demoSolo, NutritionGoal.WEIGHT_LOSS, 172, "MALE");
+        seedCustomerE2eProfile(demoCoached, NutritionGoal.MAINTAIN, 165, "FEMALE");
+        demoSolo.setActivityLevel(com.sba.nutricanbe.user.enums.ActivityLevel.MODERATE);
+        demoCoached.setActivityLevel(com.sba.nutricanbe.user.enums.ActivityLevel.LIGHT);
+        userRepository.save(demoSolo);
+        userRepository.save(demoCoached);
+        seedMacroTarget(demoSolo, 2100, 130, 230, 70);
+        seedMacroTarget(demoCoached, 1850, 105, 200, 60);
+        seedMapping(certifiedPt, demoCoached, ClientMappingStatus.ACTIVE);
+        // demoSolo: intentionally NO mapping (no PT)
+
         log.info("Seeded default users for hiring/chat test: {}, {}, {}, {}",
                 customerOne.getEmail(), customerTwo.getEmail(), certifiedPt.getEmail(), freelancePt.getEmail());
+        log.info("Seeded demo visual accounts: {} (no PT), {} (ACTIVE with {})",
+                demoSolo.getEmail(), demoCoached.getEmail(), certifiedPt.getEmail());
     }
 
     private User seedUser(String email,

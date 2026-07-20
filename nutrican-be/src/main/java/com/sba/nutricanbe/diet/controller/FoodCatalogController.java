@@ -23,10 +23,13 @@ public class FoodCatalogController {
     public ResponseEntity<ApiResponse<List<FoodItemResponse>>> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String category,
+            @RequestParam(required = false) String categoryGroup,
             @RequestParam(required = false, defaultValue = "true") boolean dietFilter,
+            @RequestParam(required = false) Integer limit,
             @AuthenticationPrincipal User user) {
         UUID userId = user != null ? user.getId() : null;
-        return ResponseEntity.ok(ApiResponse.success(foodCatalogService.search(q, category, dietFilter, userId)));
+        return ResponseEntity.ok(ApiResponse.success(
+                foodCatalogService.search(q, category, categoryGroup, dietFilter, userId, limit)));
     }
 
     @GetMapping("/resnet-dishes")

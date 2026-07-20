@@ -2,6 +2,7 @@ package com.sba.nutricanbe.common.util;
 
 import com.sba.nutricanbe.user.dto.MacroSuggestionResponse;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 
 import java.math.BigDecimal;
@@ -18,6 +19,20 @@ public final class MacroSuggestionCalculator {
     private MacroSuggestionCalculator() {
     }
 
+    public static BigDecimal resolveFactor(ActivityLevel level, BigDecimal legacyFactor) {
+        if (level != null) {
+            return level.toFactor();
+        }
+        if (legacyFactor != null) {
+            return legacyFactor;
+        }
+        return ActivityLevel.defaultLevel().toFactor();
+    }
+
+    public static ActivityLevel resolveLevel(User user) {
+        return ActivityLevel.orDefault(user != null ? user.getActivityLevel() : null);
+    }
+
     public static MacroSuggestionResponse calculate(
             User user,
             BigDecimal weightKg,
@@ -31,7 +46,7 @@ public final class MacroSuggestionCalculator {
         BigDecimal h = heightCm != null && heightCm.compareTo(BigDecimal.ZERO) > 0 ? heightCm : DEFAULT_HEIGHT;
         int a = age != null && age > 0 ? age : resolveAge(user);
         String g = gender != null && !gender.isBlank() ? gender : "male";
-        BigDecimal factor = activityFactor != null ? activityFactor : BigDecimal.valueOf(1.55);
+        BigDecimal factor = activityFactor != null ? activityFactor : resolveLevel(user).toFactor();
 
         BigDecimal bmr;
         if ("female".equalsIgnoreCase(g)) {

@@ -11,6 +11,7 @@ import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 
+import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealSource;
 
 import com.sba.nutricanbe.common.util.MultipartUtils;
@@ -108,6 +109,10 @@ public class DietLogController {
 
             @RequestParam(value = "meal_type", required = false) String mealType,
 
+            @RequestParam(value = "meal_period", required = false) String mealPeriod,
+
+            @RequestParam(value = "makeup_for_period", required = false) String makeupForPeriod,
+
             @RequestParam(value = "mealSource", required = false) String mealSource,
 
             @RequestParam(value = "mealComplexity", required = false) String mealComplexity,
@@ -122,13 +127,21 @@ public class DietLogController {
 
             @RequestParam(value = "compositeItemIds", required = false) UUID[] compositeItemIds,
 
-            @RequestParam(value = "compositePortions", required = false) String compositePortions) {
+            @RequestParam(value = "compositePortions", required = false) String compositePortions,
+
+            @RequestParam(value = "log_date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate logDate) {
 
         MultipartFile upload = MultipartUtils.requireSingleFile(file, image, files);
 
         AnalyzeMealContext context = AnalyzeMealContext.builder()
 
                 .mealType(mealType)
+
+                .mealPeriod(parseMealPeriod(mealPeriod))
+
+                .makeupForPeriod(parseMealPeriod(makeupForPeriod))
+
+                .logDate(logDate)
 
                 .mealSource(parseMealSource(mealSource))
 
@@ -380,6 +393,24 @@ public class DietLogController {
     public ResponseEntity<ApiResponse<List<SosTicketResponse>>> getSosTickets(@AuthenticationPrincipal User user) {
 
         return ResponseEntity.ok(sosService.getSosTickets(user.getId()));
+
+    }
+
+
+
+    private MealPeriod parseMealPeriod(String value) {
+
+        if (value == null || value.isBlank()) return null;
+
+        try {
+
+            return MealPeriod.valueOf(value.trim().toUpperCase());
+
+        } catch (Exception e) {
+
+            return null;
+
+        }
 
     }
 

@@ -23,10 +23,14 @@ import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.service.UserQueryService;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MacroUtils;
+import com.sba.nutricanbe.common.util.MealPeriods;
 import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
 import com.sba.nutricanbe.diet.dto.response.DietLogResponse;
 import com.sba.nutricanbe.diet.dto.response.DietSummaryResponse;
+import com.sba.nutricanbe.diet.enums.MealPeriod;
+import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.dto.response.IntakeControlResult;
 import com.sba.nutricanbe.diet.enums.IntakeStatus;
@@ -79,19 +83,30 @@ public class DietLogServiceImpl implements DietLogService {
         User customer = userQueryService.findUserById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
+        LocalDate logDate = DietDates.resolveLogDate(request.getLogDate());
+        MealPeriod mealPeriod = resolveAndValidateMealPeriod(request.getMealPeriod(), request.getMealType(), logDate);
+        MealType mealType = mealPeriod != null ? MealPeriods.toMealType(mealPeriod)
+                : request.getMealType();
+        String makeupErr = MealPeriods.validateMakeup(mealPeriod, request.getMakeupForPeriod(), logDate);
+        if (makeupErr != null) {
+            throw new BadRequestException(makeupErr);
+        }
+        MealPeriod makeup = logDate.equals(DietDates.todayVn()) ? request.getMakeupForPeriod() : null;
+
         MealSource mealSource = request.getMealSource() != null ? request.getMealSource() : MealSource.HOME_COOKED;
         MealComplexity mealComplexity = request.getMealComplexity() != null ? request.getMealComplexity() : MealComplexity.SIMPLE;
         boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
+        var reviewStatus = dietLogHelper.resolveReviewStatus(customerId, sendToPt);
 
         DietLog dietLog = DietLog.builder()
                 .customerId(customerId)
-                .mealType(request.getMealType())
+                .mealType(mealType)
+                .mealPeriod(mealPeriod)
+                .makeupForPeriod(makeup)
                 .foodDescription(request.getFoodDescription())
-                .logDate(request.getLogDate() != null ? request.getLogDate() : LocalDate.now())
+                .logDate(logDate)
                 .status(DietLogStatus.LOGGED)
-                .reviewStatus(sendToPt
-                        ? com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING
-                        : com.sba.nutricanbe.diet.enums.DietLogReviewStatus.NOT_REQUIRED)
+                .reviewStatus(reviewStatus)
                 .mealSource(mealSource)
                 .mealComplexity(mealComplexity)
                 .restaurantName(request.getRestaurantName())
@@ -127,7 +142,8 @@ public class DietLogServiceImpl implements DietLogService {
         dietLog.setExperimentCohortKey(RblCohortUtil.resolveKey(
                 dietLog.getMealSource(), dietLog.getMealComplexity(), dietLog.getRecognitionSource(), pref));
         dietLog = dietLogRepository.save(dietLog);
-        if (sendToPt) {
+        boolean pendingReview = reviewStatus == com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING;
+        if (pendingReview) {
             dietLog.setIsPtNotified(true);
             dietLogHelper.notifyPtOfNewLog(dietLog);
         }
@@ -135,7 +151,7 @@ public class DietLogServiceImpl implements DietLogService {
         DietLogResponse response = dietLogHelper.toResponse(dietLog);
         applyManualWarnings(customerId, request, response);
         IntakeControlResult loop = intakeControlLoopService.evaluateAfterLog(
-                customerId, dietLog.getLogDate(), !sendToPt);
+                customerId, dietLog.getLogDate(), !pendingReview);
         if (loop != null) {
             response.setIntakeStatus(loop.getIntakeStatus());
             response.setControlLoopMessage(loop.getControlLoopMessage());
@@ -217,6 +233,29 @@ public class DietLogServiceImpl implements DietLogService {
 
         if (request.getFoodDescription() != null) dietLog.setFoodDescription(request.getFoodDescription());
         if (request.getMealType() != null) dietLog.setMealType(request.getMealType());
+        if (request.getMealPeriod() != null) {
+            LocalDate effectiveDate = request.getLogDate() != null
+                    ? DietDates.resolveLogDate(request.getLogDate())
+                    : dietLog.getLogDate();
+            MealPeriod period = resolveAndValidateMealPeriod(
+                    request.getMealPeriod(), request.getMealType(), effectiveDate);
+            dietLog.setMealPeriod(period);
+            if (period != null) {
+                dietLog.setMealType(MealPeriods.toMealType(period));
+            }
+        }
+        if (request.getMakeupForPeriod() != null || request.getMealPeriod() != null) {
+            LocalDate effectiveDate = dietLog.getLogDate();
+            MealPeriod period = dietLog.getMealPeriod();
+            MealPeriod makeup = request.getMakeupForPeriod();
+            String makeupErr = MealPeriods.validateMakeup(period, makeup, effectiveDate);
+            if (makeupErr != null) {
+                throw new BadRequestException(makeupErr);
+            }
+            dietLog.setMakeupForPeriod(
+                    effectiveDate != null && effectiveDate.equals(DietDates.todayVn()) ? makeup : null);
+        }
+        if (request.getLogDate() != null) dietLog.setLogDate(DietDates.resolveLogDate(request.getLogDate()));
         if (request.getMealSource() != null) dietLog.setMealSource(request.getMealSource());
         if (request.getMealComplexity() != null) dietLog.setMealComplexity(request.getMealComplexity());
         if (request.getRestaurantName() != null) dietLog.setRestaurantName(request.getRestaurantName());
@@ -242,17 +281,24 @@ public class DietLogServiceImpl implements DietLogService {
                 dietLog.setMatchedFoodName(request.getFoodDescription());
             }
         }
+        if (request.getFoodItemId() != null) {
+            dietLog.setFoodItemId(request.getFoodItemId());
+        }
 
         boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
         if (sendToPt) {
+            var reviewStatus = dietLogHelper.resolveReviewStatus(userId, true);
             dietLog.setStatus(DietLogStatus.LOGGED);
-            dietLog.setReviewStatus(com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING);
-            dietLog.setIsPtNotified(true);
-            dietLogHelper.assignPtReviewerIfNeeded(dietLog, userId);
+            dietLog.setReviewStatus(reviewStatus);
+            if (reviewStatus == com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING) {
+                dietLog.setIsPtNotified(true);
+                dietLogHelper.assignPtReviewerIfNeeded(dietLog, userId);
+            }
         }
 
         dietLog = dietLogRepository.save(dietLog);
-        if (sendToPt) {
+        if (dietLog.getReviewStatus() == com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING
+                && Boolean.TRUE.equals(dietLog.getIsPtNotified())) {
             dietLogHelper.notifyPtOfNewLog(dietLog);
         }
         return ApiResponse.success(dietLogHelper.toResponse(dietLog), "Diet log updated");
@@ -272,6 +318,10 @@ public class DietLogServiceImpl implements DietLogService {
                 && dietLog.getStatus() != DietLogStatus.DRAFT
                 && dietLog.getStatus() != DietLogStatus.MANUAL_REQUIRED) {
             throw new BadRequestException("Only DRAFT, MANUAL_REQUIRED or LOGGED logs can be submitted for review");
+        }
+
+        if (!dietLogHelper.hasActivePt(customerId)) {
+            throw new BadRequestException("Bạn chưa có PT");
         }
 
         dietLog.setStatus(DietLogStatus.LOGGED);
@@ -314,7 +364,7 @@ public class DietLogServiceImpl implements DietLogService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<DietSummaryResponse> getSummary(UUID customerId, LocalDate date) {
-        if (date == null) date = LocalDate.now();
+        if (date == null) date = DietDates.todayVn();
         List<DietLog> logs = dietLogRepository.findByCustomerIdAndLogDate(customerId, date);
 
         BigDecimal totalCalories = MacroUtils.ZERO;
@@ -356,5 +406,28 @@ public class DietLogServiceImpl implements DietLogService {
                 .build();
 
         return ApiResponse.success(summary);
+    }
+
+    /**
+     * Today VN: mealPeriod must equal current window (defaults to current if omitted).
+     * Past logDate: any period allowed; derive from mealType when unambiguous.
+     */
+    private MealPeriod resolveAndValidateMealPeriod(MealPeriod requested, MealType mealType, LocalDate logDate) {
+        LocalDate today = DietDates.todayVn();
+        MealPeriod current = MealPeriods.current();
+
+        if (logDate != null && logDate.equals(today)) {
+            MealPeriod period = requested != null ? requested : current;
+            if (period != current) {
+                throw new BadRequestException(
+                        "Hôm nay chỉ được ghi nhật ký cho khung giờ hiện tại (" + current + ")");
+            }
+            return period;
+        }
+
+        if (requested != null) {
+            return requested;
+        }
+        return MealPeriods.deriveFromMealType(mealType);
     }
 }
