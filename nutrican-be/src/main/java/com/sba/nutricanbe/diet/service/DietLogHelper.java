@@ -29,6 +29,5 @@ public interface DietLogHelper {
     Optional<PtClientMapping> findActivePt(UUID customerId);
     void notifyPtOfNewLog(DietLog dietLog);
     MealType parseMealType(String mealTypeStr);
-    boolean shouldSuggestSos(MealSource mealSource, MealRecognitionResult aiResult, boolean hasDbMatch);
     DietLogResponse toResponse(DietLog dietLog);
 }

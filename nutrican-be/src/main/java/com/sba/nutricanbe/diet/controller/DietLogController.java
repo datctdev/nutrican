@@ -4,7 +4,6 @@ package com.sba.nutricanbe.diet.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
-import com.sba.nutricanbe.diet.dto.response.SosTicketResponse;
 
 import com.sba.nutricanbe.user.entity.User;
 
@@ -25,7 +24,6 @@ import com.sba.nutricanbe.diet.service.DietLogImageService;
 import com.sba.nutricanbe.diet.service.DietLogFeedbackService;
 import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.diet.service.MealAnalysisService;
-import com.sba.nutricanbe.diet.service.SosService;
 import com.sba.nutricanbe.workspace.dto.DietLogReviewResponse;
 import com.sba.nutricanbe.workspace.service.PtDietLogReviewService;
 
@@ -75,7 +73,6 @@ public class DietLogController {
     private final DietLogService dietLogService;
     private final DietLogImageService dietLogImageService;
     private final MealAnalysisService mealAnalysisService;
-    private final SosService sosService;
     private final DietLogFeedbackService dietLogFeedbackService;
     private final PtDietLogReviewService ptDietLogReviewService;
 
@@ -293,7 +290,7 @@ public class DietLogController {
 
     @PostMapping(value = "/logs/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 
-    public ResponseEntity<ApiResponse<java.util.List<DietLogImageDto>>> uploadImages(
+    public ResponseEntity<ApiResponse<List<DietLogImageDto>>> uploadImages(
 
             @PathVariable UUID id,
 
@@ -309,7 +306,7 @@ public class DietLogController {
 
     @GetMapping("/logs/{id}/images")
 
-    public ResponseEntity<ApiResponse<java.util.List<DietLogImageDto>>> getImages(
+    public ResponseEntity<ApiResponse<List<DietLogImageDto>>> getImages(
 
             @PathVariable UUID id,
 
@@ -369,30 +366,6 @@ public class DietLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
         return ResponseEntity.ok(dietLogService.getSummary(user.getId(), date));
-
-    }
-
-
-
-    @PostMapping("/sos")
-
-    public ResponseEntity<ApiResponse<Void>> createSos(
-
-            @AuthenticationPrincipal User user,
-
-            @Valid @RequestBody CreateSosRequest request) {
-
-        return ResponseEntity.ok(sosService.createSosTicket(user.getId(), request));
-
-    }
-
-
-
-    @GetMapping("/sos")
-
-    public ResponseEntity<ApiResponse<List<SosTicketResponse>>> getSosTickets(@AuthenticationPrincipal User user) {
-
-        return ResponseEntity.ok(sosService.getSosTickets(user.getId()));
 
     }
 

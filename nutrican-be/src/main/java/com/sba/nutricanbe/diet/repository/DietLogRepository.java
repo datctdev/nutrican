@@ -33,9 +33,6 @@ public interface DietLogRepository extends JpaRepository<DietLog, UUID> {
     List<DietLog> findByCustomerIdAndLogDate(
             @Param("customerId") UUID customerId, @Param("date") LocalDate date);
 
-    @Query("SELECT d FROM DietLog d WHERE d.sosTicketFlag = true AND d.status = :status")
-    Page<DietLog> findSosTickets(@Param("status") DietLogStatus status, Pageable pageable);
-
     @Query("SELECT d FROM DietLog d WHERE d.id = :id")
     Optional<DietLog> findByIdWithCustomer(@Param("id") UUID id);
 

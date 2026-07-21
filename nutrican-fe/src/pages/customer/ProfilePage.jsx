@@ -88,7 +88,6 @@ export default function ProfilePage() {
   const [newWeeklySummary, setNewWeeklySummary] = useState(false);
   const [postMealRatingOptIn, setPostMealRatingOptIn] = useState(true);
   const [hireResultEmail, setHireResultEmail] = useState(true);
-  const [sosResultEmail, setSosResultEmail] = useState(true);
   const [weeklySummaryEmail, setWeeklySummaryEmail] = useState(true);
   const [bodyMetricReminder, setBodyMetricReminder] = useState(true);
   const [showBodyMetricReminder, setShowBodyMetricReminder] = useState(false);
@@ -152,7 +151,6 @@ export default function ProfilePage() {
       const optIn = data.notificationOptIn || {};
       setPostMealRatingOptIn(optIn.postMealRating !== false);
       setHireResultEmail(optIn.hireResultEmail !== false);
-      setSosResultEmail(optIn.sosResultEmail !== false);
       setWeeklySummaryEmail(optIn.weeklySummaryEmail !== false);
       setBodyMetricReminder(optIn.bodyMetricReminder !== false);
       try {

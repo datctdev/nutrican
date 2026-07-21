@@ -14,7 +14,6 @@ export default function SettingPage() {
   // Notification Preferences States
   const [postMealRatingOptIn, setPostMealRatingOptIn] = useState(true);
   const [hireResultEmail, setHireResultEmail] = useState(true);
-  const [sosResultEmail, setSosResultEmail] = useState(true);
   const [weeklySummaryEmail, setWeeklySummaryEmail] = useState(true);
   const [bodyMetricReminder, setBodyMetricReminder] = useState(true);
 
@@ -64,7 +63,6 @@ export default function SettingPage() {
       const optIn = data.notificationOptIn || {};
       setPostMealRatingOptIn(optIn.postMealRating !== false);
       setHireResultEmail(optIn.hireResultEmail !== false);
-      setSosResultEmail(optIn.sosResultEmail !== false);
       setWeeklySummaryEmail(optIn.weeklySummaryEmail !== false);
       setBodyMetricReminder(optIn.bodyMetricReminder !== false);
     } catch (err) {
@@ -88,7 +86,6 @@ export default function SettingPage() {
         notificationOptIn: {
           postMealRating: postMealRatingOptIn,
           hireResultEmail,
-          sosResultEmail,
           weeklySummaryEmail,
           bodyMetricReminder,
         },
@@ -184,7 +181,6 @@ export default function SettingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[
                 { checked: hireResultEmail, set: setHireResultEmail, title: 'Kết quả thuê PT', desc: 'Nhận email thông báo khi PT chấp nhận/từ chối.' },
-                { checked: sosResultEmail, set: setSosResultEmail, title: 'Yêu cầu khẩn cấp (SOS)', desc: 'Nhận email khi ticket SOS được xử lý/phân công.' },
                 { checked: weeklySummaryEmail, set: setWeeklySummaryEmail, title: 'Báo cáo tổng kết tuần', desc: 'Nhận email chứa đánh giá chi tiết hàng tuần từ PT.' },
                 { checked: bodyMetricReminder, set: setBodyMetricReminder, title: 'Nhắc ghi cân hàng tuần', desc: 'Thông báo nhắc nếu bạn chưa ghi cân nặng quá 7 ngày.' },
               ].map((item) => (

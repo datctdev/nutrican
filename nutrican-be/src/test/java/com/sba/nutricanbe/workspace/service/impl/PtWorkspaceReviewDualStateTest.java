@@ -6,7 +6,6 @@ import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
-import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
@@ -36,7 +35,6 @@ class PtWorkspaceReviewDualStateTest {
     @Mock private BodyMetricRepository bodyMetricRepository;
     @Mock private UserRepository userRepository;
     @Mock private DietLogImageRepository dietLogImageRepository;
-    @Mock private SosTicketRepository sosTicketRepository;
     @Mock private UserQueryService userQueryService;
     @Mock private WebSocketSessionService webSocketSessionService;
 

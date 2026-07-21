@@ -34,9 +34,9 @@ public class CoachingVnPayServiceImpl implements CoachingVnPayService {
         params.put("vnp_OrderType", "other");
         params.put("vnp_Amount", payment.getAmount().multiply(BigDecimal.valueOf(100)).toBigInteger().toString());
         params.put("vnp_ReturnUrl", vnPayConfig.getReturnUrl());
-        if (vnPayConfig.getIpnUrl() != null && !vnPayConfig.getIpnUrl().isBlank()) {
-            params.put("vnp_IpnUrl", vnPayConfig.getIpnUrl());
-        }
+        // vnp_IpnUrl is NOT a valid vpcpay.html request parameter. Including it in the
+        // signed payload makes VNPay reject the request with code 70 (invalid signature).
+        // The IPN endpoint must be registered in the merchant portal instead.
         params.put("vnp_IpAddr", "127.0.0.1");
         params.put("vnp_CreateDate", now.format(VNP_TIME));
         params.put("vnp_CurrCode", "VND");

@@ -37,7 +37,6 @@ public class DietLogReviewResponse {
     private MacroNutrients macrosJson;
     private DietLogStatus status;
     private DietLogReviewStatus reviewStatus;
-    private Boolean sosTicketFlag;
     private LocalDate logDate;
     private LocalDateTime createdAt;
     private LocalDateTime ptReviewedAt;

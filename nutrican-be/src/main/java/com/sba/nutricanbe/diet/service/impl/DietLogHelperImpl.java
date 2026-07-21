@@ -2,7 +2,6 @@ package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 
-import com.sba.nutricanbe.ai.dto.MealRecognitionResult;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.DietLogItem;
 import com.sba.nutricanbe.diet.entity.FoodItem;
@@ -55,9 +54,6 @@ public class DietLogHelperImpl implements DietLogHelper {
     private final ApplicationEventPublisher eventPublisher;
     private final UserQueryService userQueryService;
     private final StorageService minioService;
-
-    @Value("${ai.recognition.confidence-threshold:0.25}")
-    private BigDecimal confidenceThreshold;
 
     @Override
     public void applyItemsToLog(DietLog dietLog, List<DietLogItemRequest> itemRequests) {
@@ -237,15 +233,6 @@ public class DietLogHelperImpl implements DietLogHelper {
     }
 
     @Override
-    public boolean shouldSuggestSos(MealSource mealSource, MealRecognitionResult aiResult, boolean hasDbMatch) {
-        if (mealSource == MealSource.HOME_COOKED) return false;
-        boolean isHighConfidence = !aiResult.isFallback()
-                && aiResult.getConfidenceScore() != null
-                && aiResult.getConfidenceScore().compareTo(confidenceThreshold) >= 0;
-        return !isHighConfidence || !hasDbMatch;
-    }
-
-    @Override
     public DietLogResponse toResponse(DietLog dietLog) {
         List<DietLogImageDto> additionalImages = null;
         if (dietLog.getAdditionalImages() != null && !dietLog.getAdditionalImages().isEmpty()) {
@@ -351,7 +338,6 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .foodDescription(dietLog.getFoodDescription())
                 .matchedFoodName(dietLog.getMatchedFoodName())
                 .aiFoodCode(aiFoodCode)
-                .sosTicketFlag(dietLog.getSosTicketFlag())
                 .ptReviewerId(dietLog.getPtReviewerId())
                 .ptNote(dietLog.getPtNote())
                 .ptCorrectionReason(dietLog.getPtCorrectionReason())
@@ -364,14 +350,6 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .restaurantName(dietLog.getRestaurantName())
                 .recognitionSource(dietLog.getRecognitionSource())
                 .foodItemId(dietLog.getFoodItemId())
-                .suggestSos(shouldSuggestSos(
-                        dietLog.getMealSource() != null ? dietLog.getMealSource() : MealSource.HOME_COOKED,
-                        MealRecognitionResult.builder()
-                                .confidenceScore(dietLog.getAiConfidenceScore())
-                                .fallback(dietLog.getStatus() == DietLogStatus.DRAFT
-                                        || dietLog.getStatus() == DietLogStatus.MANUAL_REQUIRED)
-                                .build(),
-                        dietLog.getFoodItemId() != null))
                 .suggestedFoodMatches(suggestedMatches)
                 .items(items)
                 .totalGrams(totalGrams)

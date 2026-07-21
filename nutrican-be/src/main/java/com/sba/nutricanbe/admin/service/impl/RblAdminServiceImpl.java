@@ -8,14 +8,10 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.DietLogItem;
-import com.sba.nutricanbe.diet.entity.SosTicket;
 import com.sba.nutricanbe.diet.enums.MealSource;
-import com.sba.nutricanbe.diet.enums.PtReviewAction;
 import com.sba.nutricanbe.diet.enums.RecognitionSource;
-import com.sba.nutricanbe.diet.enums.SosReasonCode;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
-import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.RblDatasetFilter;
 import com.sba.nutricanbe.common.util.RblMetricsUtil;
@@ -37,7 +33,6 @@ import java.util.stream.Collectors;
 public class RblAdminServiceImpl implements RblAdminService {
 
     private final DietLogRepository dietLogRepository;
-    private final SosTicketRepository sosTicketRepository;
     private final PtClientMappingRepository mappingRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -72,7 +67,7 @@ public class RblAdminServiceImpl implements RblAdminService {
         csv.append("log_id,log_date,meal_source,meal_complexity,recognition_source,experiment_cohort,ai_confidence,db_match_score,");
         csv.append("model_version,prompt_version,ai_food_name,db_food_name,ai_cal,ai_pro,ai_carb,ai_fat,db_cal,db_pro,db_carb,db_fat,");
         csv.append("pt_cal,pt_pro,pt_carb,pt_fat,delta_ai_cal,delta_db_cal,pt_action,pt_correction_reason,pt_reviewed_at,");
-        csv.append("sos_ticket_flag,sos_reason_code,fields_changed,customer_id_hash,image_object_name,");
+        csv.append("fields_changed,customer_id_hash,image_object_name,");
         csv.append("ai_portion_g,db_applied,blind_cal,blind_pro,blind_carb,blind_fat,diet_log_items_json\n");
         for (RblExportRowDto r : rows) {
             csv.append(r.getLogId()).append(',');
@@ -104,8 +99,6 @@ public class RblAdminServiceImpl implements RblAdminService {
             csv.append(safe(r.getPtAction())).append(',');
             csv.append(safe(r.getPtCorrectionReason())).append(',');
             csv.append(r.getPtReviewedAt()).append(',');
-            csv.append(r.getSosTicketFlag()).append(',');
-            csv.append(safe(r.getSosReasonCode())).append(',');
             csv.append(safe(r.getFieldsChanged())).append(',');
             csv.append(safe(r.getCustomerIdHash())).append(',');
             csv.append(safe(r.getImageObjectName())).append(',');
@@ -200,11 +193,6 @@ public class RblAdminServiceImpl implements RblAdminService {
     }
 
     private RblExportRowDto toExportRow(DietLog log) {
-        SosReasonCode sosReason = null;
-        List<SosTicket> tickets = sosTicketRepository.findByDietLog_Id(log.getId());
-        if (!tickets.isEmpty()) {
-            sosReason = tickets.get(0).getReasonCode();
-        }
         String fieldsChanged = MacroUtils.fieldsChanged(log.getMacrosAtReview(), log.getPtAdjustedMacros());
         BigDecimal aiPortionG = null;
         Boolean dbApplied = null;
@@ -243,8 +231,6 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .ptAction(log.getPtAction() != null ? log.getPtAction().name() : null)
                 .ptCorrectionReason(log.getPtCorrectionReason() != null ? log.getPtCorrectionReason().name() : null)
                 .ptReviewedAt(log.getPtReviewedAt())
-                .sosTicketFlag(log.getSosTicketFlag())
-                .sosReasonCode(sosReason != null ? sosReason.name() : null)
                 .fieldsChanged(fieldsChanged)
                 .customerIdHash(RblMetricsUtil.customerHash(log.getCustomerId()))
                 .imageObjectName(log.getImageObjectName())
@@ -290,16 +276,6 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .collect(Collectors.groupingBy(l -> l.getPtCorrectionReason().name(),
                         Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
 
-        long sosCount = reviewed.stream().filter(l -> Boolean.TRUE.equals(l.getSosTicketFlag())).count();
-        long sosReviewed = reviewed.stream()
-                .filter(l -> Boolean.TRUE.equals(l.getSosTicketFlag()) && l.getPtReviewedAt() != null).count();
-        long sosAdjust = reviewed.stream()
-                .filter(l -> Boolean.TRUE.equals(l.getSosTicketFlag()) && l.getPtAction() == PtReviewAction.ADJUST).count();
-        long sosLowConf = reviewed.stream()
-                .filter(l -> Boolean.TRUE.equals(l.getSosTicketFlag())
-                        && l.getAiConfidenceScore() != null
-                        && l.getAiConfidenceScore().compareTo(new BigDecimal("0.6")) < 0).count();
-
         double avgHours = reviewed.stream()
                 .filter(l -> l.getPtReviewedAt() != null && l.getCreatedAt() != null)
                 .mapToDouble(l -> ChronoUnit.MINUTES.between(l.getCreatedAt(), l.getPtReviewedAt()) / 60.0)
@@ -333,7 +309,6 @@ public class RblAdminServiceImpl implements RblAdminService {
         return RblStatsResponse.builder()
                 .totalReviewed(reviewed.size())
                 .totalLabeledCv(cvLabeled.size())
-                .totalSos((int) sosCount)
                 .legacyLogsExcluded((int) legacyExcluded)
                 .insufficientSample(cvLabeled.size() < 30)
                 .maeAiCalories(maeCalories(cvLabeled))
@@ -344,9 +319,6 @@ public class RblAdminServiceImpl implements RblAdminService {
                 .maeByDbMatchScoreBucket(buildMaeByDbMatchScore(cvLabeled))
                 .maeByRecognitionSource(maeByRec)
                 .topCorrectionReasons(reasons)
-                .sosToReviewRate(sosCount == 0 ? 0 : (double) sosReviewed / sosCount)
-                .sosToAdjustRate(sosCount == 0 ? 0 : (double) sosAdjust / sosCount)
-                .sosLowConfidenceRate(sosCount == 0 ? 0 : (double) sosLowConf / sosCount)
                 .foodDbCoverage(dbCoverage)
                 .blindVsAiMae(maeBlindVs(cvLabeled, "ai"))
                 .blindVsPtMae(maeBlindVs(blindLogs, "pt"))

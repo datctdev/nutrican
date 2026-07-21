@@ -91,10 +91,6 @@ public class WebSocketSessionService {
         sendToUser(ptId, "NEW_DIET_LOG", dietLogInfo);
     }
 
-    public void broadcastSos(UUID ptId, Object sosInfo) {
-        sendToUser(ptId, "SOS", sosInfo);
-    }
-
     @Data
     @Builder
     public static class WebSocketMessage {

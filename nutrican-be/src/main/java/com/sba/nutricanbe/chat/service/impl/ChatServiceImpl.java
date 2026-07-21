@@ -6,9 +6,6 @@ import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
 import com.sba.nutricanbe.chat.entity.ChatMessage;
 import com.sba.nutricanbe.chat.enums.ChatContextType;
 import com.sba.nutricanbe.chat.enums.ChatMessageType;
-import com.sba.nutricanbe.diet.entity.SosTicket;
-import com.sba.nutricanbe.diet.enums.SosTicketStatus;
-import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.chat.repository.ChatMessageRepository;
 import com.sba.nutricanbe.chat.service.ChatService;
 import com.sba.nutricanbe.common.enums.UserRole;
@@ -44,7 +41,6 @@ public class ChatServiceImpl implements ChatService {
     private final UserRepository userRepository;
     private final StorageService storageService;
     private final WebSocketSessionService webSocketSessionService;
-    private final SosTicketRepository sosTicketRepository;
     private static final String CHAT_MESSAGE_EVENT = "CHAT_MESSAGE";
 
     @Override
@@ -105,7 +101,6 @@ public class ChatServiceImpl implements ChatService {
                 .contextType(request.getContextType())
                 .contextRefId(request.getContextRefId())
                 .build());
-        recordPtFirstResponse(sender, mapping);
         return toMessageResponse(message);
     }
 
@@ -147,27 +142,7 @@ public class ChatServiceImpl implements ChatService {
                 .contextType(contextType)
                 .contextRefId(contextRefId)
                 .build());
-        recordPtFirstResponse(sender, mapping);
         return toMessageResponse(message);
-    }
-
-    private void recordPtFirstResponse(User sender, PtClientMapping mapping) {
-        if (sender.getRole() != UserRole.PT_CERTIFIED && sender.getRole() != UserRole.PT_FREELANCE) {
-            return;
-        }
-        UUID clientId = mapping.getClient().getId();
-        sosTicketRepository.findByCustomerId(clientId).stream()
-                .filter(t -> t.getPtId() != null && t.getPtId().equals(sender.getId()))
-                .filter(t -> t.getFirstResponseAt() == null
-                        && t.getStatus() != SosTicketStatus.RESOLVED
-                        && t.getStatus() != SosTicketStatus.CLOSED)
-                .forEach(ticket -> {
-                    ticket.setFirstResponseAt(LocalDateTime.now());
-                    if (ticket.getStatus() == SosTicketStatus.ASSIGNED) {
-                        ticket.setStatus(SosTicketStatus.IN_PROGRESS);
-                    }
-                    sosTicketRepository.save(ticket);
-                });
     }
 
     @Override

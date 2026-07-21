@@ -7,10 +7,8 @@ import com.sba.nutricanbe.common.util.RblMetricsUtil;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.MealPlan;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
-import com.sba.nutricanbe.diet.enums.SosTicketStatus;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
-import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
 import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
@@ -43,7 +41,6 @@ public class PtDashboardServiceImpl implements PtDashboardService {
 
     private final PtClientMappingRepository mappingRepository;
     private final DietLogRepository dietLogRepository;
-    private final SosTicketRepository sosTicketRepository;
     private final IntakeControlLoopService intakeControlLoopService;
     private final MealPlanRepository mealPlanRepository;
     private final BodyMetricRepository bodyMetricRepository;
@@ -58,13 +55,10 @@ public class PtDashboardServiceImpl implements PtDashboardService {
         long pendingCount = clientIds.isEmpty() ? 0
                 : dietLogRepository.findByCustomerIdInAndReviewStatus(
                         clientIds, DietLogReviewStatus.PENDING, PageRequest.of(0, 1)).getTotalElements();
-        long pendingSos = sosTicketRepository.findByPt_IdAndStatus(
-                ptId, SosTicketStatus.ASSIGNED, PageRequest.of(0, 1)).getTotalElements();
 
         PtStatsDto stats = PtStatsDto.builder()
                 .totalClients((int) allClients.getTotalElements())
                 .pendingReviews((int) pendingCount)
-                .pendingSosTickets((int) pendingSos)
                 .reviewsThisWeek(0)
                 .averageAdherenceRate(BigDecimal.valueOf(85))
                 .build();

@@ -21,7 +21,6 @@ import com.sba.nutricanbe.diet.repository.DietLogImageRepository;
 import com.sba.nutricanbe.diet.repository.DietLogItemRepository;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
-import com.sba.nutricanbe.diet.repository.SosTicketRepository;
 import com.sba.nutricanbe.user.service.UserQueryService;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MacroUtils;
@@ -72,7 +71,6 @@ public class DietLogServiceImpl implements DietLogService {
     private final FoodItemRepository foodItemRepository;
     private final StorageService minioService;
     private final DietLogHelper dietLogHelper;
-    private final SosTicketRepository sosTicketRepository;
     private final IntakeControlLoopService intakeControlLoopService;
     private final com.sba.nutricanbe.diet.service.UserRecipeService userRecipeService;
     private final DietPrefCheckService dietPrefCheckService;
@@ -368,7 +366,6 @@ public class DietLogServiceImpl implements DietLogService {
 
         dietLogImageRepository.deleteAll(additionalImages);
         dietLogItemRepository.deleteByDietLogId(logId);
-        sosTicketRepository.deleteByDietLogId(logId);
         dietLogRepository.delete(dietLog);
 
         return ApiResponse.success(null, "Diet log deleted");

@@ -32,7 +32,6 @@ public class AnalyzeMealResponse {
     private MealType mealType;
     private MealPeriod mealPeriod;
     private MealPeriod makeupForPeriod;
-    private Boolean suggestSos;
     private List<FoodItemResponse> suggestedFoodMatches;
     private List<FoodPredictionResponse> topPredictions;
     private Boolean llavaUsed;

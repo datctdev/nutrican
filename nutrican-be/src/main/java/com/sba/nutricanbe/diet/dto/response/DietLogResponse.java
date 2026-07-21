@@ -38,7 +38,6 @@ public class DietLogResponse {
     private String foodDescription;
     private String matchedFoodName;
     private String aiFoodCode;
-    private Boolean sosTicketFlag;
     private UUID ptReviewerId;
     private String ptNote;
     private PtCorrectionReason ptCorrectionReason;
@@ -51,7 +50,6 @@ public class DietLogResponse {
     private String restaurantName;
     private RecognitionSource recognitionSource;
     private UUID foodItemId;
-    private Boolean suggestSos;
     private java.util.List<FoodItemResponse> suggestedFoodMatches;
     private java.util.List<DietLogItemResponse> items;
     /** Total portion grams: sum(items.quantityG) or AI-adjusted portion from aiRawJson. */

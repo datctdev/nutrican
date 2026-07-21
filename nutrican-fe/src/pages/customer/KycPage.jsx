@@ -12,10 +12,11 @@ import {
   FileText, Camera, ArrowRight, RotateCcw, Loader2,
   User, Briefcase, Award, FileUp, GraduationCap, Sparkles,
   Users, TrendingUp, Star, ChevronRight, Mail, Phone, UploadCloud,
-  Plus, Trash2, MapPin, Monitor, Dumbbell, Globe,
+  Plus, Trash2, Monitor, Dumbbell, Globe,
   ExternalLink, Image as ImageIcon, Calendar, Link2
 } from 'lucide-react';
 import PtVenueAvailabilityEditor, { newVenue, weekScheduleToAvailabilityWindows } from '../../components/pt/PtVenueAvailabilityEditor';
+import ProvinceSelect from '../../components/common/ProvinceSelect';
 import { createDefaultWeekSchedule, sessionMinutesFromRateUnit, DAY_LABELS } from '../../utils/offlineHireSlots';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -58,10 +59,8 @@ const modeIncludes = (selectedMode, optionMode) =>
 const hasPositiveRate = (value) =>
   value !== '' && value !== null && value !== undefined && Number(value) > 0;
 
-const LOCATION_OPTIONS = [
-  'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ',
-  'Hải Phòng', 'Bình Dương', 'Đồng Nai', 'Vũng Tàu', 'Khác',
-];
+// Chỉ giữ chữ số (ô phí là số nguyên VNĐ, không âm, không phần thập phân)
+const digitsOnly = (value) => (value ?? '').toString().replace(/\D/g, '');
 
 const newEmptyCert = () => ({
   _id: Math.random().toString(36).slice(2),
@@ -122,6 +121,12 @@ function validatePtForm(form, certList, venues, weekSchedule) {
     if (!c.name.trim()) return `Chứng chỉ #${i + 1}: Vui lòng nhập tên chứng chỉ`;
     if (!c.issuingOrganization.trim()) return `Chứng chỉ #${i + 1}: Vui lòng nhập tổ chức cấp`;
     if (!c.issueDate) return `Chứng chỉ #${i + 1}: Vui lòng nhập ngày cấp`;
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    if (c.issueDate > currentMonth) return `Chứng chỉ #${i + 1}: Ngày cấp không được ở tương lai`;
+    if (!c.neverExpires) {
+      if (!c.expiryDate) return `Chứng chỉ #${i + 1}: Vui lòng nhập ngày hết hạn (hoặc tick "Không hết hạn")`;
+      if (c.expiryDate <= c.issueDate) return `Chứng chỉ #${i + 1}: Ngày hết hạn phải sau ngày cấp`;
+    }
     if (!c.certificateImageUrl) return `Chứng chỉ #${i + 1}: Vui lòng tải ảnh chứng chỉ lên`;
   }
   return null;
@@ -290,7 +295,7 @@ function CertCard({ cert, index, onChange, onRemove, onImageUpload }) {
         <input
           ref={imageRef}
           type="file"
-          accept="image/*,application/pdf"
+          accept="image/jpeg,image/png,application/pdf"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -549,6 +554,8 @@ export default function KycPage() {
   };
 
   const handleCertImageUpload = async (index, file) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) { toast.error('Chỉ chấp nhận ảnh JPG, PNG hoặc PDF'); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error('Ảnh không được vượt quá 5MB'); return; }
     // Show local preview immediately
     const preview = URL.createObjectURL(file);
@@ -1156,15 +1163,11 @@ export default function KycPage() {
                   {modeIncludes(ptForm.trainingMode, 'OFFLINE') && (
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Địa Điểm Hoạt Động *</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <select value={ptForm.location}
-                        onChange={(e) => setPtForm(p => ({ ...p, location: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm bg-white appearance-none">
-                        <option value="">-- Chọn tỉnh/thành --</option>
-                        {LOCATION_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                      </select>
-                    </div>
+                    <ProvinceSelect
+                      value={ptForm.location}
+                      onChange={(v) => setPtForm(p => ({ ...p, location: v }))}
+                      placeholder="Chọn hoặc tìm tỉnh/thành..."
+                    />
                   </div>
                   )}
 
@@ -1173,8 +1176,8 @@ export default function KycPage() {
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Huấn Luyện ONLINE *</label>
                     <div className="relative">
-                      <input type="number" value={ptForm.onlineRate} min={1}
-                        onChange={(e) => setPtForm(p => ({ ...p, onlineRate: e.target.value }))}
+                      <input type="text" inputMode="numeric" value={ptForm.onlineRate}
+                        onChange={(e) => setPtForm(p => ({ ...p, onlineRate: digitsOnly(e.target.value) }))}
                         placeholder="VD: 3000000"
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm" />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">VNĐ / tháng</span>
@@ -1195,8 +1198,8 @@ export default function KycPage() {
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Huấn Luyện OFFLINE *</label>
                     <div className="flex gap-3">
                       <div className="relative flex-1">
-                        <input type="number" value={ptForm.offlineRate} min={1}
-                          onChange={(e) => setPtForm(current => ({ ...current, offlineRate: e.target.value }))}
+                        <input type="text" inputMode="numeric" value={ptForm.offlineRate}
+                          onChange={(e) => setPtForm(current => ({ ...current, offlineRate: digitsOnly(e.target.value) }))}
                           placeholder="VD: 500000"
                           className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">VNĐ</span>

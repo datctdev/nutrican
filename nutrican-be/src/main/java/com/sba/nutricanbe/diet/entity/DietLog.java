@@ -73,10 +73,6 @@ public class DietLog extends BaseEntity {
     @Column(name = "food_description", columnDefinition = "TEXT")
     private String foodDescription;
 
-    @Column(name = "sos_ticket_flag")
-    @Builder.Default
-    private Boolean sosTicketFlag = false;
-
     @Column(name = "pt_reviewer_id")
     private UUID ptReviewerId;
 

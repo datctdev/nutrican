@@ -1,13 +1,16 @@
 package com.sba.nutricanbe.user.config;
 
+import com.sba.nutricanbe.common.entity.SystemSetting;
 import com.sba.nutricanbe.common.enums.RequestStatus;
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
+import com.sba.nutricanbe.common.repository.SystemSettingRepository;
 import com.sba.nutricanbe.user.dto.CertificationData;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.entity.PtUpdateRequest;
+import com.sba.nutricanbe.user.entity.Review;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
@@ -19,6 +22,7 @@ import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.PtUpdateRequestRepository;
+import com.sba.nutricanbe.user.repository.ReviewRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,90 +38,134 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Seed accounts. Hai nhóm rõ ràng:
+ * <ul>
+ *   <li><b>DEMO CHÍNH</b> ({@code @nutrican.com}, mật khẩu {@value #PASSWORD}): admin@, pt@,
+ *       customer@ (có PT), solo@ (không PT) — dữ liệu phong phú, dùng để demo cho khách.</li>
+ *   <li><b>SEED NỀN</b> ({@code @gmail.com}): làm chợ PT/đánh giá sinh động và phục vụ
+ *       integration test. Không cần nhớ khi demo.</li>
+ * </ul>
+ */
 @Slf4j
 @Component
 @Order(1)
 @RequiredArgsConstructor
 public class UserInitializer implements CommandLineRunner {
 
-    private static final String DEFAULT_PASSWORD = "123456";
+    private static final String PASSWORD = "123456";
 
     private final UserRepository userRepository;
     private final PtProfileRepository ptProfileRepository;
     private final PtClientMappingRepository ptClientMappingRepository;
     private final MacroTargetRepository macroTargetRepository;
     private final PtUpdateRequestRepository ptUpdateRequestRepository;
+    private final ReviewRepository reviewRepository;
+    private final SystemSettingRepository systemSettingRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
     public void run(String... args) {
-        // 1. Tạo Customer
-        User customerOne = seedUser(
-                "customer1@gmail.com", DEFAULT_PASSWORD, "Nguyen Van Customer",
-                UserRole.CUSTOMER, "0901000001", "12 Nguyen Trai, Quan 1, TP.HCM", LocalDate.of(1998, 3, 12));
+        ensureRequireKycSetting();
+        seedDemoAccounts();
+        seedBackgroundAccounts();
+    }
 
-        User customerTwo = seedUser(
-                "customer2@gmail.com", DEFAULT_PASSWORD, "Tran Thi Hoc Vien",
-                UserRole.CUSTOMER, "0901000002", "45 Le Loi, Quan 3, TP.HCM", LocalDate.of(2000, 8, 20));
+    // ================= DEMO CHÍNH (nhớ 4 account này) =================
 
-        // 2. Tạo PT
-        User certifiedPt = seedUser(
-                "pt.certified@gmail.com", DEFAULT_PASSWORD, "Le Minh PT Certified",
-                UserRole.PT_CERTIFIED, "0902000001", "Fitness Hub, Quan 7, TP.HCM", LocalDate.of(1992, 5, 6));
+    private void seedDemoAccounts() {
+        seedUser("admin@nutrican.com", "Quản trị viên Nutrican", UserRole.ADMIN,
+                "0900000000", "Nutrican HQ, TP.HCM", LocalDate.of(1990, 1, 1));
 
-        User freelancePt = seedUser(
-                "pt.freelance@gmail.com", DEFAULT_PASSWORD, "Pham Anh PT Freelance",
-                UserRole.PT_FREELANCE, "0902000002", "Online Coaching, TP.HCM", LocalDate.of(1990, 11, 18));
-
-        // 3. Seed Full Data cho PT 1 (Chuyên nghiệp)
-        seedFullPtProfile(
-                certifiedPt,
-                "Chào bạn, mình là PT chuyên nghiệp với hơn 5 năm kinh nghiệm. Mình tin rằng mọi sự thay đổi đều bắt đầu từ thói quen nhỏ nhất. Việc kết hợp giữa dinh dưỡng khoa học và tập luyện bài bản sẽ mang lại kết quả bền vững.",
-                "Kỷ luật là cầu nối giữa mục tiêu và thành tựu. Tập luyện không chỉ thay đổi cơ thể mà còn rèn giũa ý chí.",
-                LocalDate.of(2016, 3, 1),
-                Gender.MALE,
-                "0902000001",
-                TrainingMode.BOTH,
-                "TP. Hồ Chí Minh",
-                BigDecimal.valueOf(1200000),
-                "MONTH",
-                BigDecimal.valueOf(450000),
-                "SESSION_60",
+        User mainPt = seedUser("pt@nutrican.com", "Coach Nutrican", UserRole.PT_CERTIFIED,
+                "0902000000", "Fitness Hub, Quận 7, TP.HCM", LocalDate.of(1992, 5, 6));
+        seedFullPtProfile(mainPt,
+                "PT chính của Nutrican — hơn 5 năm kinh nghiệm huấn luyện cá nhân và tư vấn dinh dưỡng. "
+                        + "Đồng hành cùng bạn từ những thói quen nhỏ nhất tới mục tiêu vóc dáng bền vững.",
+                "Kỷ luật là cầu nối giữa mục tiêu và thành tựu.",
+                LocalDate.of(2016, 3, 1), Gender.MALE, "0902000000", TrainingMode.BOTH,
+                "TP. Hồ Chí Minh", BigDecimal.valueOf(1200000), "MONTH",
+                BigDecimal.valueOf(450000), "SESSION_60",
                 List.of("Giảm cân", "Tăng cơ", "Thể hình"),
                 List.of("WEIGHT_LOSS", "MUSCLE_GAIN"),
                 List.of("NORMAL", "EAT_CLEAN"),
                 List.of(
                         CertificationData.builder().name("NASM Certified Personal Trainer").issuingOrganization("NASM").issueDate("2018-05").neverExpires(false).expiryDate("2028-05").certificateImageUrl("https://placehold.co/600x400/e2e8f0/64748b?text=NASM+Certificate").build(),
                         CertificationData.builder().name("Nutrition Specialist").issuingOrganization("Precision Nutrition").issueDate("2019-08").neverExpires(true).certificateImageUrl("https://placehold.co/600x400/e2e8f0/64748b?text=Nutrition+Certificate").build()
-                )
-        );
+                ));
 
-        // 4. Seed Full Data cho PT 2 (Tự do)
-        seedFullPtProfile(
-                freelancePt,
+        User demoCustomer = seedUser("customer@nutrican.com", "Khách Hàng Demo", UserRole.CUSTOMER,
+                "0901000000", "12 Nguyễn Trãi, Quận 1, TP.HCM", LocalDate.of(2000, 8, 20));
+        User demoSolo = seedUser("solo@nutrican.com", "Khách Hàng Solo (Không PT)", UserRole.CUSTOMER,
+                "0911000000", "Solo Demo, TP.HCM", LocalDate.of(1998, 5, 15));
+
+        seedCustomerE2eProfile(demoCustomer, NutritionGoal.MAINTAIN, 165, "FEMALE");
+        seedCustomerE2eProfile(demoSolo, NutritionGoal.WEIGHT_LOSS, 172, "MALE");
+        seedDemoMacroIfAbsent(demoCustomer, ActivityLevel.LIGHT, 1850, 105, 200, 60);
+        seedDemoMacroIfAbsent(demoSolo, ActivityLevel.MODERATE, 2100, 130, 230, 70);
+
+        seedMapping(mainPt, demoCustomer, ClientMappingStatus.ACTIVE);
+        // solo@ cố tình KHÔNG có PT (demo self-plan)
+
+        seedPtReviewsOnce(mainPt, demoCustomer,
+                "PT tận tình, chế độ ăn sát thực tế. Sau 2 tháng mình đã có kết quả rõ rệt!");
+
+        log.info("Seeded DEMO accounts (pwd {}): admin@, pt@, customer@ (có PT), solo@ (không PT)", PASSWORD);
+    }
+
+    // ============ SEED NỀN (marketplace sinh động + integration test) ============
+
+    private void seedBackgroundAccounts() {
+        User certifiedPt = seedUser(
+                "pt.certified@gmail.com", "Le Minh PT Certified", UserRole.PT_CERTIFIED,
+                "0902000001", "Fitness Hub, Quan 7, TP.HCM", LocalDate.of(1992, 5, 6));
+        seedFullPtProfile(certifiedPt,
+                "Chào bạn, mình là PT chuyên nghiệp với hơn 5 năm kinh nghiệm. Mình tin rằng mọi sự thay đổi đều bắt đầu từ thói quen nhỏ nhất. Việc kết hợp giữa dinh dưỡng khoa học và tập luyện bài bản sẽ mang lại kết quả bền vững.",
+                "Kỷ luật là cầu nối giữa mục tiêu và thành tựu. Tập luyện không chỉ thay đổi cơ thể mà còn rèn giũa ý chí.",
+                LocalDate.of(2016, 3, 1), Gender.MALE, "0902000001", TrainingMode.BOTH,
+                "TP. Hồ Chí Minh", BigDecimal.valueOf(1200000), "MONTH",
+                BigDecimal.valueOf(450000), "SESSION_60",
+                List.of("Giảm cân", "Tăng cơ", "Thể hình"),
+                List.of("WEIGHT_LOSS", "MUSCLE_GAIN"),
+                List.of("NORMAL", "EAT_CLEAN"),
+                List.of(
+                        CertificationData.builder().name("NASM Certified Personal Trainer").issuingOrganization("NASM").issueDate("2018-05").neverExpires(false).expiryDate("2028-05").certificateImageUrl("https://placehold.co/600x400/e2e8f0/64748b?text=NASM+Certificate").build(),
+                        CertificationData.builder().name("Nutrition Specialist").issuingOrganization("Precision Nutrition").issueDate("2019-08").neverExpires(true).certificateImageUrl("https://placehold.co/600x400/e2e8f0/64748b?text=Nutrition+Certificate").build()
+                ));
+
+        User freelancePt = seedUser(
+                "pt.freelance@gmail.com", "Pham Anh PT Freelance", UserRole.PT_FREELANCE,
+                "0902000002", "Online Coaching, TP.HCM", LocalDate.of(1990, 11, 18));
+        seedFullPtProfile(freelancePt,
                 "Freelance PT chuyên hướng dẫn lịch tập tại nhà và chế độ ăn dành cho người bận rộn. Phương pháp của mình tập trung vào tính thực tế, linh hoạt nhưng vẫn đảm bảo hiệu quả.",
                 "Tập luyện phải là niềm vui, không phải là gánh nặng. Chậm mà chắc luôn tốt hơn nhanh mà bỏ cuộc.",
-                LocalDate.of(2019, 6, 1),
-                Gender.FEMALE,
-                "0902000002",
-                TrainingMode.ONLINE,
-                "Hà Nội",
-                BigDecimal.valueOf(1500000),
-                "MONTH",
-                null,
-                null,
+                LocalDate.of(2019, 6, 1), Gender.FEMALE, "0902000002", TrainingMode.ONLINE,
+                "Hà Nội", BigDecimal.valueOf(1500000), "MONTH", null, null,
                 List.of("Yoga", "Pilates", "Giảm cân"),
                 List.of("WEIGHT_LOSS", "MAINTAIN"),
                 List.of("VEGAN", "KETO"),
                 List.of(
                         CertificationData.builder().name("200H Yoga Teacher Training").issuingOrganization("Yoga Alliance").issueDate("2020-01").neverExpires(true).certificateImageUrl("https://placehold.co/600x400/e2e8f0/64748b?text=Yoga+Certificate").build()
-                )
-        );
+                ));
 
-        // 5. Tạo dữ liệu giả lập cho Yêu cầu Cập nhật (Update Request)
+        User customerOne = seedUser(
+                "customer1@gmail.com", "Nguyen Van Customer", UserRole.CUSTOMER,
+                "0901000001", "12 Nguyen Trai, Quan 1, TP.HCM", LocalDate.of(1998, 3, 12));
+        User customerTwo = seedUser(
+                "customer2@gmail.com", "Tran Thi Hoc Vien", UserRole.CUSTOMER,
+                "0901000002", "45 Le Loi, Quan 3, TP.HCM", LocalDate.of(2000, 8, 20));
+
+        seedCustomerE2eProfile(customerOne, NutritionGoal.WEIGHT_LOSS, 170, "MALE");
+        seedCustomerE2eProfile(customerTwo, NutritionGoal.WEIGHT_LOSS, 165, "FEMALE");
+        seedMacroTarget(customerOne, 2000, 120, 220, 65);
+        seedMacroTarget(customerTwo, 1900, 110, 200, 60);
+
+        seedMapping(certifiedPt, customerOne, ClientMappingStatus.ACTIVE);
+        seedMapping(freelancePt, customerTwo, ClientMappingStatus.PENDING);
+
         if (!ptUpdateRequestRepository.existsByPtIdAndStatus(certifiedPt.getId(), RequestStatus.PENDING)) {
-            PtUpdateRequest updateReq = PtUpdateRequest.builder()
+            ptUpdateRequestRepository.save(PtUpdateRequest.builder()
                     .pt(certifiedPt)
                     .requestedData(Map.of(
                             "bio", "Bản cập nhật bio mới: Mình vừa thi đậu thêm chứng chỉ NASM cấp cao quốc tế.",
@@ -128,60 +176,31 @@ public class UserInitializer implements CommandLineRunner {
                     ))
                     .reason("Tôi muốn cập nhật lại SĐT liên hệ mới và tăng nhẹ mức phí dịch vụ cho các buổi tập 90 phút.")
                     .status(RequestStatus.PENDING)
-                    .build();
-            ptUpdateRequestRepository.save(updateReq);
-            log.info("✅ Seeded PENDING PtUpdateRequest for: {}", certifiedPt.getEmail());
+                    .build());
         }
 
-        // 6. Seed Mappings & Macro Targets
-        seedMapping(certifiedPt, customerOne, ClientMappingStatus.ACTIVE);
-        seedMapping(freelancePt, customerTwo, ClientMappingStatus.PENDING);
+        seedPtReviewsOnce(certifiedPt, customerOne,
+                "Anh PT hướng dẫn rất tận tình, chế độ ăn sát với thực tế không bị ngán. Rất đáng tiền!");
 
-        seedCustomerE2eProfile(customerOne, NutritionGoal.WEIGHT_LOSS, 170, "MALE");
-        seedCustomerE2eProfile(customerTwo, NutritionGoal.WEIGHT_LOSS, 165, "FEMALE");
-        seedMacroTarget(customerOne, 2000, 120, 220, 65);
-        seedMacroTarget(customerTwo, 1900, 110, 200, 60);
-
-        // Demo visual QA — meal-windows / self-plan (password Demo123!)
-        User demoSolo = seedUser(
-                "demo.solo@nutrican.com",
-                "Demo123!",
-                "Demo Solo (Khong PT)",
-                UserRole.CUSTOMER,
-                "0911000001",
-                "Demo Solo, TP.HCM",
-                LocalDate.of(1998, 5, 15));
-        User demoCoached = seedUser(
-                "demo.coached@nutrican.com",
-                "Demo123!",
-                "Demo Coached (Co PT)",
-                UserRole.CUSTOMER,
-                "0911000002",
-                "Demo Coached, TP.HCM",
-                LocalDate.of(2000, 2, 20));
-        seedCustomerE2eProfile(demoSolo, NutritionGoal.WEIGHT_LOSS, 172, "MALE");
-        seedCustomerE2eProfile(demoCoached, NutritionGoal.MAINTAIN, 165, "FEMALE");
-        LocalDateTime onboardedAt = LocalDateTime.now().minusDays(14);
-        demoSolo.setOnboardingCompletedAt(onboardedAt);
-        demoCoached.setOnboardingCompletedAt(onboardedAt);
-        userRepository.save(demoSolo);
-        userRepository.save(demoCoached);
-        seedDemoMacroIfAbsent(demoSolo, ActivityLevel.MODERATE, 2100, 130, 230, 70);
-        seedDemoMacroIfAbsent(demoCoached, ActivityLevel.LIGHT, 1850, 105, 200, 60);
-        seedMapping(certifiedPt, demoCoached, ClientMappingStatus.ACTIVE);
-        // demoSolo: intentionally NO mapping (no PT)
-
-        log.info("Seeded full data for users: {}, {}, {}, {}",
-                customerOne.getEmail(), customerTwo.getEmail(), certifiedPt.getEmail(), freelancePt.getEmail());
-        log.info("Seeded demo visual accounts: {} (no PT), {} (ACTIVE with {})",
-                demoSolo.getEmail(), demoCoached.getEmail(), certifiedPt.getEmail());
+        log.info("Seeded background accounts: {}, {}, {}, {}",
+                customerOne.getEmail(), customerTwo.getEmail(),
+                certifiedPt.getEmail(), freelancePt.getEmail());
     }
 
-    private User seedUser(String email, String rawPassword, String fullName, UserRole role, String phone, String address, LocalDate dateOfBirth) {
+    private void ensureRequireKycSetting() {
+        if (!systemSettingRepository.existsById("REQUIRE_KYC_FOR_PT")) {
+            systemSettingRepository.save(SystemSetting.builder()
+                    .key("REQUIRE_KYC_FOR_PT")
+                    .value("false")
+                    .build());
+        }
+    }
+
+    private User seedUser(String email, String fullName, UserRole role, String phone, String address, LocalDate dateOfBirth) {
         return userRepository.findByEmail(email)
                 .map(existing -> {
                     boolean changed = false;
-                    existing.setPasswordHash(passwordEncoder.encode(rawPassword));
+                    existing.setPasswordHash(passwordEncoder.encode(PASSWORD));
                     changed = true;
                     if (existing.getRole() != role) {
                         existing.setRole(role);
@@ -199,7 +218,7 @@ public class UserInitializer implements CommandLineRunner {
                 })
                 .orElseGet(() -> userRepository.save(User.builder()
                         .email(email)
-                        .passwordHash(passwordEncoder.encode(rawPassword))
+                        .passwordHash(passwordEncoder.encode(PASSWORD))
                         .fullName(fullName)
                         .role(role)
                         .status(UserStatus.ACTIVE)
@@ -281,6 +300,26 @@ public class UserInitializer implements CommandLineRunner {
                         .client(customer)
                         .status(status)
                         .build()));
+    }
+
+    private void seedPtReviewsOnce(User pt, User reviewer, String comment) {
+        if (reviewRepository.countByPtId(pt.getId()) > 0) {
+            return;
+        }
+        reviewRepository.save(Review.builder()
+                .pt(pt)
+                .reviewer(reviewer)
+                .rating(5.0)
+                .comment(comment)
+                .isAnonymous(false)
+                .imageUrl("https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1470&auto=format&fit=crop")
+                .build());
+        ptProfileRepository.findByUserId(pt.getId()).ifPresent(profile -> {
+            Double avg = reviewRepository.findAverageRatingByPtId(pt.getId());
+            profile.setRating(avg != null ? BigDecimal.valueOf(avg) : BigDecimal.valueOf(5.0));
+            profile.setTotalReviews((int) reviewRepository.countByPtId(pt.getId()));
+            ptProfileRepository.save(profile);
+        });
     }
 
     private void seedCustomerE2eProfile(User customer, NutritionGoal goal, int heightCm, String gender) {

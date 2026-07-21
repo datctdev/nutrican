@@ -167,7 +167,6 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             }
             ExperimentCohort cohort = RblCohortUtil.resolve(mealSource, mealComplexity, recognitionSource);
             DietLogStatus status = resolveStatus(aiResult);
-            boolean suggestSos = dietLogHelper.shouldSuggestSos(mealSource, aiResult, bestMatch.isPresent());
 
             Map<String, Object> aiRaw = buildAiRawJson(aiResult, mr, portionRatio, topPredictions);
 
@@ -236,7 +235,6 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
                     .mealType(mealType)
                     .mealPeriod(mealPeriod)
                     .makeupForPeriod(makeup)
-                    .suggestSos(suggestSos)
                     .suggestedFoodMatches(suggestedMatches)
                     .topPredictions(topPredictions)
                     .llavaUsed(aiResult.getLlavaUsed())

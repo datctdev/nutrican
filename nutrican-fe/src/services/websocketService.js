@@ -83,30 +83,10 @@ const handleWebSocketMessage = (message) => {
             window.dispatchEvent(new CustomEvent('realtime_update'));
             break;
 
-        case 'SOS':
-            addNotification({
-                id: data.logId,
-                type: 'error',
-                title: 'Yêu cầu hỗ trợ SOS',
-                message: `Học viên ${data.clientName} vừa gửi một yêu cầu hỗ trợ.`,
-                isRead: false,
-                createdAt: new Date().toISOString()
-            });
-            toast.error(`SOS: Học viên ${data.clientName} vừa gửi một yêu cầu hỗ trợ.`);
-            window.dispatchEvent(new CustomEvent('realtime_update'));
-            break;
-
         case 'DIET_LOG_REVIEWED':
             addNotification({ id: data.logId, type: 'success', title: 'PT đã đánh giá bữa ăn', message: `Bữa ăn của bạn đã được PT chuyển sang trạng thái: ${data.status}.`, isRead: false, createdAt: new Date().toISOString() });
             toast.success(`PT đã đánh giá bữa ăn: Chuyển sang trạng thái ${data.status}.`);
             window.dispatchEvent(new CustomEvent('DIET_LOG_REVIEWED', { detail: data }));
-            window.dispatchEvent(new CustomEvent('realtime_update_client'));
-            break;
-
-        case 'SOS_RESOLVED':
-            addNotification({ id: data.ticketId, type: 'success', title: 'SOS đã được giải quyết', message: `PT đã phản hồi yêu cầu hỗ trợ của bạn.`, isRead: false, createdAt: new Date().toISOString() });
-            toast.success(`PT đã phản hồi yêu cầu SOS của bạn.`);
-            window.dispatchEvent(new CustomEvent('SOS_RESOLVED', { detail: data }));
             window.dispatchEvent(new CustomEvent('realtime_update_client'));
             break;
 

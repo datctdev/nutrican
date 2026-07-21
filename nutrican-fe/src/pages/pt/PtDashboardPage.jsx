@@ -75,7 +75,6 @@ export default function PtDashboardPage() {
     const statCards = [
         { label: 'Tổng học viên', value: stats?.totalClients || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-100' },
         { label: 'Chờ nhận xét', value: stats?.pendingReviews || 0, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
-        { label: 'Yêu cầu SOS', value: stats?.pendingSosTickets || 0, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-100' },
     ];
 
     return (

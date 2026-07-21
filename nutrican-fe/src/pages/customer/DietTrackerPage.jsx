@@ -5,7 +5,7 @@ import { dietService } from '../../services/dietService';
 import PostMealRatingSheet from './components/PostMealRatingSheet';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
-import { RefreshCw, AlertTriangle, X, Send, Clock, CheckCircle2, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import useWebSocket from '../../hooks/useWebSocket';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
@@ -101,12 +101,6 @@ export default function DietTrackerPage() {
 
     const [aiMealPeriod, setAiMealPeriod] = useState(suggestedPeriod);
 
-    const [isSosModalOpen, setIsSosModalOpen] = useState(false);
-    const [sosMessage, setSosMessage] = useState('');
-    const [sosSubmitting, setSosSubmitting] = useState(false);
-    const [sosTickets, setSosTickets] = useState([]);
-    const [sosDietLogId, setSosDietLogId] = useState(null);
-
     const [confirmModal, setConfirmModal] = useState(null);
     const [confirmingFood, setConfirmingFood] = useState(false);
     const [resnetDishes, setResnetDishes] = useState([]);
@@ -186,7 +180,7 @@ export default function DietTrackerPage() {
         }
     }, []);
 
-    const fetchDay = useCallback(async (dateIso, { withMeta = false } = {}) => {
+    const fetchDay = useCallback(async (dateIso) => {
         const seq = ++dayFetchSeq.current;
         selectedDateRef.current = dateIso;
         setLoading(true);
@@ -197,9 +191,6 @@ export default function DietTrackerPage() {
                 dietService.getSummary({ date: dateIso }),
                 profileExtensionsService.hasActivePt().catch(() => ({ data: { data: { hasActivePt: false } } })),
             ];
-            if (withMeta) {
-                tasks.push(dietService.getSosTickets().catch(() => ({ data: { data: [] } })));
-            }
             const results = await Promise.all(tasks);
             if (seq !== dayFetchSeq.current || selectedDateRef.current !== dateIso) return;
 
@@ -221,9 +212,6 @@ export default function DietTrackerPage() {
                 intakeStatus: rawData.intakeStatus || 'OK',
                 controlLoopMessage: rawData.controlLoopMessage || null,
             });
-            if (withMeta) {
-                setSosTickets(results[3]?.data?.data || []);
-            }
         } catch (err) {
             console.error('Error fetching diet data:', err);
         } finally {
@@ -251,7 +239,7 @@ export default function DietTrackerPage() {
     }, []);
 
     useEffect(() => {
-        fetchDay(selectedDate, { withMeta: true });
+        fetchDay(selectedDate);
     }, [selectedDate, fetchDay]);
 
     useEffect(() => {
@@ -264,14 +252,7 @@ export default function DietTrackerPage() {
             .then((res) => setOnboardingBanner(!!res.data?.data?.showBanner))
             .catch(() => setOnboardingBanner(false));
 
-        const handleRealtimeUpdate = (e) => {
-            if (e.type === 'SOS_RESOLVED' && e.detail) {
-                setSosTickets((prev) => prev.map((t) =>
-                    t.id === e.detail.ticketId
-                        ? { ...t, status: 'RESOLVED', note: e.detail.note || t.note }
-                        : t
-                ));
-            }
+        const handleRealtimeUpdate = () => {
             if (timeoutId) clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
                 if (isMounted) syncAll();
@@ -281,7 +262,6 @@ export default function DietTrackerPage() {
         window.addEventListener('realtime_update', handleRealtimeUpdate);
         window.addEventListener('realtime_update_client', handleRealtimeUpdate);
         window.addEventListener('DIET_LOG_REVIEWED', handleRealtimeUpdate);
-        window.addEventListener('SOS_RESOLVED', handleRealtimeUpdate);
         window.addEventListener('MACRO_TARGET_UPDATED', handleRealtimeUpdate);
 
         return () => {
@@ -289,9 +269,8 @@ export default function DietTrackerPage() {
             if (timeoutId) clearTimeout(timeoutId);
             window.removeEventListener('realtime_update', handleRealtimeUpdate);
             window.removeEventListener('realtime_update_client', handleRealtimeUpdate);
-            window.removeEventListener('DIET_LOG_REVIEWED', handleRealtimeUpdate);
-            window.removeEventListener('SOS_RESOLVED', handleRealtimeUpdate);
-            window.removeEventListener('MACRO_TARGET_UPDATED', handleRealtimeUpdate);
+        window.removeEventListener('DIET_LOG_REVIEWED', handleRealtimeUpdate);
+        window.removeEventListener('MACRO_TARGET_UPDATED', handleRealtimeUpdate);
         };
     }, [loadResNetDishes, syncAll]);
 
@@ -494,10 +473,6 @@ export default function DietTrackerPage() {
                 setInputMode('manual');
                 setSelectedFile(null);
                 return;
-            }
-
-            if (analyzed?.suggestSos) {
-                toast.warning('Độ tin cậy thấp — hãy kiểm tra lại thông tin.');
             }
 
             const safeTopPredictions = analyzed?.topPredictions?.length
@@ -763,30 +738,6 @@ export default function DietTrackerPage() {
         }
     };
 
-    const handleSosSubmit = async (e) => {
-        e.preventDefault();
-        if (!sosMessage.trim()) return toast.error('Vui lòng nhập nội dung cần hỗ trợ');
-        try {
-            setSosSubmitting(true);
-            await dietService.createSos({
-                note: sosMessage,
-                dietLogId: sosDietLogId || undefined,
-                priority: 'HIGH',
-                reasonCode: 'USER_REQUEST',
-            });
-            toast.success('Đã gửi yêu cầu SOS cho PT thành công!');
-            setIsSosModalOpen(false);
-            setSosMessage('');
-            setSosDietLogId(null);
-            syncAll();
-        } catch (error) {
-            console.error(error);
-            toast.error('Lỗi khi gửi yêu cầu SOS');
-        } finally {
-            setSosSubmitting(false);
-        }
-    };
-
     return (
         <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in min-w-0 overflow-x-hidden">
             {onboardingBanner && (
@@ -924,14 +875,11 @@ export default function DietTrackerPage() {
                             handleEditLog,
                             handleDelete,
                             onPreviewImage: setLightboxImage,
-                            setSosDietLogId,
-                            setSosMessage,
-                            setIsSosModalOpen,
                         }}
                     />
                 </div>
 
-                {/* Cột phải: Thống kê calo & Yêu cầu SOS */}
+                {/* Cột phải: Thống kê calo */}
                 <div className="lg:col-span-4 space-y-6">
                     <NutritionProgress
                         summary={summary}
@@ -940,85 +888,8 @@ export default function DietTrackerPage() {
                         isFuture={isFuture}
                         coachedMode={hasActivePt}
                     />
-
-                    {sosTickets.length > 0 && (
-                        <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
-                            <h4 className="text-sm font-bold text-slate-800 mb-3">Lịch sử hỗ trợ SOS</h4>
-                            <div className="space-y-2 max-h-64 overflow-auto pr-1">
-                                {sosTickets.map(ticket => (
-                                    <button
-                                        key={ticket.id}
-                                        type="button"
-                                        onClick={() => ticket.dietLogId && document.getElementById(`log-${ticket.dietLogId}`)?.scrollIntoView({ behavior: 'smooth' })}
-                                        className="w-full text-left p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors border-none outline-none"
-                                    >
-                                        <div className="flex justify-between items-center mb-1.5">
-                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${ticket.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-755' : 'bg-warning/10 text-warning border border-warning/15'}`}>
-                                                {ticket.status === 'RESOLVED' ? 'Đã giải quyết' : 'Chưa giải quyết'}
-                                            </span>
-                                            <span className="text-[10px] font-semibold text-slate-400">
-                                                {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('vi-VN') : ''}
-                                            </span>
-                                        </div>
-
-                                        <div className="text-xs text-slate-600">
-                                            {ticket.status === 'RESOLVED' ? (
-                                                <div className="bg-emerald-50/50 border border-emerald-100 p-2.5 rounded-lg mt-2">
-                                                    <span className="font-bold text-emerald-800 flex items-center gap-1.5 mb-1">
-                                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                                        PT phản hồi:
-                                                    </span>
-                                                    <span className="italic leading-relaxed font-medium">"{ticket.resolutionNote || ticket.note}"</span>
-                                                </div>
-                                            ) : (
-                                                <span className="truncate block font-medium">"{ticket.note}"</span>
-                                            )}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
-
-            {/* Modal SOS */}
-            {isSosModalOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="px-6 py-4 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
-                            <div className="flex items-center gap-2 text-amber-800">
-                                <AlertTriangle className="w-5 h-5" />
-                                <h3 className="font-bold text-lg">Yêu cầu hỗ trợ (SOS)</h3>
-                            </div>
-                            <button onClick={() => setIsSosModalOpen(false)} className="text-amber-600 hover:bg-amber-100 p-1.5 rounded-full transition-colors">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleSosSubmit} className="p-6 space-y-4">
-                            <p className="text-sm text-slate-650 font-medium leading-relaxed">
-                                Hãy mô tả chi tiết vấn đề hoặc câu hỏi của bạn về bữa ăn này để Huấn luyện viên có thể hỗ trợ định lượng chính xác nhất.
-                            </p>
-                            <textarea
-                                value={sosMessage}
-                                onChange={(e) => setSosMessage(e.target.value)}
-                                rows="4"
-                                autoFocus
-                                placeholder="Ví dụ: Anh ơi, món này em ăn ngoài tiệm, nước dùng khá béo..."
-                                className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 resize-none transition-all"
-                            />
-                            <div className="flex gap-3 pt-2">
-                                <Button type="button" variant="outline" onClick={() => setIsSosModalOpen(false)} className="flex-1 rounded-xl h-11 border-slate-200 font-bold text-slate-600 hover:bg-slate-50">
-                                    Hủy bỏ
-                                </Button>
-                                <Button type="submit" disabled={sosSubmitting} className="flex-1 rounded-xl h-11 bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-md shadow-amber-500/20">
-                                    {sosSubmitting ? 'Đang gửi...' : <><Send className="w-4 h-4 mr-2" /> Gửi yêu cầu</>}
-                                </Button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
 
             {/* Modal Xác nhận món ăn */}
             <ConfirmFoodModal

@@ -37,7 +37,6 @@ const benefits = [
   'Gợi ý bữa ăn được cá nhân hóa',
   'Hệ thống nhắn tin PT - Khách hàng',
   'Báo cáo tiến trình hàng tuần',
-  'Hỗ trợ dinh dưỡng SOS khẩn cấp',
   'Theo dõi thành phần cơ thể',
 ];
 
