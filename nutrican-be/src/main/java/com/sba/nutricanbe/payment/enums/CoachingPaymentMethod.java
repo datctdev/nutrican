@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.payment.enums;
 
 public enum CoachingPaymentMethod {
-    VNPAY
+    VNPAY,
+    WALLET
 }

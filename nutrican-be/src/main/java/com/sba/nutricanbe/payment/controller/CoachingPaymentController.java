@@ -39,6 +39,15 @@ public class CoachingPaymentController {
                 paymentService.createVnPayPayment(mappingId, user.getId())));
     }
 
+    @PostMapping("/mappings/{mappingId}/wallet")
+    public ResponseEntity<ApiResponse<CoachingPaymentResult>> payWithWallet(
+            @PathVariable UUID mappingId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(ApiResponse.success(
+                paymentService.payWithWallet(mappingId, user.getId()),
+                "Thanh toán bằng số dư ví thành công"));
+    }
+
     @GetMapping("/vnpay/return")
     public void handleVnPayReturn(
             @RequestParam Map<String, String> params,

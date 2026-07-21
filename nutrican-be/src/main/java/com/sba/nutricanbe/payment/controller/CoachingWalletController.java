@@ -4,9 +4,11 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.payment.dto.WalletResponse;
 import com.sba.nutricanbe.payment.dto.WalletTransactionResponse;
+import com.sba.nutricanbe.payment.dto.WithdrawRequest;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.payment.enums.WalletType;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +26,14 @@ public class CoachingWalletController {
     public ResponseEntity<ApiResponse<WalletResponse>> getMyWallet(
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(walletService.getWallet(user.getId())));
+    }
+
+    @PostMapping("/me/withdraw")
+    public ResponseEntity<ApiResponse<WalletResponse>> withdraw(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody WithdrawRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                walletService.withdraw(user.getId(), request), "Rút tiền thành công"));
     }
 
     @GetMapping("/me/transactions")
