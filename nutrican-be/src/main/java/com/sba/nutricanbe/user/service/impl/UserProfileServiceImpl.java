@@ -52,6 +52,15 @@ public class UserProfileServiceImpl implements UserProfileService {
         PtProfile ptProfile = ptProfileRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("PtProfile", userId));
 
+        if (request.getOnlineRate() != null
+                && request.getOnlineRate().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Phí huấn luyện online không được âm");
+        }
+        if (request.getOfflineRate() != null
+                && request.getOfflineRate().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("Phí huấn luyện offline không được âm");
+        }
+
         if (request.getBio() != null) {
             ptProfile.setBio(request.getBio());
         }

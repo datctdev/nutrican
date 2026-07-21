@@ -73,10 +73,10 @@ public class OfflineHireTestDataInitializer implements CommandLineRunner {
         PtProfile offlineProfile = seedOfflinePtProfile(offlinePt);
         seedVenuesAndAvailability(offlineProfile);
 
-        ptProfileRepository.findByUserEmail("pt.certified@gmail.com").ifPresent(profile -> {
+        ptProfileRepository.findByUserEmail("pt@nutrican.com").ifPresent(profile -> {
             if (venueRepository.countByPtProfile_IdAndActiveTrue(profile.getId()) == 0) {
                 seedVenuesAndAvailability(profile);
-                log.warn("Added offline venues/availability to pt.certified@gmail.com (BOTH mode test)");
+                log.warn("Added offline venues/availability to pt@nutrican.com (BOTH mode demo)");
             }
         });
 
@@ -93,9 +93,9 @@ public class OfflineHireTestDataInitializer implements CommandLineRunner {
                   Price: 500,000 VND / SESSION_60
                 
                 [PT online + offline]
-                  Email: pt.certified@gmail.com
+                  Email: pt@nutrican.com
                   Profile URL: /pt-profile/{}
-                  (customer1@gmail.com already ACTIVE — use customer3 for hire test)
+                  (customer@nutrican.com already ACTIVE — use customer3 for hire test)
                 
                 [Customer — no open hire request]
                   Email: customer3@gmail.com
@@ -109,7 +109,7 @@ public class OfflineHireTestDataInitializer implements CommandLineRunner {
                 """,
                 PASSWORD,
                 offlineProfile.getId(),
-                ptProfileRepository.findByUserEmail("pt.certified@gmail.com")
+                ptProfileRepository.findByUserEmail("pt@nutrican.com")
                         .map(PtProfile::getId)
                         .orElse(null));
     }

@@ -42,7 +42,7 @@ public class UserProfileController {
     @PutMapping("/pt")
     public ResponseEntity<ApiResponse<PtProfileSummary>> updateMyPtProfile(
             @AuthenticationPrincipal User user,
-            @RequestBody UpdatePtProfileRequest request) {
+            @Valid @RequestBody UpdatePtProfileRequest request) {
         return ResponseEntity.ok(userProfileService.updatePtProfile(user.getId(), request));
     }
 

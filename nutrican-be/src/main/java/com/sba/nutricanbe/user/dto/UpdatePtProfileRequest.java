@@ -23,13 +23,13 @@ public class UpdatePtProfileRequest {
 
     private String contactPhone;
 
-    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMin(value = "0.0", inclusive = true, message = "Phí huấn luyện online không được âm")
     private BigDecimal onlineRate;
 
     @Size(max = 20)
     private String onlineRateUnit;
 
-    @DecimalMin(value = "0.0", inclusive = true)
+    @DecimalMin(value = "0.0", inclusive = true, message = "Phí huấn luyện offline không được âm")
     private BigDecimal offlineRate;
 
     @Size(max = 20)

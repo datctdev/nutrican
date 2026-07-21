@@ -61,10 +61,10 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DemoVeteranDataInitializer implements CommandLineRunner {
 
-    public static final String FLAG_KEY = "DEMO_VETERAN_FIXTURES_V3";
-    private static final String SOLO_EMAIL = "demo.solo@nutrican.com";
-    private static final String COACHED_EMAIL = "demo.coached@nutrican.com";
-    private static final String PT_EMAIL = "pt.certified@gmail.com";
+    public static final String FLAG_KEY = "DEMO_VETERAN_FIXTURES_V4";
+    private static final String SOLO_EMAIL = "solo@nutrican.com";
+    private static final String COACHED_EMAIL = "customer@nutrican.com";
+    private static final String PT_EMAIL = "pt@nutrican.com";
 
     private final SystemSettingRepository systemSettingRepository;
     private final UserRepository userRepository;
