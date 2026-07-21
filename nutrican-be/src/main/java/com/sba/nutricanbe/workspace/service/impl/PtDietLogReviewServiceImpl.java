@@ -215,7 +215,6 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
                 .macrosJson(log.getMacrosJson())
                 .status(log.getStatus())
                 .reviewStatus(log.getReviewStatus())
-                .sosTicketFlag(log.getSosTicketFlag())
                 .logDate(log.getLogDate())
                 .createdAt(log.getCreatedAt())
                 .ptReviewedAt(log.getPtReviewedAt())

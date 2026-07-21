@@ -39,7 +39,6 @@ class DietLogManualSendToPtTest {
     @Mock private com.sba.nutricanbe.diet.repository.FoodItemRepository foodItemRepository;
     @Mock private com.sba.nutricanbe.infrastructure.storage.StorageService minioService;
     @Mock private DietLogHelper dietLogHelper;
-    @Mock private com.sba.nutricanbe.diet.repository.SosTicketRepository sosTicketRepository;
     @Mock private IntakeControlLoopService intakeControlLoopService;
     @Mock private com.sba.nutricanbe.diet.service.UserRecipeService userRecipeService;
     @Mock private DietPrefCheckService dietPrefCheckService;

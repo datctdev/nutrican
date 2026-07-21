@@ -1,7 +1,7 @@
 // src/components/diet/LogCard.jsx
 import { useState, useEffect } from 'react';
 import {
-    Camera, AlertTriangle, Trash2, CheckCircle2, Clock, XCircle,
+    Camera, Trash2, CheckCircle2, Clock, XCircle,
     Activity, Star, Edit, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -126,10 +126,6 @@ export default function LogCard({
     handleEditLog,
     handleDelete,
     onPreviewImage,
-    setSosDietLogId,
-    setSosMessage,
-    setIsSosModalOpen,
-    hasActivePt = false,
     isPast = false,
     readOnly = false,
 }) {
@@ -275,20 +271,6 @@ export default function LogCard({
                             >
                                 <Edit className="w-3.5 h-3.5 mr-1.5" /> Sửa & gửi bữa ăn
                             </Button>
-                            {!log.sosTicketFlag && hasActivePt && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setSosDietLogId?.(log.id);
-                                        setSosMessage?.('');
-                                        setIsSosModalOpen?.(true);
-                                    }}
-                                    className="border-warning/35 text-warning hover:bg-warning/5 rounded-lg text-xs font-bold h-9"
-                                >
-                                    <AlertTriangle className="w-3.5 h-3.5 mr-1.5" /> Báo cáo SOS
-                                </Button>
-                            )}
                         </div>
                     )}
                 </div>

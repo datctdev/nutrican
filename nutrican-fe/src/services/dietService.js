@@ -14,8 +14,6 @@ export const dietService = {
     updateLog: (id, data) => api.put(`/diet/logs/${id}`, data),
     deleteLog: (id) => api.delete(`/diet/logs/${id}`),
     getSummary: (params) => api.get('/diet/summary', { params }),
-    createSos: (data) => api.post('/diet/sos', data),
-    getSosTickets: () => api.get('/diet/sos'),
 
     confirmRecognition: (logId, { foodCode, foodItemId, portionGrams, sendToPt = false } = {}) => {
         const body = {

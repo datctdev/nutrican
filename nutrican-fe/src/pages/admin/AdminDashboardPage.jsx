@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { adminService } from '../../services/adminService';
 import { userService } from '../../services/userService';
-import { Users, Award, AlertCircle, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3, UserPlus, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
+import { Users, Award, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3, UserPlus, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AdminDashboardPage() {
@@ -125,7 +125,6 @@ export default function AdminDashboardPage() {
     { label: 'Tổng người dùng', value: stats?.totalUsers || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
     { label: 'PT hoạt động', value: stats?.totalPts || 0, icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
     { label: 'PT chờ duyệt', value: stats?.pendingPtVerifications || 0, icon: UserPlus, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-    { label: 'Yêu cầu SOS', value: stats?.activeSosTickets || 0, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
   ];
 
   return (
@@ -204,26 +203,6 @@ export default function AdminDashboardPage() {
                 <Link to="/admin/pts">
                   <Button className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11">
                     Duyệt hồ sơ <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* SOS Tickets */}
-            <Card className="bg-white border-slate-200 shadow-sm flex flex-col justify-between">
-              <CardContent className="p-6">
-                <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mb-4">
-                  <AlertCircle className="w-6 h-6 text-red-500" />
-                </div>
-                <h4 className="font-bold text-slate-900 mb-1">Yêu cầu khẩn cấp SOS</h4>
-                <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">
-                  {stats?.activeSosTickets > 0 
-                    ? `Có ${stats.activeSosTickets} yêu cầu SOS chưa giải quyết cần hỗ trợ khẩn cấp.`
-                    : 'Không có yêu cầu SOS nào. Hệ thống hoạt động ổn định.'}
-                </p>
-                <Link to="/admin/sos">
-                  <Button variant="outline" className="w-full border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl h-11">
-                    Quản lý SOS <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </Link>
               </CardContent>

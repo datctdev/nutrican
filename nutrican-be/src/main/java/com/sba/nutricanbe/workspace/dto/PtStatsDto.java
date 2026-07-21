@@ -13,7 +13,6 @@ import java.math.BigDecimal;
 public class PtStatsDto {
     private long totalClients;
     private long pendingReviews;
-    private long pendingSosTickets;
     private long reviewsThisWeek;
     private BigDecimal averageAdherenceRate;
 }

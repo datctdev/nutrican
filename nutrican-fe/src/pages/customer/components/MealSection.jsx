@@ -14,9 +14,6 @@ export default function MealSection({
     handleEditLog,
     handleDelete,
     onPreviewImage,
-    setSosDietLogId,
-    setSosMessage,
-    setIsSosModalOpen,
     hasActivePt = false,
     isPast = false,
 }) {
@@ -70,9 +67,6 @@ export default function MealSection({
                                     handleEditLog={handleEditLog}
                                     handleDelete={handleDelete}
                                     onPreviewImage={onPreviewImage}
-                                    setSosDietLogId={setSosDietLogId}
-                                    setSosMessage={setSosMessage}
-                                    setIsSosModalOpen={setIsSosModalOpen}
                                     hasActivePt={hasActivePt}
                                     isPast={isPast}
                                 />

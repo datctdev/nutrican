@@ -15,7 +15,6 @@ import com.sba.nutricanbe.workspace.service.PtDashboardService;
 import com.sba.nutricanbe.workspace.service.PtDietLogReviewService;
 import com.sba.nutricanbe.workspace.service.PtProgressService;
 import com.sba.nutricanbe.workspace.service.PtReviewService;
-import com.sba.nutricanbe.workspace.service.PtSosService;
 import com.sba.nutricanbe.workspace.service.PtTemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -38,7 +37,6 @@ public class PtWorkspaceController {
     private final PtDietLogReviewService ptDietLogReviewService;
     private final PtProgressService ptProgressService;
     private final PtReviewService ptReviewService;
-    private final PtSosService ptSosService;
     private final PtTemplateService ptTemplateService;
     private final PtHireService ptHireService;
     private final ClientGoalService clientGoalService;
@@ -128,22 +126,6 @@ public class PtWorkspaceController {
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<PtStatsDto>> getStats(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ptDashboardService.getStats(user.getId()));
-    }
-
-    @GetMapping("/sos")
-    public ResponseEntity<ApiResponse<java.util.List<com.sba.nutricanbe.diet.dto.response.SosTicketResponse>>> getSosTickets(
-            @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptSosService.getSosTickets(user.getId()));
-    }
-
-    @PutMapping("/sos/{ticketId}/resolve")
-    public ResponseEntity<ApiResponse<Void>> resolveSosTicket(
-            @PathVariable UUID ticketId,
-            @AuthenticationPrincipal User user,
-            @RequestBody(required = false) java.util.Map<String, String> body) {
-        String note = body != null ? body.get("resolutionNote") : null;
-        if (note == null && body != null) note = body.get("note");
-        return ResponseEntity.ok(ptSosService.resolveSosTicket(ticketId, user.getId(), note));
     }
 
     @PutMapping("/diet-logs/{id}/blind-estimate")

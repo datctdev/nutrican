@@ -37,8 +37,6 @@ public class RblExportRowDto {
     private String ptAction;
     private String ptCorrectionReason;
     private LocalDateTime ptReviewedAt;
-    private Boolean sosTicketFlag;
-    private String sosReasonCode;
     private String fieldsChanged;
     private String customerIdHash;
     private String imageObjectName;
