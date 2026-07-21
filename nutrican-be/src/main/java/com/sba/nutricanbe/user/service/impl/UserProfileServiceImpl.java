@@ -590,8 +590,9 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<PtUpdateRequestDto> getPendingPtUpdateRequest(UUID ptId) {
-        return ptUpdateRequestRepository.findFirstByPtIdAndStatusOrderByCreatedAtDesc(ptId, RequestStatus.PENDING)
+        return ptUpdateRequestRepository.findFirstByPtIdOrderByCreatedAtDesc(ptId)
+                .filter(req -> req.getStatus() == RequestStatus.PENDING || req.getStatus() == RequestStatus.REJECTED)
                 .map(req -> ApiResponse.success(PtUpdateRequestDto.fromEntity(req)))
-                .orElse(ApiResponse.success(null));
+                .orElse(ApiResponse.<PtUpdateRequestDto>success(null));
     }
 }
