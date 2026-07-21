@@ -58,6 +58,9 @@ const modeIncludes = (selectedMode, optionMode) =>
 const hasPositiveRate = (value) =>
   value !== '' && value !== null && value !== undefined && Number(value) > 0;
 
+// Chỉ giữ chữ số (ô phí là số nguyên VNĐ, không âm, không phần thập phân)
+const digitsOnly = (value) => (value ?? '').toString().replace(/\D/g, '');
+
 const LOCATION_OPTIONS = [
   'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ',
   'Hải Phòng', 'Bình Dương', 'Đồng Nai', 'Vũng Tàu', 'Khác',
@@ -1173,8 +1176,8 @@ export default function KycPage() {
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Huấn Luyện ONLINE *</label>
                     <div className="relative">
-                      <input type="number" value={ptForm.onlineRate} min={1}
-                        onChange={(e) => setPtForm(p => ({ ...p, onlineRate: e.target.value }))}
+                      <input type="text" inputMode="numeric" value={ptForm.onlineRate}
+                        onChange={(e) => setPtForm(p => ({ ...p, onlineRate: digitsOnly(e.target.value) }))}
                         placeholder="VD: 3000000"
                         className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm" />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-semibold">VNĐ / tháng</span>
@@ -1195,8 +1198,8 @@ export default function KycPage() {
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Huấn Luyện OFFLINE *</label>
                     <div className="flex gap-3">
                       <div className="relative flex-1">
-                        <input type="number" value={ptForm.offlineRate} min={1}
-                          onChange={(e) => setPtForm(current => ({ ...current, offlineRate: e.target.value }))}
+                        <input type="text" inputMode="numeric" value={ptForm.offlineRate}
+                          onChange={(e) => setPtForm(current => ({ ...current, offlineRate: digitsOnly(e.target.value) }))}
                           placeholder="VD: 500000"
                           className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">VNĐ</span>
