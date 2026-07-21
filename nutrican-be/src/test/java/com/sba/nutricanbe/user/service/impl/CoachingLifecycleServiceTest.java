@@ -37,6 +37,8 @@ class CoachingLifecycleServiceTest {
     @Mock private SelfPlanSubmissionRepository selfPlanSubmissionRepository;
     @Mock private SelfPlanItemRepository selfPlanItemRepository;
     @Mock private com.sba.nutricanbe.user.service.NotificationService notificationService;
+    @Mock private com.sba.nutricanbe.user.repository.ReviewRepository reviewRepository;
+    @Mock private com.sba.nutricanbe.payment.service.CoachingWalletService coachingWalletService;
     @InjectMocks private CoachingLifecycleServiceImpl service;
 
     @Test
@@ -47,7 +49,8 @@ class CoachingLifecycleServiceTest {
         User client = mock(User.class);
         PtClientMapping mapping = PtClientMapping.builder().pt(pt).client(client).status(ClientMappingStatus.ACTIVE).build();
         when(client.getId()).thenReturn(clientId);
-        when(mappingRepository.findByPt_IdAndClient_Id(ptId, clientId)).thenReturn(Optional.of(mapping));
+        when(mappingRepository.findTopByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, clientId))
+                .thenReturn(Optional.of(mapping));
         when(mappingRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         var result = service.requestEndCoaching(ptId, clientId, true);
@@ -65,9 +68,10 @@ class CoachingLifecycleServiceTest {
         when(pt.getId()).thenReturn(ptId);
         when(client.getId()).thenReturn(clientId);
         mapping.setEndRequestedBy(CoachingEndRequestedBy.PT);
-        when(mappingRepository.findFirstByClient_IdAndStatus(clientId, ClientMappingStatus.ACTIVE))
+        when(mappingRepository.findTopByClient_IdAndStatusOrderByCreatedAtDesc(clientId, ClientMappingStatus.ACTIVE))
                 .thenReturn(Optional.empty());
-        when(mappingRepository.findFirstByClient_IdAndStatus(clientId, ClientMappingStatus.END_REQUESTED))
+        when(mappingRepository.findTopByClient_IdAndStatusOrderByCreatedAtDesc(
+                clientId, ClientMappingStatus.END_REQUESTED))
                 .thenReturn(Optional.of(mapping));
         when(selfPlanSubmissionRepository.findByCustomerIdAndPtIdAndStatus(
                 eq(clientId), eq(ptId), eq(com.sba.nutricanbe.diet.enums.SelfPlanSubmissionStatus.PENDING)))

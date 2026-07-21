@@ -11,7 +11,8 @@ import com.sba.nutricanbe.diet.dto.response.MealPlanSaveResult;
 import com.sba.nutricanbe.diet.dto.response.MealPlanSuggestionResponse;
 import com.sba.nutricanbe.diet.dto.response.MealPlanWeeklySummaryResponse;
 import com.sba.nutricanbe.diet.dto.response.MealPlanWeekResponse;
-import com.sba.nutricanbe.diet.service.MealPlanService;
+import com.sba.nutricanbe.diet.service.MealPlanAuthoringService;
+import com.sba.nutricanbe.diet.service.MealPlanInteractionService;
 import com.sba.nutricanbe.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -34,7 +35,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class MealPlanController {
 
-    private final MealPlanService mealPlanService;
+    private final MealPlanAuthoringService mealPlanAuthoringService;
+    private final MealPlanInteractionService mealPlanInteractionService;
 
     @PostMapping("/api/v1/workspace/meal-plans")
     @PreAuthorize("hasAnyRole('PT_CERTIFIED', 'PT_FREELANCE')")
@@ -42,7 +44,7 @@ public class MealPlanController {
             @AuthenticationPrincipal User pt,
             @RequestBody MealPlanRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.createPlan(pt.getId(), request), "Meal plan created"));
+                mealPlanAuthoringService.createPlan(pt.getId(), request), "Meal plan created"));
     }
 
     @PutMapping("/api/v1/workspace/meal-plans/{clientId}")
@@ -52,7 +54,7 @@ public class MealPlanController {
             @PathVariable UUID clientId,
             @RequestBody MealPlanRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.updatePlan(pt.getId(), clientId, request), "Meal plan updated"));
+                mealPlanAuthoringService.updatePlan(pt.getId(), clientId, request), "Meal plan updated"));
     }
 
     @GetMapping("/api/v1/workspace/meal-plans/{clientId}")
@@ -63,7 +65,7 @@ public class MealPlanController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.getClientPlan(pt.getId(), clientId, weekStart)));
+                mealPlanAuthoringService.getClientPlan(pt.getId(), clientId, weekStart)));
     }
 
     @PostMapping("/api/v1/workspace/meal-plans/{planId}/publish")
@@ -71,7 +73,7 @@ public class MealPlanController {
     public ResponseEntity<ApiResponse<Void>> publishPlan(
             @AuthenticationPrincipal User pt,
             @PathVariable UUID planId) {
-        mealPlanService.publishPlan(pt.getId(), planId);
+        mealPlanAuthoringService.publishPlan(pt.getId(), planId);
         return ResponseEntity.ok(ApiResponse.success(null, "Meal plan published"));
     }
 
@@ -82,7 +84,7 @@ public class MealPlanController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.getCurrentPlan(user.getId(), weekStart)));
+                mealPlanInteractionService.getCurrentPlan(user.getId(), weekStart)));
     }
 
     @GetMapping("/api/v1/meal-plans/weeks")
@@ -90,7 +92,7 @@ public class MealPlanController {
     public ResponseEntity<ApiResponse<List<MealPlanWeekResponse>>> getPublishedPlanWeeks(
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.getPublishedPlanWeeks(user.getId())));
+                mealPlanInteractionService.getPublishedPlanWeeks(user.getId())));
     }
 
     @GetMapping("/api/v1/meal-plans/weekly-summaries")
@@ -98,7 +100,7 @@ public class MealPlanController {
     public ResponseEntity<ApiResponse<List<MealPlanWeeklySummaryResponse>>> getWeeklySummaries(
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.getWeeklySummaries(user.getId())));
+                mealPlanInteractionService.getWeeklySummaries(user.getId())));
     }
 
     @PutMapping("/api/v1/meal-plans/items/{itemId}/eaten")
@@ -109,7 +111,7 @@ public class MealPlanController {
             @RequestParam(defaultValue = "true") boolean eaten,
             @RequestParam(required = false) String lateTickReason) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.markEaten(user.getId(), itemId, eaten, lateTickReason)));
+                mealPlanInteractionService.markEaten(user.getId(), itemId, eaten, lateTickReason)));
     }
 
     @PostMapping("/api/v1/meal-plans/items/{itemId}/suggest")
@@ -119,7 +121,7 @@ public class MealPlanController {
             @PathVariable UUID itemId,
             @RequestBody MealPlanSuggestionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.suggestReplacement(user.getId(), itemId, request),
+                mealPlanInteractionService.suggestReplacement(user.getId(), itemId, request),
                 "Suggestion submitted"));
     }
 
@@ -130,7 +132,7 @@ public class MealPlanController {
             @PathVariable UUID itemId,
             @RequestBody MealPlanSkipRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.skipItem(user.getId(), itemId, request), "Item skipped"));
+                mealPlanInteractionService.skipItem(user.getId(), itemId, request), "Item skipped"));
     }
 
     @PutMapping("/api/v1/meal-plans/items/{itemId}/unskip")
@@ -139,7 +141,7 @@ public class MealPlanController {
             @AuthenticationPrincipal User user,
             @PathVariable UUID itemId) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.unskipItem(user.getId(), itemId), "Skipped state cleared"));
+                mealPlanInteractionService.unskipItem(user.getId(), itemId), "Skipped state cleared"));
     }
 
     @PutMapping("/api/v1/meal-plans/{planId}/meals/skip")
@@ -149,7 +151,7 @@ public class MealPlanController {
             @PathVariable UUID planId,
             @RequestBody MealPlanMealActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.skipMeal(user.getId(), planId, request), "Meal skipped"));
+                mealPlanInteractionService.skipMeal(user.getId(), planId, request), "Meal skipped"));
     }
 
     @PutMapping("/api/v1/meal-plans/{planId}/meals/unskip")
@@ -159,7 +161,7 @@ public class MealPlanController {
             @PathVariable UUID planId,
             @RequestBody MealPlanMealActionRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.unskipMeal(user.getId(), planId, request), "Meal skip cleared"));
+                mealPlanInteractionService.unskipMeal(user.getId(), planId, request), "Meal skip cleared"));
     }
 
     @GetMapping("/api/v1/meal-plans/suggestions")
@@ -168,7 +170,7 @@ public class MealPlanController {
             @AuthenticationPrincipal User user,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.getCustomerSuggestions(user.getId(), weekStart)));
+                mealPlanInteractionService.getCustomerSuggestions(user.getId(), weekStart)));
     }
 
     @PutMapping("/api/v1/meal-plans/suggestions/{suggestionId}/cancel")
@@ -177,7 +179,7 @@ public class MealPlanController {
             @AuthenticationPrincipal User user,
             @PathVariable UUID suggestionId) {
         return ResponseEntity.ok(ApiResponse.success(
-                mealPlanService.cancelReplacementRequest(user.getId(), suggestionId),
+                mealPlanInteractionService.cancelReplacementRequest(user.getId(), suggestionId),
                 "Suggestion cancelled"));
     }
 }

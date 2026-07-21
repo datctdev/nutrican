@@ -92,9 +92,6 @@ class UserProfileServiceResubmitTest {
         PtProfile profile = new PtProfile();
         profile.setPtRequestStatus(UserStatus.ACTIVE);
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(ptProfileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
-
         assertThrows(BadRequestException.class, () ->
                 userProfileService.resubmitPt(userId, PtRegistrationRequest.builder().preferredTrack("FREELANCE").build()));
     }

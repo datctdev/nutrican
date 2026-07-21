@@ -3,22 +3,18 @@ package com.sba.nutricanbe.diet.service.impl;
 import com.sba.nutricanbe.common.dto.MacroNutrients;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.diet.dto.request.MealPlanItemRequest;
-import com.sba.nutricanbe.diet.dto.request.MealPlanMealActionRequest;
 import com.sba.nutricanbe.diet.dto.request.MealPlanRequest;
 import com.sba.nutricanbe.diet.dto.response.FoodItemResponse;
 import com.sba.nutricanbe.diet.entity.MealPlan;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
-import com.sba.nutricanbe.diet.enums.MealPeriod;
-import com.sba.nutricanbe.diet.enums.MealPlanSkipReason;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
-import com.sba.nutricanbe.diet.repository.MealPlanSuggestionRepository;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.FoodCatalogService;
-import com.sba.nutricanbe.diet.service.MealPlanItemMacrosResolver;
+import com.sba.nutricanbe.diet.service.support.MealPlanDetailAssembler;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
@@ -34,7 +30,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,7 +41,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class MealPlanServiceTest {
+class MealPlanAuthoringServiceTest {
 
     @Mock private MealPlanRepository mealPlanRepository;
     @Mock private MealPlanItemRepository mealPlanItemRepository;
@@ -56,48 +51,10 @@ class MealPlanServiceTest {
     @Mock private FoodItemRepository foodItemRepository;
     @Mock private DietLogHelper dietLogHelper;
     @Mock private MacroTargetRepository macroTargetRepository;
-    @Mock private MealPlanSuggestionRepository mealPlanSuggestionRepository;
-    @Mock private MealPlanItemMacrosResolver mealPlanItemMacrosResolver;
+    @Mock private MealPlanDetailAssembler mealPlanDetailAssembler;
 
     @InjectMocks
-    private MealPlanServiceImpl mealPlanService;
-
-    @Test
-    void skipMeal_withMealPeriod_onlySkipsMatchingPeriod() {
-        UUID customerId = UUID.randomUUID();
-        UUID planId = UUID.randomUUID();
-        LocalDate planDate = LocalDate.now();
-
-        MealPlan plan = new MealPlan();
-        plan.setClientId(customerId);
-        plan.setIsPublished(true);
-        when(mealPlanRepository.findById(planId)).thenReturn(Optional.of(plan));
-
-        UUID itemId = UUID.randomUUID();
-        MealPlanItem afternoonItem = mock(MealPlanItem.class);
-        when(afternoonItem.getId()).thenReturn(itemId);
-        when(afternoonItem.getPlanDate()).thenReturn(planDate);
-        when(afternoonItem.getMealPeriod()).thenReturn(MealPeriod.AFTERNOON);
-        when(afternoonItem.getMealType()).thenReturn(MealType.SNACK);
-        when(afternoonItem.getEaten()).thenReturn(false);
-        lenient().when(afternoonItem.getSkipReason()).thenReturn(null);
-        when(mealPlanItemRepository.findByMealPlanIdAndPlanDateAndMealPeriod(
-                planId, planDate, MealPeriod.AFTERNOON)).thenReturn(List.of(afternoonItem));
-        when(mealPlanSuggestionRepository.existsByMealPlanItemIdAndStatus(any(), any())).thenReturn(false);
-        when(mealPlanItemRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        MealPlanMealActionRequest request = new MealPlanMealActionRequest();
-        request.setPlanDate(planDate);
-        request.setMealPeriod("AFTERNOON");
-        request.setSkipReason("NO_TIME");
-
-        mealPlanService.skipMeal(customerId, planId, request);
-
-        verify(mealPlanItemRepository).findByMealPlanIdAndPlanDateAndMealPeriod(
-                planId, planDate, MealPeriod.AFTERNOON);
-        verify(mealPlanItemRepository, never()).findByMealPlanIdAndPlanDateAndMealType(any(), any(), any());
-        verify(afternoonItem).setSkipReason(MealPlanSkipReason.NO_TIME);
-    }
+    private MealPlanAuthoringServiceImpl mealPlanService;
 
     @Test
     void computeMacroWarning_whenDayExceeds110Percent_returnsWarning() {
@@ -155,7 +112,7 @@ class MealPlanServiceTest {
         UUID itemId = UUID.randomUUID();
         LocalDate weekStart = LocalDate.now();
         LocalDate planDate = weekStart.plusDays(1);
-        MealPlan plan = mockPlanForUpdate(ptId, clientId, planId, weekStart);
+        mockPlanForUpdate(ptId, clientId, planId, weekStart);
         MealPlanItem eatenItem = mockEatenItem(itemId, planDate);
         when(mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(planId))
                 .thenReturn(List.of(eatenItem));
@@ -177,7 +134,7 @@ class MealPlanServiceTest {
         UUID clientId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
         LocalDate weekStart = LocalDate.now();
-        MealPlan plan = mockPlanForUpdate(ptId, clientId, planId, weekStart);
+        mockPlanForUpdate(ptId, clientId, planId, weekStart);
         MealPlanItem eatenItem = mockEatenItem(UUID.randomUUID(), weekStart.plusDays(1));
         when(mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(planId))
                 .thenReturn(List.of(eatenItem));
@@ -219,37 +176,6 @@ class MealPlanServiceTest {
 
         verify(editableItem).setPortionGrams(BigDecimal.valueOf(120));
         verify(mealPlanItemRepository).save(editableItem);
-    }
-
-    @Test
-    void unskipItem_returnsEnrichedMacrosFromResolver() {
-        UUID customerId = UUID.randomUUID();
-        UUID itemId = UUID.randomUUID();
-        UUID planId = UUID.randomUUID();
-        MealPlan plan = MealPlan.builder().clientId(customerId).isPublished(true).build();
-        org.springframework.test.util.ReflectionTestUtils.setField(plan, "id", planId);
-        MealPlanItem item = MealPlanItem.builder()
-                .mealPlanId(planId)
-                .planDate(LocalDate.now())
-                .mealType(MealType.LUNCH)
-                .foodItemId(UUID.randomUUID())
-                .portionGrams(BigDecimal.valueOf(200))
-                .skipReason(MealPlanSkipReason.DONT_LIKE)
-                .build();
-        org.springframework.test.util.ReflectionTestUtils.setField(item, "id", itemId);
-        MacroNutrients macros = new MacroNutrients(
-                BigDecimal.valueOf(420), BigDecimal.valueOf(30),
-                BigDecimal.valueOf(45), BigDecimal.valueOf(12));
-        when(mealPlanItemRepository.findById(itemId)).thenReturn(Optional.of(item));
-        when(mealPlanRepository.findById(planId)).thenReturn(Optional.of(plan));
-        when(mealPlanItemRepository.save(item)).thenAnswer(inv -> inv.getArgument(0));
-        when(mealPlanItemMacrosResolver.resolve(item)).thenReturn(macros);
-
-        var response = mealPlanService.unskipItem(customerId, itemId);
-
-        assertNotNull(response);
-        assertEquals(0, BigDecimal.valueOf(420).compareTo(response.getCalories()));
-        assertEquals(0, BigDecimal.valueOf(30).compareTo(response.getProtein()));
     }
 
     private MealPlan mockPlanForUpdate(

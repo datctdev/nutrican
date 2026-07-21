@@ -23,7 +23,8 @@ class RefundIntegrationTest extends IntegrationTestBase {
     void customerRefundWithin7Days_isPendingReview() throws Exception {
         User customer = userRepository.findByEmail("customer1@gmail.com").orElseThrow();
         User pt = userRepository.findByEmail("pt.certified@gmail.com").orElseThrow();
-        PtClientMapping mapping = mappingRepository.findByPt_IdAndClient_Id(pt.getId(), customer.getId()).orElseThrow();
+        PtClientMapping mapping = mappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(pt.getId(), customer.getId()).orElseThrow();
         ReflectionTestUtils.setField(mapping, "createdAt", LocalDateTime.now().minusDays(2));
         mappingRepository.save(mapping);
 

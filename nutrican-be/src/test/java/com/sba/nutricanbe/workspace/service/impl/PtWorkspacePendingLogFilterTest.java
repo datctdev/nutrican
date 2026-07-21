@@ -30,7 +30,7 @@ class PtWorkspacePendingLogFilterTest {
     @Mock private DietLogRepository dietLogRepository;
 
     @InjectMocks
-    private PtWorkspaceServiceImpl ptWorkspaceService;
+    private PtDietLogReviewServiceImpl ptWorkspaceService;
 
     @Test
     void filtersPendingLogsByRequestedActiveClient() {

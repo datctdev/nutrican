@@ -41,7 +41,7 @@ class PtWorkspaceReviewDualStateTest {
     @Mock private WebSocketSessionService webSocketSessionService;
 
     @InjectMocks
-    private PtWorkspaceServiceImpl ptWorkspaceService;
+    private PtDietLogReviewServiceImpl ptWorkspaceService;
 
     @Test
     void approveKeepsStatusLoggedAndSetsReviewApproved() {

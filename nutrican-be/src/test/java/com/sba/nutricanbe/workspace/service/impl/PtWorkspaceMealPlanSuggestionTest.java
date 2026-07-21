@@ -9,18 +9,19 @@ import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
 import com.sba.nutricanbe.diet.enums.MealPlanSuggestionStatus;
 import com.sba.nutricanbe.diet.enums.SelfPlanSubmissionStatus;
-import com.sba.nutricanbe.diet.repository.*;
-import com.sba.nutricanbe.user.repository.BodyMetricRepository;
-import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
-import com.sba.nutricanbe.user.repository.UserRepository;
-import com.sba.nutricanbe.user.service.ProgressTimelineService;
-import com.sba.nutricanbe.user.service.UserProfileService;
-import com.sba.nutricanbe.user.service.UserQueryService;
+import com.sba.nutricanbe.diet.repository.DietLogRepository;
+import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
+import com.sba.nutricanbe.diet.repository.MealPlanRepository;
+import com.sba.nutricanbe.diet.repository.MealPlanSuggestionRepository;
+import com.sba.nutricanbe.diet.repository.SelfPlanItemRepository;
+import com.sba.nutricanbe.diet.repository.SelfPlanSubmissionRepository;
+import com.sba.nutricanbe.diet.repository.WeeklySummaryRepository;
 import com.sba.nutricanbe.user.service.NotificationService;
-import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
-import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionDto;
 import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionReviewRequest;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
+import com.sba.nutricanbe.workspace.service.support.MealPlanSuggestionMapper;
+import com.sba.nutricanbe.workspace.service.support.PtWorkspaceAccessGuard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -42,28 +43,20 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class PtWorkspaceMealPlanSuggestionTest {
 
-    @Mock private PtClientMappingRepository mappingRepository;
-    @Mock private DietLogRepository dietLogRepository;
-    @Mock private BodyMetricRepository bodyMetricRepository;
-    @Mock private UserRepository userRepository;
-    @Mock private DietLogImageRepository dietLogImageRepository;
-    @Mock private SosTicketRepository sosTicketRepository;
-    @Mock private UserQueryService userQueryService;
-    @Mock private WebSocketSessionService webSocketSessionService;
-    @Mock private MealPlanRepository mealPlanRepository;
-    @Mock private MealPlanItemRepository mealPlanItemRepository;
     @Mock private MealPlanSuggestionRepository mealPlanSuggestionRepository;
+    @Mock private MealPlanItemRepository mealPlanItemRepository;
+    @Mock private MealPlanRepository mealPlanRepository;
+    @Mock private DietLogRepository dietLogRepository;
     @Mock private SelfPlanItemRepository selfPlanItemRepository;
     @Mock private SelfPlanSubmissionRepository selfPlanSubmissionRepository;
     @Mock private WeeklySummaryRepository weeklySummaryRepository;
-    @Mock private DietLogFeedbackRepository dietLogFeedbackRepository;
-    @Mock private ProgressTimelineService progressTimelineService;
-    @Mock private UserProfileService userProfileService;
-    @Mock private IntakeControlLoopService intakeControlLoopService;
     @Mock private NotificationService notificationService;
+    @Mock private WebSocketSessionService webSocketSessionService;
+    @Mock private PtWorkspaceAccessGuard accessGuard;
+    @Mock private MealPlanSuggestionMapper suggestionMapper;
 
     @InjectMocks
-    private PtWorkspaceServiceImpl ptWorkspaceService;
+    private PtReviewServiceImpl ptWorkspaceService;
 
     @Test
     void reviewMealPlanSuggestion_approveUpdatesItem() {
@@ -96,11 +89,16 @@ class PtWorkspaceMealPlanSuggestionTest {
                 .build();
         ReflectionTestUtils.setField(plan, "id", planId);
 
-        when(mappingRepository.existsByPt_IdAndClient_IdAndStatus(ptId, clientId, ClientMappingStatus.ACTIVE)).thenReturn(true);
         when(mealPlanSuggestionRepository.findById(suggestionId)).thenReturn(Optional.of(suggestion));
         when(mealPlanItemRepository.findById(itemId)).thenReturn(Optional.of(item));
         when(mealPlanRepository.findById(planId)).thenReturn(Optional.of(plan));
         when(mealPlanSuggestionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(suggestionMapper.toDto(any())).thenAnswer(inv -> {
+            MealPlanSuggestion s = inv.getArgument(0);
+            return MealPlanSuggestionDto.builder()
+                    .status(s.getStatus() != null ? s.getStatus().name() : null)
+                    .build();
+        });
 
         MealPlanSuggestionReviewRequest req = new MealPlanSuggestionReviewRequest();
         req.setAction("APPROVE");

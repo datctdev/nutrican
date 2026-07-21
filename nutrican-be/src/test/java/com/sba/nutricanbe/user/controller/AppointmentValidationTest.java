@@ -1,18 +1,22 @@
 package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.user.dto.BookAppointmentRequest;
 import com.sba.nutricanbe.user.entity.PtAppointment;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
-import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.AppointmentCancelType;
 import com.sba.nutricanbe.user.enums.AppointmentStatus;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.PtAppointmentRepository;
+import com.sba.nutricanbe.user.repository.PtAvailabilityWindowRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.user.repository.PtSlotHoldRepository;
 import com.sba.nutricanbe.user.repository.RefundRequestRepository;
+import com.sba.nutricanbe.user.service.AppointmentSlotHelper;
+import com.sba.nutricanbe.user.service.impl.AppointmentServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -34,45 +38,52 @@ class AppointmentValidationTest {
     @Mock private PtAppointmentRepository appointmentRepository;
     @Mock private PtClientMappingRepository mappingRepository;
     @Mock private RefundRequestRepository refundRepository;
+    @Mock private PtAvailabilityWindowRepository availabilityRepository;
+    @Mock private PtSlotHoldRepository slotHoldRepository;
 
-    @InjectMocks
-    private AppointmentController appointmentController;
+    private AppointmentServiceImpl appointmentService;
+
+    @BeforeEach
+    void setUp() {
+        AppointmentSlotHelper slotHelper = new AppointmentSlotHelper(
+                appointmentRepository, availabilityRepository, slotHoldRepository);
+        appointmentService = new AppointmentServiceImpl(
+                appointmentRepository, mappingRepository, refundRepository, slotHelper);
+    }
 
     @Test
     void book_rejectsSlotShorterThan30Minutes() {
         UUID ptId = UUID.randomUUID();
-        User customer = User.builder().build();
-        ReflectionTestUtils.setField(customer, "id", UUID.randomUUID());
+        UUID customerId = UUID.randomUUID();
         PtClientMapping mapping = PtClientMapping.builder()
                 .status(ClientMappingStatus.ACTIVE)
                 .build();
         ReflectionTestUtils.setField(mapping, "id", UUID.randomUUID());
-        when(mappingRepository.findByPt_IdAndClient_Id(ptId, customer.getId()))
+        when(mappingRepository.findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, customerId))
                 .thenReturn(Optional.of(mapping));
 
-        AppointmentController.AppointmentRequest request = new AppointmentController.AppointmentRequest();
+        BookAppointmentRequest request = new BookAppointmentRequest();
         LocalDateTime start = LocalDateTime.now().plusDays(1);
         request.setStartTime(start);
         request.setEndTime(start.plusMinutes(20));
 
         assertThrows(BadRequestException.class,
-                () -> appointmentController.book(customer, ptId, request));
+                () -> appointmentService.book(customerId, ptId, request));
     }
 
     @Test
     void book_rejectsOverlappingPtSlot() {
         UUID ptId = UUID.randomUUID();
-        User customer = User.builder().build();
-        ReflectionTestUtils.setField(customer, "id", UUID.randomUUID());
+        UUID customerId = UUID.randomUUID();
         PtClientMapping mapping = PtClientMapping.builder()
                 .status(ClientMappingStatus.ACTIVE)
                 .build();
-        when(mappingRepository.findByPt_IdAndClient_Id(ptId, customer.getId()))
+        when(mappingRepository.findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, customerId))
                 .thenReturn(Optional.of(mapping));
 
         LocalDateTime start = LocalDateTime.now().plusDays(1).withHour(10).withMinute(0);
         LocalDateTime end = start.plusMinutes(60);
-        AppointmentController.AppointmentRequest request = new AppointmentController.AppointmentRequest();
+        BookAppointmentRequest request = new BookAppointmentRequest();
         request.setStartTime(start);
         request.setEndTime(end);
 
@@ -84,15 +95,13 @@ class AppointmentValidationTest {
                 .thenReturn(List.of(existing));
 
         assertThrows(BadRequestException.class,
-                () -> appointmentController.book(customer, ptId, request));
+                () -> appointmentService.book(customerId, ptId, request));
     }
 
     @Test
     void cancelByCustomer_noFeeWhen48HoursOrMore() {
         UUID apptId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
-        User customer = User.builder().build();
-        ReflectionTestUtils.setField(customer, "id", customerId);
 
         PtAppointment appt = PtAppointment.builder()
                 .clientId(customerId)
@@ -103,17 +112,15 @@ class AppointmentValidationTest {
         when(appointmentRepository.findById(apptId)).thenReturn(Optional.of(appt));
         when(appointmentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        var response = appointmentController.cancelByCustomer(customer, apptId, null);
-        assertEquals(AppointmentCancelType.NO_FEE, response.getBody().getData().getCancelType());
-        assertEquals(AppointmentStatus.CANCELLED, response.getBody().getData().getStatus());
+        PtAppointment result = appointmentService.cancelByCustomer(customerId, apptId, null);
+        assertEquals(AppointmentCancelType.NO_FEE, result.getCancelType());
+        assertEquals(AppointmentStatus.CANCELLED, result.getStatus());
     }
 
     @Test
     void cancelByCustomer_lateWhenUnder48Hours() {
         UUID apptId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
-        User customer = User.builder().build();
-        ReflectionTestUtils.setField(customer, "id", customerId);
 
         PtAppointment appt = PtAppointment.builder()
                 .clientId(customerId)
@@ -124,16 +131,14 @@ class AppointmentValidationTest {
         when(appointmentRepository.findById(apptId)).thenReturn(Optional.of(appt));
         when(appointmentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        var response = appointmentController.cancelByCustomer(customer, apptId, null);
-        assertEquals(AppointmentCancelType.LATE, response.getBody().getData().getCancelType());
+        PtAppointment result = appointmentService.cancelByCustomer(customerId, apptId, null);
+        assertEquals(AppointmentCancelType.LATE, result.getCancelType());
     }
 
     @Test
     void cancelByCustomer_rejectsPastAppointment() {
         UUID apptId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
-        User customer = User.builder().build();
-        ReflectionTestUtils.setField(customer, "id", customerId);
 
         PtAppointment appt = PtAppointment.builder()
                 .clientId(customerId)
@@ -143,6 +148,6 @@ class AppointmentValidationTest {
         when(appointmentRepository.findById(apptId)).thenReturn(Optional.of(appt));
 
         assertThrows(BadRequestException.class,
-                () -> appointmentController.cancelByCustomer(customer, apptId, null));
+                () -> appointmentService.cancelByCustomer(customerId, apptId, null));
     }
 }

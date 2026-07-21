@@ -65,7 +65,7 @@ class CoachingLifecycleIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"));
 
-        var mapping = mappingRepository.findByPt_IdAndClient_Id(
+        var mapping = mappingRepository.findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(
                 userRepository.findByEmail("pt.certified@gmail.com").orElseThrow().getId(),
                 customerId).orElseThrow();
         assertThat(mapping.getStatus()).isEqualTo(ClientMappingStatus.COMPLETED);
@@ -76,7 +76,8 @@ class CoachingLifecycleIntegrationTest extends IntegrationTestBase {
     void autoApprovedRefund_setsTerminationReasonRefund() throws Exception {
         User customer = userRepository.findByEmail("customer1@gmail.com").orElseThrow();
         User pt = userRepository.findByEmail("pt.certified@gmail.com").orElseThrow();
-        var mapping = mappingRepository.findByPt_IdAndClient_Id(pt.getId(), customer.getId()).orElseThrow();
+        var mapping = mappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(pt.getId(), customer.getId()).orElseThrow();
 
         String body = String.format("""
                 {"mappingId":"%s","reason":"PT_CANCEL","note":"pt cancelled session"}
@@ -97,7 +98,8 @@ class CoachingLifecycleIntegrationTest extends IntegrationTestBase {
     void ptCannotViewProgressAfterRefund() throws Exception {
         User customer = userRepository.findByEmail("customer1@gmail.com").orElseThrow();
         User pt = userRepository.findByEmail("pt.certified@gmail.com").orElseThrow();
-        var mapping = mappingRepository.findByPt_IdAndClient_Id(pt.getId(), customer.getId()).orElseThrow();
+        var mapping = mappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(pt.getId(), customer.getId()).orElseThrow();
 
         String body = String.format("""
                 {"mappingId":"%s","reason":"PT_CANCEL","note":"refund test"}

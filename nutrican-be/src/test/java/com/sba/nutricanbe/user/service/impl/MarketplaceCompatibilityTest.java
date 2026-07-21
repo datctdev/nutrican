@@ -46,7 +46,6 @@ class MarketplaceCompatibilityTest {
                 .build();
         when(ptProfileRepository.findByIsVerifiedTrue(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(profile)));
-        when(mappingRepository.countByPt_IdAndStatus(any(), any())).thenReturn(2L);
 
         PtSearchRequest req = new PtSearchRequest();
         req.setVerifiedOnly(true);
@@ -70,7 +69,6 @@ class MarketplaceCompatibilityTest {
                 .build();
         when(ptProfileRepository.findByIsVerifiedTrue(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(profile)));
-        when(mappingRepository.countByPt_IdAndStatus(any(), any())).thenReturn(2L);
 
         PtSearchRequest req = new PtSearchRequest();
         req.setVerifiedOnly(true);

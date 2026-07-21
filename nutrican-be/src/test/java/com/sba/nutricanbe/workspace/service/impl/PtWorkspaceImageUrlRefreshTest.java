@@ -27,7 +27,7 @@ class PtWorkspaceImageUrlRefreshTest {
     @Mock private StorageService storageService;
 
     @InjectMocks
-    private PtWorkspaceServiceImpl ptWorkspaceService;
+    private PtDietLogReviewServiceImpl ptWorkspaceService;
 
     @Test
     void reviewResponseRegeneratesMainAndAdditionalImageUrlsFromDurableObjectNames() {
