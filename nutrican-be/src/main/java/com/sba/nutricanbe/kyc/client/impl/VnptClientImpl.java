@@ -36,7 +36,6 @@ public class VnptClientImpl implements VnptClient {
 
             var form = new LinkedMultiValueMap<String, Object>();
 
-            // IMPORTANT: multipart part must have filename
             ByteArrayResource filePart = new ByteArrayResource(file.getBytes()) {
                 @Override
                 public String getFilename() {
@@ -46,7 +45,6 @@ public class VnptClientImpl implements VnptClient {
 
             form.add("file", filePart);
             if (title != null && !title.isBlank()) form.add("title", title);
-            // description is required by VNPT - use title or default value
             String desc = (description != null && !description.isBlank()) ? description : "kyc-upload";
             form.add("description", desc);
 
@@ -85,8 +83,6 @@ public class VnptClientImpl implements VnptClient {
     }
 
 
-    // Lombok @RequiredArgsConstructor không cho custom init WebClient field dễ đọc,
-    // nên dùng constructor explicit để build WebClient đúng baseUrl + headers.
     @Override
     public ClassifyResponse classify(String imgHash, String session) {
         ClassifyRequest req = new ClassifyRequest();

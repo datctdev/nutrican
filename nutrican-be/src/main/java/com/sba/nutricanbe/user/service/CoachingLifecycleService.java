@@ -14,5 +14,5 @@ public interface CoachingLifecycleService {
 
     List<CoachingHistoryDto> getCoachingHistory(UUID customerId);
 
-    void setMaxClients(UUID ptUserId, int maxClients);
+    void setMaxClients(UUID ptUserId, Integer maxClients);
 }

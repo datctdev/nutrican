@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import {
   Loader2, ArrowLeft, Target, Beef, Wheat, Droplet,
   Upload, CheckCircle2, Zap, Scale, Heart, TrendingUp,
-  Pencil, X, Activity, AlertTriangle, RefreshCw
+  Pencil, X, Activity, AlertTriangle, RefreshCw, ArrowDown
 } from 'lucide-react';
 import {
   ACTIVITY_LEVEL_OPTIONS,
@@ -46,6 +46,9 @@ export default function MacroTargetsPage() {
 
   // Confirm Recalculate Modal State
   const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
+  const [previewMacros, setPreviewMacros] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [recalcMenuOpen, setRecalcMenuOpen] = useState(false);
 
   // Edit Goal Modal State
   const [showGoalModal, setShowGoalModal] = useState(false);
@@ -54,6 +57,32 @@ export default function MacroTargetsPage() {
     targetWeight: '',
     targetDate: ''
   });
+
+  useEffect(() => {
+    if (!recalcMenuOpen || hasActivePt) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const suggestionRes = await userService.getMacroSuggestion({
+          nutritionGoal,
+          pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+          activityLevel,
+        });
+        const m = suggestionRes.data?.data;
+        if (!cancelled && m) {
+          setPreviewMacros({
+            dailyCalories: m.dailyCalories || 0,
+            protein: m.protein || 0,
+            carb: m.carb || m.carbs || 0,
+            fat: m.fat || 0,
+          });
+        }
+      } catch {
+        if (!cancelled) setPreviewMacros(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activityLevel, recalcMenuOpen, hasActivePt, nutritionGoal, pregnancyTrimester]);
 
   const openGoalModal = () => {
     setEditGoalForm({
@@ -255,6 +284,7 @@ export default function MacroTargetsPage() {
 
   const handleRecalculateMacros = async () => {
     setShowRecalcConfirm(false);
+    setRecalcMenuOpen(false);
     setIsRecalculating(true);
     try {
       const res = await userService.recalculateMacros({
@@ -280,6 +310,111 @@ export default function MacroTargetsPage() {
       setIsRecalculating(false);
     }
   };
+
+  const openRecalcConfirm = async () => {
+    setRecalcMenuOpen(false);
+    setLoadingPreview(true);
+    setShowRecalcConfirm(true);
+    try {
+      const suggestionRes = await userService.getMacroSuggestion({
+        nutritionGoal,
+        pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
+        activityLevel,
+      });
+      const m = suggestionRes.data?.data;
+      if (m) {
+        setPreviewMacros({
+          dailyCalories: m.dailyCalories || 0,
+          protein: m.protein || 0,
+          carb: m.carb || m.carbs || 0,
+          fat: m.fat || 0,
+        });
+      }
+    } catch {
+      setPreviewMacros(null);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const macroDiffRows = [
+    { key: 'dailyCalories', label: 'Calo', shortLabel: 'Calo', unit: 'kcal' },
+    { key: 'protein', label: 'Đạm', shortLabel: 'Đạm', unit: 'g' },
+    { key: 'carb', label: 'Tinh bột', shortLabel: 'Tinh bột', unit: 'g' },
+    { key: 'fat', label: 'Chất béo', shortLabel: 'Béo', unit: 'g' },
+  ];
+
+  const macroCardStyles = {
+    dailyCalories: {
+      box: 'bg-slate-50 border border-slate-200',
+      label: 'text-slate-400',
+      value: 'text-slate-800',
+    },
+    protein: {
+      box: 'bg-rose-50 border border-rose-100',
+      label: 'text-rose-400',
+      value: 'text-rose-600',
+    },
+    carb: {
+      box: 'bg-amber-50 border border-amber-100',
+      label: 'text-amber-400',
+      value: 'text-amber-600',
+    },
+    fat: {
+      box: 'bg-indigo-50 border border-indigo-100',
+      label: 'text-indigo-400',
+      value: 'text-indigo-600',
+    },
+  };
+
+  const fmtMacroValue = (key, value) => (
+    key === 'dailyCalories' ? Number(value ?? 0).toLocaleString() : (value ?? 0)
+  );
+
+  const renderMacroCompare = (compact = false) => (
+    <div className={`space-y-2 ${compact ? '' : 'space-y-3'}`}>
+      <div className={`grid grid-cols-4 text-center ${compact ? 'gap-1.5' : 'gap-2'}`}>
+        {macroDiffRows.map(({ key, shortLabel, unit }) => {
+          const style = macroCardStyles[key];
+          return (
+            <div key={`old-${key}`} className={`rounded-xl ${compact ? 'py-2 px-1' : 'py-2.5'} ${style.box}`}>
+              <p className={`text-[10px] font-black uppercase tracking-wider ${style.label}`}>{shortLabel}</p>
+              <p className={`font-bold ${compact ? 'text-xs' : 'text-sm'} ${style.value}`}>
+                {loadingPreview ? '…' : fmtMacroValue(key, macros[key])}
+                {!loadingPreview && unit !== 'kcal' ? unit : ''}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-center">
+        <ArrowDown className={`text-slate-400 ${compact ? 'w-4 h-4' : 'w-5 h-5'}`} strokeWidth={2.5} />
+      </div>
+      <div className={`grid grid-cols-4 text-center ${compact ? 'gap-1.5' : 'gap-2'}`}>
+        {macroDiffRows.map(({ key, shortLabel, unit }) => {
+          const style = macroCardStyles[key];
+          const current = macros[key] ?? 0;
+          const next = previewMacros?.[key];
+          const changed = next != null && next !== current;
+          return (
+            <div
+              key={`new-${key}`}
+              className={`rounded-xl ${compact ? 'py-2 px-1' : 'py-2.5'} ${style.box} ${
+                changed ? 'ring-2 ring-indigo-300/60' : ''
+              }`}
+            >
+              <p className={`text-[10px] font-black uppercase tracking-wider ${style.label}`}>{shortLabel}</p>
+              <p className={`font-extrabold ${compact ? 'text-xs' : 'text-sm'} ${style.value}`}>
+                {loadingPreview ? '…' : next != null
+                  ? `${fmtMacroValue(key, next)}${unit !== 'kcal' ? unit : ''}`
+                  : '—'}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   const getDeltaString = () => {
     if (bodyMetricHistory.length < 2) return null;
@@ -405,14 +540,42 @@ export default function MacroTargetsPage() {
               ))}
             </select>
           </div>
-          <Button
-            onClick={() => setShowRecalcConfirm(true)}
-            disabled={hasActivePt || isRecalculating || isSaving}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-5 font-bold text-sm disabled:opacity-60"
-          >
-            {isRecalculating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Áp dụng & tính lại macro
-          </Button>
+          <div className="relative flex">
+            <Button
+              onClick={openRecalcConfirm}
+              disabled={hasActivePt || isRecalculating || isSaving}
+              className="flex-1 rounded-r-none bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-5 font-bold text-sm disabled:opacity-60"
+            >
+              {isRecalculating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Áp dụng & tính lại macro
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setRecalcMenuOpen((v) => !v)}
+              disabled={hasActivePt || isRecalculating || isSaving}
+              aria-label="Xem 4 chỉ số sẽ thay đổi"
+              className="rounded-l-none border-l border-indigo-500/30 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-3 py-5 disabled:opacity-60"
+            >
+              ▾
+            </Button>
+            {recalcMenuOpen && !hasActivePt && (
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">
+                  {ACTIVITY_LEVEL_OPTIONS.find((o) => o.value === activityLevel)?.shortLabel || 'Mức mới'} — so sánh nhanh
+                </p>
+                {renderMacroCompare(true)}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="mt-2 w-full text-xs font-bold text-indigo-600"
+                  onClick={openRecalcConfirm}
+                >
+                  Xác nhận áp dụng
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -537,30 +700,15 @@ export default function MacroTargetsPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-4 gap-2 text-center">
-                <div className="bg-slate-50 border border-slate-200 rounded-xl py-2.5">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Calo</p>
-                  <p className="text-sm font-bold text-slate-800">{macros.dailyCalories.toLocaleString()}</p>
-                </div>
-                <div className="bg-rose-50 border border-rose-100 rounded-xl py-2.5">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-rose-400">Đạm</p>
-                  <p className="text-sm font-bold text-rose-600">{macros.protein}g</p>
-                </div>
-                <div className="bg-amber-50 border border-amber-100 rounded-xl py-2.5">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-400">Tinh bột</p>
-                  <p className="text-sm font-bold text-amber-600">{macros.carb}g</p>
-                </div>
-                <div className="bg-indigo-50 border border-indigo-100 rounded-xl py-2.5">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-400">Béo</p>
-                  <p className="text-sm font-bold text-indigo-600">{macros.fat}g</p>
-                </div>
-              </div>
-              <p className="text-xs text-slate-400 text-center font-medium">Các giá trị hiện tại ở trên sẽ được thay thế bằng kết quả tính mới.</p>
+              {renderMacroCompare(false)}
+              <p className="text-xs text-slate-400 text-center font-medium">
+                Các giá trị ở trên sẽ được thay bằng hàng bên dưới sau khi áp dụng.
+              </p>
             </div>
 
             <div className="p-6 pt-0 flex gap-3">
               <Button
-                onClick={() => setShowRecalcConfirm(false)}
+                onClick={() => { setShowRecalcConfirm(false); setPreviewMacros(null); }}
                 variant="ghost"
                 className="flex-1 font-bold text-slate-600 hover:bg-slate-100 rounded-xl py-5"
               >

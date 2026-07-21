@@ -27,6 +27,7 @@ import {
 import {
     getSubmissionStatusLabel,
     isPlanChoiceRejected,
+    formatSubmissionScope,
 } from './planLabels';
 import LateTickReasonModal from './LateTickReasonModal';
 import MealPeriodBlock from '../../../components/diet/timeline/MealPeriodBlock';
@@ -87,16 +88,20 @@ export default function DayPlanCard({
     const [editQty, setEditQty] = useState('');
     const [submission, setSubmission] = useState(null);
     const [lateTickTarget, setLateTickTarget] = useState(null);
+    /** Coached only: local suggestion cart before save & send to PT. */
+    const [batchQueue, setBatchQueue] = useState([]);
+    const [batchBusy, setBatchBusy] = useState(false);
     const qtyDebounceRef = useRef(null);
+    const onRefreshTimelineRef = useRef(onRefreshTimeline);
+    onRefreshTimelineRef.current = onRefreshTimeline;
     const isPast = isPastIso(selectedDate);
     const isToday = isTodayIso(selectedDate);
     const vnNow = nowInVn();
-    const currentPeriod = getCurrentMealPeriod(vnNow);
 
     const refresh = useCallback(async () => {
         if (!selectedDate) return;
-        if (onRefreshTimeline) {
-            await onRefreshTimeline();
+        if (onRefreshTimelineRef.current) {
+            await onRefreshTimelineRef.current();
             return;
         }
         setLoading(true);
@@ -111,7 +116,14 @@ export default function DayPlanCard({
             const raw = subRes?.data?.data;
             const list = Array.isArray(raw) ? raw : (raw ? [raw] : []);
             const chosen = list.find((s) => s.status === 'PENDING')
-                || [...list].sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')))[0]
+                || [...list].sort((a, b) => {
+                    const rank = (s) => (s.status === 'APPROVED' || s.status === 'REJECTED' ? 2
+                        : s.status === 'CANCELLED' ? 1 : 0);
+                    const byRank = rank(b) - rank(a);
+                    if (byRank !== 0) return byRank;
+                    return String(b.decidedAt || b.submittedAt || '')
+                        .localeCompare(String(a.decidedAt || a.submittedAt || ''));
+                })[0]
                 || null;
             setSubmission(chosen);
         } catch (err) {
@@ -120,24 +132,80 @@ export default function DayPlanCard({
         } finally {
             setLoading(false);
         }
-    }, [selectedDate, hasActivePt, onRefreshTimeline]);
+    }, [selectedDate, hasActivePt]);
 
     useEffect(() => {
         if (timeline) {
             setDayPlan(dayPlanFromTimeline(timeline));
             setSubmission(timeline.selfPlanSubmission || null);
             setLoading(false);
+            return;
         }
-    }, [timeline]);
+        if (!timelineLoading) {
+            setLoading(false);
+        }
+    }, [timeline, timelineLoading]);
 
     useEffect(() => {
-        if (timeline) return;
+        if (timeline || onRefreshTimelineRef.current) return;
         refresh();
-    }, [refresh, timeline]);
+    }, [refresh, timeline, selectedDate]);
 
-    const pendingLocked = submission?.status === 'PENDING';
-    /** PT coaching: API flag or published plan on this day (timeline may load before hasActivePt). */
-    const coachedMode = hasActivePt || Boolean(timeline?.hasPtPlan ?? dayPlan?.hasPtPlan);
+    const hasPendingSubmission = useMemo(
+        () => (dayPlan?.items || []).some((i) => i.source === 'SELF' && i.lockedByReview),
+        [dayPlan],
+    );
+
+    const pendingSubmissionIds = useMemo(() => {
+        const ids = new Set(
+            (dayPlan?.items || [])
+                .filter((i) => i.source === 'SELF' && i.lockedByReview && i.submissionId)
+                .map((i) => i.submissionId),
+        );
+        return [...ids];
+    }, [dayPlan]);
+
+    const getPeriodSubmissionId = useCallback((period) => {
+        const locked = (dayPlan?.items || []).find(
+            (i) => i.source === 'SELF' && i.lockedByReview && resolvePlanItemPeriod(i) === period,
+        );
+        return locked?.submissionId || null;
+    }, [dayPlan]);
+    /** Coaching UI: active PT mapping, or published PT menu for the day (API flicker fallback). */
+    const hasPtPlan = Boolean(timeline?.hasPtPlan ?? dayPlan?.hasPtPlan);
+    const coachedMode = Boolean(hasActivePt) || hasPtPlan;
+
+    const allActualLogs = useMemo(
+        () => (timeline?.periods || []).flatMap((p) => p.actualLogs || []),
+        [timeline],
+    );
+
+    const settledCheck = useCallback(
+        (period) => isMealPeriodSettled(period, dayPlan?.items || [], allActualLogs),
+        [dayPlan, allActualLogs],
+    );
+
+    const firstOpenPeriod = useCallback(() => (
+        MEAL_PERIODS.find((p) => !settledCheck(p)) || getCurrentMealPeriod()
+    ), [settledCheck]);
+
+    useEffect(() => {
+        setBatchQueue([]);
+        setShowAdd(false);
+        setPendingFood(null);
+    }, [selectedDate]);
+
+    useEffect(() => {
+        if (!hasActivePt && !hasPtPlan) {
+            setBatchQueue([]);
+        }
+    }, [hasActivePt, hasPtPlan]);
+
+    useEffect(() => {
+        if (!showAdd || !settledCheck(addMealPeriod)) return;
+        const next = firstOpenPeriod();
+        if (next !== addMealPeriod) setAddMealPeriod(next);
+    }, [showAdd, addMealPeriod, settledCheck, firstOpenPeriod]);
 
     const draftMacros = useMemo(() => {
         if (!pendingFood) return null;
@@ -175,16 +243,16 @@ export default function DayPlanCard({
                     : editDraft,
                 excludeItemId: editId,
                 dateIso: selectedDate,
-                coachedMode: hasActivePt,
+                coachedMode,
             });
             onPlannedTotalsChange(totals);
         }, 300);
         return clear;
-    }, [dayPlan, draftMacros, editDraft, editId, addMealPeriod, onPlannedTotalsChange, selectedDate]);
+    }, [dayPlan, draftMacros, editDraft, editId, addMealPeriod, onPlannedTotalsChange, selectedDate, coachedMode]);
 
     const planProgress = useMemo(
-        () => computePlanProgressBreakdown(dayPlan?.items || [], { dateIso: selectedDate, coachedMode: hasActivePt }),
-        [dayPlan, selectedDate, hasActivePt],
+        () => computePlanProgressBreakdown(dayPlan?.items || [], { dateIso: selectedDate, coachedMode }),
+        [dayPlan, selectedDate, coachedMode],
     );
 
     const visibleItems = useMemo(() => {
@@ -192,33 +260,96 @@ export default function DayPlanCard({
         return items.filter((i) => !(i.source === 'SELF' && i.applied));
     }, [dayPlan]);
 
+    const openAddPanel = () => {
+        setShowAdd((v) => {
+            const next = !v;
+            if (next) {
+                setAddMealPeriod(firstOpenPeriod());
+            }
+            return next;
+        });
+    };
+
     const handleSelectFood = (food) => {
         setPendingFood(food);
         setPendingQty(String(Math.round(Number(food.servingSizeG) || 100)));
     };
 
-    const handleConfirmAdd = async () => {
+    /** Solo: persist immediately. Coached: queue locally then send to PT. */
+    const handleAddToBatch = async () => {
         if (!pendingFood) return;
         const qty = Number(pendingQty);
         if (!qty || qty <= 0) {
             toast.error('Số gam không hợp lệ');
             return;
         }
-        try {
-            await dietService.createSelfPlanItem({
-                planDate: selectedDate,
-                mealType: periodToMealType(addMealPeriod),
+        if (settledCheck(addMealPeriod)) {
+            toast.error('Buổi này đã chốt — chọn buổi khác');
+            setAddMealPeriod(firstOpenPeriod());
+            return;
+        }
+
+        if (!hasActivePt) {
+            setBatchBusy(true);
+            try {
+                await dietService.createSelfPlanItem({
+                    planDate: selectedDate,
+                    mealType: periodToMealType(addMealPeriod),
+                    mealPeriod: addMealPeriod,
+                    foodItemId: pendingFood.id,
+                    quantityG: qty,
+                });
+                setPendingFood(null);
+                setPendingQty('');
+                toast.success(`Đã thêm vào kế hoạch · ${MEAL_PERIOD_LABELS[addMealPeriod]}`);
+                await refresh();
+            } catch (err) {
+                toast.error(err.response?.data?.message || 'Không thêm được món');
+            } finally {
+                setBatchBusy(false);
+            }
+            return;
+        }
+
+        const macros = scaleFoodMacros(pendingFood, qty);
+        setBatchQueue((prev) => [
+            ...prev,
+            {
+                key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 mealPeriod: addMealPeriod,
                 foodItemId: pendingFood.id,
+                itemName: pendingFood.nameVi,
                 quantityG: qty,
+                calories: macros.calories,
+                protein: macros.protein,
+                carb: macros.carb,
+                fat: macros.fat,
+            },
+        ]);
+        setPendingFood(null);
+        setPendingQty('');
+        toast.success(`Đã thêm vào giỏ · ${MEAL_PERIOD_LABELS[addMealPeriod]}`);
+    };
+
+    const removeFromBatch = (key) => {
+        setBatchQueue((prev) => prev.filter((x) => x.key !== key));
+    };
+
+    const persistBatchQueue = async () => {
+        if (!batchQueue.length) return [];
+        const created = [];
+        for (const row of batchQueue) {
+            const res = await dietService.createSelfPlanItem({
+                planDate: selectedDate,
+                mealType: periodToMealType(row.mealPeriod),
+                mealPeriod: row.mealPeriod,
+                foodItemId: row.foodItemId,
+                quantityG: row.quantityG,
             });
-            toast.success('Đã thêm vào plan');
-            setPendingFood(null);
-            setShowAdd(false);
-            await refresh();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Không thêm được món');
+            created.push(res.data?.data);
         }
+        setBatchQueue([]);
+        return created;
     };
 
     const handleDelete = async (item) => {
@@ -296,7 +427,8 @@ export default function DayPlanCard({
                 onLogged?.();
             } else {
                 await mealPlanService.markEaten(item.id, true, lateTickReason || undefined);
-                toast.success('Đã ăn ✓ (theo plan PT)');
+                toast.success('Đã ghi vào nhật ký');
+                onLogged?.();
             }
             await refresh();
         } catch (err) {
@@ -312,29 +444,66 @@ export default function DayPlanCard({
     };
 
     const handleSubmit = async () => {
-        const planItems = dayPlan?.items || [];
-        const reviewable = planItems.filter(
+        if (!hasActivePt) return;
+        const serverDrafts = (dayPlan?.items || []).filter(
             (i) => i.source === 'SELF' && !i.applied && !i.eaten && !i.lockedByReview
-                && !isMealPeriodSettled(resolvePlanItemPeriod(i), planItems),
+                && !isPlanChoiceRejected(i)
+                && !settledCheck(resolvePlanItemPeriod(i)),
         );
-        const periods = [...new Set(reviewable.map((i) => resolvePlanItemPeriod(i)).filter(Boolean))];
+        const totalCount = serverDrafts.length + batchQueue.length;
+        if (totalCount === 0) {
+            toast.info('Chưa có món đề xuất để gửi');
+            return;
+        }
+        const periodSet = new Set([
+            ...serverDrafts.map((i) => resolvePlanItemPeriod(i)).filter(Boolean),
+            ...batchQueue.map((r) => r.mealPeriod),
+        ]);
+        setBatchBusy(true);
         try {
-            await dietService.submitSelfPlan(selectedDate);
-            if (periods.length === 1) {
-                toast.success(`Đã gửi ${reviewable.length} đề xuất buổi ${MEAL_PERIOD_LABELS[periods[0]] || periods[0]}`);
-            } else {
-                toast.success(`Đã gửi ${reviewable.length} đề xuất cho PT duyệt`);
+            if (batchQueue.length) {
+                await persistBatchQueue();
             }
+            await dietService.submitSelfPlan(selectedDate);
+            if (periodSet.size === 1) {
+                const p = [...periodSet][0];
+                toast.success(`Đã gửi ${totalCount} món buổi ${MEAL_PERIOD_LABELS[p] || p} cho PT`);
+            } else {
+                toast.success(`Đã gửi hàng loạt ${totalCount} món · ${periodSet.size} buổi cho PT duyệt`);
+            }
+            setShowAdd(false);
             await refresh();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Không gửi được');
+            await refresh();
+        } finally {
+            setBatchBusy(false);
         }
     };
 
-    const handleCancel = async () => {
-        if (!submission?.id) return;
+    const handleSaveBatchOnly = async () => {
+        if (!batchQueue.length) {
+            toast.info('Giỏ trống — thêm món trước');
+            return;
+        }
+        setBatchBusy(true);
         try {
-            await dietService.cancelSelfPlanSubmission(submission.id);
+            const n = batchQueue.length;
+            await persistBatchQueue();
+            toast.success(`Đã lưu ${n} món vào plan — bấm Gửi PT khi sẵn sàng`);
+            await refresh();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Không lưu được giỏ');
+        } finally {
+            setBatchBusy(false);
+        }
+    };
+
+    const handleCancel = async (submissionId) => {
+        const id = submissionId || submission?.id;
+        if (!id) return;
+        try {
+            await dietService.cancelSelfPlanSubmission(id);
             toast.success('Đã hủy gửi duyệt');
             await refresh();
         } catch (err) {
@@ -357,15 +526,43 @@ export default function DayPlanCard({
     const pendingPlanKcal = Math.round(Number(planProgress.pending?.calories) || 0);
     const kcalProgress = target > 0 ? Math.min(100, Math.round((consumedKcal / target) * 100)) : 0;
     const planItems = dayPlan?.items || [];
-    const hasSelfDraft = planItems.some(
+    const serverDrafts = planItems.filter(
         (i) => i.source === 'SELF' && !i.applied && !i.eaten && !i.lockedByReview
-            && !isMealPeriodSettled(resolvePlanItemPeriod(i), planItems),
+            && !isPlanChoiceRejected(i)
+            && !settledCheck(resolvePlanItemPeriod(i)),
     );
-    const unsentEveningDraft = planItems.some(
-        (i) => i.source === 'SELF' && !i.applied && !i.eaten && !i.lockedByReview
-            && resolvePlanItemPeriod(i) === 'EVENING'
-            && !isMealPeriodSettled('EVENING', planItems),
-    );
+    const hasSelfDraft = serverDrafts.length > 0 || batchQueue.length > 0;
+    const draftPeriodCount = new Set([
+        ...serverDrafts.map((i) => resolvePlanItemPeriod(i)).filter(Boolean),
+        ...batchQueue.map((r) => r.mealPeriod),
+    ]).size;
+    const draftItemCount = serverDrafts.length + batchQueue.length;
+    const batchByPeriod = MEAL_PERIODS
+        .map((period) => ({
+            period,
+            rows: batchQueue.filter((r) => r.mealPeriod === period),
+        }))
+        .filter((g) => g.rows.length > 0);
+    const canAddAnyPeriod = MEAL_PERIODS.some((period) => !settledCheck(period));
+
+    const submissionScopeItems = (() => {
+        if (!submission) return [];
+        if (submission.items?.length) return submission.items;
+        return planItems.filter(
+            (i) => i.source === 'SELF' && i.submissionId && i.submissionId === submission.id,
+        );
+    })();
+    const submissionScopeText = formatSubmissionScope(submissionScopeItems, MEAL_PERIOD_LABELS);
+    const rejectedByPeriod = {};
+    for (const item of planItems) {
+        // Chỉ món PT từ chối (choiceRejected), không lẫn SUPERSEDED khi duyệt món khác
+        if (item.source !== 'SELF' || !item.choiceRejected) continue;
+        const period = resolvePlanItemPeriod(item);
+        if (!period) continue;
+        if (!rejectedByPeriod[period]) rejectedByPeriod[period] = [];
+        const name = String(item.name || '').trim();
+        if (name && !rejectedByPeriod[period].includes(name)) rejectedByPeriod[period].push(name);
+    }
 
     return (
         <div className="rounded-3xl border border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50/30 to-sky-50/40 p-5 shadow-md space-y-4">
@@ -412,20 +609,29 @@ export default function DayPlanCard({
                         </p>
                     ) : (
                         <p className="text-[11px] text-slate-500 mt-1 pl-11 flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-0.5"><Lock className="h-3 w-3 text-blue-600" /> Plan</span>
+                            <span className="inline-flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3 text-blue-600" /> Plan tự lập</span>
                             <span className="inline-flex items-center gap-0.5"><CheckCircle2 className="h-3 w-3 text-emerald-600" /> Nhật ký</span>
-                            <span className="text-slate-400">· tick plan → ghi log</span>
+                            <span className="text-slate-400">· tự thêm · tick đã ăn</span>
                         </p>
                     )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    {hasActivePt && hasSelfDraft && !pendingLocked && !isPast && (
-                        <Button type="button" size="sm" onClick={handleSubmit} className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-sm">
-                            <Send className="w-3.5 h-3.5 mr-1" /> Gửi PT duyệt
+                    {hasActivePt && hasSelfDraft && !isPast && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleSubmit}
+                            disabled={batchBusy}
+                            className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-sm"
+                        >
+                            <Send className="w-3.5 h-3.5 mr-1" />
+                            Gửi PT hàng loạt
+                            {draftItemCount > 0 ? ` (${draftItemCount} món` : ''}
+                            {draftPeriodCount > 1 ? ` · ${draftPeriodCount} buổi)` : draftItemCount > 0 ? ')' : ''}
                         </Button>
                     )}
-                    {pendingLocked && (
-                        <Button type="button" size="sm" variant="outline" onClick={handleCancel} className="rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50">
+                    {hasActivePt && hasPendingSubmission && pendingSubmissionIds.length === 1 && (
+                        <Button type="button" size="sm" variant="outline" onClick={() => handleCancel(pendingSubmissionIds[0])} className="rounded-xl border-amber-300 text-amber-800 hover:bg-amber-50">
                             <Ban className="w-3.5 h-3.5 mr-1" /> Hủy gửi
                         </Button>
                     )}
@@ -433,8 +639,8 @@ export default function DayPlanCard({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={pendingLocked || isPast}
-                        onClick={() => setShowAdd((v) => !v)}
+                        disabled={isPast || !canAddAnyPeriod}
+                        onClick={openAddPanel}
                         className="rounded-xl border-teal-300 bg-white/80 text-teal-700 hover:bg-teal-50 shadow-sm"
                     >
                         <Plus className="w-4 h-4 mr-1" /> {hasActivePt ? 'Đề xuất món' : 'Thêm món'}
@@ -452,41 +658,78 @@ export default function DayPlanCard({
                     Đây là ngày tương lai. Bạn có thể chuẩn bị trước kế hoạch trong tối đa 14 ngày nhưng chưa thể tick đã ăn.
                 </div>
             )}
-
-            {hasActivePt && unsentEveningDraft && !pendingLocked && !isPast && (
-                <div className="rounded-2xl border border-indigo-300/80 bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-3 text-sm font-semibold text-indigo-900 shadow-sm">
-                    Buổi tối chưa gửi PT — bấm Gửi PT duyệt để PT xem đề xuất của bạn.
+            {isToday && vnNow.getHours() < 4 && (
+                <div className="rounded-2xl border border-violet-300/80 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-4 py-3 text-sm font-semibold text-violet-900 shadow-sm">
+                    Đang trong khung <strong>buổi khuya của ngày hôm qua</strong> (22:00–03:59).
+                    Mở lịch chọn <strong>ngày hôm qua</strong> để bấm «Đã ăn» cho buổi khuya.
                 </div>
             )}
 
-            {submission?.status && (
-                <div className={`flex items-start gap-2 text-xs font-bold px-3 py-2 rounded-xl border ${
+            {hasActivePt && hasSelfDraft && !isPast && (
+                <div className="rounded-2xl border border-indigo-300/80 bg-gradient-to-r from-indigo-50 to-violet-50 px-4 py-3 text-sm font-semibold text-indigo-900 shadow-sm">
+                    Giỏ đề xuất: <strong>{draftItemCount} món</strong>
+                    {draftPeriodCount > 0 ? ` · ${draftPeriodCount} buổi` : ''}
+                    {' — '}thêm tiếp hoặc bấm <strong>Gửi PT hàng loạt</strong>.
+                </div>
+            )}
+
+            {submission?.status && hasActivePt && (
+                <div className={`flex flex-col gap-1 text-xs font-bold px-3 py-2 rounded-xl border ${
                     submission.status === 'PENDING' ? 'bg-amber-50 border-amber-300 text-amber-900'
                         : submission.status === 'REJECTED' ? 'bg-red-50 border-red-300 text-red-900'
                             : submission.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                                 : 'bg-slate-50 border-slate-200 text-slate-600'
                 }`}
                 >
-                    <span className="shrink-0">{getSubmissionStatusLabel(submission.status)}</span>
+                    <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                        <span className="shrink-0">{getSubmissionStatusLabel(submission.status)}</span>
+                        {submissionScopeText && (
+                            <span className="font-semibold opacity-95">
+                                · {submissionScopeText}
+                            </span>
+                        )}
+                    </div>
                     {submission.ptNote && (
-                        <span className="font-medium opacity-90 truncate" title={submission.ptNote}>
-                            · {submission.ptNote}
-                        </span>
+                        <p className="font-medium opacity-90 leading-snug" title={submission.ptNote}>
+                            Ghi chú PT: {submission.ptNote}
+                        </p>
                     )}
                 </div>
             )}
 
-            {showAdd && !pendingLocked && !isPast && (
+            {showAdd && !isPast && canAddAnyPeriod && (
                 <div className="rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50/80 to-white p-4 space-y-3 shadow-inner">
-                    <select
-                        value={addMealPeriod}
-                        onChange={(e) => setAddMealPeriod(e.target.value)}
-                        className="w-full sm:w-auto px-3 py-2 rounded-xl border border-teal-200 text-sm font-semibold bg-white"
-                    >
-                        {MEAL_PERIODS.map((period) => (
-                            <option key={period} value={period}>{MEAL_PERIOD_LABELS[period]}</option>
-                        ))}
-                    </select>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <select
+                            value={addMealPeriod}
+                            onChange={(e) => setAddMealPeriod(e.target.value)}
+                            className="w-full sm:w-auto px-3 py-2 rounded-xl border border-teal-200 text-sm font-semibold bg-white"
+                        >
+                            {MEAL_PERIODS.map((period) => {
+                                const disabled = settledCheck(period);
+                                const hasPending = hasActivePt && (dayPlan?.items || []).some(
+                                    (i) => i.source === 'SELF' && i.lockedByReview && resolvePlanItemPeriod(i) === period,
+                                );
+                const inCart = hasActivePt
+                    ? batchQueue.filter((r) => r.mealPeriod === period).length
+                    : 0;
+                return (
+                    <option key={period} value={period} disabled={disabled}>
+                        {MEAL_PERIOD_LABELS[period]}
+                        {disabled ? ' (đã chốt)' : ''}
+                        {!disabled && hasPending ? ' (đang chờ PT)' : ''}
+                        {!disabled && inCart ? ` · giỏ ${inCart}` : ''}
+                    </option>
+                );
+                            })}
+                        </select>
+                        <p className="text-[11px] text-slate-500 flex-1 min-w-[12rem]">
+                            {hasActivePt
+                                ? 'Đổi buổi bất cứ lúc nào — gom sáng/trưa/chiều/tối vào một giỏ rồi gửi PT một lần.'
+                                : 'Chọn buổi rồi thêm món — món được lưu thẳng vào kế hoạch của bạn.'}
+                        </p>
+                    </div>
+
                     {!pendingFood ? (
                         <FoodSearchInput dietFilter={dietFilterOn} onSelect={handleSelectFood} />
                     ) : (
@@ -503,12 +746,88 @@ export default function DayPlanCard({
                             {draftMacros && (
                                 <span className="text-xs font-semibold text-emerald-700">{Math.round(draftMacros.calories)} kcal</span>
                             )}
-                            <Button type="button" size="sm" onClick={handleConfirmAdd} className="rounded-lg h-8 bg-teal-600 hover:bg-teal-700">
-                                Thêm
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleAddToBatch}
+                                disabled={batchBusy}
+                                className="rounded-lg h-8 bg-teal-600 hover:bg-teal-700"
+                            >
+                                {hasActivePt ? 'Thêm vào giỏ' : 'Thêm vào plan'}
                             </Button>
                             <button type="button" onClick={() => setPendingFood(null)} className="p-1.5 text-slate-400">
                                 <X className="w-4 h-4" />
                             </button>
+                        </div>
+                    )}
+
+                    {hasActivePt && (batchByPeriod.length > 0 || serverDrafts.length > 0) && (
+                        <div className="rounded-xl border border-violet-200 bg-white/90 p-3 space-y-2">
+                            <p className="text-[11px] font-extrabold uppercase tracking-wide text-violet-700">
+                                Giỏ đề xuất chưa gửi
+                            </p>
+                            {batchByPeriod.map(({ period, rows }) => (
+                                <div key={`q-${period}`} className="space-y-1">
+                                    <p className="text-xs font-bold text-slate-700">
+                                        {MEAL_PERIOD_LABELS[period]} · {rows.length} món (chưa lưu)
+                                    </p>
+                                    <ul className="space-y-1">
+                                        {rows.map((row) => (
+                                            <li key={row.key} className="flex items-center gap-2 text-sm text-slate-700 bg-violet-50/80 rounded-lg px-2 py-1.5">
+                                                <span className="flex-1 truncate font-medium">{row.itemName}</span>
+                                                <span className="text-xs text-slate-500">{row.quantityG}g</span>
+                                                <span className="text-xs font-semibold text-emerald-700">{Math.round(row.calories)} kcal</span>
+                                                <button type="button" onClick={() => removeFromBatch(row.key)} className="p-0.5 text-slate-400 hover:text-rose-500">
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ))}
+                            {serverDrafts.length > 0 && (
+                                <div className="space-y-1 pt-1 border-t border-violet-100">
+                                    <p className="text-xs font-bold text-slate-700">
+                                        Đã lưu plan · {serverDrafts.length} món chờ gửi
+                                    </p>
+                                    <ul className="space-y-1">
+                                        {serverDrafts.map((item) => (
+                                            <li key={item.id} className="flex items-center gap-2 text-sm text-slate-600 px-2 py-1">
+                                                <span className="text-[10px] font-bold text-slate-400 w-16 shrink-0">
+                                                    {MEAL_PERIOD_LABELS[resolvePlanItemPeriod(item)] || '—'}
+                                                </span>
+                                                <span className="flex-1 truncate">{item.name || item.itemName}</span>
+                                                <span className="text-xs">{Math.round(Number(item.quantityG) || 0)}g</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <div className="flex flex-wrap gap-2 pt-1">
+                                {batchQueue.length > 0 && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={batchBusy}
+                                        onClick={handleSaveBatchOnly}
+                                        className="rounded-lg border-teal-300 text-teal-800"
+                                    >
+                                        Lưu giỏ vào plan
+                                    </Button>
+                                )}
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={batchBusy || draftItemCount === 0}
+                                    onClick={handleSubmit}
+                                    className="rounded-lg bg-violet-600 hover:bg-violet-700 text-white"
+                                >
+                                    <Send className="w-3.5 h-3.5 mr-1" />
+                                    Gửi PT hàng loạt ({draftItemCount} món
+                                    {draftPeriodCount > 1 ? ` · ${draftPeriodCount} buổi` : ''})
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -525,13 +844,19 @@ export default function DayPlanCard({
                 const periodBlock = getPeriodBlock(timeline, period);
                 const actualLogs = periodBlock?.actualLogs || [];
                 if (!items.length && !actualLogs.length) return null;
-                const periodSettled = isMealPeriodSettled(period, planItems);
-                const isCurrentPeriod = isToday && period === currentPeriod;
+                const periodSettled = settledCheck(period);
+                const isCurrentPeriod = isMealPeriodOpen(selectedDate, period, vnNow);
                 const isPastPeriod = isToday && isMealPeriodPast(selectedDate, period, vnNow);
                 const isFuturePeriod = isToday && isFutureMealPeriod(period, vnNow);
                 const periodHasPendingSelfReview = planItems.some(
                     (i) => i.source === 'SELF' && i.lockedByReview && resolvePlanItemPeriod(i) === period,
                 );
+                const periodSubmissionId = getPeriodSubmissionId(period);
+
+                const periodRejectedNames = rejectedByPeriod[period] || [];
+                const periodRejectNote = periodRejectedNames.length > 0
+                    ? (submission?.status === 'REJECTED' ? (submission.ptNote || null) : null)
+                    : null;
 
                 return (
                     <MealPeriodBlock
@@ -551,9 +876,13 @@ export default function DayPlanCard({
                         isFuture={isFuture}
                         isPast={isPast}
                         vnNow={vnNow}
-                        pendingLocked={pendingLocked}
+                        pendingLocked={periodHasPendingSelfReview}
                         periodSettled={periodSettled}
                         periodHasPendingSelfReview={periodHasPendingSelfReview}
+                        periodSubmissionId={periodSubmissionId}
+                        onCancelPeriodSubmission={periodSubmissionId ? () => handleCancel(periodSubmissionId) : undefined}
+                        periodRejectedNames={periodRejectedNames}
+                        periodRejectNote={periodRejectNote}
                         pendingId={pendingId}
                         editId={editId}
                         editQty={editQty}
@@ -574,8 +903,7 @@ export default function DayPlanCard({
             <LateTickReasonModal
                 open={!!lateTickTarget}
                 loading={pendingId === lateTickTarget?.id}
-                title="Ghi lý do tick trễ"
-                description="Buổi này đã qua trong hôm nay. Lý do sẽ hiển thị để PT hiểu bối cảnh nếu cần theo dõi thêm."
+                forPt={coachedMode}
                 onClose={() => setLateTickTarget(null)}
                 onSubmit={async (reason) => {
                     const targetItem = lateTickTarget;

@@ -3,6 +3,7 @@ package com.sba.nutricanbe.common.util;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.entity.SelfPlanItem;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
@@ -72,7 +73,16 @@ public final class DayPlanRules {
         return logs.stream()
                 .filter(log -> log.getStatus() == DietLogStatus.LOGGED)
                 .filter(log -> planDate.equals(log.getLogDate()))
-                .anyMatch(log -> mealPeriod.equals(log.getMealPeriod()));
+                .filter(log -> mealPeriod.equals(log.getMealPeriod()))
+                .anyMatch(DayPlanRules::countsAsActualIntake);
+    }
+
+    /** Chờ PT duyệt nhật ký không được coi là buổi đã chốt. */
+    private static boolean countsAsActualIntake(DietLog log) {
+        DietLogReviewStatus reviewStatus = log.getReviewStatus();
+        return reviewStatus == null
+                || reviewStatus == DietLogReviewStatus.NOT_REQUIRED
+                || reviewStatus == DietLogReviewStatus.APPROVED;
     }
 
     public static boolean isPtPlanItem(MealPlanItem item) {

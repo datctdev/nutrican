@@ -5,13 +5,13 @@ public enum DietLogStatus {
     DRAFT,
     MANUAL_REQUIRED,
     LOGGED,
-    /** @deprecated Legacy v2 — use {@link com.sba.nutricanbe.diet.enums.DietLogReviewStatus} instead */
+    /** Prefer {@link DietLogReviewStatus}. */
     @Deprecated
     PT_REVIEWING,
-    /** @deprecated Legacy v2 — use {@link com.sba.nutricanbe.diet.enums.DietLogReviewStatus} instead */
+    /** Prefer {@link DietLogReviewStatus}. */
     @Deprecated
     APPROVED,
-    /** @deprecated Legacy v2 — use {@link com.sba.nutricanbe.diet.enums.DietLogReviewStatus} instead */
+    /** Prefer {@link DietLogReviewStatus}. */
     @Deprecated
     REJECTED
 }

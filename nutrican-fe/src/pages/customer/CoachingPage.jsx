@@ -16,10 +16,12 @@ import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import Modal from '../../components/common/Modal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import MealPlanSkipModal from './components/MealPlanSkipModal';
 import MealPlanWeekView from './components/MealPlanWeekView';
 import MealPlanWeekPicker from './components/MealPlanWeekPicker';
 import MealReplacementModal from './components/MealReplacementModal';
+import LateTickReasonModal from './components/LateTickReasonModal';
 import { isMealPeriodOpen, canLateTickMealPeriod, nowInVn, todayLocalIso } from './components/dietUtils';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import WithdrawModal from '../../components/wallet/WithdrawModal';
@@ -139,6 +141,10 @@ export default function CoachingPage() {
   const [replacementModalItem, setReplacementModalItem] = useState(null);
   const [submittingReplacement, setSubmittingReplacement] = useState(false);
   const [groceryModalOpen, setGroceryModalOpen] = useState(false);
+  const [lateTickTarget, setLateTickTarget] = useState(null);
+  const [lateTickLoading, setLateTickLoading] = useState(false);
+  const [cancelApptId, setCancelApptId] = useState(null);
+  const [cancellingAppt, setCancellingAppt] = useState(false);
 
   // Appointment states
   const [appointments, setAppointments] = useState([]);
@@ -511,14 +517,22 @@ export default function CoachingPage() {
     }
   };
 
-  const handleCancelAppointment = async (apptId) => {
-    if (!window.confirm('Hủy lịch hẹn này? Hủy trước 48h không phí; dưới 48h ghi nhận hủy muộn.')) return;
+  const handleCancelAppointment = (apptId) => {
+    setCancelApptId(apptId);
+  };
+
+  const confirmCancelAppointment = async () => {
+    if (!cancelApptId) return;
+    setCancellingAppt(true);
     try {
-      await appointmentService.cancel(apptId);
+      await appointmentService.cancel(cancelApptId);
       toast.success('Đã hủy lịch hẹn');
+      setCancelApptId(null);
       fetchAppointments();
     } catch (e) {
       toast.error(e.response?.data?.message || 'Không hủy được lịch hẹn');
+    } finally {
+      setCancellingAppt(false);
     }
   };
 
@@ -683,35 +697,48 @@ export default function CoachingPage() {
     }
   };
 
+  const applyMarkEaten = async (itemId, eaten, item, lateTickReason) => {
+    await mealPlanService.markEaten(itemId, eaten, lateTickReason);
+    setMealPlanItems((items) => items.map((i) => (
+      i.id === itemId ? { ...i, eaten, lateTickReason: lateTickReason || i.lateTickReason } : i
+    )));
+    if (eaten) {
+      if (item?.sourceType === 'SELF_OVERRIDE') {
+        toast.success('Đã ghi vào nhật ký');
+      } else {
+        toast.success('Đã đánh dấu tuân thủ (chưa ghi nhật ký)');
+      }
+    }
+  };
+
   const handleMarkEaten = async (itemId, eaten, itemRef) => {
     const item = itemRef || mealPlanItems.find((i) => i.id === itemId);
     try {
-      let lateTickReason;
       if (
         eaten
         && item?.planDate === todayLocalIso()
         && item?.mealPeriod
         && canLateTickMealPeriod(item.planDate, item.mealPeriod, nowInVn())
       ) {
-        lateTickReason = window.prompt('Buổi này đã qua. Hãy nhập lý do tick trễ để PT có thể theo dõi:')?.trim();
-        if (!lateTickReason || lateTickReason.length < 10) {
-          toast.error('Vui lòng nhập lý do tick trễ tối thiểu 10 ký tự');
-          return;
-        }
+        setLateTickTarget({ itemId, item });
+        return;
       }
-      await mealPlanService.markEaten(itemId, eaten, lateTickReason);
-      setMealPlanItems((items) => items.map((i) => (
-        i.id === itemId ? { ...i, eaten, lateTickReason: lateTickReason || i.lateTickReason } : i
-      )));
-      if (eaten) {
-        if (item?.sourceType === 'SELF_OVERRIDE') {
-          toast.success('Đã ghi vào nhật ký');
-        } else {
-          toast.success('Đã đánh dấu tuân thủ (chưa ghi nhật ký)');
-        }
-      }
+      await applyMarkEaten(itemId, eaten, item);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Không thể cập nhật món ăn');
+    }
+  };
+
+  const confirmLateTick = async (reason) => {
+    if (!lateTickTarget) return;
+    setLateTickLoading(true);
+    try {
+      await applyMarkEaten(lateTickTarget.itemId, true, lateTickTarget.item, reason);
+      setLateTickTarget(null);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Không thể cập nhật món ăn');
+    } finally {
+      setLateTickLoading(false);
     }
   };
 
@@ -1452,6 +1479,28 @@ export default function CoachingPage() {
           saving={skippingMeal}
         />
       )}
+
+      {/* Late tick reason — replaces window.prompt */}
+      <LateTickReasonModal
+        open={!!lateTickTarget}
+        forPt
+        loading={lateTickLoading}
+        description="Buổi này đã qua. Hãy nhập lý do tick trễ để PT có thể theo dõi."
+        onClose={() => !lateTickLoading && setLateTickTarget(null)}
+        onSubmit={confirmLateTick}
+      />
+
+      <ConfirmModal
+        open={!!cancelApptId}
+        title="Hủy lịch hẹn?"
+        description="Hủy trước 48h không phí; dưới 48h sẽ ghi nhận hủy muộn."
+        confirmLabel="Hủy lịch"
+        cancelLabel="Giữ lịch"
+        danger
+        loading={cancellingAppt}
+        onClose={() => !cancellingAppt && setCancelApptId(null)}
+        onConfirm={confirmCancelAppointment}
+      />
 
       {/* Lightbox Preview */}
       <ImageLightbox

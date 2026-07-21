@@ -1,7 +1,6 @@
 package com.sba.nutricanbe.chat.service;
 
 import com.sba.nutricanbe.chat.dto.ChatMessageRequest;
-import com.sba.nutricanbe.chat.enums.ChatContextType;
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
 import com.sba.nutricanbe.common.dto.ApiResponse;
@@ -21,9 +20,7 @@ public interface ChatService {
     ChatMessageResponse sendImageMessage(UUID senderId, UUID mappingId, String content, MultipartFile file);
 
     ChatMessageResponse sendAttachmentMessage(UUID senderId, UUID mappingId, String content, MultipartFile file,
-            ChatContextType contextType, UUID contextRefId);
+            String contextType, UUID contextRefId);
 
     ApiResponse<Void> markRead(UUID userId, UUID mappingId);
-
-    void publishRealtimeMessage(ChatMessageResponse message);
 }

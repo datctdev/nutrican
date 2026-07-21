@@ -38,15 +38,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Seed accounts. Hai nhóm rõ ràng:
- * <ul>
- *   <li><b>DEMO CHÍNH</b> ({@code @nutrican.com}, mật khẩu {@value #PASSWORD}): admin@, pt@,
- *       customer@ (có PT), solo@ (không PT) — dữ liệu phong phú, dùng để demo cho khách.</li>
- *   <li><b>SEED NỀN</b> ({@code @gmail.com}): làm chợ PT/đánh giá sinh động và phục vụ
- *       integration test. Không cần nhớ khi demo.</li>
- * </ul>
- */
+/** Seeds primary {@code @nutrican.com} accounts and background marketplace users. */
 @Slf4j
 @Component
 @Order(1)
@@ -71,8 +63,6 @@ public class UserInitializer implements CommandLineRunner {
         seedDemoAccounts();
         seedBackgroundAccounts();
     }
-
-    // ================= DEMO CHÍNH (nhớ 4 account này) =================
 
     private void seedDemoAccounts() {
         seedUser("admin@nutrican.com", "Quản trị viên Nutrican", UserRole.ADMIN,
@@ -113,8 +103,6 @@ public class UserInitializer implements CommandLineRunner {
 
         log.info("Seeded DEMO accounts (pwd {}): admin@, pt@, customer@ (có PT), solo@ (không PT)", PASSWORD);
     }
-
-    // ============ SEED NỀN (marketplace sinh động + integration test) ============
 
     private void seedBackgroundAccounts() {
         User certifiedPt = seedUser(

@@ -227,6 +227,8 @@ class PtWorkspaceMealPlanSuggestionTest {
         when(selfPlanItemRepository.findBySubmissionId(submissionId))
                 .thenReturn(List.of(afternoonSelf, eveningSelf));
         when(selfPlanSubmissionRepository.findById(submissionId)).thenReturn(Optional.of(submission));
+        when(selfPlanItemRepository.findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, today))
+                .thenReturn(List.of(afternoonSelf, eveningSelf));
         when(mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(customerId))
                 .thenReturn(List.of(plan));
         when(mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(planId))
@@ -288,6 +290,8 @@ class PtWorkspaceMealPlanSuggestionTest {
         when(selfPlanItemRepository.findBySubmissionId(submissionId))
                 .thenReturn(List.of(eveningSelf));
         when(selfPlanSubmissionRepository.findById(submissionId)).thenReturn(Optional.of(submission));
+        when(selfPlanItemRepository.findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, today))
+                .thenReturn(List.of(eveningSelf));
         when(mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(customerId))
                 .thenReturn(List.of(plan));
         when(mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(planId))

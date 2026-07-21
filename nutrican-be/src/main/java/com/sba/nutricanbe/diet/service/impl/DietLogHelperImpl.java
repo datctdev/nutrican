@@ -16,6 +16,7 @@ import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.common.event.DietLogCreatedEvent;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.diet.dto.request.DietLogItemRequest;
 import com.sba.nutricanbe.diet.dto.response.DietLogImageDto;
@@ -42,6 +43,10 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class DietLogHelperImpl implements DietLogHelper {
+
+    private static final int MAX_CUSTOM_ITEM_NAME_LEN = 120;
+    private static final BigDecimal MAX_QTY_G = BigDecimal.valueOf(5000);
+    private static final BigDecimal MAX_MACRO = BigDecimal.valueOf(20_000);
 
     private final FoodItemRepository foodItemRepository;
     private final PtClientMappingRepository ptClientMappingRepository;
@@ -77,27 +82,38 @@ public class DietLogHelperImpl implements DietLogHelper {
         dietLog.setMacrosJson(macros);
     }
 
+    /**
+     * Custom free-text items (no valid foodItemId) are stored only on {@link DietLogItem}
+     * and are never inserted into the FoodItem catalog.
+     */
     @Override
     public DietLogItem buildLogItem(DietLog dietLog, DietLogItemRequest req) {
         FoodItem food = null;
         if (req.getFoodItemId() != null) {
             food = foodItemRepository.findById(req.getFoodItemId()).orElse(null);
         }
-        BigDecimal quantity = req.getQuantityG() != null ? req.getQuantityG() : BigDecimal.valueOf(100);
+        BigDecimal quantity = sanitizeQuantity(req.getQuantityG());
         MacroNutrients itemMacros;
-        String itemName = req.getItemName();
+        String itemName;
+        UUID resolvedFoodItemId;
 
         if (food != null) {
             itemMacros = macrosForFood(food, quantity);
             itemName = food.getNameVi();
+            resolvedFoodItemId = food.getId();
         } else {
-            itemMacros = MacroNutrients.of(req.getCalories() != null ? req.getCalories() : MacroUtils.ZERO, req.getProtein() != null ? req.getProtein() : MacroUtils.ZERO, req.getCarb() != null ? req.getCarb() : MacroUtils.ZERO, req.getFat() != null ? req.getFat() : MacroUtils.ZERO);
-            itemName = req.getItemName() != null ? req.getItemName() : "Item";
+            itemName = sanitizeCustomItemName(req.getItemName());
+            itemMacros = MacroNutrients.of(
+                    sanitizeMacro(req.getCalories()),
+                    sanitizeMacro(req.getProtein()),
+                    sanitizeMacro(req.getCarb()),
+                    sanitizeMacro(req.getFat()));
+            resolvedFoodItemId = null;
         }
 
         return DietLogItem.builder()
                 .dietLog(dietLog)
-                .foodItemId(req.getFoodItemId())
+                .foodItemId(resolvedFoodItemId)
                 .itemName(itemName)
                 .quantityG(quantity)
                 .calories(itemMacros.calories())
@@ -106,6 +122,41 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .fat(itemMacros.fat())
                 .source(food != null ? DietLogItemSource.DB : DietLogItemSource.USER_SELECTED)
                 .build();
+    }
+
+    private static String sanitizeCustomItemName(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new BadRequestException("Món tùy chỉnh cần tên món (itemName)");
+        }
+        String trimmed = raw.trim().replaceAll("\\s+", " ");
+        if (trimmed.length() > MAX_CUSTOM_ITEM_NAME_LEN) {
+            trimmed = trimmed.substring(0, MAX_CUSTOM_ITEM_NAME_LEN);
+        }
+        return trimmed;
+    }
+
+    private static BigDecimal sanitizeQuantity(BigDecimal qty) {
+        BigDecimal value = qty != null ? qty : BigDecimal.valueOf(100);
+        if (value.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("quantityG must be positive");
+        }
+        if (value.compareTo(MAX_QTY_G) > 0) {
+            return MAX_QTY_G;
+        }
+        return value;
+    }
+
+    private static BigDecimal sanitizeMacro(BigDecimal value) {
+        if (value == null) {
+            return MacroUtils.ZERO;
+        }
+        if (value.compareTo(BigDecimal.ZERO) < 0) {
+            return MacroUtils.ZERO;
+        }
+        if (value.compareTo(MAX_MACRO) > 0) {
+            return MAX_MACRO;
+        }
+        return value;
     }
 
     @Override

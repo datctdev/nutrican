@@ -43,12 +43,12 @@ public final class MealPeriods {
     }
 
     public static MealPeriod current(LocalDateTime nowVn) {
-        LocalDateTime n = nowVn != null ? nowVn : LocalDateTime.now(DietDates.VN);
+        LocalDateTime n = nowVn != null ? nowVn : DietDates.nowVn();
         return fromMinutes(n.getHour() * 60 + n.getMinute());
     }
 
     public static MealPeriod current() {
-        return current(LocalDateTime.now(DietDates.VN));
+        return current(DietDates.nowVn());
     }
 
     public static boolean isInWindow(MealPeriod period, LocalDateTime nowVn) {
@@ -62,7 +62,7 @@ public final class MealPeriods {
      */
     public static boolean isMealPeriodOpen(LocalDate planDate, MealPeriod period, LocalDateTime nowVn) {
         if (planDate == null || period == null) return false;
-        LocalDateTime n = nowVn != null ? nowVn : LocalDateTime.now(DietDates.VN);
+        LocalDateTime n = nowVn != null ? nowVn : DietDates.nowVn();
         LocalDate today = n.toLocalDate();
         int hour = n.getHour();
 
@@ -74,18 +74,18 @@ public final class MealPeriods {
     }
 
     public static boolean isMealPeriodOpen(LocalDate planDate, MealPeriod period) {
-        return isMealPeriodOpen(planDate, period, LocalDateTime.now(DietDates.VN));
+        return isMealPeriodOpen(planDate, period, DietDates.nowVn());
     }
 
     /** Periods whose window has fully ended before {@code current} (same-day ordinal). */
     public static Set<MealPeriod> pastPeriods(MealPeriod current) {
-        return pastPeriods(current, LocalDateTime.now(DietDates.VN));
+        return pastPeriods(current, DietDates.nowVn());
     }
 
     public static Set<MealPeriod> pastPeriods(MealPeriod current, LocalDateTime nowVn) {
         Set<MealPeriod> past = EnumSet.noneOf(MealPeriod.class);
         if (current == null) return past;
-        LocalDateTime n = nowVn != null ? nowVn : LocalDateTime.now(DietDates.VN);
+        LocalDateTime n = nowVn != null ? nowVn : DietDates.nowVn();
         // Before 04:00 (overnight LATE): no calendar-day periods have ended yet
         if (n.getHour() < 4) {
             return past;
@@ -111,14 +111,14 @@ public final class MealPeriods {
     /** Ordinal past periods for late tick — excludes future windows (e.g. EVENING during AFTERNOON). */
     public static boolean isPastPeriodForLateTick(MealPeriod period, LocalDateTime nowVn) {
         if (period == null) return false;
-        LocalDateTime n = nowVn != null ? nowVn : LocalDateTime.now(DietDates.VN);
+        LocalDateTime n = nowVn != null ? nowVn : DietDates.nowVn();
         if (n.getHour() < 4) return false;
         MealPeriod current = current(n);
         return period.ordinal() < current.ordinal();
     }
 
     public static boolean isPastPeriodForLateTick(MealPeriod period) {
-        return isPastPeriodForLateTick(period, LocalDateTime.now(DietDates.VN));
+        return isPastPeriodForLateTick(period, DietDates.nowVn());
     }
 
     /**

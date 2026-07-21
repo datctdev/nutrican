@@ -61,7 +61,7 @@ public class DayTimelineServiceImpl implements DayTimelineService {
     public DayTimelineResponse getDayTimeline(UUID customerId, LocalDate date) {
         LocalDate planDate = date != null ? date : DietDates.todayVn();
         LocalDate today = DietDates.todayVn();
-        LocalDateTime nowVn = LocalDateTime.now(DietDates.VN);
+        LocalDateTime nowVn = DietDates.nowVn();
         MealPeriod currentPeriod = MealPeriods.current(nowVn);
 
         DayPlanResponse dayPlan = dayPlanService.getDayPlan(customerId, planDate);
@@ -167,7 +167,7 @@ public class DayTimelineServiceImpl implements DayTimelineService {
         if (period == currentPeriod) {
             return "current";
         }
-        if (MealPeriods.pastPeriods(currentPeriod, LocalDateTime.now(DietDates.VN)).contains(period)) {
+        if (MealPeriods.pastPeriods(currentPeriod, DietDates.nowVn()).contains(period)) {
             return "past";
         }
         return "future";
@@ -327,6 +327,21 @@ public class DayTimelineServiceImpl implements DayTimelineService {
         return list.stream()
                 .filter(s -> s.getStatus() == SelfPlanSubmissionStatus.PENDING)
                 .findFirst()
-                .orElse(list.get(0));
+                .orElseGet(() -> list.stream()
+                        .max(java.util.Comparator
+                                .comparing((SelfPlanSubmissionResponse s) -> statusRank(s.getStatus()))
+                                .thenComparing(s -> s.getDecidedAt() != null ? s.getDecidedAt() : s.getSubmittedAt(),
+                                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                        .orElse(list.get(0)));
+    }
+
+    /** PENDING đã lấy riêng; còn lại ưu tiên APPROVED/REJECTED hơn CANCELLED. */
+    private static int statusRank(SelfPlanSubmissionStatus status) {
+        if (status == null) return 0;
+        return switch (status) {
+            case APPROVED, REJECTED -> 2;
+            case CANCELLED -> 1;
+            default -> 0;
+        };
     }
 }

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { dietService } from '../../../services/dietService';
 import { CATEGORY_GROUPS, getCategoryColors, getCategoryLabel } from './categoryColors';
+import { Button } from '../../../components/ui/button';
 
 /** Một quy tắc duy nhất: chỉ search khi ≥ 2 ký tự. Chip nhóm chỉ lọc kết quả sau khi đã gõ. */
 const SEARCH_MIN_LEN = 2;
@@ -72,12 +73,20 @@ function SkeletonRows() {
 export default function FoodSearchInput({
     dietFilter = true,
     onSelect,
+    onAddCustom,
     placeholder = 'Gõ ít nhất 2 ký tự — vd: thịt bò, trứng, rau…',
 }) {
     const [query, setQuery] = useState('');
     const [categoryGroup, setCategoryGroup] = useState(null);
     const [open, setOpen] = useState(false);
     const [results, setResults] = useState([]);
+    const [showCustomForm, setShowCustomForm] = useState(false);
+    const [customName, setCustomName] = useState('');
+    const [customCalPer100, setCustomCalPer100] = useState('');
+    const [customProPer100, setCustomProPer100] = useState('');
+    const [customCarbPer100, setCustomCarbPer100] = useState('');
+    const [customFatPer100, setCustomFatPer100] = useState('');
+    const [customQty, setCustomQty] = useState('100');
     const [searchLoading, setSearchLoading] = useState(false);
     const [searchError, setSearchError] = useState(false);
     const wrapRef = useRef(null);
@@ -190,10 +199,140 @@ export default function FoodSearchInput({
             );
         }
         if (results.length === 0) {
+            const canCustom = query.trim().length >= SEARCH_MIN_LEN && onAddCustom;
             return (
-                <p className="px-4 py-3 text-sm text-slate-500">
-                    Không tìm thấy món nào{categoryGroup ? ` trong nhóm ${groupLabel}` : ''}. Thử bỏ dấu hoặc đổi nhóm.
-                </p>
+                <div className="px-4 py-3 space-y-2">
+                    <p className="text-sm text-slate-500">
+                        Không có trong thư viện{categoryGroup ? ` (nhóm ${groupLabel})` : ''}.
+                        {canCustom ? ' Bạn có thể thêm tạm với Calo / Đạm / Tinh bột / Chất béo ước lượng.' : ' Thử từ khóa khác hoặc món tương tự.'}
+                    </p>
+                    {canCustom && !showCustomForm && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="text-xs font-bold"
+                            onClick={() => {
+                                setShowCustomForm(true);
+                                setCustomName(query.trim());
+                            }}
+                        >
+                            + Thêm món tùy chỉnh (chưa có trong DB)
+                        </Button>
+                    )}
+                    {canCustom && showCustomForm && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 space-y-2">
+                            <p className="text-[11px] font-bold text-amber-800">
+                                Món chưa train / chưa có trong DB — nhập macro ước lượng (trên 100g)
+                            </p>
+                            <input
+                                type="text"
+                                value={customName}
+                                onChange={(e) => setCustomName(e.target.value)}
+                                placeholder="Tên món"
+                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    value={customCalPer100}
+                                    onChange={(e) => setCustomCalPer100(e.target.value)}
+                                    placeholder="Calo / 100g *"
+                                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                />
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={customQty}
+                                    onChange={(e) => setCustomQty(e.target.value)}
+                                    placeholder="Khối lượng (g)"
+                                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    value={customProPer100}
+                                    onChange={(e) => setCustomProPer100(e.target.value)}
+                                    placeholder="Đạm g / 100g"
+                                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    value={customCarbPer100}
+                                    onChange={(e) => setCustomCarbPer100(e.target.value)}
+                                    placeholder="Tinh bột g / 100g"
+                                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                                />
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    value={customFatPer100}
+                                    onChange={(e) => setCustomFatPer100(e.target.value)}
+                                    placeholder="Chất béo g / 100g"
+                                    className="rounded-lg border border-slate-200 px-3 py-2 text-sm col-span-2"
+                                />
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setShowCustomForm(false);
+                                        setCustomProPer100('');
+                                        setCustomCarbPer100('');
+                                        setCustomFatPer100('');
+                                    }}
+                                >
+                                    Hủy
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={!customName.trim() || !customCalPer100}
+                                    onClick={() => {
+                                        const qty = Number(customQty) || 100;
+                                        const cal100 = Number(customCalPer100) || 0;
+                                        const pro100 = Number(customProPer100) || 0;
+                                        const carb100 = Number(customCarbPer100) || 0;
+                                        const fat100 = Number(customFatPer100) || 0;
+                                        const ratio = qty / 100;
+                                        onAddCustom({
+                                            itemName: customName.trim(),
+                                            quantityG: qty,
+                                            calories: cal100 * ratio,
+                                            protein: pro100 * ratio,
+                                            carb: carb100 * ratio,
+                                            fat: fat100 * ratio,
+                                            _caloriesPer100g: cal100,
+                                            _proteinPer100g: pro100,
+                                            _carbPer100g: carb100,
+                                            _fatPer100g: fat100,
+                                            isCustom: true,
+                                        });
+                                        setShowCustomForm(false);
+                                        setCustomName('');
+                                        setCustomCalPer100('');
+                                        setCustomProPer100('');
+                                        setCustomCarbPer100('');
+                                        setCustomFatPer100('');
+                                        setCustomQty('100');
+                                        setQuery('');
+                                        setOpen(false);
+                                    }}
+                                >
+                                    Thêm vào bữa
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             );
         }
         return results.map((food) => (

@@ -24,7 +24,11 @@ export default function SelfPlanSubmissionReviewList({ submissions, onUpdated })
     setReviewingId(submission.id);
     try {
       await workspaceService.reviewSelfPlanSubmission(submission.id, { action, ptNote });
-      toast.success(action === 'APPROVE' ? 'Đã duyệt — override thực đơn theo bữa đã setup' : 'Đã từ chối yêu cầu');
+      toast.success(
+        action === 'APPROVE'
+          ? 'Đã duyệt đề xuất — áp dụng thay thực đơn PT đúng buổi đó'
+          : 'Đã từ chối — giữ thực đơn PT gốc',
+      );
       setNotes((current) => ({ ...current, [submission.id]: '' }));
       await onUpdated?.();
     } catch (error) {
@@ -41,7 +45,8 @@ export default function SelfPlanSubmissionReviewList({ submissions, onUpdated })
       <div>
         <h3 className="text-sm font-extrabold text-slate-800">Kế hoạch ngày đặc biệt chờ duyệt</h3>
         <p className="mt-0.5 text-xs text-slate-500">
-          Chỉ hiện các buổi học viên <strong>chưa ăn / chưa chốt</strong>. Duyệt sẽ thay thực đơn PT đúng buổi đó; buổi đã tick không xuất hiện ở đây.
+          Học viên có thể gửi <strong>nhiều món / nhiều buổi</strong>. Duyệt = áp dụng toàn bộ món trong yêu cầu
+          thay thực đơn PT <strong>đúng các buổi đó</strong> (không phải chỉ 1 món). Buổi đã ăn / đã chốt không hiện ở đây.
         </p>
       </div>
 
@@ -100,7 +105,7 @@ export default function SelfPlanSubmissionReviewList({ submissions, onUpdated })
               className="gap-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
             >
               {reviewingId === submission.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-              Duyệt override
+              Duyệt đề xuất
             </Button>
           </div>
         </div>

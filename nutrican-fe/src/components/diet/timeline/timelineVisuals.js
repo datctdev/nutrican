@@ -12,6 +12,14 @@ export function stripDisplayPrefix(value) {
 export function getPlanBadgeShort(item, coachedMode = false) {
     if (!item) return { label: '', title: '', showLock: false, className: 'bg-slate-100 text-slate-700' };
     if (item.source === 'SELF') {
+        if (item.choiceRejected) {
+            return {
+                label: 'Từ chối',
+                title: 'PT từ chối đề xuất — giữ thực đơn PT gốc',
+                showLock: false,
+                className: 'bg-rose-100 text-rose-800',
+            };
+        }
         if (item.lockedByReview) {
             return {
                 label: 'Đề xuất',
@@ -22,7 +30,7 @@ export function getPlanBadgeShort(item, coachedMode = false) {
         }
         return {
             label: coachedMode ? 'Tự chọn' : 'Tự plan',
-            title: coachedMode ? 'Món tự lên kế hoạch' : 'Món tự lên kế hoạch',
+            title: coachedMode ? 'Món tự lên kế hoạch (chưa gửi / chưa duyệt)' : 'Món tự lên kế hoạch',
             showLock: false,
             className: 'bg-teal-100 text-teal-800',
         };

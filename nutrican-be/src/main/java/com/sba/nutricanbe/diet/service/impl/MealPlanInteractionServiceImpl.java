@@ -14,9 +14,12 @@ import com.sba.nutricanbe.diet.dto.response.MealPlanItemResponse;
 import com.sba.nutricanbe.diet.dto.response.MealPlanSuggestionResponse;
 import com.sba.nutricanbe.diet.dto.response.MealPlanWeeklySummaryResponse;
 import com.sba.nutricanbe.diet.dto.response.MealPlanWeekResponse;
+import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.MealPlan;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.entity.MealPlanSuggestion;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
+import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
 import com.sba.nutricanbe.diet.enums.MealPlanReplacementReason;
@@ -24,6 +27,7 @@ import com.sba.nutricanbe.diet.enums.MealPlanSkipReason;
 import com.sba.nutricanbe.diet.enums.MealPlanSuggestionStatus;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
+import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
@@ -59,6 +63,7 @@ public class MealPlanInteractionServiceImpl implements MealPlanInteractionServic
     private static final int WEEKLY_SUMMARY_LIMIT = 8;
     private static final int MIN_LATE_TICK_REASON_LENGTH = 10;
 
+    private final DietLogRepository dietLogRepository;
     private final MealPlanRepository mealPlanRepository;
     private final MealPlanItemRepository mealPlanItemRepository;
     private final MealPlanSuggestionRepository mealPlanSuggestionRepository;
@@ -136,11 +141,14 @@ public class MealPlanInteractionServiceImpl implements MealPlanInteractionServic
             assertNoPendingSelfReviewInPeriod(customerId, item.getPlanDate(), item.getMealPeriod());
         }
 
-        if (eaten && sourceType == MealPlanItemSourceType.SELF_OVERRIDE) {
+        if (eaten && (sourceType == MealPlanItemSourceType.SELF_OVERRIDE
+                || sourceType == MealPlanItemSourceType.PT_ORIGINAL)) {
             if (Boolean.TRUE.equals(item.getEaten())) {
                 throw new BadRequestException("Món này đã được ghi nhận ăn rồi");
             }
-            createDietLogFromOverride(customerId, item, lateTickReason);
+            if (!hasActualIntakeInPeriod(customerId, item.getPlanDate(), item.getMealPeriod())) {
+                createDietLogFromPlanItem(customerId, item, lateTickReason);
+            }
         }
 
         item.setEaten(eaten);
@@ -166,7 +174,22 @@ public class MealPlanInteractionServiceImpl implements MealPlanInteractionServic
         return MealPlanItemResponse.from(saved, mealPlanItemMacrosResolver.resolve(saved));
     }
 
-    private void createDietLogFromOverride(UUID customerId, MealPlanItem item, String lateTickReason) {
+    private boolean hasActualIntakeInPeriod(UUID customerId, LocalDate planDate, MealPeriod mealPeriod) {
+        if (planDate == null || mealPeriod == null) {
+            return false;
+        }
+        return dietLogRepository.findByCustomerIdAndLogDate(customerId, planDate).stream()
+                .filter(log -> log.getStatus() == DietLogStatus.LOGGED)
+                .filter(log -> mealPeriod.equals(log.getMealPeriod()))
+                .anyMatch(log -> {
+                    DietLogReviewStatus reviewStatus = log.getReviewStatus();
+                    return reviewStatus == null
+                            || reviewStatus == DietLogReviewStatus.NOT_REQUIRED
+                            || reviewStatus == DietLogReviewStatus.APPROVED;
+                });
+    }
+
+    private void createDietLogFromPlanItem(UUID customerId, MealPlanItem item, String lateTickReason) {
         CreateDietLogRequest logReq = new CreateDietLogRequest();
         logReq.setMealType(item.getMealType());
         logReq.setMealPeriod(item.getMealPeriod());

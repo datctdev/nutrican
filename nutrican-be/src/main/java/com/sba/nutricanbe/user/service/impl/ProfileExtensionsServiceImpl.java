@@ -34,6 +34,13 @@ public class ProfileExtensionsServiceImpl implements ProfileExtensionsService {
     private final UserProfileService userProfileService;
 
     @Override
+    @Transactional(readOnly = true)
+    public String getAllergies(UUID userId) {
+        User user = loadUser(userId);
+        return user.getAllergyNotes() != null ? user.getAllergyNotes() : "";
+    }
+
+    @Override
     @Transactional
     public String updateAllergies(UUID userId, AllergyProfileRequest request) {
         User user = loadUser(userId);
@@ -135,6 +142,12 @@ public class ProfileExtensionsServiceImpl implements ProfileExtensionsService {
                 .activityLevel(user.getActivityLevel())
                 .macros(suggestion)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasActivePt(UUID userId) {
+        return dietLogHelper.hasActivePt(userId);
     }
 
     private User loadUser(UUID userId) {

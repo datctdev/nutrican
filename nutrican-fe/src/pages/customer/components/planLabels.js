@@ -23,6 +23,30 @@ export function getSubmissionStatusLabel(status) {
     }
 }
 
+/**
+ * Tóm tắt phạm vi yêu cầu theo buổi + tên món.
+ * vd: "Buổi tối: Bánh Chưng, Rau giền cơm · Buổi sáng: Cơm Tấm"
+ */
+export function formatSubmissionScope(items, periodLabels = {}) {
+    if (!items?.length) return '';
+    const byPeriod = new Map();
+    for (const item of items) {
+        const period = item.mealPeriod || item.mealType || 'OTHER';
+        const name = stripMealPeriodSuffix(item.itemName || item.name || '').trim();
+        if (!name) continue;
+        if (!byPeriod.has(period)) byPeriod.set(period, []);
+        const list = byPeriod.get(period);
+        if (!list.includes(name)) list.push(name);
+    }
+    if (byPeriod.size === 0) return '';
+    return [...byPeriod.entries()]
+        .map(([period, names]) => {
+            const label = periodLabels[period] || period;
+            return `${label}: ${names.join(', ')}`;
+        })
+        .join(' · ');
+}
+
 export function getReconcileStatusLabel(status) {
     if (status === 'ALREADY_LOGGED') {
         return 'Buổi đã có nhật ký khác - không cần tick lại';
@@ -81,6 +105,7 @@ export const MEAL_PERIOD_THEMES = {
 export function getSourceBadgeClass(item) {
     if (!item) return 'bg-slate-100 text-slate-700';
     if (item.source === 'SELF') {
+        if (isPlanChoiceRejected(item)) return 'bg-rose-100 text-rose-800';
         if (item.lockedByReview) return 'bg-amber-100 text-amber-800';
         return 'bg-teal-100 text-teal-800';
     }

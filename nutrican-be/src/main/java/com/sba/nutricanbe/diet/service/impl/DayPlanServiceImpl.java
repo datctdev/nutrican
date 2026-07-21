@@ -61,12 +61,12 @@ public class DayPlanServiceImpl implements DayPlanService {
         Optional<MealPlan> ptPlan = findPublishedPlanForDate(customerId, planDate);
         boolean hasPt = ptPlan.isPresent();
         List<DietLog> logs = dietLogRepository.findByCustomerIdAndLogDate(customerId, planDate);
-        UUID rejectedSubmissionId = selfPlanSubmissionRepository.findByCustomerIdAndPlanDate(customerId, planDate)
+        java.util.Set<UUID> rejectedSubmissionIds = selfPlanSubmissionRepository
+                .findByCustomerIdAndPlanDate(customerId, planDate)
                 .stream()
                 .filter(s -> s.getStatus() == SelfPlanSubmissionStatus.REJECTED)
                 .map(SelfPlanSubmission::getId)
-                .findFirst()
-                .orElse(null);
+                .collect(java.util.stream.Collectors.toSet());
         if (hasPt) {
             mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(ptPlan.get().getId()).stream()
                     .filter(i -> planDate.equals(i.getPlanDate()))
@@ -77,7 +77,7 @@ public class DayPlanServiceImpl implements DayPlanService {
                 .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, planDate)
                 .stream()
                 .filter(i -> !Boolean.TRUE.equals(i.getApplied()))
-                .forEach(i -> items.add(fromSelf(i, rejectedSubmissionId)));
+                .forEach(i -> items.add(fromSelf(i, rejectedSubmissionIds)));
 
         enrichChoiceRejectedFlags(items, planDate, logs);
 
@@ -128,9 +128,10 @@ public class DayPlanServiceImpl implements DayPlanService {
                 .findFirst();
     }
 
-    private DayPlanItemResponse fromSelf(SelfPlanItem item, UUID rejectedSubmissionId) {
-        boolean choiceRejected = rejectedSubmissionId != null
-                && rejectedSubmissionId.equals(item.getSubmissionId());
+    private DayPlanItemResponse fromSelf(SelfPlanItem item, java.util.Set<UUID> rejectedSubmissionIds) {
+        boolean choiceRejected = item.getSubmissionId() != null
+                && rejectedSubmissionIds != null
+                && rejectedSubmissionIds.contains(item.getSubmissionId());
         return DayPlanItemResponse.builder()
                 .id(item.getId())
                 .source("SELF")

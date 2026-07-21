@@ -43,7 +43,6 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
     private final VnptClient vnpt;
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
-    // Full-flow upload services (used by uploadFileAndAttach)
     private final UploadFileService uploadFileService;
     private final CardClassifyService cardClassifyService;
     private final CardLivenessService cardLivenessService;
@@ -239,9 +238,6 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
         return out;
     }
 
-    /**
-     * Compare face: nếu match + score >= 95 -> VERIFIED, else -> REJECTED
-     */
     public Map<String, Object> compare(UUID sessionId, UUID accountId) {
         EkycSession s = get(sessionId, accountId);
 

@@ -43,8 +43,7 @@ public class ChatServiceImpl implements ChatService {
     private final WebSocketSessionService webSocketSessionService;
     private static final String CHAT_MESSAGE_EVENT = "CHAT_MESSAGE";
 
-    @Override
-    public void publishRealtimeMessage(ChatMessageResponse message) {
+    private void publishRealtimeMessage(ChatMessageResponse message) {
         webSocketSessionService.sendToUser(message.getSenderId(), CHAT_MESSAGE_EVENT, message);
         if (!message.getSenderId().equals(message.getRecipientId())) {
             webSocketSessionService.sendToUser(message.getRecipientId(), CHAT_MESSAGE_EVENT, message);
@@ -107,6 +106,21 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public ChatMessageResponse sendAttachmentMessage(UUID senderId, UUID mappingId, String content,
+            MultipartFile file, String contextType, UUID contextRefId) {
+        ChatContextType ctx = null;
+        if (contextType != null && !contextType.isBlank()) {
+            try {
+                ctx = ChatContextType.valueOf(contextType.trim().toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                throw new BadRequestException("Invalid contextType: " + contextType);
+            }
+        }
+        ChatMessageResponse message = saveAttachmentMessage(senderId, mappingId, content, file, ctx, contextRefId);
+        publishRealtimeMessage(message);
+        return message;
+    }
+
+    private ChatMessageResponse saveAttachmentMessage(UUID senderId, UUID mappingId, String content,
             MultipartFile file, ChatContextType contextType, UUID contextRefId) {
         if (mappingId == null) {
             throw new BadRequestException("mappingId is required");
@@ -171,7 +185,9 @@ public class ChatServiceImpl implements ChatService {
                 .imageUrl(imageUrl)
                 .imageObjectName(objectName)
                 .build());
-        return toMessageResponse(message);
+        ChatMessageResponse response = toMessageResponse(message);
+        publishRealtimeMessage(response);
+        return response;
     }
 
     @Override

@@ -7,15 +7,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Unified KYC orchestration interface.
- * Gộp full-flow upload (từ KycOrchestratorServiceImpl) và individual-step
- * operations (từ KycOrchestratorImpl / interface cũ KycOrchestrator).
- * Xóa KycOrchestrator interface riêng lẻ — dùng interface này làm điểm duy nhất.
- */
+/** Orchestrates KYC session lifecycle and VNPT document steps. */
 public interface KycOrchestratorService {
 
-    // ── Full-flow upload (new workflow) ──────────────────────────────────────
     Map<String, Object> uploadFileAndAttach(
             UUID sessionId,
             UUID userId,
@@ -24,12 +18,10 @@ public interface KycOrchestratorService {
             String description
     );
 
-    // ── Session lifecycle ────────────────────────────────────────────────────
     UUID start(UUID accountId);
 
     EkycSession get(UUID sessionId, UUID accountId);
 
-    // ── Individual step operations (step-by-step workflow) ──────────────────
     String uploadToVnptAndAttach(
             UUID sessionId,
             UUID accountId,

@@ -21,7 +21,6 @@ import {
     getPreviewForSelection,
     initialAdjustedGrams,
     getCurrentMealPeriod,
-    getLockedMealPeriods,
     periodToMealType,
     todayLocalIso,
     isFutureIso,
@@ -31,10 +30,21 @@ import {
     addDaysIso,
     monthKeyFromIso,
     fetchAllDietLogsForRange,
+    getDemoVnClock,
+    setDemoVnClock,
 } from './components/dietUtils';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const POST_MEAL_PROMPT_KEY = 'nutrican_post_meal_prompt';
+const DEMO_CLOCK_OPTIONS = [
+    { value: '', label: 'Giờ thật VN' },
+    { value: '09:00', label: 'Demo 09:00 · sáng' },
+    { value: '12:00', label: 'Demo 12:00 · trưa' },
+    { value: '15:00', label: 'Demo 15:00 · chiều' },
+    { value: '21:00', label: 'Demo 21:00 · tối' },
+    { value: '23:00', label: 'Demo 23:00 · khuya' },
+    { value: '01:00', label: 'Demo 01:00 · qua đêm' },
+];
 
 function maxPlanDateIso() {
     return addDaysIso(todayLocalIso(), 14);
@@ -110,6 +120,7 @@ export default function DietTrackerPage() {
     const [postMealPrompt, setPostMealPrompt] = useState(null);
     const [onboardingBanner, setOnboardingBanner] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
+    const [demoClock, setDemoClockUi] = useState(() => getDemoVnClock());
 
     const isToday = isTodayIso(selectedDate);
     const isFuture = isFutureIso(selectedDate);
@@ -118,27 +129,22 @@ export default function DietTrackerPage() {
     const applyAiPeriodLock = isToday;
     const [makeupForPeriod, setMakeupForPeriod] = useState(null);
 
+    /** Hôm nay: luôn đồng bộ khung theo giờ VN (tránh stale EVENING khi đã sang LATE). */
     useEffect(() => {
         if (!isToday) {
             setMakeupForPeriod(null);
-            return;
+            return undefined;
         }
-        const current = getCurrentMealPeriod();
-        setAiMealPeriod(current);
-        setManualMealPeriod(current);
+        const sync = () => {
+            const current = getCurrentMealPeriod();
+            setAiMealPeriod(current);
+            setManualMealPeriod(current);
+        };
+        sync();
         setMakeupForPeriod(null);
+        const timer = setInterval(sync, 30_000);
+        return () => clearInterval(timer);
     }, [isToday, selectedDate]);
-
-    useEffect(() => {
-        if (!isToday) return;
-        const locked = getLockedMealPeriods();
-        if (locked.has(aiMealPeriod)) {
-            setAiMealPeriod(getCurrentMealPeriod());
-        }
-        if (locked.has(manualMealPeriod)) {
-            setManualMealPeriod(getCurrentMealPeriod());
-        }
-    }, [isToday, aiMealPeriod, manualMealPeriod]);
 
     const [plannedTotals, setPlannedTotals] = useState(null);
     const changeSelectedDate = useCallback((nextIso) => {
@@ -229,10 +235,11 @@ export default function DietTrackerPage() {
     }, []);
 
     const syncAll = useCallback(() => {
-        fetchDay(selectedDateRef.current);
+        const dayPromise = fetchDay(selectedDateRef.current);
         if (calendarOpenRef.current) {
             fetchMonthDots(viewingMonthRef.current);
         }
+        return dayPromise;
     }, [fetchDay, fetchMonthDots]);
 
     const loadResNetDishes = useCallback(async () => {
@@ -397,6 +404,10 @@ export default function DietTrackerPage() {
         ]);
     };
 
+    const addCustomIngredient = (custom) => {
+        setIngredientItems((prev) => [...prev, { ...custom }]);
+    };
+
     const updateIngredientQty = (idx, qty) => {
         setIngredientItems((prev) =>
             prev.map((it, i) => {
@@ -452,10 +463,14 @@ export default function DietTrackerPage() {
         }
         try {
             setAnalyzing(true);
+            const period = isToday ? getCurrentMealPeriod() : aiMealPeriod;
+            if (isToday) {
+                setAiMealPeriod(period);
+            }
             const formData = new FormData();
             formData.append('file', selectedFile);
-            formData.append('meal_type', periodToMealType(aiMealPeriod));
-            formData.append('meal_period', aiMealPeriod);
+            formData.append('meal_type', periodToMealType(period));
+            formData.append('meal_period', period);
             if (makeupForPeriod) formData.append('makeup_for_period', makeupForPeriod);
             formData.append('mealSource', 'HOME_COOKED');
             formData.append('log_date', selectedDate);
@@ -583,15 +598,6 @@ export default function DietTrackerPage() {
                 orderedImages.forEach((image) => formData.append('files', image.file));
                 await dietService.uploadImages(logId, formData);
             }
-
-            if (hasActivePt) {
-                // updateLog chặn ngày quá khứ — dùng submitForReview cho bù nhật ký
-                if (isPastIso(selectedDate)) {
-                    await dietService.submitForReview(logId);
-                } else {
-                    await dietService.updateLog(logId, { sendToPt: true });
-                }
-            }
             return logId;
         } catch (error) {
             if (!isPastIso(selectedDate)) {
@@ -609,19 +615,31 @@ export default function DietTrackerPage() {
         }
         try {
             setUploading(true);
+            const period = isToday ? getCurrentMealPeriod() : manualMealPeriod;
+            if (isToday) {
+                setManualMealPeriod(period);
+            }
             const newLogId = await createAndSendMeal({
-                mealType: periodToMealType(manualMealPeriod),
-                mealPeriod: manualMealPeriod,
+                mealType: periodToMealType(period),
+                mealPeriod: period,
                 makeupForPeriod: makeupForPeriod || undefined,
                 mealSource: 'HOME_COOKED',
                 logDate: selectedDate,
-                items: ingredientItems.map((it) => ({
-                    foodItemId: it.foodItemId,
-                    quantityG: it.quantityG,
-                })),
+                items: ingredientItems.map((it) => (
+                    // Custom: không gửi foodItemId — chỉ gắn vào nhật ký, không ghi catalog FoodItem
+                    it.isCustom || !it.foodItemId
+                        ? {
+                            itemName: it.itemName,
+                            quantityG: it.quantityG,
+                            calories: it.calories,
+                            protein: it.protein,
+                            carb: it.carb,
+                            fat: it.fat,
+                        }
+                        : { foodItemId: it.foodItemId, quantityG: it.quantityG }
+                )),
             });
-            toast.success(hasActivePt ? 'Đã gửi bữa ăn cho PT duyệt!' : 'Đã lưu bữa ăn!');
-            if (newLogId && hasActivePt) schedulePostMealPrompt(newLogId);
+            toast.success('Đã lưu bữa ăn!');
             setIngredientItems([]);
             setMakeupForPeriod(null);
             clearMealImages();
@@ -689,21 +707,19 @@ export default function DietTrackerPage() {
                     protein: preview?.protein ?? dish?.protein ?? confirmModal.protein,
                     carb: preview?.carb ?? dish?.carb ?? confirmModal.carb,
                     fat: preview?.fat ?? dish?.fat ?? confirmModal.fat,
-                    sendToPt: true,
+                    sendToPt: false,
                 });
             } else {
                 res = await dietService.confirmRecognition(confirmModal.logId, {
                     foodCode: selected.type === 'code' ? selected.value : undefined,
                     foodItemId: selected.type === 'id' ? selected.value : undefined,
                     portionGrams: confirmModal.adjustedGrams,
-                    sendToPt: true,
+                    sendToPt: false,
                 });
             }
 
             const data = res.data?.data;
-            const pending = data?.reviewStatus === 'PENDING';
-            toast.success(pending ? 'Đã gửi bữa ăn cho PT duyệt!' : 'Đã lưu bữa ăn!');
-            if (confirmModal.logId && hasActivePt) schedulePostMealPrompt(confirmModal.logId);
+            toast.success('Đã lưu bữa ăn!');
             if (data?.dietPrefWarning) {
                 toast.warning(data.dietPrefWarning);
                 setConfirmModal((prev) => prev ? { ...prev, dietPrefWarning: data.dietPrefWarning } : prev);
@@ -794,9 +810,32 @@ export default function DietTrackerPage() {
                         )}
                     </div>
                 </div>
-                <Button onClick={syncAll} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl">
-                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Đồng bộ dữ liệu
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-900 shadow-sm">
+                        <span className="whitespace-nowrap">Giờ demo VN</span>
+                        <select
+                            value={demoClock}
+                            onChange={(e) => {
+                                const next = e.target.value;
+                                setDemoVnClock(next);
+                                setDemoClockUi(next);
+                                toast.message(next
+                                    ? `Đang giả lập giờ VN ${next} — reload…`
+                                    : 'Trở lại giờ thật VN — reload…');
+                                window.setTimeout(() => window.location.reload(), 250);
+                            }}
+                            className="rounded-lg border border-amber-300 bg-white px-2 py-1 text-xs font-bold text-slate-800"
+                            title="Giả lập Asia/Ho_Chi_Minh để demo khung buổi (không cần đổi timezone máy)"
+                        >
+                            {DEMO_CLOCK_OPTIONS.map((opt) => (
+                                <option key={opt.value || 'real'} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <Button onClick={syncAll} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl">
+                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Đồng bộ dữ liệu
+                    </Button>
+                </div>
             </div>
 
             <DietDateCalendar
@@ -831,6 +870,7 @@ export default function DietTrackerPage() {
                         makeupForPeriod={makeupForPeriod}
                         setMakeupForPeriod={setMakeupForPeriod}
                         addIngredientFromSearch={addIngredientFromSearch}
+                        addCustomIngredient={addCustomIngredient}
                         ingredientItems={ingredientItems}
                         updateIngredientQty={updateIngredientQty}
                         removeIngredient={removeIngredient}
@@ -866,7 +906,7 @@ export default function DietTrackerPage() {
                         onPlannedTotalsChange={setPlannedTotals}
                         timeline={timeline}
                         timelineLoading={timelineLoading}
-                        onRefreshTimeline={() => fetchDay(selectedDate)}
+                        onRefreshTimeline={syncAll}
                         logHandlers={{
                             handleEditLog,
                             handleDelete,

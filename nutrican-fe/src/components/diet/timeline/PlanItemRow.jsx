@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
     Lock, Trash2, Check, Pencil, X, Clock, CheckCircle2, AlertCircle,
-    ChevronDown, ChevronUp, UtensilsCrossed,
+    ChevronDown, ChevronUp, Utensils,
 } from 'lucide-react';
 import { Button } from '../../ui/button';
 import {
@@ -114,7 +114,7 @@ export default function PlanItemRow({
                     aria-expanded={expanded}
                 >
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shrink-0">
-                        {badge.showLock ? <Lock className="h-3.5 w-3.5" /> : <UtensilsCrossed className="h-3.5 w-3.5" />}
+                        {badge.showLock ? <Lock className="h-3.5 w-3.5" /> : <Utensils className="h-3.5 w-3.5" />}
                     </span>
                     <span className="min-w-0 flex-1">
                         <span className={`block text-sm font-bold truncate ${notChosen ? 'line-through text-slate-400' : 'text-slate-800'}`}>
@@ -134,7 +134,10 @@ export default function PlanItemRow({
                                 <CheckCircle2 className="h-3 w-3 text-emerald-600 inline" aria-label="Đã ăn" />
                             )}
                             {pendingReview && !notChosen && (
-                                <Clock className="h-3 w-3 text-amber-600 inline" aria-label="Chờ duyệt" />
+                                <span className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-bold text-amber-800">
+                                    <Clock className="h-3 w-3" aria-hidden />
+                                    chờ duyệt
+                                </span>
                             )}
                             {item.lateTickReason && (
                                 <AlertCircle className="h-3 w-3 text-orange-600 inline" aria-label="Tick trễ" />
@@ -276,7 +279,7 @@ export function RejectedPlanItems({ items }) {
                 onClick={() => setOpen((v) => !v)}
                 className="text-[10px] font-bold text-slate-500 hover:text-slate-700"
             >
-                {open ? '▾' : '▸'} {items.length} phương án khác
+                {open ? '▾' : '▸'} {items.length} món không được chọn
             </button>
             {open && (
                 <ul className="mt-1 space-y-1">

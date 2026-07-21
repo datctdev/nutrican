@@ -14,6 +14,7 @@ import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.PtUpdateRequestRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.TrainingMode;
@@ -42,6 +43,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final SystemSettingRepository systemSettingRepository;
     private final PtVenueAvailabilityService venueAvailabilityService;
     private final PtUpdateRequestRepository ptUpdateRequestRepository;
+    private final DietLogHelper dietLogHelper;
 
     @Override
     @Transactional
@@ -138,7 +140,6 @@ public class UserProfileServiceImpl implements UserProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
-        // Check REQUIRE_KYC_FOR_PT setting
         boolean requireKyc = systemSettingRepository.findById("REQUIRE_KYC_FOR_PT")
                 .map(setting -> Boolean.parseBoolean(setting.getValue()))
                 .orElse(true);
@@ -147,12 +148,10 @@ public class UserProfileServiceImpl implements UserProfileService {
             throw new BadRequestException("Bạn phải xác thực danh tính (KYC) trước khi đăng ký làm PT");
         }
 
-        // Check if user already has a PT profile
         if (ptProfileRepository.findByUserId(userId).isPresent()) {
             throw new BadRequestException("User already has a PT profile");
         }
 
-        // Map certifications from request DTOs to entity data objects
         List<CertificationData> certDataList = mapCerts(request);
 
         if ("CERTIFIED".equalsIgnoreCase(request.getPreferredTrack())) {
@@ -303,7 +302,6 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Override
     @Transactional
     public ApiResponse<String> uploadCv(UUID userId, MultipartFile file) {
-        // Validate file type
         String contentType = file.getContentType();
         if (contentType == null || (!contentType.equals("application/pdf") &&
                 !contentType.equals("application/msword") &&
@@ -312,7 +310,6 @@ public class UserProfileServiceImpl implements UserProfileService {
             throw new BadRequestException("Only PDF and Word documents are allowed");
         }
 
-        // Validate file size (max 10MB)
         if (file.getSize() > 10 * 1024 * 1024) {
             throw new BadRequestException("File size must be less than 10MB");
         }
@@ -383,6 +380,16 @@ public class UserProfileServiceImpl implements UserProfileService {
                         .fat(BigDecimal.valueOf(65))
                         .build());
         return ApiResponse.success(toMacroResponse(target));
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<MacroTargetResponse> setMacroTargetForSelf(UUID userId, MacroTargetRequest request) {
+        if (dietLogHelper.hasActivePt(userId)) {
+            throw new BadRequestException(
+                    "Mục tiêu dinh dưỡng đang do PT quản lý — liên hệ PT để thay đổi macro");
+        }
+        return setMacroTarget(userId, request);
     }
 
     @Override

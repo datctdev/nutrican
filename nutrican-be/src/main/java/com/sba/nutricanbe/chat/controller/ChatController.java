@@ -2,19 +2,17 @@ package com.sba.nutricanbe.chat.controller;
 
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
-import com.sba.nutricanbe.chat.enums.ChatContextType;
 import com.sba.nutricanbe.chat.service.ChatService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.user.entity.User;
-import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -51,9 +49,8 @@ public class ChatController {
             @AuthenticationPrincipal User user,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String content) {
-        ChatMessageResponse message = chatService.sendImageMessage(user.getId(), mappingId, content, file);
-        chatService.publishRealtimeMessage(message);
-        return ResponseEntity.ok(ApiResponse.success(message, "Image message sent"));
+        return ResponseEntity.ok(ApiResponse.success(
+                chatService.sendImageMessage(user.getId(), mappingId, content, file), "Image message sent"));
     }
 
     @PostMapping(value = "/threads/{mappingId}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -64,12 +61,10 @@ public class ChatController {
             @RequestParam(required = false) String content,
             @RequestParam(required = false) String contextType,
             @RequestParam(required = false) UUID contextRefId) {
-        ChatContextType ctx = contextType != null
-                ? ChatContextType.valueOf(contextType) : null;
-        ChatMessageResponse message = chatService.sendAttachmentMessage(
-                user.getId(), mappingId, content, file, ctx, contextRefId);
-        chatService.publishRealtimeMessage(message);
-        return ResponseEntity.ok(ApiResponse.success(message, "Attachment sent"));
+        return ResponseEntity.ok(ApiResponse.success(
+                chatService.sendAttachmentMessage(
+                        user.getId(), mappingId, content, file, contextType, contextRefId),
+                "Attachment sent"));
     }
 
     @PutMapping("/threads/{mappingId}/read")
