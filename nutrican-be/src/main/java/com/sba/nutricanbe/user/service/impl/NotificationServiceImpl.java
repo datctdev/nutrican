@@ -152,7 +152,6 @@ public class NotificationServiceImpl implements NotificationService {
         return switch (event) {
             case "HIRE_RESULT", "HIRE_ACCEPTED", "HIRE_REJECTED" -> optIn.getOrDefault("hireResultEmail", true);
             case "REFUND_UPDATE" -> optIn.getOrDefault("refundEmail", true);
-            case "SOS_RESOLVED", "SOS_ESCALATED" -> optIn.getOrDefault("sosResultEmail", true);
             case "WEEKLY_SUMMARY" -> optIn.getOrDefault("weeklySummaryEmail", true);
             default -> optIn.getOrDefault("email", true);
         };
@@ -162,9 +161,6 @@ public class NotificationServiceImpl implements NotificationService {
         return switch (event) {
             case "NEW_DIET_LOG" -> "Nhật ký ăn mới";
             case "DIET_LOG_REVIEWED" -> "PT đã duyệt nhật ký";
-            case "SOS" -> "SOS khẩn cấp";
-            case "SOS_RESOLVED" -> "SOS đã xử lý";
-            case "SOS_ESCALATED" -> "SOS quá hạn";
             case "HIRE_RESULT", "HIRE_ACCEPTED" -> "PT chấp nhận yêu cầu thuê";
             case "HIRE_REJECTED" -> "PT từ chối yêu cầu thuê";
             case "HIRE_PAYMENT_EXPIRED" -> "Yêu cầu coaching hết hạn thanh toán";
@@ -183,7 +179,6 @@ public class NotificationServiceImpl implements NotificationService {
         return switch (event) {
             case "NEW_DIET_LOG", "DIET_LOG_REVIEWED" -> NotificationLinkType.DIET_LOG;
             case "CHAT_MESSAGE" -> NotificationLinkType.CHAT;
-            case "SOS", "SOS_RESOLVED", "SOS_ESCALATED" -> NotificationLinkType.SOS;
             case "HIRE_RESULT", "HIRE_ACCEPTED", "HIRE_REJECTED", "HIRE_PAYMENT_EXPIRED" ->
                     NotificationLinkType.HIRE;
             case "REFUND_UPDATE" -> NotificationLinkType.REFUND;
@@ -198,7 +193,6 @@ public class NotificationServiceImpl implements NotificationService {
         return switch (event) {
             case "HIRE_RESULT", "HIRE_ACCEPTED", "HIRE_REJECTED" -> "hire-result";
             case "REFUND_UPDATE" -> "refund-result";
-            case "SOS_RESOLVED" -> "sos-resolved";
             case "WEEKLY_SUMMARY" -> "weekly-summary";
             default -> "generic-notification";
         };

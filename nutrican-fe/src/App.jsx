@@ -28,7 +28,6 @@ import PtPortfolioEditor from './pages/pt/PtPortfolioEditor';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import PtVerificationPage from './pages/admin/PtVerificationPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
-import SosTicketsPage from './pages/admin/SosTicketsPage';
 import RefundReviewPage from './pages/admin/RefundReviewPage';
 import FoodTagsPage from './pages/admin/FoodTagsPage';
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -104,10 +103,6 @@ function App() {
                 {
                     path: '/admin/users',
                     element: <ProtectedRoute allowedRoles={['ADMIN']}><UserManagementPage /></ProtectedRoute>,
-                },
-                {
-                    path: '/admin/sos',
-                    element: <ProtectedRoute allowedRoles={['ADMIN']}><SosTicketsPage /></ProtectedRoute>,
                 },
                 {
                     path: '/admin/refunds',

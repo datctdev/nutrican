@@ -112,8 +112,6 @@ export default function Header() {
                 return isPtMode ? '/pt/reviews' : '/diet';
             case 'CHAT':
                 return isPtMode ? '/pt/chat' : '/chat';
-            case 'SOS':
-                return role === 'ADMIN' ? '/admin/sos' : isPtMode ? '/pt/reviews' : '/diet';
             case 'HIRE':
                 return isPtMode ? '/pt/clients' : '/coaching';
             case 'REFUND':
@@ -139,10 +137,6 @@ export default function Header() {
         if (n.linkRefId) {
             if (n.linkType === 'DIET_LOG') {
                 navigate(rolePath(base, n.linkRefId, 'log'));
-                return;
-            }
-            if (n.linkType === 'SOS') {
-                navigate(user?.role === 'ADMIN' ? `/admin/sos` : '/diet');
                 return;
             }
             if (n.linkType === 'CHAT') {
@@ -195,7 +189,6 @@ export default function Header() {
             { label: 'Duyệt PT', href: '/admin/pts' },
             { label: 'Hoàn tiền', href: '/admin/refunds' },
             { label: 'Người dùng', href: '/admin/users' },
-            { label: 'Hỗ trợ SOS', href: '/admin/sos' },
         ],
     };
 

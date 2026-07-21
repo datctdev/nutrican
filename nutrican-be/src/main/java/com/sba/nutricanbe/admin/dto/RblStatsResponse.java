@@ -11,7 +11,6 @@ import java.util.Map;
 public class RblStatsResponse {
     private int totalReviewed;
     private int totalLabeledCv;
-    private int totalSos;
     private int legacyLogsExcluded;
     private boolean insufficientSample;
     private BigDecimal maeAiCalories;
@@ -22,9 +21,6 @@ public class RblStatsResponse {
     private Map<String, BigDecimal> maeByRecognitionSource;
     private Map<String, BigDecimal> maeByDbMatchScoreBucket;
     private Map<String, Integer> topCorrectionReasons;
-    private double sosToReviewRate;
-    private double sosToAdjustRate;
-    private double sosLowConfidenceRate;
     private double foodDbCoverage;
     private BigDecimal blindVsAiMae;
     private BigDecimal blindVsPtMae;

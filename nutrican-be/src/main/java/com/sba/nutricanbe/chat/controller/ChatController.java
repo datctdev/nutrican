@@ -2,6 +2,7 @@ package com.sba.nutricanbe.chat.controller;
 
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
+import com.sba.nutricanbe.chat.enums.ChatContextType;
 import com.sba.nutricanbe.chat.service.ChatService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
@@ -63,8 +64,8 @@ public class ChatController {
             @RequestParam(required = false) String content,
             @RequestParam(required = false) String contextType,
             @RequestParam(required = false) UUID contextRefId) {
-        com.sba.nutricanbe.chat.enums.ChatContextType ctx = contextType != null
-                ? com.sba.nutricanbe.chat.enums.ChatContextType.valueOf(contextType) : null;
+        ChatContextType ctx = contextType != null
+                ? ChatContextType.valueOf(contextType) : null;
         ChatMessageResponse message = chatService.sendAttachmentMessage(
                 user.getId(), mappingId, content, file, ctx, contextRefId);
         chatService.publishRealtimeMessage(message);

@@ -13,15 +13,11 @@ export const adminService = {
     verifyPt: (userId, data) => api.put(`/admin/pts/${userId}/verify`, data),
     getPtDocuments: (ptId) => api.get(`/admin/pts/${ptId}/documents`),
 
-    // PT Update Requests (MỚI)
+    // PT Update Requests (MỚI THÊM)
     getPendingUpdateRequests: (params = {}) => api.get('/admin/pts/update-requests/pending', { params }),
     reviewUpdateRequest: (requestId, data) => api.put(`/admin/pts/update-requests/${requestId}/review`, data),
 
-    // SOS Tickets
-    getSosTickets: (params = {}) => api.get('/admin/sos-tickets', { params }),
-    assignSosTicket: (ticketId, ptId) => api.put(`/admin/sos-tickets/${ticketId}/assign`, { ptId }),
-
-    // RBL Research
+    // RBL Research & Refunds
     getRblStats: (params) => api.get('/admin/rbl/stats', { params }),
     getRblExportPreview: (params) => api.get('/admin/rbl/export/preview', { params }),
     downloadRblExport: (params) => api.get('/admin/rbl/export', { params, responseType: 'blob' }),

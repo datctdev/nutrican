@@ -5,12 +5,13 @@ import { Button } from '../../components/ui/button';
 import {
     Camera, Plus, Trash2, Save, ImagePlus, Loader2, LayoutTemplate,
     Link as LinkIcon, Image as ImageIcon, Lock, ShieldCheck, FileEdit,
-    AlertCircle, CheckCircle2, GraduationCap, MapPin, Target, Clock,
+    AlertCircle, CheckCircle2, GraduationCap, Target, Clock,
     UserCircle, Quote, Send, Briefcase, Award, FileUp, UploadCloud,
     Monitor, Globe, Dumbbell, Calendar, Phone, Banknote, ExternalLink
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { userService } from '../../services/userService';
+import ProvinceSelect from '../../components/common/ProvinceSelect';
 import { toast } from 'sonner';
 
 const getPermanentUrl = (url) => {
@@ -51,11 +52,6 @@ const TRAINING_MODE_OPTIONS = [
     { value: 'OFFLINE', label: 'Trực tiếp (Offline)', icon: Dumbbell },
     { value: 'ONLINE', label: 'Online', icon: Monitor },
     { value: 'BOTH', label: 'Cả hai', icon: Globe },
-];
-
-const LOCATION_OPTIONS = [
-    'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ',
-    'Hải Phòng', 'Bình Dương', 'Đồng Nai', 'Vũng Tàu', 'Khác',
 ];
 
 const newEmptyCert = () => ({
@@ -999,14 +995,12 @@ export default function PtPortfolioEditor() {
                                         </div>
                                         <div>
                                             <label className="block text-xs font-bold text-slate-600 mb-2">Địa điểm hoạt động</label>
-                                            <select
+                                            <ProvinceSelect
                                                 value={activeForm.location}
-                                                onChange={(e) => setUpdateForm({ ...updateForm, location: e.target.value })}
-                                                className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-white disabled:bg-slate-50"
-                                            >
-                                                <option value="">-- Chọn tỉnh/thành --</option>
-                                                {LOCATION_OPTIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                                            </select>
+                                                onChange={(v) => setUpdateForm({ ...updateForm, location: v })}
+                                                disabled={!!pendingRequest}
+                                                placeholder="Chọn hoặc tìm tỉnh/thành..."
+                                            />
                                         </div>
                                     </div>
 
