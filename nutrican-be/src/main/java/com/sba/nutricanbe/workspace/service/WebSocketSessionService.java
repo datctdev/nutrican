@@ -30,7 +30,6 @@ public class WebSocketSessionService {
         this.objectMapper = objectMapper;
         this.notificationService = notificationService;
     }
-    // Map lưu trữ Session, Value là List để hỗ trợ 1 PT đăng nhập trên nhiều thiết bị (Web, Mobile)
     private final Map<UUID, CopyOnWriteArrayList<WebSocketSession>> sessions = new ConcurrentHashMap<>();
 
     public void registerSession(UUID userId, WebSocketSession session) {

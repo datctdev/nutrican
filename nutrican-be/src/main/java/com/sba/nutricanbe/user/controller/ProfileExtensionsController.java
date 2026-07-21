@@ -2,7 +2,6 @@ package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
-import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.user.dto.AllergyProfileRequest;
 import com.sba.nutricanbe.user.dto.BodyMetricDto;
 import com.sba.nutricanbe.user.dto.BodyMetricReminderStatusDto;
@@ -19,7 +18,6 @@ import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.dto.RecalculateMacrosRequest;
 import com.sba.nutricanbe.user.dto.RecalculateMacrosResponse;
 import com.sba.nutricanbe.user.dto.UserPreferencesRequest;
-import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
@@ -31,12 +29,16 @@ import com.sba.nutricanbe.user.service.ProfileExtensionsService;
 import com.sba.nutricanbe.workspace.dto.MilestoneDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
@@ -53,20 +55,19 @@ public class ProfileExtensionsController {
     private final OnboardingService onboardingService;
     private final CoachingLifecycleService coachingLifecycleService;
     private final ProfileExtensionsService profileExtensionsService;
-    private final com.sba.nutricanbe.diet.service.DietLogHelper dietLogHelper;
 
     @GetMapping("/allergies")
     public ResponseEntity<ApiResponse<String>> getAllergies(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(
-                user.getAllergyNotes() != null ? user.getAllergyNotes() : "", "Allergies fetched"));
+                profileExtensionsService.getAllergies(user.getId()), "Allergies fetched"));
     }
 
     @PutMapping("/allergies")
     public ResponseEntity<ApiResponse<String>> updateAllergies(
             @AuthenticationPrincipal User user,
             @RequestBody AllergyProfileRequest request) {
-        String notes = profileExtensionsService.updateAllergies(user.getId(), request);
-        return ResponseEntity.ok(ApiResponse.success(notes, "Allergies updated"));
+        return ResponseEntity.ok(ApiResponse.success(
+                profileExtensionsService.updateAllergies(user.getId(), request), "Allergies updated"));
     }
 
     @PutMapping("/preferences")
@@ -99,8 +100,8 @@ public class ProfileExtensionsController {
     public ResponseEntity<ApiResponse<RecalculateMacrosResponse>> recalculateMacros(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody RecalculateMacrosRequest request) {
-        RecalculateMacrosResponse body = profileExtensionsService.recalculateMacros(user.getId(), request);
-        return ResponseEntity.ok(ApiResponse.success(body, "Macros recalculated"));
+        return ResponseEntity.ok(ApiResponse.success(
+                profileExtensionsService.recalculateMacros(user.getId(), request), "Macros recalculated"));
     }
 
     @GetMapping("/goals")
@@ -126,26 +127,24 @@ public class ProfileExtensionsController {
             @AuthenticationPrincipal User user,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        var result = bodyMetricService.listMetrics(user.getId(),
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "recordDate")));
-        return ResponseEntity.ok(ApiResponse.success(PageResponse.from(result)));
+        return ResponseEntity.ok(ApiResponse.success(
+                PageResponse.from(bodyMetricService.listMetrics(user.getId(), page, size))));
     }
 
     @PostMapping("/body-metrics")
     public ResponseEntity<ApiResponse<BodyMetricDto>> recordBodyMetric(
             @AuthenticationPrincipal User user,
             @RequestBody BodyMetricRequest request) {
-        BodyMetric saved = bodyMetricService.recordMetric(user.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(
-                BodyMetricDto.from(saved), "Body metric recorded"));
+                bodyMetricService.recordMetricDto(user.getId(), request), "Body metric recorded"));
     }
 
     @PostMapping(value = "/body-metrics/analyze-inbody", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<InbodyAnalysisResponse>> analyzeInbody(
             @AuthenticationPrincipal User user,
             @RequestParam("file") MultipartFile file) {
-        InbodyAnalysisResponse result = bodyMetricService.analyzeInbody(file);
-        return ResponseEntity.ok(ApiResponse.success(result, "Inbody sheet analyzed successfully"));
+        return ResponseEntity.ok(ApiResponse.success(
+                bodyMetricService.analyzeInbody(file), "Inbody sheet analyzed successfully"));
     }
 
     @GetMapping("/body-metric-reminder-status")
@@ -177,8 +176,8 @@ public class ProfileExtensionsController {
     @GetMapping("/has-active-pt")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> hasActivePt(
             @AuthenticationPrincipal User user) {
-        boolean active = dietLogHelper.hasActivePt(user.getId());
-        return ResponseEntity.ok(ApiResponse.success(Map.of("hasActivePt", active)));
+        return ResponseEntity.ok(ApiResponse.success(
+                Map.of("hasActivePt", profileExtensionsService.hasActivePt(user.getId()))));
     }
 
     @GetMapping("/coaching-history")
@@ -205,11 +204,7 @@ public class ProfileExtensionsController {
     public ResponseEntity<ApiResponse<Void>> setMaxClients(
             @AuthenticationPrincipal User user,
             @RequestBody Map<String, Integer> body) {
-        Integer max = body != null ? body.get("maxClients") : null;
-        if (max == null) {
-            throw new BadRequestException("maxClients is required");
-        }
-        coachingLifecycleService.setMaxClients(user.getId(), max);
+        coachingLifecycleService.setMaxClients(user.getId(), body != null ? body.get("maxClients") : null);
         return ResponseEntity.ok(ApiResponse.success(null, "maxClients updated"));
     }
 }

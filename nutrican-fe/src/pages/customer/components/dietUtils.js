@@ -224,8 +224,71 @@ export function addDaysIso(iso, delta) {
     return formatLocalDate(d);
 }
 
+/** localStorage key — FE sends same value as X-Nutrican-Demo-Vn-Clock to BE. */
+export const DEMO_VN_CLOCK_KEY = 'nutrican.demoVnClock';
+
+export function getDemoVnClock() {
+    try {
+        return localStorage.getItem(DEMO_VN_CLOCK_KEY) || '';
+    } catch {
+        return '';
+    }
+}
+
+export function setDemoVnClock(value) {
+    try {
+        if (!value) localStorage.removeItem(DEMO_VN_CLOCK_KEY);
+        else localStorage.setItem(DEMO_VN_CLOCK_KEY, value);
+    } catch { /* ignore */ }
+}
+
+function vnWallParts(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    }).formatToParts(date);
+    const get = (type) => parts.find((p) => p.type === type)?.value;
+    return {
+        year: Number(get('year')),
+        month: Number(get('month')),
+        day: Number(get('day')),
+        hour: Number(get('hour') === '24' ? '0' : get('hour')),
+        minute: Number(get('minute')),
+        second: Number(get('second')),
+    };
+}
+
+/** Parse demo clock: `HH:mm` / `HH:mm:ss` / `yyyy-MM-ddTHH:mm[:ss]` as VN wall time. */
+export function parseDemoVnClock(raw, baseDate = new Date()) {
+    if (!raw || typeof raw !== 'string') return null;
+    const value = raw.trim();
+    if (!value) return null;
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
+        const [h, m, s = '0'] = value.split(':');
+        const wall = vnWallParts(baseDate);
+        return new Date(wall.year, wall.month - 1, wall.day, Number(h), Number(m), Number(s), 0);
+    }
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (m) {
+        return new Date(
+            Number(m[1]), Number(m[2]) - 1, Number(m[3]),
+            Number(m[4]), Number(m[5]), Number(m[6] || 0), 0,
+        );
+    }
+    return null;
+}
+
 export function nowInVn() {
-    return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+    const demo = parseDemoVnClock(getDemoVnClock());
+    if (demo) return demo;
+    const wall = vnWallParts();
+    return new Date(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second, 0);
 }
 
 export function todayLocalIso() {
@@ -360,19 +423,25 @@ export function getCurrentMealPeriod(date = nowInVn()) {
 /** Periods whose window has fully ended (AI lock on today). */
 export function getLockedMealPeriods(date = nowInVn()) {
     const minutes = toLocalMinutes(date);
+    // Before 04:00: overnight LATE belongs to yesterday — nothing on today's calendar is locked yet.
+    if (minutes < 4 * 60) return new Set();
     const current = mealPeriodFromMinutes(minutes);
     const order = MEAL_PERIODS;
     const idx = order.indexOf(current);
     const locked = new Set();
     for (let i = 0; i < idx; i += 1) locked.add(order[i]);
-    if (current !== 'LATE' && minutes >= 4 * 60) locked.add('LATE');
+    if (current !== 'LATE') locked.add('LATE');
     return locked;
 }
 
 export function isFutureMealPeriod(period, date = new Date()) {
+    const nowDate = date instanceof Date ? date : new Date(date);
+    const minutes = toLocalMinutes(nowDate);
+    // Soft start of calendar day: all of today's windows are still upcoming.
+    if (minutes < 4 * 60) return MEAL_PERIODS.includes(period);
     const order = MEAL_PERIODS;
-    const current = getCurrentMealPeriod(date);
-    const locked = getLockedMealPeriods(date);
+    const current = getCurrentMealPeriod(nowDate);
+    const locked = getLockedMealPeriods(nowDate);
     if (locked.has(period)) return false;
     return order.indexOf(period) > order.indexOf(current);
 }

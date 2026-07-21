@@ -15,9 +15,13 @@ import java.util.UUID;
 public interface BodyMetricService {
     BodyMetric recordMetric(UUID userId, BodyMetricRequest request);
 
+    BodyMetricDto recordMetricDto(UUID userId, BodyMetricRequest request);
+
     InbodyAnalysisResponse analyzeInbody(MultipartFile file);
 
     Page<BodyMetricDto> listMetrics(UUID userId, Pageable pageable);
+
+    Page<BodyMetricDto> listMetrics(UUID userId, int page, int size);
 
     Page<BodyMetricDto> listMetricsForClient(UUID ptId, UUID clientId, Pageable pageable);
 

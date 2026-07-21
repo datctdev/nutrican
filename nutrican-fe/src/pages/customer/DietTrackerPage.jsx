@@ -30,10 +30,21 @@ import {
     addDaysIso,
     monthKeyFromIso,
     fetchAllDietLogsForRange,
+    getDemoVnClock,
+    setDemoVnClock,
 } from './components/dietUtils';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const POST_MEAL_PROMPT_KEY = 'nutrican_post_meal_prompt';
+const DEMO_CLOCK_OPTIONS = [
+    { value: '', label: 'Giờ thật VN' },
+    { value: '09:00', label: 'Demo 09:00 · sáng' },
+    { value: '12:00', label: 'Demo 12:00 · trưa' },
+    { value: '15:00', label: 'Demo 15:00 · chiều' },
+    { value: '21:00', label: 'Demo 21:00 · tối' },
+    { value: '23:00', label: 'Demo 23:00 · khuya' },
+    { value: '01:00', label: 'Demo 01:00 · qua đêm' },
+];
 
 function maxPlanDateIso() {
     return addDaysIso(todayLocalIso(), 14);
@@ -109,6 +120,7 @@ export default function DietTrackerPage() {
     const [postMealPrompt, setPostMealPrompt] = useState(null);
     const [onboardingBanner, setOnboardingBanner] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
+    const [demoClock, setDemoClockUi] = useState(() => getDemoVnClock());
 
     const isToday = isTodayIso(selectedDate);
     const isFuture = isFutureIso(selectedDate);
@@ -223,10 +235,11 @@ export default function DietTrackerPage() {
     }, []);
 
     const syncAll = useCallback(() => {
-        fetchDay(selectedDateRef.current);
+        const dayPromise = fetchDay(selectedDateRef.current);
         if (calendarOpenRef.current) {
             fetchMonthDots(viewingMonthRef.current);
         }
+        return dayPromise;
     }, [fetchDay, fetchMonthDots]);
 
     const loadResNetDishes = useCallback(async () => {
@@ -797,9 +810,32 @@ export default function DietTrackerPage() {
                         )}
                     </div>
                 </div>
-                <Button onClick={syncAll} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl">
-                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Đồng bộ dữ liệu
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-900 shadow-sm">
+                        <span className="whitespace-nowrap">Giờ demo VN</span>
+                        <select
+                            value={demoClock}
+                            onChange={(e) => {
+                                const next = e.target.value;
+                                setDemoVnClock(next);
+                                setDemoClockUi(next);
+                                toast.message(next
+                                    ? `Đang giả lập giờ VN ${next} — reload…`
+                                    : 'Trở lại giờ thật VN — reload…');
+                                window.setTimeout(() => window.location.reload(), 250);
+                            }}
+                            className="rounded-lg border border-amber-300 bg-white px-2 py-1 text-xs font-bold text-slate-800"
+                            title="Giả lập Asia/Ho_Chi_Minh để demo khung buổi (không cần đổi timezone máy)"
+                        >
+                            {DEMO_CLOCK_OPTIONS.map((opt) => (
+                                <option key={opt.value || 'real'} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <Button onClick={syncAll} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl">
+                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Đồng bộ dữ liệu
+                    </Button>
+                </div>
             </div>
 
             <DietDateCalendar
@@ -870,7 +906,7 @@ export default function DietTrackerPage() {
                         onPlannedTotalsChange={setPlannedTotals}
                         timeline={timeline}
                         timelineLoading={timelineLoading}
-                        onRefreshTimeline={() => fetchDay(selectedDate)}
+                        onRefreshTimeline={syncAll}
                         logHandlers={{
                             handleEditLog,
                             handleDelete,

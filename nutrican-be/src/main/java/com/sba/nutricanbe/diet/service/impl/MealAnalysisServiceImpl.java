@@ -45,6 +45,7 @@ import com.sba.nutricanbe.diet.dto.response.IntakeControlResult;
 import com.sba.nutricanbe.diet.service.DietPrefCheckService;
 import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
 import com.sba.nutricanbe.diet.service.MealAnalysisService;
+import com.sba.nutricanbe.diet.util.AnalyzeMealContextFactory;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -83,6 +84,31 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
     private final FoodGateService foodGateService;
     private final DietPrefCheckService dietPrefCheckService;
     private final IntakeControlLoopService intakeControlLoopService;
+
+    @Override
+    @Transactional
+    public ApiResponse<AnalyzeMealResponse> analyzeMeal(
+            UUID customerId,
+            MultipartFile file,
+            String mealType,
+            String mealPeriod,
+            String makeupForPeriod,
+            LocalDate logDate,
+            String mealSource,
+            String mealComplexity,
+            String restaurantName,
+            UUID hotpotBrothId,
+            UUID[] hotpotItemIds,
+            String hotpotPortions,
+            UUID[] compositeItemIds,
+            String compositePortions) {
+        AnalyzeMealContext context = AnalyzeMealContextFactory.fromMultipart(
+                mealType, mealPeriod, makeupForPeriod, logDate,
+                mealSource, mealComplexity, restaurantName,
+                hotpotBrothId, hotpotItemIds, hotpotPortions,
+                compositeItemIds, compositePortions);
+        return analyzeMeal(customerId, file, context);
+    }
 
     @Override
     @Transactional

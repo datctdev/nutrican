@@ -102,11 +102,6 @@ public class AppointmentSlotHelper {
         return !overlaps.isEmpty();
     }
 
-    /** @deprecated use hasOverlap */
-    public boolean hasOverlapLegacy(UUID ptId, LocalDateTime start, LocalDateTime end, UUID excludeId) {
-        return hasAppointmentOverlap(ptId, start, end, excludeId);
-    }
-
     public int sessionMinutesFromRateUnit(String rateUnit) {
         if ("SESSION_90".equalsIgnoreCase(rateUnit)) {
             return 90;

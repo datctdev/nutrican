@@ -16,7 +16,9 @@ import com.sba.nutricanbe.user.service.BodyMetricService;
 import com.sba.nutricanbe.user.service.ProgressTimelineService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,10 +67,22 @@ public class BodyMetricServiceImpl implements BodyMetricService {
     }
 
     @Override
+    @Transactional
+    public BodyMetricDto recordMetricDto(UUID userId, BodyMetricRequest request) {
+        return BodyMetricDto.from(recordMetric(userId, request));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Page<BodyMetricDto> listMetrics(UUID userId, Pageable pageable) {
         return bodyMetricRepository.findByUserIdOrderByRecordDateDesc(userId, pageable)
                 .map(BodyMetricDto::from);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BodyMetricDto> listMetrics(UUID userId, int page, int size) {
+        return listMetrics(userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "recordDate")));
     }
 
     @Override

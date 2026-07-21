@@ -133,7 +133,10 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
 
     @Override
     @Transactional
-    public void setMaxClients(UUID ptUserId, int maxClients) {
+    public void setMaxClients(UUID ptUserId, Integer maxClients) {
+        if (maxClients == null) {
+            throw new BadRequestException("maxClients is required");
+        }
         if (maxClients < 1 || maxClients > 20) {
             throw new BadRequestException("maxClients must be between 1 and 20");
         }

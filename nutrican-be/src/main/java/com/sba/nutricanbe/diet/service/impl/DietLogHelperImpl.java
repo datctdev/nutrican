@@ -83,10 +83,8 @@ public class DietLogHelperImpl implements DietLogHelper {
     }
 
     /**
-     * Builds a diet-log line item.
-     * <p>
-     * Security: custom/free-text items (no valid {@code foodItemId}) are stored only on
-     * {@link DietLogItem} with null foodItemId — never inserted into the FoodItem catalog.
+     * Custom free-text items (no valid foodItemId) are stored only on {@link DietLogItem}
+     * and are never inserted into the FoodItem catalog.
      */
     @Override
     public DietLogItem buildLogItem(DietLog dietLog, DietLogItemRequest req) {
@@ -104,7 +102,6 @@ public class DietLogHelperImpl implements DietLogHelper {
             itemName = food.getNameVi();
             resolvedFoodItemId = food.getId();
         } else {
-            // Custom free-text: do NOT write FoodItem catalog; drop any bogus foodItemId
             itemName = sanitizeCustomItemName(req.getItemName());
             itemMacros = MacroNutrients.of(
                     sanitizeMacro(req.getCalories()),

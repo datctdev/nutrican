@@ -20,7 +20,7 @@ public class HirePtRequest {
     /** OFFLINE: one or more session start times (package hire) */
     private List<LocalDateTime> sessionStarts;
 
-    /** @deprecated use sessionStarts — kept for backward compat */
+    /** Prefer {@code sessionStarts}; retained for older clients. */
     private LocalDateTime firstSessionStart;
 
     public List<LocalDateTime> resolvedSessionStarts() {

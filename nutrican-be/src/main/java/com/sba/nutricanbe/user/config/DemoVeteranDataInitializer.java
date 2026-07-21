@@ -98,7 +98,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             return;
         }
 
-        // Always refresh PT portion sizes so demo bars fill ~full macro targets
         rescaleCoachedPtPlanPortions(coachedOpt.get(), food);
 
         if (systemSettingRepository.existsById(FLAG_KEY)
@@ -128,20 +127,21 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             log.info("{} seeded — 14d fixtures for {} and {}", FLAG_KEY, SOLO_EMAIL, COACHED_EMAIL);
         }
 
-        // Luôn chạy cuối — kể cả khi flag done (demo tick trễ + PT duyệt tối)
         LocalDate today = DietDates.todayVn();
         soloOpt.ifPresent(solo -> {
             refreshYesterdayBackfillDemo(solo, food, today);
+            refreshYesterdayOvernightDemo(solo, food, today, null);
             refreshTodayLateTickDemo(solo, food, today);
         });
         coachedOpt.ifPresent(coached -> ptOpt.ifPresent(pt -> {
             refreshYesterdayBackfillDemo(coached, food, today);
+            refreshYesterdayOvernightDemo(coached, food, today, pt);
             refreshTodayLateTickDemo(coached, food, today);
             refreshTodayEveningReviewDemo(coached, pt, food, today);
         }));
     }
 
-    /** Idempotent: hôm qua chỉ giữ log sáng (test bù nhật ký). */
+    /** Keeps only yesterday's morning log for backfill demos. */
     private void refreshYesterdayBackfillDemo(User user, FoodItem food, LocalDate today) {
         if (food == null) {
             return;
@@ -160,9 +160,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                 "Demo backfill · chỉ có sáng — bù trưa/chiều bằng Ghi nhật ký");
     }
 
-    /**
-     * Hôm qua: chỉ còn log buổi sáng — để test bù nhật ký (Manual/AI) cho trưa/chiều/tối.
-     */
     private void seedYesterdayBackfillDemo(User solo, User coached, FoodItem food, LocalDate today) {
         LocalDate yesterday = today.minusDays(1);
         for (User user : List.of(solo, coached)) {
@@ -175,8 +172,86 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
     }
 
     /**
-     * Hôm nay: xóa log các buổi đã qua, reset plan chưa tick — để test tick trễ trong ngày.
+     * Full plan for yesterday so overnight LATE (0–4h) is tickable, while diary stays morning-only (backfill).
+     * Solo: 5 self-plan periods (MORNING eaten + linked log; LATE uneaten).
+     * Coached: full PT day including LATE uneaten.
      */
+    private void refreshYesterdayOvernightDemo(User user, FoodItem food, LocalDate today, User pt) {
+        if (food == null) {
+            return;
+        }
+        LocalDate yesterday = today.minusDays(1);
+        boolean coached = COACHED_EMAIL.equalsIgnoreCase(user.getEmail());
+
+        // LATE must stay open for overnight tick — no LATE log settling the period.
+        dietLogRepository.findByCustomerIdAndLogDate(user.getId(), yesterday).stream()
+                .filter(l -> l.getMealPeriod() == MealPeriod.LATE)
+                .forEach(dietLogRepository::delete);
+
+        if (!coached) {
+            ensureSoloYesterdayPlan(user, food, yesterday);
+        } else if (pt != null) {
+            ensureCoachedYesterdayPlan(user, pt, food, yesterday);
+        }
+        log.debug("Yesterday overnight plan refreshed for {} on {}", user.getEmail(), yesterday);
+    }
+
+    private void ensureSoloYesterdayPlan(User solo, FoodItem food, LocalDate yesterday) {
+        for (MealPeriod period : MealPeriod.values()) {
+            cleanupDuplicateSelfItems(solo.getId(), yesterday, period);
+            if (!hasSelfPlanForPeriod(solo.getId(), yesterday, period)) {
+                saveSelf(solo, food, yesterday, period, period == MealPeriod.MORNING, null);
+            }
+        }
+
+        DietLog morningLog = dietLogRepository.findByCustomerIdAndLogDate(solo.getId(), yesterday).stream()
+                .filter(l -> l.getMealPeriod() == MealPeriod.MORNING)
+                .findFirst()
+                .orElse(null);
+
+        for (SelfPlanItem item : selfPlanItemRepository
+                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(solo.getId(), yesterday)) {
+            MealPeriod period = item.getMealPeriod();
+            if (period == MealPeriod.LATE) {
+                item.setEaten(false);
+                item.setDietLogId(null);
+                selfPlanItemRepository.save(item);
+            } else if (period == MealPeriod.MORNING && morningLog != null) {
+                item.setEaten(true);
+                item.setDietLogId(morningLog.getId());
+                selfPlanItemRepository.save(item);
+            } else if (period != null) {
+                item.setEaten(false);
+                item.setDietLogId(null);
+                selfPlanItemRepository.save(item);
+            }
+        }
+    }
+
+    private void ensureCoachedYesterdayPlan(User coached, User pt, FoodItem food, LocalDate yesterday) {
+        LocalDate weekStart = yesterday.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        MealPlan plan = ensurePublishedWeekPlan(coached, pt, weekStart);
+        if (!hasPtPlanItemsForDay(plan.getId(), yesterday)) {
+            seedPtDayItems(plan, food, yesterday, false);
+        }
+        mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId()).stream()
+                .filter(i -> yesterday.equals(i.getPlanDate()))
+                .filter(i -> i.getSourceType() == MealPlanItemSourceType.PT_ORIGINAL)
+                .forEach(item -> {
+                    if (item.getMealPeriod() == MealPeriod.LATE) {
+                        item.setEaten(false);
+                        item.setLateTickReason(null);
+                        mealPlanItemRepository.save(item);
+                    } else if (item.getMealPeriod() == MealPeriod.MORNING) {
+                        // Morning diary exists for backfill; leave PT morning unticked so PT tick/late-tick still demoable
+                        // except we want LATE as the overnight hero — morning can stay uneaten too for PT mark.
+                        item.setEaten(false);
+                        item.setLateTickReason(null);
+                        mealPlanItemRepository.save(item);
+                    }
+                });
+    }
+
     private void refreshTodayLateTickDemo(User user, FoodItem food, LocalDate today) {
         if (food == null) {
             return;
@@ -296,7 +371,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                         "Demo " + period.name() + " · ngày " + logDate);
             }
         }
-        // Today: chỉ log các buổi đã qua — không log buổi hiện tại (tránh chốt buổi → ẩn đơn PT duyệt)
         MealPeriod current = MealPeriods.current();
         for (MealPeriod period : dayPeriods) {
             if (period.ordinal() < current.ordinal()) {
@@ -341,36 +415,41 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
     }
 
     private void seedSoloPlans(User solo, FoodItem food, LocalDate today) {
+        LocalDate yesterday = today.minusDays(1);
         LocalDate end = today.plusDays(14);
-        for (LocalDate d = today; !d.isAfter(end); d = d.plusDays(1)) {
+        for (LocalDate d = yesterday; !d.isAfter(end); d = d.plusDays(1)) {
             if (hasSelfPlanForDay(solo.getId(), d)) {
                 continue;
             }
-            boolean fullDay = d.equals(today) || d.getDayOfWeek().getValue() <= 5;
-            saveSelf(solo, food, d, MealPeriod.MORNING, d.equals(today), null);
+            boolean isYesterday = d.equals(yesterday);
+            boolean isToday = d.equals(today);
+            boolean fullDay = isToday || isYesterday || d.getDayOfWeek().getValue() <= 5;
+            saveSelf(solo, food, d, MealPeriod.MORNING, isToday || isYesterday, null);
             saveSelf(solo, food, d, MealPeriod.NOON, false, null);
-            if (fullDay || d.equals(today)) {
+            if (fullDay) {
                 saveSelf(solo, food, d, MealPeriod.AFTERNOON, false, null);
                 saveSelf(solo, food, d, MealPeriod.EVENING, false, null);
                 saveSelf(solo, food, d, MealPeriod.LATE, false, null);
             }
         }
-        // Link today morning eaten to diet log if exists
+        linkMorningSelfToLog(solo, today);
+        linkMorningSelfToLog(solo, yesterday);
+    }
+
+    private void linkMorningSelfToLog(User solo, LocalDate day) {
         selfPlanItemRepository
-                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(solo.getId(), today)
+                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(solo.getId(), day)
                 .stream()
                 .filter(i -> i.getMealPeriod() == MealPeriod.MORNING && Boolean.TRUE.equals(i.getEaten()))
                 .filter(i -> i.getDietLogId() == null)
                 .findFirst()
-                .ifPresent(morning -> {
-                    dietLogRepository.findByCustomerIdAndLogDate(solo.getId(), today).stream()
-                            .filter(l -> l.getMealPeriod() == MealPeriod.MORNING)
-                            .findFirst()
-                            .ifPresent(log -> {
-                                morning.setDietLogId(log.getId());
-                                selfPlanItemRepository.save(morning);
-                            });
-                });
+                .ifPresent(morning -> dietLogRepository.findByCustomerIdAndLogDate(solo.getId(), day).stream()
+                        .filter(l -> l.getMealPeriod() == MealPeriod.MORNING)
+                        .findFirst()
+                        .ifPresent(log -> {
+                            morning.setDietLogId(log.getId());
+                            selfPlanItemRepository.save(morning);
+                        }));
     }
 
     private boolean hasSelfPlanForDay(java.util.UUID customerId, LocalDate day) {
@@ -386,7 +465,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                 .anyMatch(i -> period.equals(i.getMealPeriod()));
     }
 
-    /** Giữ bản gắn submission (chờ duyệt); xóa self draft trùng buổi. */
+    /** Keeps the submission-linked item; removes duplicate drafts in the same period. */
     private void cleanupDuplicateSelfItems(java.util.UUID customerId, LocalDate day, MealPeriod period) {
         List<SelfPlanItem> periodItems = selfPlanItemRepository
                 .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, day)
@@ -413,7 +492,8 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             LocalDate weekEnd = weekCursor.plusDays(6);
             if (!weekEnd.isBefore(today)) {
                 MealPlan plan = ensurePublishedWeekPlan(coached, pt, weekCursor);
-                LocalDate dayStart = weekCursor.isBefore(today) ? today : weekCursor;
+                LocalDate planFrom = today.minusDays(1);
+                LocalDate dayStart = weekCursor.isBefore(planFrom) ? planFrom : weekCursor;
                 LocalDate dayEnd = weekEnd.isAfter(horizonEnd) ? horizonEnd : weekEnd;
                 for (LocalDate d = dayStart; !d.isAfter(dayEnd); d = d.plusDays(1)) {
                     if (!hasPtPlanItemsForDay(plan.getId(), d)) {
@@ -424,7 +504,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             weekCursor = weekCursor.plusWeeks(1);
         }
 
-        // History: APPROVED submission ~7 days ago → SELF_OVERRIDE items that day
         LocalDate approvedDay = today.minusDays(7);
         if (!selfPlanSubmissionRepository.existsByCustomerIdAndPlanDateAndStatus(
                 coached.getId(), approvedDay, SelfPlanSubmissionStatus.APPROVED)) {
@@ -471,7 +550,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                     .build());
         }
 
-        // REJECTED ~4 days ago
         LocalDate rejectedDay = today.minusDays(4);
         if (!selfPlanSubmissionRepository.existsByCustomerIdAndPlanDateAndStatus(
                 coached.getId(), rejectedDay, SelfPlanSubmissionStatus.REJECTED)) {
@@ -492,10 +570,8 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             selfPlanItemRepository.save(rejectedItem);
         }
 
-        // Today scenario: PT chiều đã ăn → self chiều settled; tối PENDING cho PT
         seedTodaySettledScenario(coached, pt, food, today);
 
-        // PENDING submissions for PT approve/reject manual verify (+1/+2)
         seedPendingSubmission(coached, pt, food, today.plusDays(1), MealPeriod.MORNING);
         seedPendingSubmission(coached, pt, food, today.plusDays(2), MealPeriod.EVENING);
     }
@@ -523,7 +599,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                             item.setLateTickReason("Demo: tick trễ buổi chiều");
                             mealPlanItemRepository.save(item);
                         }));
-        // Buổi tối: giữ PT chưa tick để demo submission PENDING hiện trên màn PT
         mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(coached.getId()).stream()
                 .filter(p -> {
                     LocalDate start = p.getWeekStart();
@@ -547,15 +622,11 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
         }
     }
 
-    /**
-     * Mỗi lần khởi động: buổi tối hôm nay PT chưa tick + self PENDING — để PT luôn thấy đơn 20/7.
-     * Bỏ qua nếu buổi tối đã có SELF_OVERRIDE (PT đã duyệt xong).
-     */
+    /** Ensures tonight remains open for a pending self-plan review. */
     private void refreshTodayEveningReviewDemo(User coached, User pt, FoodItem food, LocalDate today) {
         if (!COACHED_EMAIL.equalsIgnoreCase(coached.getEmail())) {
             return;
         }
-        // Nhật ký buổi tối hôm nay = buổi chốt → PT không thấy đơn duyệt
         dietLogRepository.findByCustomerIdAndLogDate(coached.getId(), today).stream()
                 .filter(l -> l.getMealPeriod() == MealPeriod.EVENING)
                 .forEach(dietLogRepository::delete);
@@ -689,7 +760,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
         }
     }
 
-    /** Re-scale PT original items so full-day plan ≈ 95–100% macro target (demo UX). */
     private void rescaleCoachedPtPlanPortions(User coached, FoodItem food) {
         if (coached == null || food == null || food.getCalories() == null) {
             return;
@@ -703,7 +773,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                         .stream()
                         .filter(i -> i.getSourceType() == MealPlanItemSourceType.PT_ORIGINAL)
                         .filter(i -> i.getPlanDate() != null
-                                && !i.getPlanDate().isBefore(today)
+                                && !i.getPlanDate().isBefore(today.minusDays(1))
                                 && !i.getPlanDate().isAfter(end))
                         .forEach(item -> {
                             MealPeriod period = item.getMealPeriod() != null

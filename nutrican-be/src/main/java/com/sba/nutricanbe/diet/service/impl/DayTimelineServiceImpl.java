@@ -61,7 +61,7 @@ public class DayTimelineServiceImpl implements DayTimelineService {
     public DayTimelineResponse getDayTimeline(UUID customerId, LocalDate date) {
         LocalDate planDate = date != null ? date : DietDates.todayVn();
         LocalDate today = DietDates.todayVn();
-        LocalDateTime nowVn = LocalDateTime.now(DietDates.VN);
+        LocalDateTime nowVn = DietDates.nowVn();
         MealPeriod currentPeriod = MealPeriods.current(nowVn);
 
         DayPlanResponse dayPlan = dayPlanService.getDayPlan(customerId, planDate);
@@ -167,7 +167,7 @@ public class DayTimelineServiceImpl implements DayTimelineService {
         if (period == currentPeriod) {
             return "current";
         }
-        if (MealPeriods.pastPeriods(currentPeriod, LocalDateTime.now(DietDates.VN)).contains(period)) {
+        if (MealPeriods.pastPeriods(currentPeriod, DietDates.nowVn()).contains(period)) {
             return "past";
         }
         return "future";
