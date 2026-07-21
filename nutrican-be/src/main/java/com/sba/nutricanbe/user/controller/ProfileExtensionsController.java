@@ -3,19 +3,19 @@ package com.sba.nutricanbe.user.controller;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
-import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
-import com.sba.nutricanbe.common.util.MacroSuggestionCalculator;
 import com.sba.nutricanbe.user.dto.AllergyProfileRequest;
 import com.sba.nutricanbe.user.dto.BodyMetricDto;
 import com.sba.nutricanbe.user.dto.BodyMetricReminderStatusDto;
 import com.sba.nutricanbe.user.dto.BodyMetricRequest;
 import com.sba.nutricanbe.user.dto.ClientGoalDto;
 import com.sba.nutricanbe.user.dto.ClientGoalRequest;
+import com.sba.nutricanbe.user.dto.CoachingHistoryDto;
 import com.sba.nutricanbe.user.dto.InbodyAnalysisResponse;
+import com.sba.nutricanbe.user.dto.MacroSuggestionQuery;
 import com.sba.nutricanbe.user.dto.MacroSuggestionResponse;
-import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.OnboardingRequest;
 import com.sba.nutricanbe.user.dto.OnboardingStatusDto;
+import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.dto.RecalculateMacrosRequest;
 import com.sba.nutricanbe.user.dto.RecalculateMacrosResponse;
 import com.sba.nutricanbe.user.dto.UserPreferencesRequest;
@@ -23,64 +23,57 @@ import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
-import com.sba.nutricanbe.user.repository.BodyMetricRepository;
-import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.BodyMetricService;
 import com.sba.nutricanbe.user.service.ClientGoalService;
-import com.sba.nutricanbe.user.service.UserProfileService;
+import com.sba.nutricanbe.user.service.CoachingLifecycleService;
+import com.sba.nutricanbe.user.service.OnboardingService;
+import com.sba.nutricanbe.user.service.ProfileExtensionsService;
 import com.sba.nutricanbe.workspace.dto.MilestoneDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/profile")
 @RequiredArgsConstructor
 public class ProfileExtensionsController {
 
-    private final UserRepository userRepository;
     private final ClientGoalService clientGoalService;
     private final BodyMetricService bodyMetricService;
-    private final BodyMetricRepository bodyMetricRepository;
-    private final com.sba.nutricanbe.user.service.OnboardingService onboardingService;
-    private final com.sba.nutricanbe.user.service.CoachingLifecycleService coachingLifecycleService;
-    private final UserProfileService userProfileService;
+    private final OnboardingService onboardingService;
+    private final CoachingLifecycleService coachingLifecycleService;
+    private final ProfileExtensionsService profileExtensionsService;
     private final com.sba.nutricanbe.diet.service.DietLogHelper dietLogHelper;
 
     @GetMapping("/allergies")
     public ResponseEntity<ApiResponse<String>> getAllergies(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ApiResponse.success(user.getAllergyNotes() != null ? user.getAllergyNotes() : "", "Allergies fetched"));
+        return ResponseEntity.ok(ApiResponse.success(
+                user.getAllergyNotes() != null ? user.getAllergyNotes() : "", "Allergies fetched"));
     }
 
     @PutMapping("/allergies")
     public ResponseEntity<ApiResponse<String>> updateAllergies(
             @AuthenticationPrincipal User user,
             @RequestBody AllergyProfileRequest request) {
-        user.setAllergyNotes(request.getAllergyNotes());
-        userRepository.save(user);
-        return ResponseEntity.ok(ApiResponse.success(request.getAllergyNotes(), "Allergies updated"));
+        String notes = profileExtensionsService.updateAllergies(user.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(notes, "Allergies updated"));
     }
 
     @PutMapping("/preferences")
     public ResponseEntity<ApiResponse<Void>> updatePreferences(
             @AuthenticationPrincipal User user,
             @RequestBody UserPreferencesRequest request) {
-        if (request.getDietPreference() != null) user.setDietPreference(request.getDietPreference());
-        if (request.getNutritionGoal() != null) user.setNutritionGoal(request.getNutritionGoal());
-        if (request.getActivityLevel() != null) user.setActivityLevel(request.getActivityLevel());
-        if (request.getPregnancyTrimester() != null) user.setPregnancyTrimester(request.getPregnancyTrimester());
-        if (request.getNotificationOptIn() != null) user.setNotificationOptIn(request.getNotificationOptIn());
-        userRepository.save(user);
+        profileExtensionsService.updatePreferences(user.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(null, "Preferences updated"));
     }
 
@@ -95,81 +88,18 @@ public class ProfileExtensionsController {
             @RequestParam(required = false) ActivityLevel activityLevel,
             @RequestParam(required = false) NutritionGoal nutritionGoal,
             @RequestParam(required = false) Integer pregnancyTrimester) {
-        User fresh = userRepository.findById(user.getId()).orElse(user);
-        BigDecimal resolvedWeight = weightKg;
-        if (resolvedWeight == null) {
-            resolvedWeight = bodyMetricRepository.findTopByUserIdOrderByRecordDateDesc(user.getId())
-                    .map(BodyMetric::getWeight)
-                    .orElse(null);
-        }
-        Integer resolvedHeight = fresh.getHeightCm();
-        if (heightCm != null) {
-            resolvedHeight = heightCm.intValue();
-        }
-        String resolvedGender = gender != null ? gender : fresh.getGender();
-        BigDecimal factor = MacroSuggestionCalculator.resolveFactor(
-                activityLevel != null ? activityLevel : fresh.getActivityLevel(),
-                activityFactor);
-        MacroSuggestionResponse suggestion = MacroSuggestionCalculator.calculate(
-                fresh,
-                resolvedWeight,
-                resolvedHeight != null ? BigDecimal.valueOf(resolvedHeight) : null,
-                age,
-                resolvedGender,
-                factor,
-                nutritionGoal,
-                pregnancyTrimester);
-        return ResponseEntity.ok(ApiResponse.success(suggestion));
+        MacroSuggestionQuery query = new MacroSuggestionQuery(
+                weightKg, heightCm, age, gender, activityFactor,
+                activityLevel, nutritionGoal, pregnancyTrimester);
+        return ResponseEntity.ok(ApiResponse.success(
+                profileExtensionsService.suggestMacros(user.getId(), query)));
     }
 
     @PostMapping("/recalculate-macros")
-    @Transactional
     public ResponseEntity<ApiResponse<RecalculateMacrosResponse>> recalculateMacros(
             @AuthenticationPrincipal User user,
             @Valid @RequestBody RecalculateMacrosRequest request) {
-        if (request.getActivityLevel() == null) {
-            throw new BadRequestException("activityLevel is required");
-        }
-        if (dietLogHelper.hasActivePt(user.getId())) {
-            throw new BadRequestException(
-                    "Mục tiêu dinh dưỡng đang do PT quản lý — liên hệ PT để thay đổi macro");
-        }
-        User fresh = userRepository.findById(user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("User", user.getId()));
-        fresh.setActivityLevel(request.getActivityLevel());
-        if (request.getNutritionGoal() != null) {
-            fresh.setNutritionGoal(request.getNutritionGoal());
-        }
-        if (request.getPregnancyTrimester() != null) {
-            fresh.setPregnancyTrimester(request.getPregnancyTrimester());
-        }
-        userRepository.save(fresh);
-
-        BigDecimal weight = bodyMetricRepository.findTopByUserIdOrderByRecordDateDesc(fresh.getId())
-                .map(BodyMetric::getWeight)
-                .orElse(null);
-        Integer height = fresh.getHeightCm();
-        MacroSuggestionResponse suggestion = MacroSuggestionCalculator.calculate(
-                fresh,
-                weight,
-                height != null ? BigDecimal.valueOf(height) : null,
-                null,
-                fresh.getGender(),
-                request.getActivityLevel().toFactor(),
-                request.getNutritionGoal() != null ? request.getNutritionGoal() : fresh.getNutritionGoal(),
-                request.getPregnancyTrimester() != null ? request.getPregnancyTrimester() : fresh.getPregnancyTrimester());
-
-        MacroTargetRequest macroReq = new MacroTargetRequest();
-        macroReq.setDailyCalories(suggestion.getDailyCalories());
-        macroReq.setProtein(suggestion.getProtein());
-        macroReq.setCarb(suggestion.getCarb());
-        macroReq.setFat(suggestion.getFat());
-        userProfileService.setMacroTarget(fresh.getId(), macroReq);
-
-        RecalculateMacrosResponse body = RecalculateMacrosResponse.builder()
-                .activityLevel(fresh.getActivityLevel())
-                .macros(suggestion)
-                .build();
+        RecalculateMacrosResponse body = profileExtensionsService.recalculateMacros(user.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(body, "Macros recalculated"));
     }
 
@@ -182,7 +112,8 @@ public class ProfileExtensionsController {
     public ResponseEntity<ApiResponse<ClientGoalDto>> saveGoals(
             @AuthenticationPrincipal User user,
             @RequestBody ClientGoalRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(clientGoalService.saveGoals(user.getId(), request), "Goals saved"));
+        return ResponseEntity.ok(ApiResponse.success(
+                clientGoalService.saveGoals(user.getId(), request), "Goals saved"));
     }
 
     @GetMapping("/milestones")
@@ -244,27 +175,27 @@ public class ProfileExtensionsController {
     }
 
     @GetMapping("/has-active-pt")
-    public ResponseEntity<ApiResponse<java.util.Map<String, Boolean>>> hasActivePt(
+    public ResponseEntity<ApiResponse<Map<String, Boolean>>> hasActivePt(
             @AuthenticationPrincipal User user) {
         boolean active = dietLogHelper.hasActivePt(user.getId());
-        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of("hasActivePt", active)));
+        return ResponseEntity.ok(ApiResponse.success(Map.of("hasActivePt", active)));
     }
 
     @GetMapping("/coaching-history")
-    public ResponseEntity<ApiResponse<List<com.sba.nutricanbe.user.dto.CoachingHistoryDto>>> coachingHistory(
+    public ResponseEntity<ApiResponse<List<CoachingHistoryDto>>> coachingHistory(
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(coachingLifecycleService.getCoachingHistory(user.getId())));
     }
 
     @PostMapping("/end-coaching")
-    public ResponseEntity<ApiResponse<com.sba.nutricanbe.user.dto.PtClientMappingResponse>> requestEndCoaching(
+    public ResponseEntity<ApiResponse<PtClientMappingResponse>> requestEndCoaching(
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(
                 coachingLifecycleService.requestEndCoaching(user.getId(), user.getId(), false)));
     }
 
     @PutMapping("/end-coaching/confirm")
-    public ResponseEntity<ApiResponse<com.sba.nutricanbe.user.dto.PtClientMappingResponse>> confirmEndCoaching(
+    public ResponseEntity<ApiResponse<PtClientMappingResponse>> confirmEndCoaching(
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(
                 coachingLifecycleService.confirmEndCoaching(user.getId(), user.getId(), false)));
@@ -273,10 +204,10 @@ public class ProfileExtensionsController {
     @PutMapping("/pt/max-clients")
     public ResponseEntity<ApiResponse<Void>> setMaxClients(
             @AuthenticationPrincipal User user,
-            @RequestBody java.util.Map<String, Integer> body) {
+            @RequestBody Map<String, Integer> body) {
         Integer max = body != null ? body.get("maxClients") : null;
         if (max == null) {
-            throw new com.sba.nutricanbe.common.exception.BadRequestException("maxClients is required");
+            throw new BadRequestException("maxClients is required");
         }
         coachingLifecycleService.setMaxClients(user.getId(), max);
         return ResponseEntity.ok(ApiResponse.success(null, "maxClients updated"));
