@@ -24,8 +24,8 @@ import { isMealPeriodOpen, canLateTickMealPeriod, nowInVn, todayLocalIso } from 
 import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
 import {
-  Loader2, Utensils, Calendar, Sparkles, Check, User, AlertCircle, X, ShieldAlert, BookOpen,
-  MessageSquare, Send, ImagePlus, UploadCloud, Clock, ShoppingCart
+    Loader2, Utensils, Calendar, Sparkles, Check, User, AlertCircle, X, ShieldAlert, BookOpen,
+    MessageSquare, Send, ImagePlus, UploadCloud, Clock, ShoppingCart, FileText
 } from 'lucide-react';
 import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
 import useWebSocket from '../../hooks/useWebSocket';
@@ -932,15 +932,25 @@ export default function CoachingPage() {
                                   ? 'bg-slate-900 text-white rounded-2xl rounded-tr-sm shadow-sm'
                                   : 'bg-white border border-slate-200 text-slate-850 rounded-2xl rounded-tl-sm shadow-sm'
                               }`}>
-                                {msg.imageUrl && (
-                                  <img
-                                    src={msg.imageUrl}
-                                    alt={msg.content || 'Ảnh gửi kèm'}
-                                    onClick={() => setLightboxImage(msg.imageUrl)}
-                                    className="mb-1.5 max-h-60 w-full rounded-xl object-cover cursor-zoom-in hover:opacity-95 transition-opacity"
-                                  />
-                                )}
-                                {msg.content && <p className="leading-relaxed">{msg.content}</p>}
+                                  {msg.imageUrl && (
+                                      <img
+                                          src={msg.imageUrl}
+                                          alt={msg.content || 'Ảnh gửi kèm'}
+                                          onClick={() => setLightboxImage(msg.imageUrl)}
+                                          className="mb-1.5 max-h-60 w-full rounded-xl object-cover cursor-zoom-in hover:opacity-95 transition-opacity"
+                                      />
+                                  )}
+                                  {msg.attachmentUrl && (
+                                      <a
+                                          href={msg.attachmentUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className={`mb-2 flex items-center gap-2 text-sm font-semibold underline ${isMe ? 'text-white/90' : 'text-blue-600'}`}
+                                      >
+                                          <FileText className="w-4 h-4 shrink-0" /> Tệp đính kèm (PDF)
+                                      </a>
+                                  )}
+                                  {msg.content && <p className="leading-relaxed">{msg.content}</p>}
                               </div>
                               <span className="text-[9px] text-slate-400 mt-1 px-1.5 font-bold flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5" /> {formatTime(msg.createdAt)}
