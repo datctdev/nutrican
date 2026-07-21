@@ -3,6 +3,7 @@ package com.sba.nutricanbe.common.util;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.entity.SelfPlanItem;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealPlanSkipReason;
@@ -64,5 +65,23 @@ class DayPlanRulesTest {
                 .build();
         assertFalse(DayPlanRules.isMealPeriodSettled(
                 DAY, MealPeriod.EVENING, List.of(), List.of(self), List.of()));
+    }
+
+    @Test
+    void notSettledWhenOnlyPendingReviewLogInPeriod() {
+        DietLog pending = DietLog.builder()
+                .logDate(DAY)
+                .mealPeriod(MealPeriod.EVENING)
+                .status(DietLogStatus.LOGGED)
+                .reviewStatus(DietLogReviewStatus.PENDING)
+                .build();
+        SelfPlanItem self = SelfPlanItem.builder()
+                .planDate(DAY)
+                .mealPeriod(MealPeriod.EVENING)
+                .mealType(MealType.DINNER)
+                .eaten(false)
+                .build();
+        assertFalse(DayPlanRules.isMealPeriodSettled(
+                DAY, MealPeriod.EVENING, List.of(), List.of(self), List.of(pending)));
     }
 }

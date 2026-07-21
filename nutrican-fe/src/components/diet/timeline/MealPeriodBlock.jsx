@@ -1,4 +1,5 @@
-import { Clock } from 'lucide-react';
+import { Clock, Ban } from 'lucide-react';
+import { Button } from '../../ui/button';
 import { MEAL_PERIOD_LABELS, formatMacroDisplay } from '../../../pages/customer/components/dietUtils';
 import PeriodStatusChip from './PeriodStatusChip';
 import PlanLane from './PlanLane';
@@ -24,6 +25,10 @@ export default function MealPeriodBlock({
     pendingLocked = false,
     periodSettled = false,
     periodHasPendingSelfReview = false,
+    periodSubmissionId = null,
+    onCancelPeriodSubmission,
+    periodRejectedNames = [],
+    periodRejectNote = null,
     pendingId = null,
     editId = null,
     editQty = '',
@@ -65,12 +70,30 @@ export default function MealPeriodBlock({
                 {isPastPeriod && (
                     <span className="text-[10px] font-semibold text-amber-700">Đã qua</span>
                 )}
-                {actualLogs.length > 0 && (
+                {periodHasPendingSelfReview && onCancelPeriodSubmission && (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={onCancelPeriodSubmission}
+                        className="ml-auto h-7 rounded-lg border-amber-300 text-[10px] font-bold text-amber-800 hover:bg-amber-50 px-2"
+                    >
+                        <Ban className="h-3 w-3 mr-1" /> Hủy gửi buổi này
+                    </Button>
+                )}
+                {!periodHasPendingSelfReview && actualLogs.length > 0 && (
                     <span className="text-[11px] font-semibold text-slate-500 ml-auto">
                         {formatMacroDisplay(actualKcal)} kcal thực tế
                     </span>
                 )}
             </header>
+
+            {periodRejectedNames.length > 0 && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/80 px-2.5 py-1.5 text-[11px] font-semibold text-rose-800">
+                    PT từ chối đề xuất buổi này: {periodRejectedNames.join(', ')}
+                    {periodRejectNote ? ` — “${periodRejectNote}”` : ''}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <PlanLane

@@ -8,7 +8,6 @@ import FoodSearchInput from './FoodSearchInput';
 import {
     MEAL_PERIODS,
     MEAL_PERIOD_LABELS,
-    getLockedMealPeriods,
     getPastMealPeriodsForMakeup,
     getCurrentMealPeriod,
 } from './dietUtils';
@@ -30,6 +29,7 @@ export default function FoodInputCard({
     makeupForPeriod,
     setMakeupForPeriod,
     addIngredientFromSearch,
+    addCustomIngredient,
     ingredientItems,
     updateIngredientQty,
     removeIngredient,
@@ -47,34 +47,48 @@ export default function FoodInputCard({
     applyAiPeriodLock = false,
     hasActivePt = false,
 }) {
-    const lockedPeriods = applyAiPeriodLock ? getLockedMealPeriods() : new Set();
     const currentPeriod = getCurrentMealPeriod();
     const pastForMakeup = applyAiPeriodLock ? getPastMealPeriodsForMakeup() : [];
-    const renderPeriodOptions = (lockedMode) => MEAL_PERIODS.map((period) => {
-        const isLocked = lockedMode && (lockedPeriods.has(period) || period !== currentPeriod);
-        return (
-            <option key={period} value={period} disabled={isLocked}>
-                {MEAL_PERIOD_LABELS[period]}{isLocked ? ' — chỉ khung hiện tại' : ''}
-            </option>
-        );
-    });
+    const currentLabel = MEAL_PERIOD_LABELS[currentPeriod] || currentPeriod;
+
+    const renderPeriodOptions = () => MEAL_PERIODS.map((period) => (
+        <option key={period} value={period}>
+            {MEAL_PERIOD_LABELS[period]}
+        </option>
+    ));
+
+    /** Hôm nay: không dropdown rối — hiện chip khung đang diễn ra. */
+    const renderTodayPeriodChip = () => (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700/80">Đang ghi nhật ký vào</p>
+            <p className="text-base font-extrabold text-emerald-900 mt-0.5">{currentLabel}</p>
+            <p className="text-[11px] text-emerald-800/80 mt-1 font-medium">
+                Hệ thống tự chọn theo giờ hiện tại — bạn chỉ cần chụp ảnh / nhập món.
+            </p>
+        </div>
+    );
+
     const renderMakeupSelect = () => {
         if (!applyAiPeriodLock || pastForMakeup.length === 0) return null;
         return (
             <div className="mt-3">
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Bù cho buổi đã quên (tuỳ chọn)</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Bù cho buổi đã quên? (tuỳ chọn)
+                </label>
                 <select
                     value={makeupForPeriod || ''}
                     onChange={(e) => setMakeupForPeriod?.(e.target.value || null)}
                     className="w-full px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 bg-white"
                 >
-                    <option value="">Không</option>
+                    <option value="">Không — chỉ ghi {currentLabel}</option>
                     {pastForMakeup.map((p) => (
-                        <option key={p} value={p}>{MEAL_PERIOD_LABELS[p]}</option>
+                        <option key={p} value={p}>
+                            Có — đánh dấu bù {MEAL_PERIOD_LABELS[p]}
+                        </option>
                     ))}
                 </select>
                 <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
-                    Quên ghi bữa trước? Vẫn ghi ở khung hiện tại và chọn buổi cần bù.
+                    Quên ghi bữa trước? Vẫn lưu vào khung hiện tại và gắn nhãn buổi cần bù.
                 </p>
             </div>
         );
@@ -101,20 +115,23 @@ export default function FoodInputCard({
                 </div>
 
                 {inputMode === 'ai' && (
-                    <div className="mb-4">
-                        <select 
-                            value={aiMealPeriod} 
-                            onChange={(e) => setAiMealPeriod(e.target.value)} 
-                            className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700"
-                            disabled={applyAiPeriodLock}
-                        >
-                            {renderPeriodOptions(true)}
-                        </select>
-                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
-                            {applyAiPeriodLock
-                                ? 'Hôm nay chỉ ghi được khung giờ hiện tại'
-                                : 'Chọn buổi cho ngày đang xem'}
-                        </p>
+                    <div className="mb-4 space-y-2">
+                        {applyAiPeriodLock ? (
+                            renderTodayPeriodChip()
+                        ) : (
+                            <>
+                                <select
+                                    value={aiMealPeriod}
+                                    onChange={(e) => setAiMealPeriod(e.target.value)}
+                                    className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700"
+                                >
+                                    {renderPeriodOptions()}
+                                </select>
+                                <p className="text-[11px] text-slate-400 font-medium">
+                                    Chọn buổi cho ngày đang xem
+                                </p>
+                            </>
+                        )}
                         {renderMakeupSelect()}
                     </div>
                 )}
@@ -149,19 +166,22 @@ export default function FoodInputCard({
                     <form onSubmit={handleManualSubmit} className="space-y-5 animate-fade-in bg-slate-50/50 p-6 rounded-3xl border border-slate-100">
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1.5">Bữa ăn</label>
-                            <select 
-                                value={manualMealPeriod} 
-                                onChange={(e) => setManualMealPeriod(e.target.value)} 
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                                disabled={applyAiPeriodLock}
-                            >
-                                {renderPeriodOptions(!!applyAiPeriodLock)}
-                            </select>
-                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
-                            {applyAiPeriodLock
-                                ? 'Hôm nay chỉ ghi được khung giờ hiện tại'
-                                : 'Chọn buổi cho ngày đang xem'}
-                        </p>
+                            {applyAiPeriodLock ? (
+                                renderTodayPeriodChip()
+                            ) : (
+                                <>
+                                    <select
+                                        value={manualMealPeriod}
+                                        onChange={(e) => setManualMealPeriod(e.target.value)}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                    >
+                                        {renderPeriodOptions()}
+                                    </select>
+                                    <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
+                                        Chọn buổi cho ngày đang xem
+                                    </p>
+                                </>
+                            )}
                         {renderMakeupSelect()}
                         </div>
 
@@ -178,6 +198,7 @@ export default function FoodInputCard({
                         <FoodSearchInput
                             dietFilter={dietFilterOn ?? true}
                             onSelect={addIngredientFromSearch}
+                            onAddCustom={addCustomIngredient}
                         />
 
                         {ingredientItems.length > 0 && (
@@ -185,8 +206,13 @@ export default function FoodInputCard({
                                 <label className="block text-sm font-bold text-slate-700">Nguyên liệu đã chọn</label>
                                 <div className="space-y-2">
                                     {ingredientItems.map((it, idx) => (
-                                        <div key={`${it.foodItemId}-${idx}`} className="flex items-center gap-2 bg-white p-3 rounded-xl border border-slate-200">
-                                            <span className="flex-1 text-sm font-semibold text-slate-700 truncate">{it.itemName}</span>
+                                        <div key={`${it.foodItemId || 'custom'}-${it.itemName}-${idx}`} className="flex items-center gap-2 bg-white p-3 rounded-xl border border-slate-200">
+                                            <span className="flex-1 text-sm font-semibold text-slate-700 truncate">
+                                                {it.itemName}
+                                                {it.isCustom && (
+                                                    <span className="ml-1 text-[10px] font-bold text-amber-700">(tùy chỉnh)</span>
+                                                )}
+                                            </span>
                                             <input
                                                 type="number"
                                                 min="0"

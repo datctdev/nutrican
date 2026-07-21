@@ -467,6 +467,14 @@ export function canLateTickMealPeriod(planDate, period, now = nowInVn()) {
         && isMealPeriodPast(planDate, period, now);
 }
 
+/** Chờ PT duyệt nhật ký không được coi là buổi đã chốt. */
+function isActualIntakeLog(log) {
+    if (!log) return false;
+    if (log.status && log.status !== 'LOGGED') return false;
+    const rs = log.reviewStatus;
+    return !rs || rs === 'NOT_REQUIRED' || rs === 'APPROVED';
+}
+
 /**
  * Buổi đã chốt khi: có diet log buổi đó, món PT/override eaten, toàn bộ PT skip, hoặc self eaten.
  * @param {string} mealPeriod
@@ -476,7 +484,7 @@ export function canLateTickMealPeriod(planDate, period, now = nowInVn()) {
 export function isMealPeriodSettled(mealPeriod, items = [], logs = []) {
     if (!mealPeriod) return false;
     const inPeriod = (items || []).filter((i) => resolvePlanItemPeriod(i) === mealPeriod);
-    if ((logs || []).some((l) => l.mealPeriod === mealPeriod && (l.status === 'LOGGED' || !l.status))) {
+    if ((logs || []).some((l) => l.mealPeriod === mealPeriod && isActualIntakeLog(l))) {
         return true;
     }
     const ptItems = inPeriod.filter((i) => i.source === 'PT' || i.sourceType === 'SELF_OVERRIDE' || i.sourceType === 'PT_ORIGINAL');

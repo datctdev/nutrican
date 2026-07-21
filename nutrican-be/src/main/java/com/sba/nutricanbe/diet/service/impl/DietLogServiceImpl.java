@@ -491,8 +491,8 @@ public class DietLogServiceImpl implements DietLogService {
                         && MealPeriods.isPastPeriodForLateTick(period)) {
                     return period;
                 }
-                throw new BadRequestException(
-                        "Hôm nay chỉ được ghi nhật ký cho khung giờ hiện tại (" + current + ")");
+                // Client stale period (e.g. EVENING after 22:00) → soft-correct to current window
+                return current;
             }
             return period;
         }

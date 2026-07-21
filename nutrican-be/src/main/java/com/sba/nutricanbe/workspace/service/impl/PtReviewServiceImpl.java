@@ -219,7 +219,8 @@ public class PtReviewServiceImpl implements PtReviewService {
             if (request.getPtNote() == null || request.getPtNote().isBlank()) {
                 throw new BadRequestException("ptNote là bắt buộc khi từ chối");
             }
-            reviewableItems.forEach(item -> item.setLockedByReview(false));
+            // Giữ submissionId → customer thấy "PT từ chối", không trả món về giỏ draft
+            items.forEach(item -> item.setLockedByReview(false));
             selfPlanItemRepository.saveAll(items);
             submission.setStatus(SelfPlanSubmissionStatus.REJECTED);
         } else if ("APPROVE".equals(action)) {
@@ -296,9 +297,11 @@ public class PtReviewServiceImpl implements PtReviewService {
         List<DietLog> logs = dietLogRepository.findByCustomerIdAndLogDate(customerId, planDate).stream()
                 .filter(log -> log.getStatus() == DietLogStatus.LOGGED)
                 .toList();
+        List<SelfPlanItem> allDaySelfItems = selfPlanItemRepository
+                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, planDate);
         return items.stream()
                 .filter(item -> !Boolean.TRUE.equals(item.getEaten()))
-                .filter(item -> isReviewableSubmissionItem(planDate, item, ptItems, items, logs))
+                .filter(item -> isReviewableSubmissionItem(planDate, item, ptItems, allDaySelfItems, logs))
                 .toList();
     }
 

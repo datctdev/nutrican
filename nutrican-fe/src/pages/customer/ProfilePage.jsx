@@ -11,6 +11,7 @@ import { chatService } from '../../services/chatService';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import Modal from '../../components/common/Modal';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import { toast } from 'sonner';
 import {
   Loader2, Camera, User, Mail, Phone, MapPin, Edit3,
@@ -105,6 +106,8 @@ export default function ProfilePage() {
   const [mappingStatus, setMappingStatus] = useState(null);
   const [endRequestedBy, setEndRequestedBy] = useState(null);
   const [endCoachingModalOpen, setEndCoachingModalOpen] = useState(false);
+  const [cancelApptId, setCancelApptId] = useState(null);
+  const [cancellingAppt, setCancellingAppt] = useState(false);
 
   useWebSocket();
 
@@ -218,14 +221,22 @@ export default function ProfilePage() {
     }
   };
 
-  const handleCancelAppointment = async (apptId) => {
-    if (!window.confirm('Hủy lịch hẹn này? Hủy trước 48h không phí; dưới 48h ghi nhận hủy muộn.')) return;
+  const handleCancelAppointment = (apptId) => {
+    setCancelApptId(apptId);
+  };
+
+  const confirmCancelAppointment = async () => {
+    if (!cancelApptId) return;
+    setCancellingAppt(true);
     try {
-      await appointmentService.cancel(apptId);
+      await appointmentService.cancel(cancelApptId);
       toast.success('Đã hủy lịch hẹn');
+      setCancelApptId(null);
       fetchAppointments();
     } catch (e) {
       toast.error(e.response?.data?.message || 'Không hủy được lịch hẹn');
+    } finally {
+      setCancellingAppt(false);
     }
   };
   const fetchAppointments = async () => {
@@ -719,6 +730,18 @@ export default function ProfilePage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={!!cancelApptId}
+        title="Hủy lịch hẹn?"
+        description="Hủy trước 48h không phí; dưới 48h sẽ ghi nhận hủy muộn."
+        confirmLabel="Hủy lịch"
+        cancelLabel="Giữ lịch"
+        danger
+        loading={cancellingAppt}
+        onClose={() => !cancellingAppt && setCancelApptId(null)}
+        onConfirm={confirmCancelAppointment}
+      />
 
     </div>
   );

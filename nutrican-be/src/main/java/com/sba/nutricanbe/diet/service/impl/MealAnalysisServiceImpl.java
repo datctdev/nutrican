@@ -698,8 +698,8 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
         if (logDate != null && logDate.equals(today)) {
             MealPeriod period = requested != null ? requested : current;
             if (period != current) {
-                throw new BadRequestException(
-                        "Hôm nay chỉ được ghi nhật ký cho khung giờ hiện tại (" + current + ")");
+                // Soft-correct stale client period so demo/AI flow không bị chặn
+                return current;
             }
             return period;
         }

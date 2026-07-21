@@ -21,7 +21,6 @@ import {
     getPreviewForSelection,
     initialAdjustedGrams,
     getCurrentMealPeriod,
-    getLockedMealPeriods,
     periodToMealType,
     todayLocalIso,
     isFutureIso,
@@ -124,27 +123,22 @@ export default function DietTrackerPage() {
     const applyAiPeriodLock = isToday;
     const [makeupForPeriod, setMakeupForPeriod] = useState(null);
 
+    /** Hôm nay: luôn đồng bộ khung theo giờ VN (tránh stale EVENING khi đã sang LATE). */
     useEffect(() => {
         if (!isToday) {
             setMakeupForPeriod(null);
-            return;
+            return undefined;
         }
-        const current = getCurrentMealPeriod();
-        setAiMealPeriod(current);
-        setManualMealPeriod(current);
+        const sync = () => {
+            const current = getCurrentMealPeriod();
+            setAiMealPeriod(current);
+            setManualMealPeriod(current);
+        };
+        sync();
         setMakeupForPeriod(null);
+        const timer = setInterval(sync, 30_000);
+        return () => clearInterval(timer);
     }, [isToday, selectedDate]);
-
-    useEffect(() => {
-        if (!isToday) return;
-        const locked = getLockedMealPeriods();
-        if (locked.has(aiMealPeriod)) {
-            setAiMealPeriod(getCurrentMealPeriod());
-        }
-        if (locked.has(manualMealPeriod)) {
-            setManualMealPeriod(getCurrentMealPeriod());
-        }
-    }, [isToday, aiMealPeriod, manualMealPeriod]);
 
     const [plannedTotals, setPlannedTotals] = useState(null);
     const changeSelectedDate = useCallback((nextIso) => {
@@ -418,6 +412,10 @@ export default function DietTrackerPage() {
         ]);
     };
 
+    const addCustomIngredient = (custom) => {
+        setIngredientItems((prev) => [...prev, { ...custom }]);
+    };
+
     const updateIngredientQty = (idx, qty) => {
         setIngredientItems((prev) =>
             prev.map((it, i) => {
@@ -473,10 +471,14 @@ export default function DietTrackerPage() {
         }
         try {
             setAnalyzing(true);
+            const period = isToday ? getCurrentMealPeriod() : aiMealPeriod;
+            if (isToday) {
+                setAiMealPeriod(period);
+            }
             const formData = new FormData();
             formData.append('file', selectedFile);
-            formData.append('meal_type', periodToMealType(aiMealPeriod));
-            formData.append('meal_period', aiMealPeriod);
+            formData.append('meal_type', periodToMealType(period));
+            formData.append('meal_period', period);
             if (makeupForPeriod) formData.append('makeup_for_period', makeupForPeriod);
             formData.append('mealSource', 'HOME_COOKED');
             formData.append('log_date', selectedDate);
@@ -608,15 +610,6 @@ export default function DietTrackerPage() {
                 orderedImages.forEach((image) => formData.append('files', image.file));
                 await dietService.uploadImages(logId, formData);
             }
-
-            if (hasActivePt) {
-                // updateLog chặn ngày quá khứ — dùng submitForReview cho bù nhật ký
-                if (isPastIso(selectedDate)) {
-                    await dietService.submitForReview(logId);
-                } else {
-                    await dietService.updateLog(logId, { sendToPt: true });
-                }
-            }
             return logId;
         } catch (error) {
             if (!isPastIso(selectedDate)) {
@@ -634,19 +627,31 @@ export default function DietTrackerPage() {
         }
         try {
             setUploading(true);
+            const period = isToday ? getCurrentMealPeriod() : manualMealPeriod;
+            if (isToday) {
+                setManualMealPeriod(period);
+            }
             const newLogId = await createAndSendMeal({
-                mealType: periodToMealType(manualMealPeriod),
-                mealPeriod: manualMealPeriod,
+                mealType: periodToMealType(period),
+                mealPeriod: period,
                 makeupForPeriod: makeupForPeriod || undefined,
                 mealSource: 'HOME_COOKED',
                 logDate: selectedDate,
-                items: ingredientItems.map((it) => ({
-                    foodItemId: it.foodItemId,
-                    quantityG: it.quantityG,
-                })),
+                items: ingredientItems.map((it) => (
+                    // Custom: không gửi foodItemId — chỉ gắn vào nhật ký, không ghi catalog FoodItem
+                    it.isCustom || !it.foodItemId
+                        ? {
+                            itemName: it.itemName,
+                            quantityG: it.quantityG,
+                            calories: it.calories,
+                            protein: it.protein,
+                            carb: it.carb,
+                            fat: it.fat,
+                        }
+                        : { foodItemId: it.foodItemId, quantityG: it.quantityG }
+                )),
             });
-            toast.success(hasActivePt ? 'Đã gửi bữa ăn cho PT duyệt!' : 'Đã lưu bữa ăn!');
-            if (newLogId && hasActivePt) schedulePostMealPrompt(newLogId);
+            toast.success('Đã lưu bữa ăn!');
             setIngredientItems([]);
             setMakeupForPeriod(null);
             clearMealImages();
@@ -714,21 +719,19 @@ export default function DietTrackerPage() {
                     protein: preview?.protein ?? dish?.protein ?? confirmModal.protein,
                     carb: preview?.carb ?? dish?.carb ?? confirmModal.carb,
                     fat: preview?.fat ?? dish?.fat ?? confirmModal.fat,
-                    sendToPt: true,
+                    sendToPt: false,
                 });
             } else {
                 res = await dietService.confirmRecognition(confirmModal.logId, {
                     foodCode: selected.type === 'code' ? selected.value : undefined,
                     foodItemId: selected.type === 'id' ? selected.value : undefined,
                     portionGrams: confirmModal.adjustedGrams,
-                    sendToPt: true,
+                    sendToPt: false,
                 });
             }
 
             const data = res.data?.data;
-            const pending = data?.reviewStatus === 'PENDING';
-            toast.success(pending ? 'Đã gửi bữa ăn cho PT duyệt!' : 'Đã lưu bữa ăn!');
-            if (confirmModal.logId && hasActivePt) schedulePostMealPrompt(confirmModal.logId);
+            toast.success('Đã lưu bữa ăn!');
             if (data?.dietPrefWarning) {
                 toast.warning(data.dietPrefWarning);
                 setConfirmModal((prev) => prev ? { ...prev, dietPrefWarning: data.dietPrefWarning } : prev);
@@ -880,6 +883,7 @@ export default function DietTrackerPage() {
                         makeupForPeriod={makeupForPeriod}
                         setMakeupForPeriod={setMakeupForPeriod}
                         addIngredientFromSearch={addIngredientFromSearch}
+                        addCustomIngredient={addCustomIngredient}
                         ingredientItems={ingredientItems}
                         updateIngredientQty={updateIngredientQty}
                         removeIngredient={removeIngredient}

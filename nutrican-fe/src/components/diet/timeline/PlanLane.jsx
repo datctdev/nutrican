@@ -45,7 +45,8 @@ export default function PlanLane({
                         {activeItems.map((item) => {
                             const isSelf = item.source === 'SELF';
                             const canEditSelf = !readOnly && !isPast && isSelf && !item.eaten
-                                && !item.lockedByReview && !pendingLocked && !periodSettled;
+                                && !item.lockedByReview && !isPlanChoiceRejected(item)
+                                && !periodHasPendingSelfReview && !periodSettled;
                             return (
                                 <PlanItemRow
                                     key={`${item.source}-${item.id}`}

@@ -276,7 +276,7 @@ export function RejectedPlanItems({ items }) {
                 onClick={() => setOpen((v) => !v)}
                 className="text-[10px] font-bold text-slate-500 hover:text-slate-700"
             >
-                {open ? '▾' : '▸'} {items.length} phương án khác
+                {open ? '▾' : '▸'} {items.length} món không được chọn
             </button>
             {open && (
                 <ul className="mt-1 space-y-1">
