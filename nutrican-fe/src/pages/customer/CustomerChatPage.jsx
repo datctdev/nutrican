@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
-import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X, UploadCloud } from 'lucide-react';
+import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X, UploadCloud, FileText } from 'lucide-react';
 import { chatService } from '../../services/chatService';
 import { sendWebSocketMessage } from '../../services/websocketService';
 import { useAuthStore } from '../../stores/authStore';
@@ -371,6 +371,16 @@ export default function CustomerChatPage() {
                                                         onClick={() => setLightboxImage(msg.imageUrl)}
                                                         className="mb-2 max-h-72 w-full rounded-2xl object-cover cursor-zoom-in hover:opacity-95 transition-opacity"
                                                     />
+                                                )}
+                                                {msg.attachmentUrl && (
+                                                    <a
+                                                        href={msg.attachmentUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className={`mb-2 flex items-center gap-2 text-sm font-semibold underline ${isMe ? 'text-white/90' : 'text-blue-600'}`}
+                                                    >
+                                                        <FileText className="w-4 h-4 shrink-0" /> Tệp đính kèm (PDF)
+                                                    </a>
                                                 )}
                                                 {msg.content && <p>{msg.content}</p>}
                                             </div>
