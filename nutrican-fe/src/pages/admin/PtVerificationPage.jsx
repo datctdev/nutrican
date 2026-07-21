@@ -312,10 +312,10 @@ export default function PtVerificationPage() {
                                             </div>
                                             <div className="bg-slate-50 p-6 w-full xl:w-72 flex flex-col justify-center gap-3 border-t xl:border-t-0 xl:border-l border-slate-200/60">
                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-2">Quyết định phê duyệt</p>
-                                                <Button onClick={() => handleVerify(uid, 'PT_CERTIFIED')} disabled={isActing} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 shadow-md shadow-emerald-500/20 font-bold text-sm transition-all hover:-translate-y-0.5">
+                                                <Button onClick={() => handleVerifyNew(uid, 'PT_CERTIFIED')} disabled={isActing} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-12 shadow-md shadow-emerald-500/20 font-bold text-sm transition-all hover:-translate-y-0.5">
                                                     {actionLoading === uid + '_approve' ? <Loader2 className="w-5 h-5 animate-spin" /> : <><CheckCircle2 className="w-5 h-5 mr-2" />Duyệt Certified PT</>}
                                                 </Button>
-                                                <Button onClick={() => handleVerify(uid, 'PT_FREELANCE')} disabled={isActing} variant="outline" className="rounded-xl h-12 border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-100 text-sm transition-all">
+                                                <Button onClick={() => handleVerifyNew(uid, 'PT_FREELANCE')} disabled={isActing} variant="outline" className="rounded-xl h-12 border-slate-200 bg-white font-bold text-slate-700 hover:bg-slate-100 text-sm transition-all">
                                                     {actionLoading === uid + '_approve' ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Star className="w-5 h-5 mr-2 text-amber-500" />Duyệt Freelance PT</>}
                                                 </Button>
                                                 <div className="border-t border-slate-200 my-2" />
