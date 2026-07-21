@@ -63,7 +63,7 @@ public class AppointmentServiceImpl implements AppointmentService {
                 .endTime(request.getEndTime())
                 .type(request.getType() != null ? request.getType() : DEFAULT_APPOINTMENT_TYPE)
                 .note(request.getNote())
-                .status(AppointmentStatus.PENDING)
+                .status(AppointmentStatus.CONFIRMED)
                 .build());
     }
 

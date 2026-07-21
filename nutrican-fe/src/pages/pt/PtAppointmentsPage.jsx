@@ -54,7 +54,7 @@ export default function PtAppointmentsPage() {
         <Calendar className="w-8 h-8 text-blue-600" />
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Lịch hẹn</h1>
-          <p className="text-sm text-slate-500">Xác nhận hoặc hủy lịch với học viên</p>
+          <p className="text-sm text-slate-500">Lịch tự chốt sau khi học viên đặt — bạn có thể hủy nếu cần</p>
         </div>
       </div>
 
@@ -78,16 +78,18 @@ export default function PtAppointmentsPage() {
                     {a.status}
                   </span>
                 </div>
-                {a.status === 'PENDING' && (
+                {(a.status === 'PENDING' || a.status === 'CONFIRMED') && (
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleAction(a.id, 'CONFIRM')} disabled={!!acting}
-                      className="gap-1 bg-emerald-600 hover:bg-emerald-700">
-                      {acting === a.id + 'CONFIRM' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                      Xác nhận
-                    </Button>
+                    {a.status === 'PENDING' && (
+                      <Button size="sm" onClick={() => handleAction(a.id, 'CONFIRM')} disabled={!!acting}
+                        className="gap-1 bg-emerald-600 hover:bg-emerald-700">
+                        {acting === a.id + 'CONFIRM' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        Xác nhận
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => handleAction(a.id, 'CANCEL')} disabled={!!acting}
                       className="gap-1 text-red-600">
-                      <X className="w-4 h-4" /> Hủy
+                      {acting === a.id + 'CANCEL' ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />} Hủy
                     </Button>
                   </div>
                 )}

@@ -535,7 +535,7 @@ export default function CoachingPage() {
         type: 'ONLINE',
         note: apptForm.note || undefined,
       });
-      toast.success('Đã gửi yêu cầu đặt lịch');
+      toast.success('Đã đặt lịch — buổi tập được chốt luôn với PT');
       setApptForm((f) => ({ ...f, startTime: '', endTime: '', note: '' }));
       fetchAppointments();
     } catch (err) {
@@ -1269,7 +1269,7 @@ export default function CoachingPage() {
                     </div>
 
                     <Button onClick={handleBookAppointment} disabled={bookingAppt} className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-bold shadow-md animate-fade-in">
-                      {bookingAppt ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Gửi yêu cầu đặt lịch'}
+                      {bookingAppt ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Đặt lịch'}
                     </Button>
                   </div>
                 </CardContent>
