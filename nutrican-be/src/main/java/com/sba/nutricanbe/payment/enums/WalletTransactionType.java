@@ -5,5 +5,6 @@ public enum WalletTransactionType {
     HOLD,
     RELEASE,
     COMMISSION,
-    REFUND
+    REFUND,
+    WITHDRAWAL
 }

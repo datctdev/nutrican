@@ -60,40 +60,14 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
             UUID mappingId, UUID customerId) {
         PtClientMapping mapping = mappingRepository.findByIdForUpdate(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", mappingId));
-        if (!mapping.getClient().getId().equals(customerId)) {
-            throw new BadRequestException("You can only pay for your own coaching request");
-        }
-        if (mapping.getStatus() != ClientMappingStatus.AWAITING_PAYMENT) {
-            throw new BadRequestException("The coaching request is not awaiting payment");
-        }
-        if (mapping.getPaymentDueAt() != null
-                && mapping.getPaymentDueAt().isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("The payment window for this coaching request has expired");
-        }
-        if (mapping.getAgreedAmount() == null || mapping.getAgreedAmount().signum() <= 0) {
-            throw new BadRequestException("The coaching request does not have a valid agreed amount");
-        }
+        validatePayable(mapping, customerId);
         if (mapping.getAgreedAmount().compareTo(new BigDecimal("9999999999")) > 0) {
             throw new BadRequestException("The coaching price exceeds VNPay's supported amount");
-        }
-        try {
-            mapping.getAgreedAmount().setScale(0, RoundingMode.UNNECESSARY);
-        } catch (ArithmeticException exception) {
-            throw new BadRequestException("VND coaching price must be a whole number");
-        }
-        if (paymentRepository.existsByMapping_IdAndStatus(mappingId, CoachingPaymentStatus.SUCCESS)) {
-            throw new BadRequestException("This coaching request has already been paid");
         }
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime attemptExpiresAt = now.plusMinutes(30);
-        paymentRepository
-                .findFirstByMapping_IdAndStatusOrderByCreatedAtDesc(
-                        mappingId, CoachingPaymentStatus.PENDING)
-                .ifPresent(pending -> {
-                    pending.setStatus(CoachingPaymentStatus.CANCELLED);
-                    paymentRepository.save(pending);
-                });
+        cancelPendingPayment(mappingId);
         Payment payment = paymentRepository.save(Payment.builder()
                 .mapping(mapping)
                 .method(CoachingPaymentMethod.VNPAY)
@@ -114,6 +88,40 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
                 .status(payment.getStatus().name())
                 .paymentUrl(vnPayService.buildPaymentUrl(payment))
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public CoachingPaymentResult payWithWallet(UUID mappingId, UUID customerId) {
+        PtClientMapping mapping = mappingRepository.findByIdForUpdate(mappingId)
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", mappingId));
+        validatePayable(mapping, customerId);
+
+        LocalDateTime now = LocalDateTime.now();
+        cancelPendingPayment(mappingId);
+        Payment payment = paymentRepository.save(Payment.builder()
+                .mapping(mapping)
+                .method(CoachingPaymentMethod.WALLET)
+                .status(CoachingPaymentStatus.SUCCESS)
+                .amount(mapping.getAgreedAmount())
+                .currency("VND")
+                .orderNumber(generateOrderNumber(now))
+                .txnRef(generateTxnRef(mappingId))
+                .expiresAt(now)
+                .paidAt(now)
+                .build());
+
+        // Moves the customer's existing available balance straight into escrow (HELD).
+        // Throws BadRequestException if the balance is insufficient, rolling back this payment.
+        walletService.holdFromWalletBalance(payment);
+
+        mapping.setStatus(ClientMappingStatus.ACTIVE);
+        mapping.setCoachingStartedAt(now);
+        mapping.setPaymentDueAt(null);
+        mappingRepository.save(mapping);
+        offlinePackageAppointmentService.materializeOfflinePackageIfNeeded(mapping);
+        notifyPaymentSuccessAfterCommit(mapping, payment);
+        return result(payment, mapping, true, "Coaching payment completed");
     }
 
     @Override
@@ -311,6 +319,41 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
                 .success(success)
                 .message(message)
                 .build();
+    }
+
+    private void validatePayable(PtClientMapping mapping, UUID customerId) {
+        if (!mapping.getClient().getId().equals(customerId)) {
+            throw new BadRequestException("You can only pay for your own coaching request");
+        }
+        if (mapping.getStatus() != ClientMappingStatus.AWAITING_PAYMENT) {
+            throw new BadRequestException("The coaching request is not awaiting payment");
+        }
+        if (mapping.getPaymentDueAt() != null
+                && mapping.getPaymentDueAt().isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("The payment window for this coaching request has expired");
+        }
+        if (mapping.getAgreedAmount() == null || mapping.getAgreedAmount().signum() <= 0) {
+            throw new BadRequestException("The coaching request does not have a valid agreed amount");
+        }
+        try {
+            mapping.getAgreedAmount().setScale(0, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException exception) {
+            throw new BadRequestException("VND coaching price must be a whole number");
+        }
+        if (paymentRepository.existsByMapping_IdAndStatus(
+                mapping.getId(), CoachingPaymentStatus.SUCCESS)) {
+            throw new BadRequestException("This coaching request has already been paid");
+        }
+    }
+
+    private void cancelPendingPayment(UUID mappingId) {
+        paymentRepository
+                .findFirstByMapping_IdAndStatusOrderByCreatedAtDesc(
+                        mappingId, CoachingPaymentStatus.PENDING)
+                .ifPresent(pending -> {
+                    pending.setStatus(CoachingPaymentStatus.CANCELLED);
+                    paymentRepository.save(pending);
+                });
     }
 
     private String generateTxnRef(UUID mappingId) {

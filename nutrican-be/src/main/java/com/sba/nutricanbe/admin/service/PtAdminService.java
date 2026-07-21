@@ -5,6 +5,7 @@ import com.sba.nutricanbe.admin.dto.PtVerificationRequest;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 
+import java.util.Map;
 import java.util.UUID;
 
 public interface PtAdminService {
@@ -14,4 +15,8 @@ public interface PtAdminService {
     ApiResponse<Void> verifyPt(UUID userId, PtVerificationRequest request);
 
     ApiResponse<PageResponse<PendingPtDto>> getPtDocuments(UUID ptId);
+
+    ApiResponse<PageResponse<Map<String, Object>>> getPendingUpdateRequests(int page, int size);
+
+    ApiResponse<Void> reviewUpdateRequest(UUID requestId, String action, String adminNote);
 }

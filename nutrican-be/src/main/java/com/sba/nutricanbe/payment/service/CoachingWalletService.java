@@ -3,6 +3,7 @@ package com.sba.nutricanbe.payment.service;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.payment.dto.WalletResponse;
 import com.sba.nutricanbe.payment.dto.WalletTransactionResponse;
+import com.sba.nutricanbe.payment.dto.WithdrawRequest;
 import com.sba.nutricanbe.payment.entity.Payment;
 import com.sba.nutricanbe.payment.enums.WalletType;
 
@@ -10,6 +11,8 @@ import java.util.UUID;
 
 public interface CoachingWalletService {
     void holdSuccessfulPayment(Payment payment);
+
+    void holdFromWalletBalance(Payment payment);
 
     void releaseEscrow(UUID mappingId);
 
@@ -22,6 +25,8 @@ public interface CoachingWalletService {
     boolean rejectEscrowDisputeIfPresent(UUID mappingId);
 
     WalletResponse getWallet(UUID userId);
+
+    WalletResponse withdraw(UUID userId, WithdrawRequest request);
 
     WalletResponse getSystemWallet(WalletType type);
 

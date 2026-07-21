@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public interface CoachingPaymentService {
     CreateCoachingPaymentResponse createVnPayPayment(UUID mappingId, UUID customerId);
+    CoachingPaymentResult payWithWallet(UUID mappingId, UUID customerId);
     CoachingPaymentResult processVnPayCallback(Map<String, String> params);
     VnPayIpnResponse processVnPayIpn(Map<String, String> params);
 }

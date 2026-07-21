@@ -5,7 +5,9 @@ import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.payment.dto.WalletResponse;
 import com.sba.nutricanbe.payment.dto.WalletTransactionResponse;
+import com.sba.nutricanbe.payment.dto.WithdrawRequest;
 import com.sba.nutricanbe.payment.entity.*;
+import com.sba.nutricanbe.payment.event.WithdrawalCompletedEvent;
 import com.sba.nutricanbe.payment.enums.*;
 import com.sba.nutricanbe.payment.repository.CoachingEscrowRepository;
 import com.sba.nutricanbe.payment.repository.CoachingPaymentRepository;
@@ -18,6 +20,7 @@ import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -38,6 +41,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     private final CoachingEscrowRepository escrowRepository;
     private final CoachingPaymentRepository paymentRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.payment.platform-fee-rate:10.00}")
     private BigDecimal platformFeeRate;
@@ -109,6 +113,60 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
                     .referenceType("COACHING_ESCROW")
                     .referenceId(escrow.getId())
                     .note("Hold coaching fee until coaching is completed")
+                    .build());
+        }
+
+        walletRepository.saveAll(List.of(customerWallet, ptWallet, escrowWallet));
+    }
+
+    @Override
+    @Transactional
+    public void holdFromWalletBalance(Payment payment) {
+        PtClientMapping mapping = payment.getMapping();
+        if (escrowRepository.findByMapping_Id(mapping.getId()).isPresent()) {
+            return;
+        }
+
+        Wallet customerWallet = getOrCreateUserWalletForUpdate(mapping.getClient());
+        Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
+        Wallet ptWallet = getOrCreateUserWalletForUpdate(mapping.getPt());
+
+        if (platformFeeRate.signum() < 0 || platformFeeRate.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new BadRequestException("Platform fee rate must be between 0 and 100");
+        }
+        BigDecimal amount = payment.getAmount();
+        BigDecimal fee = amount.multiply(platformFeeRate)
+                .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+        CoachingEscrow escrow = escrowRepository.save(CoachingEscrow.builder()
+                .mapping(mapping)
+                .payment(payment)
+                .customerWallet(customerWallet)
+                .ptWallet(ptWallet)
+                .escrowWallet(escrowWallet)
+                .amount(amount)
+                .platformFeeRate(platformFeeRate)
+                .platformFeeAmount(fee)
+                .status(CoachingEscrowStatus.HELD)
+                .build());
+
+        String holdDedupe = "COACHING_ESCROW_HOLD:" + escrow.getId();
+        if (!transactionRepository.existsByDedupeKey(holdDedupe)) {
+            try {
+                customerWallet.subtractAvailable(amount);
+            } catch (IllegalStateException exception) {
+                throw new BadRequestException("Số dư ví không đủ để thanh toán");
+            }
+            escrowWallet.addLocked(amount);
+            transactionRepository.save(WalletTransaction.builder()
+                    .fromWallet(customerWallet)
+                    .toWallet(escrowWallet)
+                    .amount(amount)
+                    .type(WalletTransactionType.HOLD)
+                    .status(WalletTransactionStatus.SUCCESS)
+                    .dedupeKey(holdDedupe)
+                    .referenceType("COACHING_ESCROW")
+                    .referenceId(escrow.getId())
+                    .note("Thanh toán coaching bằng số dư ví (giữ trong escrow)")
                     .build());
         }
 
@@ -293,6 +351,53 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         return WalletResponse.from(getOrCreateUserWalletForUpdate(user));
+    }
+
+    @Override
+    @Transactional
+    public WalletResponse withdraw(UUID userId, WithdrawRequest request) {
+        if (request == null || request.getAmount() == null
+                || request.getAmount().signum() <= 0) {
+            throw new BadRequestException("Số tiền rút phải lớn hơn 0");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+        Wallet wallet = getOrCreateUserWalletForUpdate(user);
+
+        BigDecimal amount = request.getAmount();
+        try {
+            wallet.subtractAvailable(amount);
+        } catch (IllegalStateException exception) {
+            throw new BadRequestException("Số dư khả dụng không đủ để rút");
+        }
+
+        String bankName = request.getBankName().trim();
+        String bankAccountNumber = request.getBankAccountNumber().trim();
+
+        String dedupe = "WALLET_WITHDRAWAL:" + UUID.randomUUID();
+        transactionRepository.save(WalletTransaction.builder()
+                .fromWallet(wallet)
+                .toWallet(null)
+                .amount(amount)
+                .type(WalletTransactionType.WITHDRAWAL)
+                .status(WalletTransactionStatus.SUCCESS)
+                .dedupeKey(dedupe)
+                .referenceType("WALLET_WITHDRAWAL")
+                .referenceId(user.getId())
+                .note("Rút tiền về " + bankName + " - STK " + bankAccountNumber)
+                .build());
+        walletRepository.save(wallet);
+
+        eventPublisher.publishEvent(new WithdrawalCompletedEvent(
+                user.getEmail(),
+                user.getFullName(),
+                amount,
+                wallet.getAvailableBalance(),
+                wallet.getCurrency(),
+                bankName,
+                bankAccountNumber));
+
+        return WalletResponse.from(wallet);
     }
 
     @Override

@@ -224,7 +224,7 @@ export default function PtPortfolioEditor() {
     const [lockedProfile, setLockedProfile] = useState(null);
 
     const [updateModalOpen, setUpdateModalOpen] = useState(false);
-    const [pendingRequest, setPendingRequest] = useState(null);
+    const [latestRequest, setLatestRequest] = useState(null);
     const [sendingRequest, setSendingRequest] = useState(false);
     const [updateReason, setUpdateReason] = useState('');
     const cvInputRef = useRef(null);
@@ -248,6 +248,9 @@ export default function PtPortfolioEditor() {
         cvUrl: '',
         cvFileName: ''
     });
+
+    const isPending = latestRequest?.status === 'PENDING';
+    const isRejected = latestRequest?.status === 'REJECTED';
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -312,7 +315,23 @@ export default function PtPortfolioEditor() {
 
                 const reqRes = await userService.getPendingPtUpdateRequest();
                 if (reqRes.data?.data) {
-                    setPendingRequest(reqRes.data.data);
+                    const req = reqRes.data.data;
+                    setLatestRequest(req);
+
+                    if (req.status === 'REJECTED' && req.requestedData) {
+                        setUpdateReason(req.reason || '');
+                        setUpdateForm(prev => ({ ...prev, ...req.requestedData }));
+                        if (req.requestedData.certifications && req.requestedData.certifications.length > 0) {
+                            setCertList(req.requestedData.certifications.map(c => ({
+                                ...c,
+                                _id: Math.random().toString(),
+                                isUploading: false,
+                                certificateImageUrl: getPermanentUrl(c.certificateImageUrl)
+                            })));
+                        }
+                    } else if (req.status === 'PENDING') {
+                        setUpdateReason(req.reason || '');
+                    }
                 }
             } catch (error) {
                 console.error("Lỗi lấy dữ liệu:", error);
@@ -388,7 +407,7 @@ export default function PtPortfolioEditor() {
             };
             const res = await userService.submitPtUpdateRequest(payload);
             toast.success('Đã gửi yêu cầu thay đổi hồ sơ!');
-            setPendingRequest(res.data.data);
+            setLatestRequest(res.data.data);
             setUpdateModalOpen(false);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Lỗi khi gửi yêu cầu');
@@ -462,8 +481,8 @@ export default function PtPortfolioEditor() {
         return <div className="flex justify-center items-center min-h-[50vh]"><Loader2 className="w-8 h-8 animate-spin text-blue-600" /></div>;
     }
 
-    const activeForm = pendingRequest ? pendingRequest.requestedData : updateForm;
-    const activeCerts = pendingRequest ? pendingRequest.requestedData?.certifications || [] : certList;
+    const activeForm = isPending ? latestRequest.requestedData : updateForm;
+    const activeCerts = isPending ? latestRequest.requestedData?.certifications || [] : certList;
 
     return (
         <div className="max-w-[1600px] mx-auto pb-12 animate-fade-in mt-6 px-4">
@@ -482,10 +501,14 @@ export default function PtPortfolioEditor() {
                     <Button
                         onClick={() => setUpdateModalOpen(true)}
                         variant="outline"
-                        className={`rounded-xl font-bold h-12 px-6 ${pendingRequest ? 'border-amber-200 text-amber-700 hover:bg-amber-50' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}
+                        className={`rounded-xl font-bold h-12 px-6 ${
+                            isPending ? 'border-amber-200 text-amber-700 hover:bg-amber-50' :
+                                isRejected ? 'border-red-200 text-red-700 hover:bg-red-50' :
+                                    'border-blue-200 text-blue-700 hover:bg-blue-50'
+                        }`}
                     >
-                        {pendingRequest ? <Clock className="w-4 h-4 mr-2" /> : <FileEdit className="w-4 h-4 mr-2" />}
-                        {pendingRequest ? 'Đang chờ duyệt...' : 'Cập nhật Hồ sơ'}
+                        {isPending ? <Clock className="w-4 h-4 mr-2" /> : isRejected ? <AlertCircle className="w-4 h-4 mr-2" /> : <FileEdit className="w-4 h-4 mr-2" />}
+                        {isPending ? 'Đang chờ duyệt...' : isRejected ? 'Cập nhật bị từ chối' : 'Cập nhật Hồ sơ'}
                     </Button>
                     <Button
                         onClick={handleSavePortfolio}
@@ -665,10 +688,14 @@ export default function PtPortfolioEditor() {
                             <div className="pt-2">
                                 <Button
                                     onClick={() => setUpdateModalOpen(true)}
-                                    className={`w-full text-white rounded-xl h-11 font-bold shadow-sm ${pendingRequest ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-800 hover:bg-slate-900'}`}
+                                    className={`w-full text-white rounded-xl h-11 font-bold shadow-sm ${
+                                        isPending ? 'bg-amber-500 hover:bg-amber-600' :
+                                            isRejected ? 'bg-red-500 hover:bg-red-600' :
+                                                'bg-slate-800 hover:bg-slate-900'
+                                    }`}
                                 >
-                                    {pendingRequest ? <Clock className="w-4 h-4 mr-2" /> : <FileEdit className="w-4 h-4 mr-2" />}
-                                    {pendingRequest ? 'Xem Yêu cầu đang chờ duyệt' : 'Gửi Yêu Cầu Thay Đổi Hồ Sơ'}
+                                    {isPending ? <Clock className="w-4 h-4 mr-2" /> : isRejected ? <AlertCircle className="w-4 h-4 mr-2" /> : <FileEdit className="w-4 h-4 mr-2" />}
+                                    {isPending ? 'Xem Yêu cầu đang chờ duyệt' : isRejected ? 'Xem lý do bị từ chối' : 'Gửi Yêu Cầu Thay Đổi Hồ Sơ'}
                                 </Button>
                             </div>
                         </CardContent>
@@ -805,32 +832,46 @@ export default function PtPortfolioEditor() {
 
                     <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl flex flex-col animate-in zoom-in-95 fade-in duration-200 relative z-10 max-h-[90vh]">
 
-                        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50 rounded-t-[2rem] shrink-0">
+                        <div className={`px-8 py-6 border-b flex items-center justify-between rounded-t-[2rem] shrink-0 ${isPending ? 'bg-amber-50 border-amber-100' : isRejected ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'}`}>
                             <div>
                                 <h3 className="text-xl font-black text-slate-900">Yêu cầu cập nhật Hồ sơ</h3>
                                 <p className="text-sm font-medium text-slate-500 mt-1">
-                                    {pendingRequest ? 'Bạn đang có một yêu cầu chờ duyệt.' : 'Thay đổi các thông tin đã được kiểm duyệt.'}
+                                    {isPending ? 'Bạn đang có một yêu cầu chờ duyệt.' : isRejected ? 'Yêu cầu trước đó bị từ chối. Hãy sửa và gửi lại.' : 'Thay đổi các thông tin đã được kiểm duyệt.'}
                                 </p>
                             </div>
-                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${pendingRequest ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                                {pendingRequest ? <Clock className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isPending ? 'bg-amber-100 text-amber-600' : isRejected ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                                {isPending ? <Clock className="w-6 h-6" /> : isRejected ? <AlertCircle className="w-6 h-6" /> : <ShieldCheck className="w-6 h-6" />}
                             </div>
                         </div>
 
                         <div className="p-8 overflow-y-auto space-y-8 bg-slate-50/30">
-                            {pendingRequest && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex gap-3">
-                                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+
+                            {isPending && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex gap-3 shadow-sm">
+                                    <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                                     <div>
                                         <h4 className="font-bold text-amber-900">Đang chờ Admin phê duyệt</h4>
                                         <p className="text-sm font-medium text-amber-800 mt-1 leading-relaxed">
-                                            Bạn đã gửi yêu cầu vào ngày {new Date(pendingRequest.createdAt).toLocaleDateString('vi-VN')}. Không thể thay đổi khi đang chờ duyệt.
+                                            Bạn đã gửi yêu cầu vào ngày {new Date(latestRequest.createdAt).toLocaleDateString('vi-VN')}. Không thể thay đổi khi đang chờ duyệt.
                                         </p>
                                     </div>
                                 </div>
                             )}
 
-                            <fieldset disabled={!!pendingRequest} className="space-y-10">
+                            {isRejected && (
+                                <div className="bg-red-50 border border-red-200 rounded-2xl p-5 flex gap-3 shadow-sm">
+                                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                                    <div>
+                                        <h4 className="font-bold text-red-900">Yêu cầu cập nhật bị từ chối</h4>
+                                        <p className="text-sm font-medium text-red-800 mt-1 leading-relaxed">
+                                            Lý do từ Admin: <strong>{latestRequest.adminNote || 'Không có ghi chú chi tiết'}</strong>
+                                        </p>
+                                        <p className="text-xs font-bold text-red-700 mt-2">Vui lòng chỉnh sửa lại thông tin bên dưới và gửi lại yêu cầu mới.</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <fieldset disabled={isPending} className="space-y-10">
 
                                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
                                     <h4 className="text-sm font-black text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2"><UserCircle className="w-4 h-4 text-blue-500"/> THÔNG TIN CƠ BẢN</h4>
@@ -897,7 +938,7 @@ export default function PtPortfolioEditor() {
                                                 <button
                                                     key={spec}
                                                     type="button"
-                                                    disabled={!!pendingRequest}
+                                                    disabled={isPending}
                                                     onClick={() => toggleArrayItem('specializations', spec)}
                                                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${activeForm.specializations?.includes(spec) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200'}`}
                                                 >
@@ -914,7 +955,7 @@ export default function PtPortfolioEditor() {
                                                 <button
                                                     key={opt.value}
                                                     type="button"
-                                                    disabled={!!pendingRequest}
+                                                    disabled={isPending}
                                                     onClick={() => toggleArrayItem('preferredGoals', opt.value)}
                                                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${activeForm.preferredGoals?.includes(opt.value) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}`}
                                                 >
@@ -931,7 +972,7 @@ export default function PtPortfolioEditor() {
                                                 <button
                                                     key={opt.value}
                                                     type="button"
-                                                    disabled={!!pendingRequest}
+                                                    disabled={isPending}
                                                     onClick={() => toggleArrayItem('preferredDietTypes', opt.value)}
                                                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${activeForm.preferredDietTypes?.includes(opt.value) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}
                                                 >
@@ -993,13 +1034,13 @@ export default function PtPortfolioEditor() {
                                             key={cert._id || i}
                                             cert={cert}
                                             index={i}
-                                            disabled={!!pendingRequest}
+                                            disabled={isPending}
                                             onChange={handleCertChange}
                                             onRemove={(idx) => setCertList(p => p.filter((_, j) => j !== idx))}
                                             onImageUpload={handleCertImageUpload}
                                         />
                                     ))}
-                                    {!pendingRequest && (
+                                    {!isPending && (
                                         <button
                                             type="button"
                                             onClick={() => setCertList(p => [...p, newEmptyCert()])}
@@ -1021,11 +1062,11 @@ export default function PtPortfolioEditor() {
                                             accept=".pdf,.doc,.docx"
                                             onChange={handleCvUpload}
                                             className="hidden"
-                                            disabled={!!pendingRequest}
+                                            disabled={isPending}
                                         />
                                         <div
-                                            onClick={() => !pendingRequest && cvInputRef.current?.click()}
-                                            className={`border-2 border-dashed rounded-xl p-4 text-center transition-all ${pendingRequest ? 'bg-slate-50 border-slate-200' : 'cursor-pointer hover:border-purple-400 hover:bg-purple-50 border-slate-300'}`}
+                                            onClick={() => !isPending && cvInputRef.current?.click()}
+                                            className={`border-2 border-dashed rounded-xl p-4 text-center transition-all ${isPending ? 'bg-slate-50 border-slate-200' : 'cursor-pointer hover:border-purple-400 hover:bg-purple-50 border-slate-300'}`}
                                         >
                                             {activeForm.cvUrl ? (
                                                 <div className="flex items-center justify-center gap-2 text-purple-700">
@@ -1059,7 +1100,7 @@ export default function PtPortfolioEditor() {
                                     </div>
                                 </div>
 
-                                {!pendingRequest && (
+                                {!isPending && (
                                     <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 shadow-sm">
                                         <label className="block text-sm font-black text-blue-800 mb-2">Lý do thay đổi hồ sơ *</label>
                                         <textarea
@@ -1081,14 +1122,14 @@ export default function PtPortfolioEditor() {
                             >
                                 Đóng
                             </Button>
-                            {!pendingRequest && (
+                            {!isPending && (
                                 <Button
                                     onClick={handleSendUpdateRequest}
                                     disabled={sendingRequest}
                                     className="flex-1 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 h-12 transition-all hover:-translate-y-0.5"
                                 >
                                     <Send className="w-4 h-4 mr-2" />
-                                    {sendingRequest ? 'Đang gửi...' : 'Gửi Yêu Cầu Duyệt'}
+                                    {sendingRequest ? 'Đang gửi...' : isRejected ? 'Gửi Lại Yêu Cầu' : 'Gửi Yêu Cầu Duyệt'}
                                 </Button>
                             )}
                         </div>

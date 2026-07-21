@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -38,5 +39,19 @@ public class PtAdminController {
     public ResponseEntity<ApiResponse<PageResponse<PendingPtDto>>> getPtDocuments(
             @PathVariable UUID ptId) {
         return ResponseEntity.ok(ptAdminService.getPtDocuments(ptId));
+    }
+
+    @GetMapping("/update-requests/pending")
+    public ResponseEntity<ApiResponse<PageResponse<Map<String, Object>>>> getPendingUpdateRequests(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ptAdminService.getPendingUpdateRequests(page, size));
+    }
+
+    @PutMapping("/update-requests/{requestId}/review")
+    public ResponseEntity<ApiResponse<Void>> reviewUpdateRequest(
+            @PathVariable UUID requestId,
+            @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(ptAdminService.reviewUpdateRequest(requestId, body.get("action"), body.get("adminNote")));
     }
 }

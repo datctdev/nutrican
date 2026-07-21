@@ -24,6 +24,8 @@ import MealReplacementModal from './components/MealReplacementModal';
 import LateTickReasonModal from './components/LateTickReasonModal';
 import { isMealPeriodOpen, canLateTickMealPeriod, nowInVn, todayLocalIso } from './components/dietUtils';
 import ImageLightbox from '../../components/common/ImageLightbox';
+import WithdrawModal from '../../components/wallet/WithdrawModal';
+import { formatVnd } from '../../utils/currency';
 import { toast } from 'sonner';
 import {
     Loader2, Utensils, Calendar, Sparkles, Check, User, AlertCircle, X, ShieldAlert, BookOpen,
@@ -159,6 +161,8 @@ export default function CoachingPage() {
   const [openHireRequest, setOpenHireRequest] = useState(null);
   const [startingPayment, setStartingPayment] = useState(false);
   const [coachingWallet, setCoachingWallet] = useState(null);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [payingWithWallet, setPayingWithWallet] = useState(false);
 
   // Parse URL tab parameter
   useEffect(() => {
@@ -233,6 +237,24 @@ export default function CoachingPage() {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Không thể khởi tạo thanh toán VNPay');
       setStartingPayment(false);
+    }
+  };
+
+  const payCoachingWithWallet = async () => {
+    if (!openHireRequest?.id) return;
+    try {
+      setPayingWithWallet(true);
+      const res = await coachingPaymentService.payWithWallet(openHireRequest.id);
+      toast.success(res.data?.message || 'Thanh toán bằng số dư ví thành công');
+      await fetchCoachingStatus();
+      coachingPaymentService.getMyWallet()
+        .then((r) => setCoachingWallet(r.data?.data || null))
+        .catch(() => {});
+      window.dispatchEvent(new Event('hire_request_updated'));
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Thanh toán bằng số dư ví thất bại');
+    } finally {
+      setPayingWithWallet(false);
     }
   };
 
@@ -751,14 +773,35 @@ export default function CoachingPage() {
           <p className="text-slate-500 mt-1 font-medium">Tương tác với Huấn luyện viên, xem thực đơn và quản lý lịch hẹn tư vấn.</p>
         </div>
         {coachingWallet && (
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2 text-right">
-            <p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Số dư ví coaching</p>
-            <p className="text-lg font-black text-slate-900">
-              {Number(coachingWallet.availableBalance || 0).toLocaleString('vi-VN')}đ
-            </p>
+          <div className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2">
+            <div className="text-right">
+              <p className="text-[10px] font-black uppercase tracking-wider text-blue-600">Số dư ví coaching</p>
+              <p className="text-lg font-black text-slate-900">
+                {formatVnd(coachingWallet.availableBalance || 0)}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setWithdrawOpen(true)}
+              disabled={!(Number(coachingWallet.availableBalance) > 0)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shrink-0"
+            >
+              Rút tiền
+            </Button>
           </div>
         )}
       </div>
+
+      <WithdrawModal
+        open={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+        availableBalance={coachingWallet?.availableBalance || 0}
+        onSuccess={() => {
+          coachingPaymentService.getMyWallet()
+            .then((r) => setCoachingWallet(r.data?.data || null))
+            .catch(() => {});
+        }}
+      />
 
       {openHireRequest && (
         <div className={`mb-6 rounded-3xl border p-5 shadow-sm ${openHireRequest.status === 'AWAITING_PAYMENT' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
@@ -811,9 +854,31 @@ export default function CoachingPage() {
               )}
             </div>
             {openHireRequest.status === 'AWAITING_PAYMENT' && (
-              <Button onClick={startCoachingPayment} disabled={startingPayment} className="h-12 shrink-0 rounded-xl bg-emerald-600 px-6 font-black text-white hover:bg-emerald-700">
-                {startingPayment ? 'Đang chuyển đến VNPay...' : 'Thanh toán ngay'}
-              </Button>
+              <div className="flex shrink-0 flex-col gap-2 sm:w-56">
+                <Button onClick={startCoachingPayment} disabled={startingPayment || payingWithWallet} className="h-12 rounded-xl bg-emerald-600 px-6 font-black text-white hover:bg-emerald-700">
+                  {startingPayment ? 'Đang chuyển đến VNPay...' : 'Thanh toán qua VNPay'}
+                </Button>
+                {(() => {
+                  const balance = Number(coachingWallet?.availableBalance) || 0;
+                  const amount = Number(openHireRequest.agreedAmount) || 0;
+                  const enough = balance >= amount && amount > 0;
+                  return (
+                    <>
+                      <Button
+                        onClick={payCoachingWithWallet}
+                        disabled={!enough || startingPayment || payingWithWallet}
+                        className="h-12 rounded-xl border border-emerald-600 bg-white px-6 font-black text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                      >
+                        {payingWithWallet ? 'Đang xử lý...' : 'Thanh toán bằng số dư ví'}
+                      </Button>
+                      <p className="text-center text-[11px] font-semibold text-slate-500">
+                        Số dư ví: {Number(balance).toLocaleString('vi-VN')}đ
+                        {!enough && amount > 0 && <span className="text-amber-600"> · không đủ</span>}
+                      </p>
+                    </>
+                  );
+                })()}
+              </div>
             )}
           </div>
         </div>

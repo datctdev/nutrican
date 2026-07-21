@@ -157,7 +157,7 @@ public class UserInitializer implements CommandLineRunner {
                     .pt(certifiedPt)
                     .requestedData(Map.of(
                             "bio", "Bản cập nhật bio mới: Mình vừa thi đậu thêm chứng chỉ NASM cấp cao quốc tế.",
-                            "trainingMode", "HYBRID",
+                            "trainingMode", "BOTH",
                             "contactPhone", "0988123456",
                             "hourlyRate", 500000,
                             "rateUnit", "SESSION_90"

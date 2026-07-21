@@ -3,10 +3,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Users, Clock, AlertTriangle } from 'lucide-react';
+import { Users, Clock, AlertTriangle, Wallet } from 'lucide-react';
 import { workspaceService } from '../../services/workspaceService';
 import { userService } from '../../services/userService';
+import { coachingPaymentService } from '../../services/coachingPaymentService';
 import { useAuthStore } from '../../stores/authStore';
+import { formatVnd } from '../../utils/currency';
+import WithdrawModal from '../../components/wallet/WithdrawModal';
 import { toast } from 'sonner';
 
 export default function PtDashboardPage() {
@@ -17,6 +20,17 @@ export default function PtDashboardPage() {
     const [savingMax, setSavingMax] = useState(false);
     const [pendingHiresCount, setPendingHiresCount] = useState(0);
     const [alerts, setAlerts] = useState([]);
+    const [wallet, setWallet] = useState(null);
+    const [withdrawOpen, setWithdrawOpen] = useState(false);
+
+    const fetchWallet = useCallback(async () => {
+        try {
+            const res = await coachingPaymentService.getMyWallet();
+            setWallet(res.data?.data || null);
+        } catch {
+            setWallet(null);
+        }
+    }, []);
 
     const fetchData = useCallback(async () => {
         try {
@@ -36,6 +50,7 @@ export default function PtDashboardPage() {
     useEffect(() => {
         const init = async () => {
             await fetchData();
+            fetchWallet();
             try {
                 const res = await userService.getProfile();
                 const max = res.data?.data?.maxClients;
@@ -53,7 +68,7 @@ export default function PtDashboardPage() {
         return () => {
             window.removeEventListener('realtime_update', handleRealtimeUpdate);
         };
-    }, [fetchData]);
+    }, [fetchData, fetchWallet]);
 
     const handleSaveMaxClients = async () => {
         const value = Number(maxClients);
@@ -116,6 +131,31 @@ export default function PtDashboardPage() {
                     </Card>
                 ))}
             </div>
+
+            {/* Wallet / earnings */}
+            <Card className="bg-white border-slate-200 shadow-sm rounded-3xl">
+                <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 rounded-2xl bg-emerald-100">
+                            <Wallet className="w-6 h-6 text-emerald-600" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Số dư ví (thu nhập coaching)</p>
+                            <p className="text-3xl font-black text-slate-900">{formatVnd(wallet?.availableBalance || 0)}</p>
+                            {Number(wallet?.lockedBalance) > 0 && (
+                                <p className="text-xs text-slate-400 mt-1">Đang tạm giữ: {formatVnd(wallet.lockedBalance)}</p>
+                            )}
+                        </div>
+                    </div>
+                    <Button
+                        onClick={() => setWithdrawOpen(true)}
+                        disabled={!(Number(wallet?.availableBalance) > 0)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 px-6 font-bold shrink-0"
+                    >
+                        Rút tiền
+                    </Button>
+                </CardContent>
+            </Card>
 
             {/* Attention list */}
             <div className="space-y-4">
@@ -196,6 +236,13 @@ export default function PtDashboardPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <WithdrawModal
+                open={withdrawOpen}
+                onClose={() => setWithdrawOpen(false)}
+                availableBalance={wallet?.availableBalance || 0}
+                onSuccess={fetchWallet}
+            />
         </div>
     );
 }
