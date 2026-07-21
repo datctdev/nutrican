@@ -10,7 +10,13 @@ import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.service.MarketplaceService;
 import com.sba.nutricanbe.user.service.ClientGoalService;
 import com.sba.nutricanbe.workspace.dto.*;
-import com.sba.nutricanbe.workspace.service.PtWorkspaceService;
+import com.sba.nutricanbe.workspace.service.PtClientService;
+import com.sba.nutricanbe.workspace.service.PtDashboardService;
+import com.sba.nutricanbe.workspace.service.PtDietLogReviewService;
+import com.sba.nutricanbe.workspace.service.PtProgressService;
+import com.sba.nutricanbe.workspace.service.PtReviewService;
+import com.sba.nutricanbe.workspace.service.PtSosService;
+import com.sba.nutricanbe.workspace.service.PtTemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +33,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PtWorkspaceController {
 
-    private final PtWorkspaceService ptWorkspaceService;
+    private final PtClientService ptClientService;
+    private final PtDashboardService ptDashboardService;
+    private final PtDietLogReviewService ptDietLogReviewService;
+    private final PtProgressService ptProgressService;
+    private final PtReviewService ptReviewService;
+    private final PtSosService ptSosService;
+    private final PtTemplateService ptTemplateService;
     private final MarketplaceService marketplaceService;
     private final ClientGoalService clientGoalService;
     private final com.sba.nutricanbe.user.service.BodyMetricService bodyMetricService;
@@ -39,7 +51,7 @@ public class PtWorkspaceController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String status) {
-        return ResponseEntity.ok(ptWorkspaceService.getClients(user.getId(), page, size, status));
+        return ResponseEntity.ok(ptClientService.getClients(user.getId(), page, size, status));
     }
 
     @GetMapping("/diet-logs/pending")
@@ -48,7 +60,7 @@ public class PtWorkspaceController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) UUID clientId) {
-        return ResponseEntity.ok(ptWorkspaceService.getPendingLogs(user.getId(), page, size, clientId));
+        return ResponseEntity.ok(ptDietLogReviewService.getPendingLogs(user.getId(), page, size, clientId));
     }
 
     @PutMapping("/diet-logs/{id}/review")
@@ -56,7 +68,7 @@ public class PtWorkspaceController {
             @PathVariable UUID id,
             @AuthenticationPrincipal User user,
             @RequestBody ReviewActionRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.reviewLog(id, user.getId(), request));
+        return ResponseEntity.ok(ptDietLogReviewService.reviewLog(id, user.getId(), request));
     }
 
     @GetMapping("/progress/{clientId}")
@@ -67,7 +79,7 @@ public class PtWorkspaceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate mealPlanWeekStart) {
-        return ResponseEntity.ok(ptWorkspaceService.getClientProgress(
+        return ResponseEntity.ok(ptProgressService.getClientProgress(
                 user.getId(), clientId, startDate, endDate, mealPlanWeekStart));
     }
 
@@ -86,7 +98,7 @@ public class PtWorkspaceController {
     public ResponseEntity<ApiResponse<Void>> assignClient(
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.assignClient(user.getId(), clientId));
+        return ResponseEntity.ok(ptClientService.assignClient(user.getId(), clientId));
     }
 
     @PutMapping("/clients/{clientId}/hire-request")
@@ -100,7 +112,7 @@ public class PtWorkspaceController {
     @GetMapping("/alerts")
     public ResponseEntity<ApiResponse<java.util.List<PtClientAlertDto>>> getAlerts(
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.getClientAlerts(user.getId()));
+        return ResponseEntity.ok(ptDashboardService.getClientAlerts(user.getId()));
     }
 
     @PostMapping("/clients/{clientId}/milestones")
@@ -115,13 +127,13 @@ public class PtWorkspaceController {
 
     @GetMapping("/stats")
     public ResponseEntity<ApiResponse<PtStatsDto>> getStats(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.getStats(user.getId()));
+        return ResponseEntity.ok(ptDashboardService.getStats(user.getId()));
     }
 
     @GetMapping("/sos")
     public ResponseEntity<ApiResponse<java.util.List<com.sba.nutricanbe.diet.dto.response.SosTicketResponse>>> getSosTickets(
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.getSosTickets(user.getId()));
+        return ResponseEntity.ok(ptSosService.getSosTickets(user.getId()));
     }
 
     @PutMapping("/sos/{ticketId}/resolve")
@@ -131,7 +143,7 @@ public class PtWorkspaceController {
             @RequestBody(required = false) java.util.Map<String, String> body) {
         String note = body != null ? body.get("resolutionNote") : null;
         if (note == null && body != null) note = body.get("note");
-        return ResponseEntity.ok(ptWorkspaceService.resolveSosTicket(ticketId, user.getId(), note));
+        return ResponseEntity.ok(ptSosService.resolveSosTicket(ticketId, user.getId(), note));
     }
 
     @PutMapping("/diet-logs/{id}/blind-estimate")
@@ -139,12 +151,12 @@ public class PtWorkspaceController {
             @PathVariable UUID id,
             @AuthenticationPrincipal User user,
             @RequestBody BlindEstimateRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.submitBlindEstimate(id, user.getId(), request));
+        return ResponseEntity.ok(ptDietLogReviewService.submitBlindEstimate(id, user.getId(), request));
     }
 
     @GetMapping("/rbl/stats")
     public ResponseEntity<ApiResponse<PtRblStatsDto>> getRblStats(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.getRblStats(user.getId()));
+        return ResponseEntity.ok(ptDashboardService.getRblStats(user.getId()));
     }
 
     @PutMapping("/clients/{clientId}/macro-target")
@@ -152,7 +164,7 @@ public class PtWorkspaceController {
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user,
             @RequestBody com.sba.nutricanbe.user.dto.MacroTargetRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.setClientMacroTarget(user.getId(), clientId, request));
+        return ResponseEntity.ok(ptClientService.setClientMacroTarget(user.getId(), clientId, request));
     }
 
     @PutMapping("/meal-plan-suggestions/{id}")
@@ -160,20 +172,20 @@ public class PtWorkspaceController {
             @PathVariable UUID id,
             @AuthenticationPrincipal User user,
             @RequestBody MealPlanSuggestionReviewRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.reviewMealPlanSuggestion(user.getId(), id, request));
+        return ResponseEntity.ok(ptReviewService.reviewMealPlanSuggestion(user.getId(), id, request));
     }
 
     @GetMapping("/clients/{clientId}/meal-plan-suggestions")
     public ResponseEntity<ApiResponse<java.util.List<MealPlanSuggestionDto>>> getPendingSuggestions(
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.getPendingMealPlanSuggestions(user.getId(), clientId));
+        return ResponseEntity.ok(ptReviewService.getPendingMealPlanSuggestions(user.getId(), clientId));
     }
 
     @GetMapping("/self-plan-submissions")
     public ResponseEntity<ApiResponse<java.util.List<com.sba.nutricanbe.diet.dto.response.SelfPlanSubmissionResponse>>> listSelfPlanSubmissions(
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.listPendingSelfPlanSubmissions(user.getId()));
+        return ResponseEntity.ok(ptReviewService.listPendingSelfPlanSubmissions(user.getId()));
     }
 
     @PutMapping("/self-plan-submissions/{id}")
@@ -181,14 +193,14 @@ public class PtWorkspaceController {
             @PathVariable UUID id,
             @AuthenticationPrincipal User user,
             @RequestBody com.sba.nutricanbe.diet.dto.request.SelfPlanSubmissionReviewRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.reviewSelfPlanSubmission(user.getId(), id, request));
+        return ResponseEntity.ok(ptReviewService.reviewSelfPlanSubmission(user.getId(), id, request));
     }
 
     @PostMapping("/weekly-summary")
     public ResponseEntity<ApiResponse<WeeklySummaryDto>> createWeeklySummary(
             @AuthenticationPrincipal User user,
             @RequestBody WeeklySummaryRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.createWeeklySummary(user.getId(), request));
+        return ResponseEntity.ok(ptReviewService.createWeeklySummary(user.getId(), request));
     }
 
     @PostMapping("/clients/{clientId}/end-coaching")
@@ -211,7 +223,7 @@ public class PtWorkspaceController {
     public ResponseEntity<ApiResponse<PtClientProfileDto>> getClientProfile(
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.getClientProfile(user.getId(), clientId));
+        return ResponseEntity.ok(ptClientService.getClientProfile(user.getId(), clientId));
     }
 
     @PutMapping("/clients/{clientId}/profile")
@@ -219,34 +231,34 @@ public class PtWorkspaceController {
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user,
             @RequestBody PtClientProfileDto request) {
-        return ResponseEntity.ok(ptWorkspaceService.updateClientProfile(user.getId(), clientId, request));
+        return ResponseEntity.ok(ptClientService.updateClientProfile(user.getId(), clientId, request));
     }
 
     @PostMapping("/clients")
     public ResponseEntity<ApiResponse<PtClientProfileDto>> createClient(
             @AuthenticationPrincipal User user,
             @RequestBody CreateClientRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.createClient(user.getId(), request));
+        return ResponseEntity.ok(ptClientService.createClient(user.getId(), request));
     }
 
     @GetMapping("/clients/{clientId}/chat-context")
     public ResponseEntity<ApiResponse<com.sba.nutricanbe.chat.dto.ChatContextSummaryDto>> getChatContext(
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.getChatContext(user.getId(), clientId));
+        return ResponseEntity.ok(ptProgressService.getChatContext(user.getId(), clientId));
     }
 
     @PostMapping("/templates")
     public ResponseEntity<ApiResponse<TemplateResponse>> saveAsTemplate(
             @AuthenticationPrincipal User user,
             @RequestBody CreateTemplateRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.saveAsTemplate(user.getId(), request));
+        return ResponseEntity.ok(ptTemplateService.saveAsTemplate(user.getId(), request));
     }
 
     @GetMapping("/templates")
     public ResponseEntity<ApiResponse<java.util.List<TemplateResponse>>> getTemplates(
             @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(ptWorkspaceService.getTemplatesByPt(user.getId()));
+        return ResponseEntity.ok(ptTemplateService.getTemplatesByPt(user.getId()));
     }
 
     @PostMapping("/clients/{clientId}/apply-template/{templateId}")
@@ -255,7 +267,7 @@ public class PtWorkspaceController {
             @PathVariable UUID templateId,
             @AuthenticationPrincipal User user,
             @RequestBody ApplyTemplateRequest request) {
-        return ResponseEntity.ok(ptWorkspaceService.applyTemplateToClient(user.getId(), templateId, clientId, request));
+        return ResponseEntity.ok(ptTemplateService.applyTemplateToClient(user.getId(), templateId, clientId, request));
     }
 
     @GetMapping("/clients/{clientId}/day-plan")
@@ -263,7 +275,7 @@ public class PtWorkspaceController {
             @AuthenticationPrincipal User user,
             @PathVariable UUID clientId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(ptWorkspaceService.getClientDayPlan(user.getId(), clientId, date));
+        return ResponseEntity.ok(ptProgressService.getClientDayPlan(user.getId(), clientId, date));
     }
 
     @GetMapping("/clients/{clientId}/diet-summary")
@@ -271,7 +283,7 @@ public class PtWorkspaceController {
             @AuthenticationPrincipal User user,
             @PathVariable UUID clientId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(ptWorkspaceService.getClientDietSummary(user.getId(), clientId, date));
+        return ResponseEntity.ok(ptProgressService.getClientDietSummary(user.getId(), clientId, date));
     }
 
     @GetMapping("/clients/{clientId}/day-timeline")
@@ -279,6 +291,6 @@ public class PtWorkspaceController {
             @AuthenticationPrincipal User user,
             @PathVariable UUID clientId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(ptWorkspaceService.getClientDayTimeline(user.getId(), clientId, date));
+        return ResponseEntity.ok(ptProgressService.getClientDayTimeline(user.getId(), clientId, date));
     }
 }

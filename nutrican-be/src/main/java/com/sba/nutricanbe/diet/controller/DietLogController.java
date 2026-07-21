@@ -27,7 +27,7 @@ import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.diet.service.MealAnalysisService;
 import com.sba.nutricanbe.diet.service.SosService;
 import com.sba.nutricanbe.workspace.dto.DietLogReviewResponse;
-import com.sba.nutricanbe.workspace.service.PtWorkspaceService;
+import com.sba.nutricanbe.workspace.service.PtDietLogReviewService;
 
 import jakarta.validation.Valid;
 
@@ -77,7 +77,7 @@ public class DietLogController {
     private final MealAnalysisService mealAnalysisService;
     private final SosService sosService;
     private final DietLogFeedbackService dietLogFeedbackService;
-    private final PtWorkspaceService ptWorkspaceService;
+    private final PtDietLogReviewService ptDietLogReviewService;
 
 
 
@@ -195,7 +195,7 @@ public class DietLogController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "APPROVED") DietLogReviewStatus reviewStatus) {
-        return ResponseEntity.ok(ptWorkspaceService.getClientDietLogs(
+        return ResponseEntity.ok(ptDietLogReviewService.getClientDietLogs(
                 user.getId(), clientId, page, size, reviewStatus));
     }
 
