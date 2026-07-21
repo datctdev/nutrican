@@ -17,23 +17,14 @@ import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.ReviewRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.dto.CreateReviewRequest;
-import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.dto.PtProfileResponse;
 import com.sba.nutricanbe.user.dto.PtSearchRequest;
 import com.sba.nutricanbe.user.dto.ReviewResponse;
-import com.sba.nutricanbe.user.dto.HirePtRequest;
 import com.sba.nutricanbe.user.enums.TrainingMode;
-import com.sba.nutricanbe.user.repository.PtVenueRepository;
-import com.sba.nutricanbe.user.entity.PtVenue;
 import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
 import com.sba.nutricanbe.user.dto.MappingSessionResponse;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
-import com.sba.nutricanbe.user.entity.PtMappingSession;
-import com.sba.nutricanbe.user.service.AppointmentSlotHelper;
 import com.sba.nutricanbe.user.service.MarketplaceService;
-import com.sba.nutricanbe.user.service.OfflineHireSessionService;
-import com.sba.nutricanbe.user.service.SlotHoldService;
-import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -42,16 +33,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.UUID;
 import java.util.List;
-import java.time.LocalDateTime;
 
 @Slf4j
 @Service
@@ -62,17 +49,9 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     private final UserRepository userRepository;
     private final ReviewRepository reviewRepository;
     private final PtClientMappingRepository mappingRepository;
-    private final WebSocketSessionService webSocketSessionService;
     private final StorageService storageService;
     private final PtVenueAvailabilityService venueAvailabilityService;
-    private final PtVenueRepository venueRepository;
-    private final AppointmentSlotHelper appointmentSlotHelper;
-    private final OfflineHireSessionService offlineHireSessionService;
     private final PtMappingSessionRepository mappingSessionRepository;
-    private final SlotHoldService slotHoldService;
-
-    @Value("${app.payment.accepted-request-hours:24}")
-    private long acceptedRequestHours;
 
     @Override
     @Transactional(readOnly = true)
@@ -295,277 +274,6 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
         log.info("Review created for PT: {} by user: {}", ptId, reviewerId);
         return ApiResponse.success(ReviewResponse.toReviewResponse(review), "Gửi đánh giá thành công!");
-    }
-
-    @Override
-    @Transactional
-    public ApiResponse<PtClientMappingResponse> hirePt(
-            UUID ptId, UUID customerId, HirePtRequest request) {
-        User pt = userRepository.findById(ptId)
-                .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
-        if (pt.getRole() != UserRole.PT_CERTIFIED && pt.getRole() != UserRole.PT_FREELANCE) {
-            throw new BadRequestException("User is not a PT");
-        }
-
-        PtProfile profile = ptProfileRepository.findByUserId(ptId)
-                .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
-        if (!Boolean.TRUE.equals(profile.getIsVerified())) {
-            throw new BadRequestException("PT must be verified before accepting clients");
-        }
-
-        // Serialize hire requests per customer so double-clicks cannot create
-        // two concurrent open contracts.
-        User customer = userRepository.findByIdForUpdate(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", customerId));
-        if (!customer.hasCustomerPrivileges()) {
-            throw new BadRequestException("Only customers can hire a PT");
-        }
-        if (pt.getId().equals(customer.getId())) {
-            throw new BadRequestException("You cannot hire yourself");
-        }
-
-        TrainingMode selectedMode = request.getTrainingMode();
-        if (selectedMode == TrainingMode.BOTH) {
-            throw new BadRequestException("Please select either ONLINE or OFFLINE coaching");
-        }
-        boolean modeAvailable = profile.getTrainingMode() == TrainingMode.BOTH
-                || profile.getTrainingMode() == selectedMode;
-        if (!modeAvailable) {
-            throw new BadRequestException("This PT does not offer the selected coaching mode");
-        }
-
-        BigDecimal perSessionAmount = null;
-        Integer sessionCount = null;
-        BigDecimal agreedAmount;
-        String agreedRateUnit = selectedMode == TrainingMode.ONLINE
-                ? profile.getOnlineRateUnit() : profile.getOfflineRateUnit();
-        if (selectedMode == TrainingMode.ONLINE) {
-            agreedAmount = profile.getOnlineRate();
-        } else {
-            perSessionAmount = profile.getOfflineRate();
-            agreedAmount = perSessionAmount;
-        }
-        if (agreedAmount == null || agreedAmount.signum() <= 0 || agreedRateUnit == null
-                || agreedRateUnit.isBlank()) {
-            throw new BadRequestException("The selected coaching package does not have a valid price");
-        }
-
-        UUID venueId = null;
-        String venueName = null;
-        String venueAddress = null;
-        String venueMapsUrl = null;
-        LocalDateTime firstSessionStart = null;
-        LocalDateTime firstSessionEnd = null;
-        OfflineHireSessionService.ValidatedOfflineHire validatedOffline = null;
-        PtVenue selectedVenue = null;
-
-        if (selectedMode == TrainingMode.OFFLINE) {
-            if (request.getVenueId() == null) {
-                throw new BadRequestException("Please select a training venue");
-            }
-            List<LocalDateTime> sessionStarts = request.resolvedSessionStarts();
-            if (sessionStarts.isEmpty()) {
-                throw new BadRequestException("Please select at least one session");
-            }
-            long activeVenues = venueRepository.countByPtProfile_IdAndActiveTrue(profile.getId());
-            if (activeVenues == 0) {
-                throw new BadRequestException("PT has not configured any training venues");
-            }
-            List<com.sba.nutricanbe.user.dto.PtAvailabilityWindowResponse> availability =
-                    venueAvailabilityService.listAvailabilityForProfile(profile.getId());
-            if (availability.isEmpty()) {
-                throw new BadRequestException("PT has not configured availability");
-            }
-            selectedVenue = venueRepository.findByIdAndPtProfile_Id(request.getVenueId(), profile.getId())
-                    .orElseThrow(() -> new BadRequestException("Selected venue is not valid for this PT"));
-            if (!Boolean.TRUE.equals(selectedVenue.getActive())) {
-                throw new BadRequestException("Selected venue is no longer available");
-            }
-            validatedOffline = offlineHireSessionService.validateOfflineSessions(
-                    ptId, profile.getId(), availability, agreedRateUnit, sessionStarts, null);
-            sessionCount = validatedOffline.sessionCount();
-            agreedAmount = perSessionAmount.multiply(BigDecimal.valueOf(sessionCount));
-            firstSessionStart = validatedOffline.earliestStart();
-            firstSessionEnd = validatedOffline.earliestEnd();
-            venueId = selectedVenue.getId();
-            venueName = selectedVenue.getName();
-            venueAddress = selectedVenue.getAddress();
-            venueMapsUrl = selectedVenue.getMapsUrl();
-        }
-
-        final UUID snapshotVenueId = venueId;
-        final String snapshotVenueName = venueName;
-        final String snapshotVenueAddress = venueAddress;
-        final String snapshotVenueMapsUrl = venueMapsUrl;
-        final LocalDateTime snapshotFirstStart = firstSessionStart;
-        final LocalDateTime snapshotFirstEnd = firstSessionEnd;
-        final BigDecimal snapshotPerSession = perSessionAmount;
-        final Integer snapshotSessionCount = sessionCount;
-        final BigDecimal snapshotAgreedAmount = agreedAmount;
-        final OfflineHireSessionService.ValidatedOfflineHire snapshotValidated = validatedOffline;
-        final PtVenue snapshotVenue = selectedVenue;
-
-        mappingRepository.findFirstByClient_IdAndStatusIn(
-                        customerId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))
-                .ifPresent(active -> {
-                    if (!active.getPt().getId().equals(ptId)) {
-                        throw new BadRequestException("Bạn đang có PT. Kết thúc coaching hiện tại trước.");
-                    }
-                });
-
-        mappingRepository.findFirstByClient_IdAndStatusIn(
-                        customerId, List.of(ClientMappingStatus.PENDING, ClientMappingStatus.AWAITING_PAYMENT))
-                .ifPresent(openRequest -> {
-                    if (!openRequest.getPt().getId().equals(ptId)) {
-                        throw new BadRequestException(
-                                "You already have another coaching request in progress");
-                    }
-                });
-
-        PtClientMapping mapping = mappingRepository
-                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, customerId)
-                .map(existing -> {
-                    if (existing.getStatus() == ClientMappingStatus.ACTIVE) {
-                        throw new BadRequestException("Bạn đã liên kết với Huấn luyện viên này rồi.");
-                    }
-                    if (existing.getStatus() == ClientMappingStatus.PENDING) {
-                        throw new BadRequestException("Bạn đã gửi yêu cầu trước đó, vui lòng chờ PT xác nhận.");
-                    }
-                    if (existing.getStatus() == ClientMappingStatus.AWAITING_PAYMENT) {
-                        throw new BadRequestException("PT has accepted. Please complete payment first.");
-                    }
-                    if (existing.getStatus() == ClientMappingStatus.END_REQUESTED) {
-                        throw new BadRequestException(
-                                "Please complete the current coaching termination first");
-                    }
-
-                    // Each new hire is a separate coaching contract. Keeping the
-                    // previous mapping immutable preserves its payment and escrow history.
-                    return PtClientMapping.builder()
-                            .pt(pt)
-                            .client(customer)
-                            .status(ClientMappingStatus.PENDING)
-                            .selectedTrainingMode(selectedMode)
-                            .agreedAmount(snapshotAgreedAmount)
-                            .agreedRateUnit(agreedRateUnit)
-                            .perSessionAmount(snapshotPerSession)
-                            .sessionCount(snapshotSessionCount)
-                            .venueId(snapshotVenueId)
-                            .venueName(snapshotVenueName)
-                            .venueAddress(snapshotVenueAddress)
-                            .venueMapsUrl(snapshotVenueMapsUrl)
-                            .firstSessionStart(snapshotFirstStart)
-                            .firstSessionEnd(snapshotFirstEnd)
-                            .build();
-                })
-                .orElseGet(() -> PtClientMapping.builder()
-                        .pt(pt)
-                        .client(customer)
-                        .status(ClientMappingStatus.PENDING)
-                        .selectedTrainingMode(selectedMode)
-                        .agreedAmount(snapshotAgreedAmount)
-                        .agreedRateUnit(agreedRateUnit)
-                        .perSessionAmount(snapshotPerSession)
-                        .sessionCount(snapshotSessionCount)
-                        .venueId(snapshotVenueId)
-                        .venueName(snapshotVenueName)
-                        .venueAddress(snapshotVenueAddress)
-                        .venueMapsUrl(snapshotVenueMapsUrl)
-                        .firstSessionStart(snapshotFirstStart)
-                        .firstSessionEnd(snapshotFirstEnd)
-                        .build());
-
-        mapping = mappingRepository.save(mapping);
-        if (selectedMode == TrainingMode.OFFLINE && snapshotValidated != null && snapshotVenue != null) {
-            offlineHireSessionService.persistSessionsAndHolds(
-                    mapping.getId(), ptId, snapshotVenue, snapshotValidated);
-        }
-        return ApiResponse.success(toMappingResponseWithSessions(mapping), "Hiring request sent");
-    }
-
-    @Override
-    @Transactional
-    public ApiResponse<PtClientMappingResponse> updateHireRequest(UUID clientId, UUID ptId, String action) {
-        PtClientMapping mapping = mappingRepository
-                .findTopByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, clientId)
-                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", clientId));
-
-        if (mapping.getStatus() != ClientMappingStatus.PENDING) {
-            throw new BadRequestException("Only pending hiring requests can be updated");
-        }
-
-        String normalized = action != null ? action.trim().toUpperCase() : "";
-        switch (normalized) {
-            case "ACCEPT" -> {
-                PtProfile profile = ptProfileRepository.findByUserIdForUpdate(ptId)
-                        .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
-                int max = profile.getMaxClients() != null ? profile.getMaxClients() : 10;
-                long reservedSlots = mappingRepository.countByPt_IdAndStatusIn(
-                        ptId,
-                        List.of(
-                                ClientMappingStatus.AWAITING_PAYMENT,
-                                ClientMappingStatus.ACTIVE,
-                                ClientMappingStatus.END_REQUESTED));
-                if (reservedSlots >= max) {
-                    throw new BadRequestException("PT đã đủ số client tối đa (" + max + ")");
-                }
-                if (mapping.getSelectedTrainingMode() == TrainingMode.OFFLINE) {
-                    offlineHireSessionService.revalidateForAccept(
-                            ptId, mapping.getId(), mapping.getAgreedRateUnit());
-                }
-                mapping.setStatus(ClientMappingStatus.AWAITING_PAYMENT);
-                mapping.setAcceptedAt(LocalDateTime.now());
-                mapping.setPaymentDueAt(LocalDateTime.now()
-                        .plusHours(Math.max(1, acceptedRequestHours)));
-            }
-            case "REJECT", "DECLINE" -> {
-                mapping.setStatus(ClientMappingStatus.INACTIVE);
-                mapping.setAcceptedAt(null);
-                mapping.setPaymentDueAt(null);
-                slotHoldService.releaseByMapping(mapping.getId());
-            }
-            default -> throw new BadRequestException("Invalid action: " + action);
-        }
-
-        mapping = mappingRepository.save(mapping);
-        String message = mapping.getStatus() == ClientMappingStatus.AWAITING_PAYMENT
-                ? "Hiring request accepted. Waiting for customer payment."
-                : "Hiring request rejected";
-        notifyHireResult(mapping, mapping.getStatus() == ClientMappingStatus.AWAITING_PAYMENT);
-        return ApiResponse.success(toMappingResponseWithSessions(mapping), message);
-    }
-
-    private PtClientMappingResponse toMappingResponseWithSessions(PtClientMapping mapping) {
-        List<MappingSessionResponse> sessions = mappingSessionRepository
-                .findByMappingIdOrderBySequenceAsc(mapping.getId())
-                .stream()
-                .map(MappingSessionResponse::from)
-                .toList();
-        return PtClientMappingResponse.toMappingResponse(mapping, sessions);
-    }
-
-    private void notifyHireResult(PtClientMapping mapping, boolean accepted) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("mappingId", mapping.getId());
-        payload.put("ptId", mapping.getPt().getId());
-        payload.put("customerId", mapping.getClient().getId());
-        payload.put("accepted", accepted);
-        payload.put("message", accepted
-                ? "PT đã chấp nhận. Vui lòng thanh toán để bắt đầu coaching."
-                : "PT đã từ chối yêu cầu coaching.");
-        String event = accepted ? "HIRE_ACCEPTED" : "HIRE_REJECTED";
-        webSocketSessionService.sendToUser(mapping.getClient().getId(), event, payload);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public ApiResponse<PtClientMappingResponse> getOpenHireRequest(UUID customerId) {
-        PtClientMappingResponse response = mappingRepository.findFirstByClient_IdAndStatusIn(
-                        customerId,
-                        List.of(ClientMappingStatus.PENDING, ClientMappingStatus.AWAITING_PAYMENT))
-                .map(this::toMappingResponseWithSessions)
-                .orElse(null);
-        return ApiResponse.success(response);
     }
 
     @Override

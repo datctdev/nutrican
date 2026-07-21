@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.workspace.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sba.nutricanbe.user.service.NotificationService;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class WebSocketSessionService {
 
     private final ObjectMapper objectMapper;
-    private final com.sba.nutricanbe.user.service.NotificationService notificationService;
+    private final NotificationService notificationService;
 
     public WebSocketSessionService(
             ObjectMapper objectMapper,

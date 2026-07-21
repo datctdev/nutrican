@@ -7,7 +7,7 @@ import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.user.dto.BodyMetricDto;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
-import com.sba.nutricanbe.user.service.MarketplaceService;
+import com.sba.nutricanbe.user.service.PtHireService;
 import com.sba.nutricanbe.user.service.ClientGoalService;
 import com.sba.nutricanbe.workspace.dto.*;
 import com.sba.nutricanbe.workspace.service.PtClientService;
@@ -40,7 +40,7 @@ public class PtWorkspaceController {
     private final PtReviewService ptReviewService;
     private final PtSosService ptSosService;
     private final PtTemplateService ptTemplateService;
-    private final MarketplaceService marketplaceService;
+    private final PtHireService ptHireService;
     private final ClientGoalService clientGoalService;
     private final com.sba.nutricanbe.user.service.BodyMetricService bodyMetricService;
     private final com.sba.nutricanbe.user.service.CoachingLifecycleService coachingLifecycleService;
@@ -106,7 +106,7 @@ public class PtWorkspaceController {
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user,
             @RequestParam String action) {
-        return ResponseEntity.ok(marketplaceService.updateHireRequest(clientId, user.getId(), action));
+        return ResponseEntity.ok(ptHireService.updateHireRequest(clientId, user.getId(), action));
     }
 
     @GetMapping("/alerts")
