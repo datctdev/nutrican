@@ -75,6 +75,20 @@ function statusMeta(status) {
   return SESSION_STATUS[status] || { text: status || '—', cls: 'bg-slate-100 text-slate-700 border-slate-200' };
 }
 
+/** Hủy khi còn chờ dạy / chờ xử lý — ẩn khi đã chốt (CONFIRMED) hoặc sau đó. */
+function canCancelByStatus(status) {
+  return status === 'SCHEDULED' || status === 'PENDING';
+}
+
+function canCancelMergedItem(sessionStatus, appointmentStatus) {
+  // Session lifecycle wins: Chờ dạy (SCHEDULED) vẫn hủy được dù appointment đã CONFIRMED.
+  if (sessionStatus) {
+    return canCancelByStatus(sessionStatus);
+  }
+  // Appointment-only: chỉ PENDING (CONFIRMED hiện badge "Đã chốt")
+  return appointmentStatus === 'PENDING';
+}
+
 /** Enable «Đã dạy xong» when session has started (during or after). */
 export function canMarkSessionDone(item, now = new Date()) {
   if (!item || item.status !== 'SCHEDULED' || !item.sessionId || !item.start) return false;
@@ -104,7 +118,7 @@ export function toTimetableItem(raw, extras = {}) {
     type: raw.type || 'OFFLINE',
     title: extras.title || raw.note || (raw.sequence != null ? `Buổi #${raw.sequence}` : 'Buổi offline'),
     counterpartName: extras.counterpartName || raw.counterpartName || raw.clientName || raw.ptName,
-    canCancel: extras.canCancel ?? ['PENDING', 'CONFIRMED'].includes(raw.status),
+    canCancel: extras.canCancel ?? canCancelByStatus(raw.status),
     confirmDeadlineAt: raw.confirmDeadlineAt,
     raw,
   };
@@ -139,7 +153,9 @@ export function mergeTimetableSources({ sessions = [], appointments = [], counte
       confirmDeadlineAt: s.confirmDeadlineAt,
     }, {
       counterpartName: s.counterpartName || counterpartName,
-      canCancel: match ? ['PENDING', 'CONFIRMED'].includes(match.status) : false,
+      canCancel: match
+        ? canCancelMergedItem(s.status, match.status)
+        : false,
     }));
   });
 
@@ -147,7 +163,7 @@ export function mergeTimetableSources({ sessions = [], appointments = [], counte
     if (usedAppt.has(a.id)) return;
     items.push(toTimetableItem(a, {
       counterpartName: a.counterpartName || counterpartName,
-      canCancel: ['PENDING', 'CONFIRMED'].includes(a.status),
+      canCancel: a.status === 'PENDING',
       title: a.note || 'Buổi offline',
     }));
   });
