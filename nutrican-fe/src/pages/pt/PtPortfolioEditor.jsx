@@ -420,7 +420,7 @@ export default function PtPortfolioEditor() {
             setLoading(true);
             const response = await userService.updatePtProfile({ portfolioShowcase: portfolioData });
             if (response.data) {
-                toast.success('Cập nhật Thư viện ảnh thành công!');
+                toast.success('Đã lưu ảnh bìa và Case Study!');
                 setUser({ ...user, ptProfile: response.data.data });
             }
         } catch (error) {
@@ -515,7 +515,7 @@ export default function PtPortfolioEditor() {
                         className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/30 h-12 px-8 font-bold transition-all hover:-translate-y-0.5"
                     >
                         <Save className="w-5 h-5 mr-2" />
-                        {loading ? 'Đang lưu...' : 'Lưu Ảnh Portfolio'}
+                        {loading ? 'Đang lưu...' : 'Lưu Portfolio'}
                     </Button>
                 </div>
             </div>
@@ -740,17 +740,28 @@ export default function PtPortfolioEditor() {
 
                     <Card className="rounded-[2rem] border-slate-200 shadow-sm">
                         <CardContent className="p-6 sm:p-8">
-                            <div className="flex justify-between items-center mb-8 border-b border-slate-100 pb-4">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-8 border-b border-slate-100 pb-4">
                                 <div>
                                     <h2 className="text-xl font-black text-slate-800">Thư viện Kết quả Học viên</h2>
+                                    <p className="text-xs text-slate-500 mt-1 font-medium">Thêm/sửa Case Study rồi bấm Lưu để lưu lên hồ sơ công khai.</p>
                                 </div>
-                                <Button onClick={addTransformation} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl font-bold h-11">
-                                    <Plus className="w-5 h-5 mr-1" /> Thêm Case Study
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button onClick={addTransformation} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl font-bold h-11">
+                                        <Plus className="w-5 h-5 mr-1" /> Thêm Case Study
+                                    </Button>
+                                    <Button
+                                        onClick={handleSavePortfolio}
+                                        disabled={loading}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-11 px-5 shadow-md shadow-blue-500/20"
+                                    >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {loading ? 'Đang lưu...' : 'Lưu Case Study'}
+                                    </Button>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-10">
-                                {portfolioData.transformations?.map((item) => (
+                                {portfolioData.transformations?.length ? portfolioData.transformations.map((item) => (
                                     <div key={item.id} className="border border-slate-200 rounded-[2rem] relative shadow-sm overflow-hidden flex flex-col md:flex-row">
 
                                         <button
@@ -775,6 +786,7 @@ export default function PtPortfolioEditor() {
                                                 ) : (
                                                     <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full text-slate-400 hover:bg-slate-200">
                                                         <ImagePlus className="w-8 h-8 mb-2" />
+                                                        <span className="text-[10px] font-bold uppercase tracking-wide">Before</span>
                                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload('transform', item.id, 'beforeUrl', e.target.files[0])} />
                                                     </label>
                                                 )}
@@ -795,6 +807,7 @@ export default function PtPortfolioEditor() {
                                                 ) : (
                                                     <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full text-slate-400 hover:bg-slate-200">
                                                         <ImagePlus className="w-8 h-8 mb-2" />
+                                                        <span className="text-[10px] font-bold uppercase tracking-wide">After</span>
                                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload('transform', item.id, 'afterUrl', e.target.files[0])} />
                                                     </label>
                                                 )}
@@ -818,8 +831,26 @@ export default function PtPortfolioEditor() {
                                             />
                                         </div>
                                     </div>
-                                ))}
+                                )) : (
+                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-14 text-center text-slate-400">
+                                        <p className="font-bold text-sm">Chưa có Case Study nào</p>
+                                        <p className="text-xs mt-1">Bấm &quot;Thêm Case Study&quot; để bắt đầu.</p>
+                                    </div>
+                                )}
                             </div>
+
+                            {(portfolioData.transformations?.length > 0) && (
+                                <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
+                                    <Button
+                                        onClick={handleSavePortfolio}
+                                        disabled={loading}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-12 px-8 shadow-lg shadow-blue-500/25"
+                                    >
+                                        <Save className="w-5 h-5 mr-2" />
+                                        {loading ? 'Đang lưu...' : 'Lưu Case Study'}
+                                    </Button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -997,7 +1028,7 @@ export default function PtPortfolioEditor() {
                                             <ProvinceSelect
                                                 value={activeForm.location}
                                                 onChange={(v) => setUpdateForm({ ...updateForm, location: v })}
-                                                disabled={!!pendingRequest}
+                                                disabled={isPending}
                                                 placeholder="Chọn hoặc tìm tỉnh/thành..."
                                             />
                                         </div>
