@@ -75,36 +75,42 @@ function statusMeta(status) {
   return SESSION_STATUS[status] || { text: status || '—', cls: 'bg-slate-100 text-slate-700 border-slate-200' };
 }
 
-/** Enable «Đã dạy xong» when session has started (during or after). */
-export function canMarkSessionDone(item, now = new Date()) {
-  if (!item || item.status !== 'SCHEDULED' || !item.sessionId || !item.start) return false;
-  return item.start.getTime() <= now.getTime();
+/** Hủy khi còn chờ dạy / chờ xử lý — ẩn khi đã chốt (CONFIRMED) hoặc sau đó. */
+function canCancelByStatus(status) {
+  return status === 'SCHEDULED' || status === 'PENDING';
 }
 
-/** Hủy chỉ khi buổi chưa bắt đầu và còn chờ dạy / lịch hẹn còn hiệu lực. */
+function canCancelMergedItem(sessionStatus, appointmentStatus) {
+  if (sessionStatus) {
+    return canCancelByStatus(sessionStatus);
+  }
+  return appointmentStatus === 'PENDING';
+}
+
+/** Hủy chỉ khi buổi chưa bắt đầu và còn SCHEDULED/PENDING. */
 export function canCancelAppointment(item, now = new Date()) {
   if (!item || !item.start) return false;
   if (item.start.getTime() <= now.getTime()) return false;
   if (item.sessionId) {
     return item.status === 'SCHEDULED';
   }
-  return ['PENDING', 'CONFIRMED'].includes(item.status);
+  return item.status === 'PENDING' || item.status === 'SCHEDULED';
 }
 
-/** Đổi lịch: chưa tới giờ + session SCHEDULED (hoặc appointment PENDING/CONFIRMED không session). */
+/** Đổi lịch: chưa tới giờ + session SCHEDULED (hoặc appointment PENDING). */
 export function canRescheduleAppointment(item, now = new Date()) {
   if (!item || !item.start) return false;
   if (item.start.getTime() <= now.getTime()) return false;
   if (item.sessionId) {
     return item.status === 'SCHEDULED';
   }
-  return ['PENDING', 'CONFIRMED'].includes(item.status);
+  return item.status === 'PENDING' || item.status === 'CONFIRMED';
 }
 
-function typeLabel(type) {
-  if (!type || type === 'OFFLINE') return 'Offline';
-  if (type === 'ONLINE') return 'Online';
-  return type;
+/** Enable «Đã dạy xong» when session has started (during or after). */
+export function canMarkSessionDone(item, now = new Date()) {
+  if (!item || item.status !== 'SCHEDULED' || !item.sessionId || !item.start) return false;
+  return now.getTime() >= item.start.getTime();
 }
 
 /**
@@ -130,7 +136,7 @@ export function toTimetableItem(raw, extras = {}) {
     type: raw.type || 'OFFLINE',
     title: extras.title || raw.note || (raw.sequence != null ? `Buổi #${raw.sequence}` : 'Buổi offline'),
     counterpartName: extras.counterpartName || raw.counterpartName || raw.clientName || raw.ptName,
-    canCancel: extras.canCancel ?? false,
+    canCancel: extras.canCancel ?? canCancelByStatus(raw.status),
     confirmDeadlineAt: raw.confirmDeadlineAt,
     raw,
   };
@@ -165,8 +171,9 @@ export function mergeTimetableSources({ sessions = [], appointments = [], counte
       confirmDeadlineAt: s.confirmDeadlineAt,
     }, {
       counterpartName: s.counterpartName || counterpartName,
-      // canCancel tính động theo now trong modal (canCancelAppointment)
-      canCancel: true,
+      canCancel: match
+        ? canCancelMergedItem(s.status, match.status)
+        : false,
     }));
   });
 
@@ -174,7 +181,7 @@ export function mergeTimetableSources({ sessions = [], appointments = [], counte
     if (usedAppt.has(a.id)) return;
     items.push(toTimetableItem(a, {
       counterpartName: a.counterpartName || counterpartName,
-      canCancel: true,
+      canCancel: a.status === 'PENDING',
       title: a.note || 'Buổi offline',
     }));
   });
@@ -423,8 +430,8 @@ export default function CoachingTimetable({
               {selected.sequence != null && (
                 <span className="text-xs font-bold text-slate-500">Buổi #{selected.sequence}</span>
               )}
-              <span className="text-xs font-semibold text-slate-500 tracking-wider">
-                {typeLabel(selected.type)}
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                {selected.type || 'OFFLINE'}
               </span>
             </div>
 

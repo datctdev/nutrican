@@ -27,6 +27,7 @@ import WithdrawModal from '../../components/wallet/WithdrawModal';
 import PtWeeklyCalendarPicker from '../../components/pt/PtWeeklyCalendarPicker';
 import CoachingTimetable, { mergeTimetableSources } from '../../components/coaching/CoachingTimetable';
 import SessionConfirmPanel from '../../components/coaching/SessionConfirmPanel';
+import SessionDisputeThread from '../../components/coaching/SessionDisputeThread';
 import { formatVnd } from '../../utils/currency';
 import { toast } from 'sonner';
 import {
@@ -167,6 +168,8 @@ export default function CoachingPage() {
   const [payingWithWallet, setPayingWithWallet] = useState(false);
   const [mySessions, setMySessions] = useState([]);
   const [sessionActing, setSessionActing] = useState(null);
+  const [myDisputes, setMyDisputes] = useState([]);
+  const [disputeActing, setDisputeActing] = useState(null);
 
   useEffect(() => {
     if (tabParam) {
@@ -189,6 +192,9 @@ export default function CoachingPage() {
       profileExtensionsService.getMySessions()
         .then((r) => setMySessions(r.data?.data || []))
         .catch(() => setMySessions([]));
+      profileExtensionsService.getSessionDisputes({ status: 'PENDING' })
+        .then((r) => setMyDisputes(r.data?.data || []))
+        .catch(() => setMyDisputes([]));
     };
     window.addEventListener('refund_update', onRefundUpdate);
     window.addEventListener('hire_request_updated', onHireUpdate);
@@ -221,6 +227,10 @@ export default function CoachingPage() {
       profileExtensionsService.getMySessions()
         .then((r) => setMySessions(r.data?.data || []))
         .catch(() => setMySessions([]));
+
+      profileExtensionsService.getSessionDisputes({ status: 'PENDING' })
+        .then((r) => setMyDisputes(r.data?.data || []))
+        .catch(() => setMyDisputes([]));
 
       if (activeThreads.length > 0) {
         setRefundForm((f) => ({ ...f, mappingId: activeThreads[0].mappingId }));
@@ -575,10 +585,15 @@ export default function CoachingPage() {
 
   const refreshMySessions = useCallback(async () => {
     try {
-      const r = await profileExtensionsService.getMySessions();
-      setMySessions(r.data?.data || []);
+      const [sessionsRes, disputesRes] = await Promise.all([
+        profileExtensionsService.getMySessions(),
+        profileExtensionsService.getSessionDisputes({ status: 'PENDING' }),
+      ]);
+      setMySessions(sessionsRes.data?.data || []);
+      setMyDisputes(disputesRes.data?.data || []);
     } catch {
       setMySessions([]);
+      setMyDisputes([]);
     }
   }, []);
 
@@ -606,13 +621,27 @@ export default function CoachingPage() {
     setSessionActing(sessionId);
     try {
       await profileExtensionsService.disputeSession(sessionId, { reason: text });
-      toast.success('Đã gửi khiếu nại');
+      toast.success('Đã gửi khiếu nại — PT và Admin sẽ được thông báo');
       await refreshMySessions();
       fetchAppointments();
     } catch (e) {
       toast.error(e.response?.data?.message || 'Gửi khiếu nại thất bại');
     } finally {
       setSessionActing(null);
+    }
+  };
+
+  const handleDisputeReply = async (disputeId, body) => {
+    setDisputeActing(disputeId);
+    try {
+      await profileExtensionsService.replySessionDispute(disputeId, { body });
+      toast.success('Đã gửi bổ sung ý kiến');
+      const res = await profileExtensionsService.getSessionDisputes({ status: 'PENDING' });
+      setMyDisputes(res.data?.data || []);
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Gửi ý kiến thất bại');
+    } finally {
+      setDisputeActing(null);
     }
   };
 
@@ -1007,6 +1036,23 @@ export default function CoachingPage() {
         onConfirm={(sessionId) => handleConfirmSession(sessionId)}
         onDispute={(sessionId, reason) => handleDisputeSession(sessionId, reason)}
       />
+
+      {myDisputes.length > 0 && (
+        <div className="mb-6 space-y-3">
+          <h2 className="text-sm font-black uppercase tracking-wider text-rose-700">
+            Tranh chấp đang mở ({myDisputes.length})
+          </h2>
+          {myDisputes.map((d) => (
+            <SessionDisputeThread
+              key={d.id}
+              dispute={d}
+              viewerRole="customer"
+              actingId={disputeActing}
+              onSendMessage={handleDisputeReply}
+            />
+          ))}
+        </div>
+      )}
 
       {ptThreads.length === 0 ? (
         <div className="text-center py-16 px-4 bg-white border border-slate-200 rounded-3xl shadow-sm max-w-2xl mx-auto">

@@ -12,6 +12,7 @@ import com.sba.nutricanbe.payment.enums.WalletType;
 import com.sba.nutricanbe.payment.repository.CoachingEscrowRepository;
 import com.sba.nutricanbe.payment.repository.WalletTransactionRepository;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
+import com.sba.nutricanbe.user.service.MappingSessionConfirmService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -32,6 +33,7 @@ public class FinanceAdminController {
     private final CoachingWalletService walletService;
     private final WalletTransactionRepository transactionRepository;
     private final CoachingEscrowRepository escrowRepository;
+    private final MappingSessionConfirmService mappingSessionConfirmService;
     private final SystemSettingService systemSettingService;
 
     @GetMapping("/overview")
@@ -54,6 +56,7 @@ public class FinanceAdminController {
                 .heldEscrowCount(escrowRepository.countByStatusIn(
                         List.of(CoachingEscrowStatus.HELD, CoachingEscrowStatus.PARTIALLY_RELEASED)))
                 .disputedEscrowCount(escrowRepository.countByStatus(CoachingEscrowStatus.DISPUTED))
+                .pendingSessionDisputeCount(mappingSessionConfirmService.countPendingDisputes())
                 .platformFeeRate(systemSettingService.getPlatformFeeRate())
                 .build();
         return ResponseEntity.ok(ApiResponse.success(dto));

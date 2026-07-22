@@ -16,5 +16,6 @@ public class FinanceOverviewDto {
     private BigDecimal totalPayments;
     private long heldEscrowCount;
     private long disputedEscrowCount;
+    private long pendingSessionDisputeCount;
     private BigDecimal platformFeeRate;
 }

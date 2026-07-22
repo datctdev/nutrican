@@ -1,12 +1,14 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { appointmentService } from '../../services/appointmentService';
 import { workspaceService } from '../../services/workspaceService';
+import SessionDisputeThread from '../../components/coaching/SessionDisputeThread';
 import { toast } from 'sonner';
 import { Loader2, Calendar, Plus } from 'lucide-react';
 import Modal from '../../components/common/Modal';
 import CoachingTimetable, { mergeTimetableSources } from '../../components/coaching/CoachingTimetable';
+import useWebSocket from '../../hooks/useWebSocket';
 
 function toLocalInputValue(date) {
   if (!date) return '';
@@ -18,7 +20,6 @@ function toLocalInputValue(date) {
 
 function fromLocalInputValue(value) {
   if (!value) return null;
-  // Treat as local wall-clock (no Z) — matches BE LocalDateTime
   const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
   if (!m) return null;
   return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00`;
@@ -27,9 +28,11 @@ function fromLocalInputValue(value) {
 export default function PtAppointmentsPage() {
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
+  const [disputes, setDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState(null);
   const [actingId, setActingId] = useState(null);
+  const [disputeActing, setDisputeActing] = useState(null);
   const [rescheduleItem, setRescheduleItem] = useState(null);
   const [rescheduleAt, setRescheduleAt] = useState('');
   const [rescheduling, setRescheduling] = useState(false);
@@ -38,34 +41,43 @@ export default function PtAppointmentsPage() {
   const [addAt, setAddAt] = useState('');
   const [adding, setAdding] = useState(false);
 
+  useWebSocket();
+
   const offlineClients = useMemo(
     () => (clients || []).filter((c) => c.selectedTrainingMode === 'OFFLINE' && c.mappingId),
     [clients],
   );
   const hasOffline = offlineClients.length > 0 || (appointments || []).some((a) => a.type === 'OFFLINE');
 
-  const fetchAppts = async () => {
+  const fetchAppts = useCallback(async () => {
     setLoading(true);
     try {
-      const [apptRes, clientsRes] = await Promise.all([
+      const [apptRes, clientsRes, disputesRes] = await Promise.all([
         appointmentService.getPtUpcoming(),
         workspaceService.getClients({ page: 0, size: 100, status: 'ACTIVE' }).catch(() => null),
+        workspaceService.getSessionDisputes({ status: 'PENDING' }).catch(() => null),
       ]);
       setAppointments(apptRes.data.data || []);
       const page = clientsRes?.data?.data;
       const list = page?.content || page?.items || (Array.isArray(page) ? page : []);
       setClients(list);
+      setDisputes(disputesRes?.data?.data || []);
     } catch {
       toast.error('Không thể tải lịch hẹn');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => fetchAppts(), 0);
-    return () => clearTimeout(t);
-  }, []);
+    const onUpdate = () => fetchAppts();
+    window.addEventListener('session_confirm_updated', onUpdate);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('session_confirm_updated', onUpdate);
+    };
+  }, [fetchAppts]);
 
   const items = useMemo(() => {
     const nameByClientId = {};
@@ -88,8 +100,7 @@ export default function PtAppointmentsPage() {
     setCancellingId(id);
     try {
       const res = await appointmentService.updateAppointment(id, 'CANCEL');
-      const msg = res?.data?.message;
-      toast.success(msg || 'Đã hủy buổi');
+      toast.success(res?.data?.message || 'Đã hủy buổi');
       fetchAppts();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Hủy thất bại');
@@ -108,6 +119,20 @@ export default function PtAppointmentsPage() {
       toast.error(err.response?.data?.message || 'Không thể xác nhận buổi');
     } finally {
       setActingId(null);
+    }
+  };
+
+  const handleDisputeReply = async (disputeId, body) => {
+    setDisputeActing(disputeId);
+    try {
+      await workspaceService.replySessionDispute(disputeId, { body });
+      toast.success('Đã gửi phản hồi tranh chấp');
+      const res = await workspaceService.getSessionDisputes({ status: 'PENDING' });
+      setDisputes(res.data?.data || []);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gửi phản hồi thất bại');
+    } finally {
+      setDisputeActing(null);
     }
   };
 
@@ -168,7 +193,7 @@ export default function PtAppointmentsPage() {
             <h1 className="text-2xl font-bold text-slate-900">Lịch buổi tập offline</h1>
             <p className="text-sm text-slate-500 mt-0.5 max-w-xl">
               Đổi lịch hoặc thêm buổi khi còn tiền escrow. «Đã dạy xong» bật khi tới giờ.
-              Hủy buổi chờ dạy (≥48h phía HV): hoàn ví; hủy sát giờ: không hoàn.
+              Hủy buổi chờ dạy sẽ hoàn ví (nếu còn escrow). Tranh chấp phản hồi bên dưới.
             </p>
           </div>
         </div>
@@ -181,6 +206,23 @@ export default function PtAppointmentsPage() {
           </Button>
         )}
       </div>
+
+      {disputes.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-black uppercase tracking-wider text-rose-700">
+            Tranh chấp đang mở ({disputes.length})
+          </h2>
+          {disputes.map((d) => (
+            <SessionDisputeThread
+              key={d.id}
+              dispute={d}
+              viewerRole="pt"
+              actingId={disputeActing}
+              onSendMessage={handleDisputeReply}
+            />
+          ))}
+        </div>
+      )}
 
       {!loading && !hasOffline ? (
         <Card className="border-dashed border-slate-200">
@@ -222,7 +264,7 @@ export default function PtAppointmentsPage() {
       >
         <div className="space-y-3">
           <p className="text-xs text-slate-500">
-            Chọn khung giờ trong lịch nhận học viên của bạn. Không đụng tới tiền escrow.
+            Chọn khung giờ trong lịch nhận học viên. Không đụng tới tiền escrow.
           </p>
           <label className="block text-[10px] font-bold text-slate-500 uppercase">Thời gian mới</label>
           <input

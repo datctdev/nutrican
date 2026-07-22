@@ -226,6 +226,11 @@ const handleWebSocketMessage = (message) => {
             window.dispatchEvent(new CustomEvent('session_confirm_updated', { detail: data }));
             break;
 
+        case 'SESSION_DISPUTE_MESSAGE':
+            toast.info(data?.message || 'Có trao đổi mới trong tranh chấp buổi tập.');
+            window.dispatchEvent(new CustomEvent('session_confirm_updated', { detail: data }));
+            break;
+
         case 'SESSION_DISPUTE_RESOLVED':
             toast.success(data?.message || 'Tranh chấp buổi tập đã được xử lý.');
             window.dispatchEvent(new CustomEvent('session_confirm_updated', { detail: data }));

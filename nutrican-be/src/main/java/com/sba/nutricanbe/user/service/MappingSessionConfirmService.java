@@ -1,8 +1,9 @@
 package com.sba.nutricanbe.user.service;
 
 import com.sba.nutricanbe.user.dto.MappingSessionResponse;
-import com.sba.nutricanbe.user.dto.SessionDisputeRequest;
+import com.sba.nutricanbe.user.dto.SessionDisputeMessageRequest;
 import com.sba.nutricanbe.user.dto.SessionDisputeResponse;
+import com.sba.nutricanbe.user.dto.SessionDisputeRequest;
 import com.sba.nutricanbe.user.dto.SessionDisputeReviewRequest;
 
 import java.util.List;
@@ -20,9 +21,18 @@ public interface MappingSessionConfirmService {
 
     List<SessionDisputeResponse> listDisputes(String status);
 
-    SessionDisputeResponse resolveDispute(UUID disputeId, SessionDisputeReviewRequest request);
+    List<SessionDisputeResponse> listDisputesForPt(UUID ptUserId, String status);
+
+    List<SessionDisputeResponse> listDisputesForCustomer(UUID customerId, String status);
+
+    SessionDisputeResponse addDisputeMessage(UUID userId, UUID disputeId, SessionDisputeMessageRequest request,
+                                             boolean asAdmin);
+
+    SessionDisputeResponse resolveDispute(UUID adminId, UUID disputeId, SessionDisputeReviewRequest request);
 
     int autoConfirmOverdueSessions();
 
     List<MappingSessionResponse> listSessionsForCustomer(UUID customerId);
+
+    long countPendingDisputes();
 }

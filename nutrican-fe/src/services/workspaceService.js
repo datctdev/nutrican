@@ -25,6 +25,8 @@ export const workspaceService = {
     requestEndCoaching: (clientId) => api.post(`/workspace/clients/${clientId}/end-coaching`),
     confirmEndCoaching: (clientId) => api.put(`/workspace/clients/${clientId}/end-coaching/confirm`),
     markSessionDone: (sessionId) => api.post(`/workspace/sessions/${sessionId}/mark-done`),
+    getSessionDisputes: (params = {}) => api.get('/workspace/session-disputes', { params }),
+    replySessionDispute: (id, data) => api.post(`/workspace/session-disputes/${id}/messages`, data),
     getChatContext: (clientId) => api.get(`/workspace/clients/${clientId}/chat-context`),
     getClientProfile: (clientId) => api.get(`/workspace/clients/${clientId}/profile`),
     getClientDayPlan: (clientId, date) => api.get(`/workspace/clients/${clientId}/day-plan`, { params: { date } }),
