@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.user.dto.PtAvailabilityWindowResponse;
 import com.sba.nutricanbe.user.entity.PtMappingSession;
 import com.sba.nutricanbe.user.entity.PtVenue;
+import com.sba.nutricanbe.user.enums.MappingSessionStatus;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -85,6 +86,7 @@ public class OfflineHireSessionService {
                     .venueName(venue.getName())
                     .venueAddress(venue.getAddress())
                     .venueMapsUrl(venue.getMapsUrl())
+                    .status(MappingSessionStatus.SCHEDULED)
                     .build());
         }
 

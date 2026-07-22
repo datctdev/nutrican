@@ -3,6 +3,7 @@ package com.sba.nutricanbe.payment.service.impl;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.service.SystemSettingService;
 import com.sba.nutricanbe.payment.dto.WalletResponse;
 import com.sba.nutricanbe.payment.dto.WalletTransactionResponse;
 import com.sba.nutricanbe.payment.dto.WithdrawRequest;
@@ -16,11 +17,9 @@ import com.sba.nutricanbe.payment.repository.WalletTransactionRepository;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
-import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -44,9 +43,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     private final PtClientMappingRepository mappingRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
-
-    @Value("${app.payment.platform-fee-rate:10.00}")
-    private BigDecimal platformFeeRate;
+    private final SystemSettingService systemSettingService;
 
     @Override
     @Transactional
@@ -61,12 +58,8 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
         Wallet ptWallet = getOrCreateUserWalletForUpdate(mapping.getPt());
 
-        if (platformFeeRate.signum() < 0 || platformFeeRate.compareTo(BigDecimal.valueOf(100)) > 0) {
-            throw new BadRequestException("Platform fee rate must be between 0 and 100");
-        }
+        BigDecimal feeRate = resolveFeeRate();
         BigDecimal amount = payment.getAmount();
-        BigDecimal fee = amount.multiply(platformFeeRate)
-                .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
         CoachingEscrow escrow = escrowRepository.save(CoachingEscrow.builder()
                 .mappingId(mapping.getId())
                 .payment(payment)
@@ -74,8 +67,9 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
                 .ptWallet(ptWallet)
                 .escrowWallet(escrowWallet)
                 .amount(amount)
-                .platformFeeRate(platformFeeRate)
-                .platformFeeAmount(fee)
+                .remainingAmount(amount)
+                .platformFeeRate(feeRate)
+                .platformFeeAmount(BigDecimal.ZERO)
                 .status(CoachingEscrowStatus.HELD)
                 .build());
 
@@ -133,12 +127,8 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
         Wallet ptWallet = getOrCreateUserWalletForUpdate(mapping.getPt());
 
-        if (platformFeeRate.signum() < 0 || platformFeeRate.compareTo(BigDecimal.valueOf(100)) > 0) {
-            throw new BadRequestException("Platform fee rate must be between 0 and 100");
-        }
+        BigDecimal feeRate = resolveFeeRate();
         BigDecimal amount = payment.getAmount();
-        BigDecimal fee = amount.multiply(platformFeeRate)
-                .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
         CoachingEscrow escrow = escrowRepository.save(CoachingEscrow.builder()
                 .mappingId(mapping.getId())
                 .payment(payment)
@@ -146,8 +136,9 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
                 .ptWallet(ptWallet)
                 .escrowWallet(escrowWallet)
                 .amount(amount)
-                .platformFeeRate(platformFeeRate)
-                .platformFeeAmount(fee)
+                .remainingAmount(amount)
+                .platformFeeRate(feeRate)
+                .platformFeeAmount(BigDecimal.ZERO)
                 .status(CoachingEscrowStatus.HELD)
                 .build());
 
@@ -180,7 +171,12 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     public void releaseEscrow(UUID mappingId) {
         CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
-        releaseLockedEscrow(escrow);
+        BigDecimal remaining = escrow.effectiveRemaining();
+        if (remaining.signum() <= 0) {
+            return;
+        }
+        releaseToPtInternal(escrow, remaining, "COACHING_ESCROW", escrow.getId(),
+                "Release remaining coaching fee to PT");
     }
 
     @Override
@@ -188,89 +184,242 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     public boolean releaseEscrowIfPresent(UUID mappingId) {
         return escrowRepository.findByMappingIdForUpdate(mappingId)
                 .map(escrow -> {
-                    releaseLockedEscrow(escrow);
+                    BigDecimal remaining = escrow.effectiveRemaining();
+                    if (remaining.signum() > 0
+                            && (escrow.getStatus() == CoachingEscrowStatus.HELD
+                            || escrow.getStatus() == CoachingEscrowStatus.PARTIALLY_RELEASED)) {
+                        releaseToPtInternal(escrow, remaining, "COACHING_ESCROW", escrow.getId(),
+                                "Release remaining coaching fee to PT");
+                    }
                     return true;
                 })
                 .orElse(false);
     }
 
-    private void releaseLockedEscrow(CoachingEscrow escrow) {
-        if (escrow.getStatus() == CoachingEscrowStatus.RELEASED) {
-            return;
+    @Override
+    @Transactional
+    public void releaseToPt(UUID mappingId, BigDecimal grossAmount, String referenceType,
+                            UUID referenceId, String note) {
+        CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
+        releaseToPtInternal(escrow, grossAmount, referenceType, referenceId, note);
+    }
+
+    @Override
+    @Transactional
+    public void refundToCustomer(UUID mappingId, BigDecimal grossAmount, String referenceType,
+                                 UUID referenceId, String note) {
+        CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
+        refundToCustomerInternal(escrow, grossAmount, referenceType, referenceId, note);
+    }
+
+    @Override
+    @Transactional
+    public void settleSplit(UUID mappingId, BigDecimal ptGross, BigDecimal customerGross,
+                            String referenceType, UUID referenceId, String note) {
+        CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
+        BigDecimal pt = nullToZero(ptGross);
+        BigDecimal customer = nullToZero(customerGross);
+        if (pt.signum() < 0 || customer.signum() < 0) {
+            throw new BadRequestException("Settlement amounts must be non-negative");
         }
-        if (escrow.getStatus() != CoachingEscrowStatus.HELD) {
-            throw new BadRequestException("Escrow cannot be released in status " + escrow.getStatus());
+        BigDecimal total = pt.add(customer);
+        BigDecimal remaining = escrow.effectiveRemaining();
+        if (total.compareTo(remaining) > 0) {
+            throw new BadRequestException("Settlement exceeds remaining escrow");
         }
+        if (pt.signum() > 0) {
+            releaseToPtInternal(escrow, pt, referenceType, referenceId,
+                    note != null ? note + " (PT share)" : "Settle PT share");
+        }
+        // reload remaining after PT release
+        escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
+        if (customer.signum() > 0) {
+            refundToCustomerInternal(escrow, customer, referenceType, referenceId,
+                    note != null ? note + " (customer share)" : "Settle customer share");
+        }
+    }
+
+    @Override
+    @Transactional
+    public boolean refundRemainingIfPresent(UUID mappingId, String note) {
+        return escrowRepository.findByMappingIdForUpdate(mappingId)
+                .map(escrow -> {
+                    BigDecimal remaining = escrow.effectiveRemaining();
+                    if (remaining.signum() > 0) {
+                        refundToCustomerInternal(escrow, remaining, "COACHING_ESCROW", escrow.getId(),
+                                note != null ? note : "Refund remaining escrow to customer");
+                    }
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal getRemainingEscrow(UUID mappingId) {
+        return escrowRepository.findByMappingId(mappingId)
+                .map(CoachingEscrow::effectiveRemaining)
+                .orElse(BigDecimal.ZERO);
+    }
+
+    private void releaseToPtInternal(CoachingEscrow escrow, BigDecimal grossAmount,
+                                     String referenceType, UUID referenceId, String note) {
+        assertEscrowPayable(escrow);
+        BigDecimal gross = requirePositive(grossAmount, "Release amount");
+        BigDecimal remaining = escrow.effectiveRemaining();
+        if (gross.compareTo(remaining) > 0) {
+            throw new BadRequestException("Release amount exceeds remaining escrow");
+        }
+
         PtClientMapping mapping = mappingRepository.findById(escrow.getMappingId())
                 .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", escrow.getMappingId()));
-        ClientMappingStatus mappingStatus = mapping.getStatus();
-        if (mappingStatus != ClientMappingStatus.COMPLETED) {
-            throw new BadRequestException("Coaching must be confirmed as ended before escrow release");
-        }
 
         Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
         Wallet platformWallet = getOrCreateSystemWalletForUpdate(WalletType.PLATFORM);
         Wallet ptWallet = getOrCreateUserWalletForUpdate(mapping.getPt());
 
-        BigDecimal amount = escrow.getAmount();
-        BigDecimal fee = escrow.getPlatformFeeAmount();
-        BigDecimal ptNet = amount.subtract(fee);
+        BigDecimal feeRate = escrow.getPlatformFeeRate() != null
+                ? escrow.getPlatformFeeRate() : resolveFeeRate();
+        BigDecimal fee = computeFee(gross, feeRate);
+        BigDecimal ptNet = gross.subtract(fee);
         if (ptNet.signum() < 0) {
-            throw new BadRequestException("Platform fee exceeds escrow amount");
+            throw new BadRequestException("Platform fee exceeds release amount");
         }
+
+        String releaseDedupe = "RELEASE:" + referenceType + ":" + referenceId + ":" + gross.toPlainString();
+        if (transactionRepository.existsByDedupeKey(releaseDedupe)) {
+            return;
+        }
+
         try {
-            escrowWallet.subtractLocked(amount);
+            escrowWallet.subtractLocked(gross);
         } catch (IllegalStateException exception) {
             throw new BadRequestException(exception.getMessage());
         }
         ptWallet.addAvailable(ptNet);
-        platformWallet.addAvailable(fee);
-
-        String releaseDedupe = "COACHING_ESCROW_RELEASE:" + escrow.getId();
-        if (!transactionRepository.existsByDedupeKey(releaseDedupe)) {
-            transactionRepository.save(WalletTransaction.builder()
-                    .fromWallet(escrowWallet)
-                    .toWallet(ptWallet)
-                    .amount(ptNet)
-                    .type(WalletTransactionType.RELEASE)
-                    .status(WalletTransactionStatus.SUCCESS)
-                    .dedupeKey(releaseDedupe)
-                    .referenceType("COACHING_ESCROW")
-                    .referenceId(escrow.getId())
-                    .note("Release completed coaching fee to PT")
-                    .build());
+        if (fee.signum() > 0) {
+            platformWallet.addAvailable(fee);
         }
 
-        String feeDedupe = "COACHING_COMMISSION:" + escrow.getId();
-        if (fee.signum() > 0 && !transactionRepository.existsByDedupeKey(feeDedupe)) {
-            transactionRepository.save(WalletTransaction.builder()
-                    .fromWallet(escrowWallet)
-                    .toWallet(platformWallet)
-                    .amount(fee)
-                    .type(WalletTransactionType.COMMISSION)
-                    .status(WalletTransactionStatus.SUCCESS)
-                    .dedupeKey(feeDedupe)
-                    .referenceType("COACHING_ESCROW")
-                    .referenceId(escrow.getId())
-                    .note("Nutrican platform coaching commission")
-                    .build());
+        transactionRepository.save(WalletTransaction.builder()
+                .fromWallet(escrowWallet)
+                .toWallet(ptWallet)
+                .amount(ptNet)
+                .type(WalletTransactionType.RELEASE)
+                .status(WalletTransactionStatus.SUCCESS)
+                .dedupeKey(releaseDedupe)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .note(note != null ? note : "Release to PT")
+                .build());
+
+        if (fee.signum() > 0) {
+            String feeDedupe = "COMMISSION:" + referenceType + ":" + referenceId + ":" + fee.toPlainString();
+            if (!transactionRepository.existsByDedupeKey(feeDedupe)) {
+                transactionRepository.save(WalletTransaction.builder()
+                        .fromWallet(escrowWallet)
+                        .toWallet(platformWallet)
+                        .amount(fee)
+                        .type(WalletTransactionType.COMMISSION)
+                        .status(WalletTransactionStatus.SUCCESS)
+                        .dedupeKey(feeDedupe)
+                        .referenceType(referenceType)
+                        .referenceId(referenceId)
+                        .note("Platform commission on PT share")
+                        .build());
+            }
         }
 
         walletRepository.saveAll(List.of(escrowWallet, platformWallet, ptWallet));
-        escrow.setStatus(CoachingEscrowStatus.RELEASED);
-        escrow.setReleasedAt(LocalDateTime.now());
+        BigDecimal newRemaining = remaining.subtract(gross);
+        escrow.setRemainingAmount(newRemaining);
+        escrow.setPlatformFeeAmount(nullToZero(escrow.getPlatformFeeAmount()).add(fee));
+        updateEscrowStatusAfterOutflow(escrow, newRemaining, false);
         escrowRepository.save(escrow);
+    }
+
+    private void refundToCustomerInternal(CoachingEscrow escrow, BigDecimal grossAmount,
+                                          String referenceType, UUID referenceId, String note) {
+        if (escrow.getStatus() == CoachingEscrowStatus.REFUNDED
+                && escrow.effectiveRemaining().signum() <= 0) {
+            return;
+        }
+        if (escrow.getStatus() != CoachingEscrowStatus.HELD
+                && escrow.getStatus() != CoachingEscrowStatus.PARTIALLY_RELEASED
+                && escrow.getStatus() != CoachingEscrowStatus.DISPUTED) {
+            throw new BadRequestException("Escrow cannot be refunded in status " + escrow.getStatus());
+        }
+
+        BigDecimal gross = requirePositive(grossAmount, "Refund amount");
+        BigDecimal remaining = escrow.effectiveRemaining();
+        if (gross.compareTo(remaining) > 0) {
+            throw new BadRequestException("Refund amount exceeds remaining escrow");
+        }
+
+        String refundDedupe = "REFUND:" + referenceType + ":" + referenceId + ":" + gross.toPlainString();
+        if (transactionRepository.existsByDedupeKey(refundDedupe)) {
+            return;
+        }
+
+        Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
+        PtClientMapping mapping = mappingRepository.findById(escrow.getMappingId())
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", escrow.getMappingId()));
+        Wallet customerWallet = getOrCreateUserWalletForUpdate(mapping.getClient());
+
+        try {
+            escrowWallet.subtractLocked(gross);
+        } catch (IllegalStateException exception) {
+            throw new BadRequestException(exception.getMessage());
+        }
+        customerWallet.addAvailable(gross);
+
+        transactionRepository.save(WalletTransaction.builder()
+                .fromWallet(escrowWallet)
+                .toWallet(customerWallet)
+                .amount(gross)
+                .type(WalletTransactionType.REFUND)
+                .status(WalletTransactionStatus.SUCCESS)
+                .dedupeKey(refundDedupe)
+                .referenceType(referenceType)
+                .referenceId(referenceId)
+                .note(note != null ? note : "Refund to customer")
+                .build());
+
+        walletRepository.saveAll(List.of(escrowWallet, customerWallet));
+        BigDecimal newRemaining = remaining.subtract(gross);
+        escrow.setRemainingAmount(newRemaining);
+        updateEscrowStatusAfterOutflow(escrow, newRemaining, true);
+        escrowRepository.save(escrow);
+
+        if (escrow.getStatus() == CoachingEscrowStatus.REFUNDED) {
+            escrow.getPayment().setStatus(CoachingPaymentStatus.REFUNDED);
+            paymentRepository.save(escrow.getPayment());
+        }
+    }
+
+    private void updateEscrowStatusAfterOutflow(CoachingEscrow escrow, BigDecimal newRemaining,
+                                                boolean lastOpWasRefund) {
+        if (newRemaining.signum() > 0) {
+            escrow.setStatus(CoachingEscrowStatus.PARTIALLY_RELEASED);
+            return;
+        }
+        boolean anyCommission = nullToZero(escrow.getPlatformFeeAmount()).signum() > 0;
+        if (anyCommission || !lastOpWasRefund) {
+            escrow.setStatus(CoachingEscrowStatus.RELEASED);
+            escrow.setReleasedAt(LocalDateTime.now());
+        } else {
+            escrow.setStatus(CoachingEscrowStatus.REFUNDED);
+        }
     }
 
     @Override
     @Transactional
     public boolean refundEscrowIfPresent(UUID mappingId) {
-        return escrowRepository.findByMappingIdForUpdate(mappingId)
-                .map(escrow -> {
-                    refundLockedEscrow(escrow);
-                    return true;
-                })
-                .orElse(false);
+        return refundRemainingIfPresent(mappingId, "Refund held coaching fee to customer wallet");
     }
 
     @Override
@@ -278,7 +427,8 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     public boolean markEscrowDisputedIfPresent(UUID mappingId) {
         return escrowRepository.findByMappingIdForUpdate(mappingId)
                 .map(escrow -> {
-                    if (escrow.getStatus() == CoachingEscrowStatus.HELD) {
+                    if (escrow.getStatus() == CoachingEscrowStatus.HELD
+                            || escrow.getStatus() == CoachingEscrowStatus.PARTIALLY_RELEASED) {
                         escrow.setStatus(CoachingEscrowStatus.DISPUTED);
                         escrowRepository.save(escrow);
                     } else if (escrow.getStatus() != CoachingEscrowStatus.DISPUTED) {
@@ -296,9 +446,14 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         return escrowRepository.findByMappingIdForUpdate(mappingId)
                 .map(escrow -> {
                     if (escrow.getStatus() == CoachingEscrowStatus.DISPUTED) {
-                        escrow.setStatus(CoachingEscrowStatus.HELD);
+                        boolean partial = escrow.effectiveRemaining()
+                                .compareTo(escrow.getAmount()) < 0;
+                        escrow.setStatus(partial
+                                ? CoachingEscrowStatus.PARTIALLY_RELEASED
+                                : CoachingEscrowStatus.HELD);
                         escrowRepository.save(escrow);
-                    } else if (escrow.getStatus() != CoachingEscrowStatus.HELD) {
+                    } else if (escrow.getStatus() != CoachingEscrowStatus.HELD
+                            && escrow.getStatus() != CoachingEscrowStatus.PARTIALLY_RELEASED) {
                         throw new BadRequestException(
                                 "Escrow dispute cannot be rejected in status "
                                         + escrow.getStatus());
@@ -306,49 +461,6 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
                     return true;
                 })
                 .orElse(false);
-    }
-
-    private void refundLockedEscrow(CoachingEscrow escrow) {
-        if (escrow.getStatus() == CoachingEscrowStatus.REFUNDED) {
-            return;
-        }
-        if (escrow.getStatus() != CoachingEscrowStatus.HELD
-                && escrow.getStatus() != CoachingEscrowStatus.DISPUTED) {
-            throw new BadRequestException("Only held or disputed escrow can be refunded");
-        }
-
-        Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
-        PtClientMapping mapping = mappingRepository.findById(escrow.getMappingId())
-                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", escrow.getMappingId()));
-        Wallet customerWallet = getOrCreateUserWalletForUpdate(mapping.getClient());
-        BigDecimal amount = escrow.getAmount();
-        try {
-            escrowWallet.subtractLocked(amount);
-        } catch (IllegalStateException exception) {
-            throw new BadRequestException(exception.getMessage());
-        }
-        customerWallet.addAvailable(amount);
-
-        String refundDedupe = "COACHING_ESCROW_REFUND:" + escrow.getId();
-        if (!transactionRepository.existsByDedupeKey(refundDedupe)) {
-            transactionRepository.save(WalletTransaction.builder()
-                    .fromWallet(escrowWallet)
-                    .toWallet(customerWallet)
-                    .amount(amount)
-                    .type(WalletTransactionType.REFUND)
-                    .status(WalletTransactionStatus.SUCCESS)
-                    .dedupeKey(refundDedupe)
-                    .referenceType("COACHING_ESCROW")
-                    .referenceId(escrow.getId())
-                    .note("Refund held coaching fee to customer wallet")
-                    .build());
-        }
-
-        walletRepository.saveAll(List.of(escrowWallet, customerWallet));
-        escrow.setStatus(CoachingEscrowStatus.REFUNDED);
-        escrowRepository.save(escrow);
-        escrow.getPayment().setStatus(CoachingPaymentStatus.REFUNDED);
-        paymentRepository.save(escrow.getPayment());
     }
 
     @Override
@@ -441,6 +553,34 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
                 wallet.getId(), PageRequest.of(page, size));
         return PageResponse.from(transactions.map(item ->
                 WalletTransactionResponse.from(item, wallet.getId())));
+    }
+
+    private void assertEscrowPayable(CoachingEscrow escrow) {
+        if (escrow.getStatus() != CoachingEscrowStatus.HELD
+                && escrow.getStatus() != CoachingEscrowStatus.PARTIALLY_RELEASED
+                && escrow.getStatus() != CoachingEscrowStatus.DISPUTED) {
+            throw new BadRequestException("Escrow cannot be released in status " + escrow.getStatus());
+        }
+    }
+
+    private BigDecimal resolveFeeRate() {
+        return systemSettingService.getPlatformFeeRate();
+    }
+
+    private BigDecimal computeFee(BigDecimal gross, BigDecimal feeRate) {
+        return gross.multiply(feeRate)
+                .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal requirePositive(BigDecimal amount, String label) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new BadRequestException(label + " must be greater than 0");
+        }
+        return amount;
+    }
+
+    private BigDecimal nullToZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 
     private Wallet getOrCreateUserWalletForUpdate(User user) {

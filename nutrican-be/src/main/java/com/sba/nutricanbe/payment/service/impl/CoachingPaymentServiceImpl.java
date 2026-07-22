@@ -17,6 +17,7 @@ import com.sba.nutricanbe.user.dto.NotificationPayload;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.NotificationLinkType;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.service.NotificationService;
 import com.sba.nutricanbe.user.service.OfflinePackageAppointmentService;
@@ -116,6 +117,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         mapping.setStatus(ClientMappingStatus.ACTIVE);
         mapping.setCoachingStartedAt(now);
         mapping.setPaymentDueAt(null);
+        applyOnlinePeriodEnd(mapping, now);
         mappingRepository.save(mapping);
         offlinePackageAppointmentService.materializeOfflinePackageIfNeeded(mapping);
         notifyPaymentSuccessAfterCommit(mapping, payment);
@@ -207,10 +209,17 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         mapping.setStatus(ClientMappingStatus.ACTIVE);
         mapping.setCoachingStartedAt(LocalDateTime.now());
         mapping.setPaymentDueAt(null);
+        applyOnlinePeriodEnd(mapping, mapping.getCoachingStartedAt());
         mappingRepository.save(mapping);
         offlinePackageAppointmentService.materializeOfflinePackageIfNeeded(mapping);
         notifyPaymentSuccessAfterCommit(mapping, payment);
         return result(payment, mapping, true, "Coaching payment completed");
+    }
+
+    private void applyOnlinePeriodEnd(PtClientMapping mapping, LocalDateTime startedAt) {
+        if (mapping.getSelectedTrainingMode() == TrainingMode.ONLINE && startedAt != null) {
+            mapping.setPeriodEndsAt(startedAt.plusMonths(1));
+        }
     }
 
     @Override

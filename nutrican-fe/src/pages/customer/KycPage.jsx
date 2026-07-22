@@ -12,7 +12,7 @@ import {
   User, Briefcase, Award, FileUp, GraduationCap, Sparkles,
   Users, TrendingUp, Star, ChevronRight, Mail, Phone, UploadCloud,
   Plus, Trash2, Monitor, Dumbbell, Globe,
-  ExternalLink, Image as ImageIcon, Calendar, Link2
+  ExternalLink, Image as ImageIcon, Calendar, Link2, Percent
 } from 'lucide-react';
 import PtVenueAvailabilityEditor, { newVenue, weekScheduleToAvailabilityWindows } from '../../components/pt/PtVenueAvailabilityEditor';
 import ProvinceSelect from '../../components/common/ProvinceSelect';
@@ -365,6 +365,7 @@ export default function KycPage() {
   const [adminRejectNote, setAdminRejectNote] = useState('');
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const [requireKyc, setRequireKyc] = useState(true);
+  const [platformFeeRate, setPlatformFeeRate] = useState(null);
 
   const [sessionId, setSessionId] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
@@ -414,12 +415,15 @@ export default function KycPage() {
     const checkStatus = async () => {
       setIsLoadingStatus(true);
       try {
-        const [profileRes, settingRes] = await Promise.all([
+        const [profileRes, settingRes, feeRes] = await Promise.all([
           userService.getProfile(),
-          userService.getRequireKycSetting().catch(() => ({ data: { data: true } }))
+          userService.getRequireKycSetting().catch(() => ({ data: { data: true } })),
+          userService.getPlatformFeeRate().catch(() => ({ data: { data: null } })),
         ]);
         const userData = profileRes.data?.data;
         setRequireKyc(settingRes.data?.data ?? true);
+        const fee = feeRes.data?.data;
+        setPlatformFeeRate(fee != null ? Number(fee) : null);
         if (userData?.ptProfile) {
           setHasPtProfile(true);
           setPtProfileStatus(userData.ptProfile.ptRequestStatus || userData.ptProfile.verificationStatus);
@@ -885,6 +889,15 @@ export default function KycPage() {
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-slate-800">Bạn muốn đăng ký theo hướng nào?</h2>
               <p className="text-slate-500 mt-2">Chọn lộ trình phù hợp với năng lực và kinh nghiệm của bạn</p>
+              {platformFeeRate != null && (
+                <div className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+                  <Percent className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <span>
+                    Phí hoa hồng nền tảng hiện tại: <strong>{platformFeeRate}%</strong>
+                    {' '}(trừ trên phần thu nhập PT khi giải ngân)
+                  </span>
+                </div>
+              )}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1328,6 +1341,14 @@ export default function KycPage() {
                     </div>
                   ))}
                 </div>
+                {platformFeeRate != null && (
+                  <div className="mt-5 pt-4 border-t border-white/10">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Phí nền tảng</p>
+                    <p className="text-sm text-slate-200">
+                      Hoa hồng hiện tại <span className="font-bold text-amber-300">{platformFeeRate}%</span> trên phần PT nhận mỗi lần giải ngân từ escrow.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

@@ -27,8 +27,8 @@ import PtPortfolioEditor from './pages/pt/PtPortfolioEditor';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import PtVerificationPage from './pages/admin/PtVerificationPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
-import RefundReviewPage from './pages/admin/RefundReviewPage';
 import FoodTagsPage from './pages/admin/FoodTagsPage';
+import AdminFinancePage from './pages/admin/AdminFinancePage';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import OnboardingGuard from './components/common/OnboardingGuard';
 import ChatPage from './pages/pt/ChatPage';
@@ -104,8 +104,8 @@ function App() {
                     element: <ProtectedRoute allowedRoles={['ADMIN']}><UserManagementPage /></ProtectedRoute>,
                 },
                 {
-                    path: '/admin/refunds',
-                    element: <ProtectedRoute allowedRoles={['ADMIN']}><RefundReviewPage /></ProtectedRoute>,
+                    path: '/admin/finance',
+                    element: <ProtectedRoute allowedRoles={['ADMIN']}><AdminFinancePage /></ProtectedRoute>,
                 },
                 {
                     path: '/admin/food-tags',

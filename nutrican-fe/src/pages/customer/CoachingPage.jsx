@@ -155,6 +155,8 @@ export default function CoachingPage() {
   const [coachingWallet, setCoachingWallet] = useState(null);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [payingWithWallet, setPayingWithWallet] = useState(false);
+  const [mySessions, setMySessions] = useState([]);
+  const [sessionActing, setSessionActing] = useState(null);
 
   useEffect(() => {
     if (tabParam) {
@@ -173,11 +175,18 @@ export default function CoachingPage() {
       }, 300);
     };
     const onHireUpdate = () => fetchCoachingStatus();
+    const onSessionUpdate = () => {
+      profileExtensionsService.getMySessions()
+        .then((r) => setMySessions(r.data?.data || []))
+        .catch(() => setMySessions([]));
+    };
     window.addEventListener('refund_update', onRefundUpdate);
     window.addEventListener('hire_request_updated', onHireUpdate);
+    window.addEventListener('session_confirm_updated', onSessionUpdate);
     return () => {
       window.removeEventListener('refund_update', onRefundUpdate);
       window.removeEventListener('hire_request_updated', onHireUpdate);
+      window.removeEventListener('session_confirm_updated', onSessionUpdate);
     };
   }, []);
 
@@ -198,6 +207,10 @@ export default function CoachingPage() {
       coachingPaymentService.getMyWallet()
         .then((response) => setCoachingWallet(response.data?.data || null))
         .catch(() => setCoachingWallet(null));
+
+      profileExtensionsService.getMySessions()
+        .then((r) => setMySessions(r.data?.data || []))
+        .catch(() => setMySessions([]));
 
       if (activeThreads.length > 0) {
         setApptForm((f) => ({ ...f, ptId: activeThreads[0].participantId }));
@@ -866,6 +879,67 @@ export default function CoachingPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {mySessions.some((s) => s.status === 'AWAITING_CONFIRM') && (
+        <div className="mb-6 rounded-3xl border border-blue-200 bg-blue-50 p-5 shadow-sm space-y-3">
+          <h2 className="text-lg font-black text-slate-900">Xác nhận buổi tập</h2>
+          <p className="text-sm text-slate-600">PT vừa xác nhận đã dạy xong. Bạn đồng ý trừ buổi vào gói?</p>
+          {mySessions.filter((s) => s.status === 'AWAITING_CONFIRM').map((s) => (
+            <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white p-3">
+              <div className="text-sm font-semibold text-slate-800">
+                Buổi #{s.sequence}: {formatSessionRange(s.startTime, s.endTime)}
+                {s.confirmDeadlineAt && (
+                  <p className="text-xs font-medium text-amber-700 mt-1">
+                    Tự động xác nhận trước: {new Date(s.confirmDeadlineAt).toLocaleString('vi-VN')}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  className="bg-emerald-600 text-white"
+                  disabled={sessionActing === s.id}
+                  onClick={async () => {
+                    setSessionActing(s.id);
+                    try {
+                      await profileExtensionsService.confirmSession(s.id);
+                      toast.success('Đã xác nhận buổi tập');
+                      const r = await profileExtensionsService.getMySessions();
+                      setMySessions(r.data?.data || []);
+                    } catch (e) {
+                      toast.error(e.response?.data?.message || 'Xác nhận thất bại');
+                    } finally {
+                      setSessionActing(null);
+                    }
+                  }}
+                >
+                  Đồng ý
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={sessionActing === s.id}
+                  onClick={async () => {
+                    const reason = window.prompt('Lý do không đồng ý / khiếu nại?');
+                    if (!reason || !reason.trim()) return;
+                    setSessionActing(s.id);
+                    try {
+                      await profileExtensionsService.disputeSession(s.id, { reason: reason.trim() });
+                      toast.success('Đã gửi khiếu nại');
+                      const r = await profileExtensionsService.getMySessions();
+                      setMySessions(r.data?.data || []);
+                    } catch (e) {
+                      toast.error(e.response?.data?.message || 'Gửi khiếu nại thất bại');
+                    } finally {
+                      setSessionActing(null);
+                    }
+                  }}
+                >
+                  Không đồng ý
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

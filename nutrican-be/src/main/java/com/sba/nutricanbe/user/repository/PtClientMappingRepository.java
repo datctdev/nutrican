@@ -2,6 +2,7 @@ package com.sba.nutricanbe.user.repository;
 
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -102,4 +104,9 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
             ClientMappingStatus status, java.time.LocalDateTime paymentDueAt);
 
     List<PtClientMapping> findByClient_IdAndStatusOrderByCompletedAtDesc(UUID clientId, ClientMappingStatus status);
+
+    List<PtClientMapping> findBySelectedTrainingModeAndStatusAndPeriodEndsAtBefore(
+            TrainingMode selectedTrainingMode,
+            ClientMappingStatus status,
+            LocalDateTime periodEndsAt);
 }

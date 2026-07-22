@@ -54,6 +54,10 @@ public class PtClientMapping extends BaseEntity {
     @Column(name = "coaching_started_at")
     private LocalDateTime coachingStartedAt;
 
+    /** Online coaching period end (typically startedAt + 1 month). */
+    @Column(name = "period_ends_at")
+    private LocalDateTime periodEndsAt;
+
     @CreationTimestamp
     @Column(name = "assigned_at", updatable = false)
     private LocalDateTime assignedAt;

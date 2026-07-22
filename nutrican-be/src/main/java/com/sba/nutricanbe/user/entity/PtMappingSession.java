@@ -1,9 +1,11 @@
 package com.sba.nutricanbe.user.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
+import com.sba.nutricanbe.user.enums.MappingSessionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -39,4 +41,21 @@ public class PtMappingSession extends BaseEntity {
 
     @Column(name = "venue_maps_url", length = 500)
     private String venueMapsUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    @Builder.Default
+    private MappingSessionStatus status = MappingSessionStatus.SCHEDULED;
+
+    @Column(name = "pt_marked_done_at")
+    private LocalDateTime ptMarkedDoneAt;
+
+    @Column(name = "customer_responded_at")
+    private LocalDateTime customerRespondedAt;
+
+    @Column(name = "confirm_deadline_at")
+    private LocalDateTime confirmDeadlineAt;
+
+    @Column(name = "released_amount", precision = 15, scale = 2)
+    private BigDecimal releasedAmount;
 }

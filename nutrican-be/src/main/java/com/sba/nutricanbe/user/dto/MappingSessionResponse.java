@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -23,6 +24,11 @@ public class MappingSessionResponse {
     private String venueName;
     private String venueAddress;
     private String venueMapsUrl;
+    private String status;
+    private LocalDateTime ptMarkedDoneAt;
+    private LocalDateTime customerRespondedAt;
+    private LocalDateTime confirmDeadlineAt;
+    private BigDecimal releasedAmount;
 
     public static MappingSessionResponse from(PtMappingSession session) {
         return MappingSessionResponse.builder()
@@ -34,6 +40,11 @@ public class MappingSessionResponse {
                 .venueName(session.getVenueName())
                 .venueAddress(session.getVenueAddress())
                 .venueMapsUrl(session.getVenueMapsUrl())
+                .status(session.getStatus() != null ? session.getStatus().name() : null)
+                .ptMarkedDoneAt(session.getPtMarkedDoneAt())
+                .customerRespondedAt(session.getCustomerRespondedAt())
+                .confirmDeadlineAt(session.getConfirmDeadlineAt())
+                .releasedAmount(session.getReleasedAmount())
                 .build();
     }
 }

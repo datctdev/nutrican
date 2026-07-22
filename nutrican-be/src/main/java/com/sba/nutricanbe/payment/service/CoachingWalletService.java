@@ -7,6 +7,7 @@ import com.sba.nutricanbe.payment.dto.WithdrawRequest;
 import com.sba.nutricanbe.payment.entity.Payment;
 import com.sba.nutricanbe.payment.enums.WalletType;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public interface CoachingWalletService {
@@ -24,6 +25,19 @@ public interface CoachingWalletService {
 
     boolean rejectEscrowDisputeIfPresent(UUID mappingId);
 
+    /** Release gross amount to PT (fee taken from PT share only). */
+    void releaseToPt(UUID mappingId, BigDecimal grossAmount, String referenceType, UUID referenceId, String note);
+
+    /** Refund gross amount to customer (no fee). */
+    void refundToCustomer(UUID mappingId, BigDecimal grossAmount, String referenceType, UUID referenceId, String note);
+
+    /** Split remaining: ptGross to PT (with fee), customerGross to customer. */
+    void settleSplit(UUID mappingId, BigDecimal ptGross, BigDecimal customerGross,
+                     String referenceType, UUID referenceId, String note);
+
+    /** Refund whatever remains in escrow to customer. */
+    boolean refundRemainingIfPresent(UUID mappingId, String note);
+
     WalletResponse getWallet(UUID userId);
 
     WalletResponse withdraw(UUID userId, WithdrawRequest request);
@@ -34,4 +48,6 @@ public interface CoachingWalletService {
 
     PageResponse<WalletTransactionResponse> getSystemTransactions(
             WalletType type, int page, int size);
+
+    BigDecimal getRemainingEscrow(UUID mappingId);
 }

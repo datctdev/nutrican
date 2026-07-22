@@ -41,16 +41,26 @@ public class CoachingEscrow extends BaseEntity {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
+    /** Remaining locked amount still held in escrow. */
+    @Column(name = "remaining_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal remainingAmount;
+
     @Column(name = "platform_fee_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal platformFeeRate;
 
+    /** Cumulative commission paid to platform from this escrow. */
     @Column(name = "platform_fee_amount", nullable = false, precision = 15, scale = 2)
-    private BigDecimal platformFeeAmount;
+    @Builder.Default
+    private BigDecimal platformFeeAmount = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private CoachingEscrowStatus status;
 
     @Column(name = "released_at")
     private LocalDateTime releasedAt;
+
+    public BigDecimal effectiveRemaining() {
+        return remainingAmount != null ? remainingAmount : amount;
+    }
 }
