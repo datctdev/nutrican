@@ -53,6 +53,13 @@ public class SessionDispute extends BaseEntity {
     @Column(name = "admin_note", length = 1000)
     private String adminNote;
 
+    /** Latest PT reply snapshot for quick list views (full thread in messages). */
+    @Column(name = "pt_note", length = 1000)
+    private String ptNote;
+
+    @Column(name = "pt_responded_at")
+    private LocalDateTime ptRespondedAt;
+
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
 }

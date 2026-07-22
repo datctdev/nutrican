@@ -15,4 +15,14 @@ public interface SessionDisputeRepository extends JpaRepository<SessionDispute, 
     List<SessionDispute> findByStatusOrderByCreatedAtDesc(SessionDisputeStatus status);
 
     List<SessionDispute> findAllByOrderByCreatedAtDesc();
+
+    List<SessionDispute> findByPtIdOrderByCreatedAtDesc(UUID ptId);
+
+    List<SessionDispute> findByPtIdAndStatusOrderByCreatedAtDesc(UUID ptId, SessionDisputeStatus status);
+
+    List<SessionDispute> findByCustomerIdOrderByCreatedAtDesc(UUID customerId);
+
+    List<SessionDispute> findByCustomerIdAndStatusOrderByCreatedAtDesc(UUID customerId, SessionDisputeStatus status);
+
+    long countByStatus(SessionDisputeStatus status);
 }

@@ -23,6 +23,7 @@ export const adminService = {
     getFinanceTransactions: (params = {}) => api.get('/admin/finance/transactions', { params }),
     getSessionDisputes: (params = {}) => api.get('/admin/session-disputes', { params }),
     resolveSessionDispute: (id, data) => api.put(`/admin/session-disputes/${id}`, data),
+    replySessionDispute: (id, data) => api.post(`/admin/session-disputes/${id}/messages`, data),
     getAllergenMappings: () => api.get('/admin/allergen-mappings'),
     createAllergenMapping: (data) => api.post('/admin/allergen-mappings', data),
     updateAllergenMapping: (id, data) => api.put(`/admin/allergen-mappings/${id}`, data),
