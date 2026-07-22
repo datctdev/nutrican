@@ -10,6 +10,6 @@ import java.util.UUID;
 public interface DayPlanService {
     DayPlanResponse getDayPlan(UUID customerId, LocalDate date);
 
-    /** Published PT meal plan (if any) that covers the given date for this customer. */
+
     Optional<MealPlan> getPublishedPlanForDate(UUID customerId, LocalDate date);
 }

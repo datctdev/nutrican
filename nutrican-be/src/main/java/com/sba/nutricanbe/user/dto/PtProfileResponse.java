@@ -58,7 +58,7 @@ public class PtProfileResponse {
     private List<PtVenueResponse> venues;
     private List<PtAvailabilityWindowResponse> availability;
 
-    /** Snapshot from open mapping (customer view) */
+
     private UUID venueId;
     private String venueName;
     private String venueAddress;

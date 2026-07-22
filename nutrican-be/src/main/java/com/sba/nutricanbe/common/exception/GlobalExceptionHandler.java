@@ -103,9 +103,7 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
-    /**
-     * Catch-all: log đầy đủ server-side với correlation ID, KHÔNG expose chi tiết nội bộ ra client.
-     */
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex) {
         String correlationId = UUID.randomUUID().toString().substring(0, 8).toUpperCase();

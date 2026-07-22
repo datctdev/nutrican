@@ -20,7 +20,7 @@ public class FoodItemResponse {
     private String foodCode;
     private List<String> aliases;
     private String category;
-    /** SoT group: PROTEIN | CARB | FAT | VEG | FRUIT | OTHER */
+
     private String categoryGroup;
     private String categoryGroupLabel;
     private BigDecimal servingSizeG;

@@ -63,7 +63,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     java.util.List<org.springframework.security.core.GrantedAuthority> authorities = new java.util.ArrayList<>();
                     authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
                     
-                    // Role Hierarchy: PTs and ADMIN also have CUSTOMER privileges
                     if ("PT_CERTIFIED".equals(role) || "PT_FREELANCE".equals(role) || "ADMIN".equals(role)) {
                         authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
                     }

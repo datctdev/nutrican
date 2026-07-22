@@ -49,11 +49,7 @@ function PlanMacroDetails({ item }) {
     );
 }
 
-/**
- * Plan item row — tick rules matrix:
- * - Solo: showSelfEat on self items
- * - Coached: showPtMark on PT original; no tick on self / lockedByReview
- */
+
 export default function PlanItemRow({
     item,
     selectedDate,
@@ -268,7 +264,7 @@ export default function PlanItemRow({
     );
 }
 
-/** Collapsed rejected / not-chosen alternatives */
+
 export function RejectedPlanItems({ items }) {
     const [open, setOpen] = useState(false);
     if (!items?.length) return null;

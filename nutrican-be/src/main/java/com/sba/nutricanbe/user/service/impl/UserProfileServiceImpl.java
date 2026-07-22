@@ -160,9 +160,6 @@ public class UserProfileServiceImpl implements UserProfileService {
             }
         }
 
-        // Intentional: User.role stays CUSTOMER until admin approves (PtAdminServiceImpl).
-        // PT pending state lives on PtProfile.ptRequestStatus (default PENDING_APPROVAL).
-        // Customer can still use /diet while PT application is pending — by design.
 
         PtProfile ptProfile = PtProfile.builder()
                 .user(user)

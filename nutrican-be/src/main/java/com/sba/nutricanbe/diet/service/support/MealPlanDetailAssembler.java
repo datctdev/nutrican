@@ -14,10 +14,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Assembles the full detail view (plan + enriched items + diet-preference warnings)
- * shared by the PT authoring view and the customer's current-plan view.
- */
+
 @Component
 @RequiredArgsConstructor
 public class MealPlanDetailAssembler {

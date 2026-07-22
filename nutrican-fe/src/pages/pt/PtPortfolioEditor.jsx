@@ -1,4 +1,3 @@
-// src/pages/pt/PtPortfolioEditor.jsx
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';

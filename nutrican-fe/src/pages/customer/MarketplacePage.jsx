@@ -1,4 +1,3 @@
-// src/pages/customer/MarketplacePage.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
@@ -53,7 +52,6 @@ export default function MarketplacePage() {
         try {
             setHistoryLoading(true);
             const res = await profileExtensionsService.getCoachingHistory();
-            // Lọc ra các PT đã COMPLETED để hiển thị phần Đánh giá
             const completedHistory = (res.data?.data || []).filter(h => h.status === 'COMPLETED');
             setCoachingHistory(completedHistory);
         } catch (err) {
@@ -74,7 +72,7 @@ export default function MarketplacePage() {
     return (
         <div className="max-w-[1600px] mx-auto space-y-10 pb-12 animate-fade-in">
 
-            {/* Hero Search Section */}
+
             <div className="bg-gradient-to-br from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-10 md:p-16 text-center shadow-lg relative overflow-hidden mt-6 mx-4 md:mx-0">
                 <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                 <div className="relative z-10 max-w-2xl mx-auto">
@@ -98,7 +96,7 @@ export default function MarketplacePage() {
             </div>
 
             <div className="px-4 md:px-0">
-                {/* PHÂN HỆ: PT ĐÃ ĐỒNG HÀNH (Chỉ hiện khi có dữ liệu) */}
+
                 {!historyLoading && coachingHistory.length > 0 && (
                     <div className="mb-12">
                         <div className="flex items-center gap-3 mb-6 px-2">
@@ -129,7 +127,7 @@ export default function MarketplacePage() {
                                         </div>
 
                                         <div className="flex gap-2">
-                                            {/* FIX URL TẠI ĐÂY NỮA */}
+
                                             <Link to={`/pt-profile/${history.ptProfileId}`} className="flex-1">
                                                 <Button
                                                     className={`w-full rounded-xl font-bold shadow-sm h-11 ${
@@ -153,7 +151,7 @@ export default function MarketplacePage() {
                     </div>
                 )}
 
-                {/* PHÂN HỆ: TÌM KIẾM CHUNG */}
+
                 <div className="flex flex-wrap justify-between items-end gap-4 mb-6 px-2 border-t border-slate-100 pt-8">
                     <div>
                         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Huấn luyện viên nổi bật</h2>

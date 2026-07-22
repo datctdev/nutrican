@@ -28,9 +28,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
-/**
- * Seed accounts + venue/availability for manual offline-hire smoke tests (dev only).
- */
+
 @Slf4j
 @Component
 @Profile("dev")

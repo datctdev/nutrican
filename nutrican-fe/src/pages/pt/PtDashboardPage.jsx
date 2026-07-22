@@ -1,4 +1,3 @@
-// src/pages/pt/PtDashboardPage.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
@@ -55,7 +54,7 @@ export default function PtDashboardPage() {
                 const res = await userService.getProfile();
                 const max = res.data?.data?.maxClients;
                 if (max) setMaxClients(max);
-            } catch { /* ignore */ }
+            } catch
         };
         init();
 
@@ -132,7 +131,7 @@ export default function PtDashboardPage() {
                 ))}
             </div>
 
-            {/* Wallet / earnings */}
+
             <Card className="bg-white border-slate-200 shadow-sm rounded-3xl">
                 <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
@@ -157,7 +156,7 @@ export default function PtDashboardPage() {
                 </CardContent>
             </Card>
 
-            {/* Attention list */}
+
             <div className="space-y-4">
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5 text-amber-500" />

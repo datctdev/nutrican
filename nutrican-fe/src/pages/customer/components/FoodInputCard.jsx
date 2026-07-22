@@ -1,4 +1,3 @@
-// src/pages/customer/components/FoodInputCard.jsx
 import {
     Sparkles, Keyboard, Camera, RefreshCw, X, Send, ImagePlus, Star, Trash2
 } from 'lucide-react';
@@ -57,7 +56,7 @@ export default function FoodInputCard({
         </option>
     ));
 
-    /** Hôm nay: không dropdown rối — hiện chip khung đang diễn ra. */
+
     const renderTodayPeriodChip = () => (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3">
             <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700/80">Đang ghi nhật ký vào</p>

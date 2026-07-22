@@ -1,4 +1,3 @@
-// src/pages/customer/components/DayPlanCard.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, X, Send, Ban, CalendarDays, Lock, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
@@ -32,7 +31,7 @@ import {
 import LateTickReasonModal from './LateTickReasonModal';
 import MealPeriodBlock from '../../../components/diet/timeline/MealPeriodBlock';
 
-/** Display plan items by 5 UI periods. */
+
 const PERIOD_ORDER = MEAL_PERIODS;
 
 function dayPlanFromTimeline(timeline) {
@@ -88,7 +87,7 @@ export default function DayPlanCard({
     const [editQty, setEditQty] = useState('');
     const [submission, setSubmission] = useState(null);
     const [lateTickTarget, setLateTickTarget] = useState(null);
-    /** Coached only: local suggestion cart before save & send to PT. */
+
     const [batchQueue, setBatchQueue] = useState([]);
     const [batchBusy, setBatchBusy] = useState(false);
     const qtyDebounceRef = useRef(null);
@@ -171,7 +170,7 @@ export default function DayPlanCard({
         );
         return locked?.submissionId || null;
     }, [dayPlan]);
-    /** Coaching UI: active PT mapping, or published PT menu for the day (API flicker fallback). */
+
     const hasPtPlan = Boolean(timeline?.hasPtPlan ?? dayPlan?.hasPtPlan);
     const coachedMode = Boolean(hasActivePt) || hasPtPlan;
 
@@ -275,7 +274,7 @@ export default function DayPlanCard({
         setPendingQty(String(Math.round(Number(food.servingSizeG) || 100)));
     };
 
-    /** Solo: persist immediately. Coached: queue locally then send to PT. */
+
     const handleAddToBatch = async () => {
         if (!pendingFood) return;
         const qty = Number(pendingQty);
@@ -555,7 +554,6 @@ export default function DayPlanCard({
     const submissionScopeText = formatSubmissionScope(submissionScopeItems, MEAL_PERIOD_LABELS);
     const rejectedByPeriod = {};
     for (const item of planItems) {
-        // Chỉ món PT từ chối (choiceRejected), không lẫn SUPERSEDED khi duyệt món khác
         if (item.source !== 'SELF' || !item.choiceRejected) continue;
         const period = resolvePlanItemPeriod(item);
         if (!period) continue;

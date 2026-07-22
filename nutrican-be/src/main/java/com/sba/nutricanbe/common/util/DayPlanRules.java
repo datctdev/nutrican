@@ -12,9 +12,7 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * Shared day-plan rules for meal-period settlement (customer + PT).
- */
+
 public final class DayPlanRules {
 
     private DayPlanRules() {}
@@ -77,7 +75,7 @@ public final class DayPlanRules {
                 .anyMatch(DayPlanRules::countsAsActualIntake);
     }
 
-    /** Chờ PT duyệt nhật ký không được coi là buổi đã chốt. */
+
     private static boolean countsAsActualIntake(DietLog log) {
         DietLogReviewStatus reviewStatus = log.getReviewStatus();
         return reviewStatus == null

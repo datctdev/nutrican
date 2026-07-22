@@ -1,4 +1,3 @@
-// src/pages/admin/PtVerificationPage.jsx
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -192,7 +191,7 @@ export default function PtVerificationPage() {
                 </div>
             </div>
 
-            {/* TABS CHÍNH */}
+
             <div className="flex gap-6 border-b border-slate-200">
                 <button
                     className={`pb-4 px-2 font-bold text-sm transition-colors relative flex items-center gap-2 ${mainTab === 'NEW' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
@@ -373,7 +372,7 @@ export default function PtVerificationPage() {
                                                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 pb-2">Các trường thông tin yêu cầu thay đổi</p>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     {Object.entries(req.requestedData).map(([key, value]) => {
-                                                        if (!FIELD_LABELS[key]) return null; // Ẩn các trường không mapping
+                                                        if (!FIELD_LABELS[key]) return null;
                                                         return (
                                                             <div key={key} className="bg-slate-50 p-3.5 rounded-xl border border-slate-100">
                                                                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">{FIELD_LABELS[key]}</p>
@@ -409,7 +408,7 @@ export default function PtVerificationPage() {
                 </>
             )}
 
-            {/* Modal Từ Chối Chung Cho Cả 2 Tab */}
+
             {rejectModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setRejectModal(null)}>
                     <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200 border border-slate-100" onClick={(e) => e.stopPropagation()}>

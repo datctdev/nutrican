@@ -58,8 +58,6 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         }
 
         Wallet customerWallet = getOrCreateUserWalletForUpdate(mapping.getClient());
-        // Always lock the system escrow before the PT wallet. Release uses the
-        // same order, preventing a pay-vs-release deadlock across PT contracts.
         Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
         Wallet ptWallet = getOrCreateUserWalletForUpdate(mapping.getPt());
 

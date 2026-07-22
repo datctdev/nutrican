@@ -19,7 +19,6 @@ test.describe('Deep meal periods MP-01…MP-08', () => {
       await manualTab.click();
       const manualSelect = page.getByRole('combobox').first();
       await expect(manualSelect).toBeVisible();
-      // Manual can pick any unlocked period value
       const values = await manualSelect.locator('option:not([disabled])').evaluateAll((opts) =>
         opts.map((o) => (o as HTMLOptionElement).value),
       );
@@ -32,7 +31,6 @@ test.describe('Deep meal periods MP-01…MP-08', () => {
       await seedAuthCookie(page, USERS.customer.email, USERS.customer.password, request);
       await page.goto('/diet');
       await expect(page.getByText(/nhật ký hôm nay|nhật ký ngày/i).first()).toBeVisible({ timeout: 15_000 });
-      // MealSection labels or period select both prove 5-window UI is wired
       const diaryHeading = page.getByText(/nhật ký hôm nay/i);
       await expect(diaryHeading).toBeVisible();
       const bodyText = await page.getByRole('main').innerText();

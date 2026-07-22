@@ -1,4 +1,3 @@
-// src/pages/customer/components/ConfirmFoodModal.jsx
 import { useEffect, useRef, useState } from 'react';
 import { X, Sparkles, Send, Search, Loader2 } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
@@ -39,7 +38,6 @@ export default function ConfirmFoodModal({
     const searchSeqRef = useRef(0);
     const debounceRef = useRef(null);
 
-    // Reset search UI whenever a new modal session opens (new logId)
     useEffect(() => {
         if (!confirmModal?.logId) return;
         setSearchQuery('');

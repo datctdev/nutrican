@@ -10,7 +10,7 @@ const MONTHS_VI = [
 
 function daysInMonthGrid(year, monthIndex) {
   const first = new Date(year, monthIndex, 1);
-  const startPad = first.getDay(); // 0 = CN
+  const startPad = first.getDay();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
   const cells = [];
   for (let i = 0; i < startPad; i++) cells.push(null);
@@ -21,17 +21,7 @@ function daysInMonthGrid(year, monthIndex) {
   return cells;
 }
 
-/**
- * @param {object} props
- * @param {boolean} props.open
- * @param {() => void} props.onClose
- * @param {string} props.selectedDate YYYY-MM-DD
- * @param {(iso: string) => void} props.onSelectDate
- * @param {string} props.viewingMonth YYYY-MM
- * @param {(ym: string) => void} props.onViewingMonthChange
- * @param {Set<string>|string[]} props.dottedDates
- * @param {boolean} [props.dotsLoading]
- */
+
 export default function DietDateCalendar({
   open,
   onClose,
@@ -173,7 +163,6 @@ export default function DietDateCalendar({
           )}
           {cells.map((iso, idx) => {
             if (!iso) return <div key={`e-${idx}`} className="aspect-square" />;
-            // Allow near-future for day-plan; block far future only
             const maxPlan = (() => {
               const d = parseLocalDate(today);
               d.setDate(d.getDate() + 14);
@@ -217,7 +206,7 @@ export default function DietDateCalendar({
 
   return (
     <>
-      {/* Mobile: bottom sheet */}
+
       <div
         className="fixed inset-0 z-[60] flex items-end justify-center md:hidden bg-slate-900/40 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
@@ -226,7 +215,7 @@ export default function DietDateCalendar({
           {panel}
         </div>
       </div>
-      {/* Desktop: centered popover overlay (anchor-agnostic, consistent) */}
+
       <div
         className="hidden md:flex fixed inset-0 z-[60] items-center justify-center bg-slate-900/30 backdrop-blur-sm animate-fade-in"
         onClick={onClose}

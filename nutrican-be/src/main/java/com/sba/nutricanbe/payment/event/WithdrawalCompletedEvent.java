@@ -4,9 +4,7 @@ import lombok.Getter;
 
 import java.math.BigDecimal;
 
-/**
- * Phát ra sau khi rút tiền khỏi ví thành công (đã commit) để gửi email thông báo cho người dùng.
- */
+
 @Getter
 public class WithdrawalCompletedEvent {
 

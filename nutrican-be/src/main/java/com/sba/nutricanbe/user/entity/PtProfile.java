@@ -35,7 +35,7 @@ public class PtProfile extends BaseEntity {
     @Builder.Default
     private Boolean isVerified = false;
 
-    /** Hướng đăng ký mong muốn do user chọn: CERTIFIED hoặc FREELANCE */
+
     @Column(name = "preferred_track", length = 20)
     private String preferredTrack;
 
@@ -45,30 +45,30 @@ public class PtProfile extends BaseEntity {
     @Column(name = "training_philosophy", columnDefinition = "TEXT")
     private String trainingPhilosophy;
 
-    /** Ngày bắt đầu hoạt động làm PT — hệ thống tự tính số năm kinh nghiệm */
+
     @Column(name = "experience_start_date")
     private LocalDate experienceStartDate;
 
-    /** Computed: số năm kinh nghiệm tính từ experienceStartDate đến ngày hiện tại */
+
     public Integer getYearsOfExperience() {
         if (experienceStartDate == null) return 0;
         return (int) ChronoUnit.YEARS.between(experienceStartDate, LocalDate.now());
     }
 
-    /** Số điện thoại liên hệ riêng của PT (có thể khác số tài khoản) */
+
     @Column(name = "contact_phone", length = 20)
     private String contactPhone;
 
-    /** Hình thức huấn luyện: ONLINE / OFFLINE / BOTH */
+
     @Enumerated(EnumType.STRING)
     @Column(name = "training_mode", length = 20)
     private TrainingMode trainingMode;
 
-    /** Địa điểm hoạt động chính, VD: "TP. Hồ Chí Minh" */
+
     @Column(name = "location", length = 100)
     private String location;
 
-    /** Đơn vị tính phí: HOUR | SESSION_60 | SESSION_90 | MONTH */
+
     @Column(name = "online_rate", precision = 12, scale = 2)
     private BigDecimal onlineRate;
 
@@ -102,7 +102,7 @@ public class PtProfile extends BaseEntity {
     @Builder.Default
     private Tier tier = Tier.TIER_2;
 
-    /** Danh sách chứng chỉ chuyên môn (JSONB) — mỗi chứng chỉ có ảnh xác minh */
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "certifications", columnDefinition = "jsonb")
     private List<CertificationData> certifications;

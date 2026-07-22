@@ -1,4 +1,3 @@
-// src/services/api.js
 import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
 import { DEMO_VN_CLOCK_KEY } from '../pages/customer/components/dietUtils';
@@ -23,7 +22,7 @@ api.interceptors.request.use(
             if (demoClock) {
                 config.headers['X-Nutrican-Demo-Vn-Clock'] = demoClock;
             }
-        } catch { /* ignore */ }
+        } catch
         if (config.data instanceof FormData) {
             delete config.headers['Content-Type'];
         }

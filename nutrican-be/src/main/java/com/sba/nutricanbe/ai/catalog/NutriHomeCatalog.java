@@ -14,10 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Loads NutriHome PDF macro data extracted to JSON (333 foods + ResNet10 bundle).
- * Regenerate: {@code research/scripts/extract_nutrihome_pdf.py}
- */
+
 @Slf4j
 public final class NutriHomeCatalog {
 
@@ -206,7 +203,7 @@ public final class NutriHomeCatalog {
         return forCode(foodCode);
     }
 
-    /** Compact NutriHome table for LLaVA prompt (ResNet10 + key variants). */
+
     public static String llavaMacroReferenceBlock() {
         ensureLoaded();
         StringBuilder sb = new StringBuilder();
@@ -221,7 +218,7 @@ public final class NutriHomeCatalog {
         return sb.toString().trim();
     }
 
-    /** Macro line for one catalog code (used when ResNet hint is Food-101). */
+
     public static String llavaMacroLineForCode(String foodCode) {
         ensureLoaded();
         return forCode(foodCode)
@@ -229,7 +226,7 @@ public final class NutriHomeCatalog {
                 .orElse("");
     }
 
-    /** Top Food-101 entries for LLaVA prompt (raw-meat / steak confusion cluster). */
+
     public static String llavaFood101ReferenceBlock() {
         ensureLoaded();
         String[] focusCodes = {

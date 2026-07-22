@@ -42,7 +42,7 @@ import java.util.UUID;
 public class CoachingPaymentServiceImpl implements CoachingPaymentService {
 
     private static final DateTimeFormatter ORDER_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
-    /** Grace after attempt expiresAt for late browser return / IPN. */
+
     private static final int PAYMENT_ATTEMPT_GRACE_MINUTES = 15;
 
     private final CoachingPaymentRepository paymentRepository;
@@ -111,8 +111,6 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
                 .paidAt(now)
                 .build());
 
-        // Moves the customer's existing available balance straight into escrow (HELD).
-        // Throws BadRequestException if the balance is insufficient, rolling back this payment.
         walletService.holdFromWalletBalance(payment);
 
         mapping.setStatus(ClientMappingStatus.ACTIVE);

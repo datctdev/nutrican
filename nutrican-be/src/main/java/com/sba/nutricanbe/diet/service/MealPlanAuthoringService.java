@@ -7,9 +7,7 @@ import com.sba.nutricanbe.diet.dto.response.MealPlanSaveResult;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * PT-facing meal-plan authoring: create, update, view and publish plans for a client.
- */
+
 public interface MealPlanAuthoringService {
 
     MealPlanSaveResult createPlan(UUID ptId, MealPlanRequest request);

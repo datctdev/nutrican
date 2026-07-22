@@ -20,7 +20,7 @@ export function localDateOffsetIso(dayOffset: number): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Retry seed login until backend + UserInitializer are ready (avoids E2E flake on cold start). */
+
 export async function waitForBackend(
   request: APIRequestContext,
   maxAttempts = 30,

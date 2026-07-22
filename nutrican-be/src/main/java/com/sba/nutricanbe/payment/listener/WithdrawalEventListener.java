@@ -12,9 +12,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.text.NumberFormat;
 import java.util.Locale;
 
-/**
- * Sau khi giao dịch rút tiền commit thành công, gửi email thông báo cho người dùng.
- */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

@@ -1,4 +1,3 @@
-// src/pages/auth/ResetPasswordPage.jsx
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';

@@ -3,9 +3,7 @@ package com.sba.nutricanbe.ai.catalog;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Cuisine / catalog grouping for fusion guardrails (VN vs Food-101 vs unified VN dishes).
- */
+
 public final class FoodCodeCategory {
 
     private static final Set<String> RESNET10_CODES = Set.of(
@@ -53,7 +51,7 @@ public final class FoodCodeCategory {
         return NutriHomeCatalog.isUnifiedVnCode(code);
     }
 
-    /** True when LLaVA mapped a VN dish name/code but ResNet hint is international Food-101. */
+
     public static boolean isCrossCuisineHallucination(String resnetCode, String llavaResolvedCode) {
         if (resnetCode == null || llavaResolvedCode == null) {
             return false;

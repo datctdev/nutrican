@@ -1,4 +1,3 @@
-// src/pages/customer/ProfilePage.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { userService } from '../../services/userService';
@@ -155,7 +154,7 @@ export default function ProfilePage() {
       setBodyMetricReminder(optIn.bodyMetricReminder !== false);
       try {
         localStorage.setItem('nutrican_post_meal_opt_in', JSON.stringify(optIn.postMealRating !== false));
-      } catch { /* ignore */ }
+      } catch
 
       const activeThreads = (threadsRes.data.data || []).filter((t) => t.status === 'ACTIVE' || t.status === 'END_REQUESTED');
       setPtThreads(activeThreads);
@@ -248,9 +247,6 @@ export default function ProfilePage() {
       setLoadingAppts(false);
     }
   };
-
-
-
 
 
   const handleMarkEaten = async (itemId, eaten) => {
@@ -375,7 +371,7 @@ export default function ProfilePage() {
         <p className="text-slate-500 mt-1 font-medium">Xem và quản lý thông tin cá nhân của bạn.</p>
       </div>
 
-      {/* Basic profile card */}
+
       <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
         <div className="h-32 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
         <CardContent className="px-8 pb-8">
@@ -432,7 +428,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Target Settings, Health & Progress Quick Link */}
+
       <Card className="border-slate-200 bg-slate-50/50 shadow-sm border-dashed rounded-2xl cursor-pointer hover:border-slate-350 hover:bg-slate-50 transition-all" onClick={() => navigate('/macro-targets')}>
         <CardContent className="p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -448,7 +444,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Meal plan */}
+
       <Card className="border-slate-200 shadow-sm">
         <CardContent className="p-6">
           <div className="mb-4 flex items-center gap-2">
@@ -523,7 +519,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Appointments */}
+
       <Card className="border-slate-200 shadow-sm">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-center gap-2">
@@ -598,7 +594,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Coaching lifecycle */}
+
       <Card className="border-slate-200 shadow-sm">
         <CardContent className="p-6 space-y-4">
           <h3 className="text-lg font-bold text-slate-900">Coaching với PT</h3>
@@ -637,7 +633,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Refund */}
+
       <Card className="border-slate-200 shadow-sm">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-center gap-2">

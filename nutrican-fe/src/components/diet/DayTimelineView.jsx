@@ -1,4 +1,3 @@
-// src/components/diet/DayTimelineView.jsx
 import { Lock, CheckCircle2 } from 'lucide-react';
 import { MEAL_PERIODS, MEAL_PERIOD_LABELS } from '../../pages/customer/components/dietUtils';
 import MealPeriodBlock from './timeline/MealPeriodBlock';

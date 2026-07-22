@@ -38,7 +38,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-/** Seeds primary {@code @nutrican.com} accounts and background marketplace users. */
+
 @Slf4j
 @Component
 @Order(1)
@@ -96,7 +96,6 @@ public class UserInitializer implements CommandLineRunner {
         seedDemoMacroIfAbsent(demoSolo, ActivityLevel.MODERATE, 2100, 130, 230, 70);
 
         seedMapping(mainPt, demoCustomer, ClientMappingStatus.ACTIVE);
-        // solo@ cố tình KHÔNG có PT (demo self-plan)
 
         seedPtReviewsOnce(mainPt, demoCustomer,
                 "PT tận tình, chế độ ăn sát thực tế. Sau 2 tháng mình đã có kết quả rõ rệt!");

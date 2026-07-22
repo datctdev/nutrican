@@ -493,7 +493,6 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
             recognitionSource = RecognitionSource.HYBRID;
             dbApplied = true;
         } else if (aiResult.getCalories() != null) {
-            // UI / A1.1: NutriHome × portion from fusion
             macros = MacroNutrients.of(aiResult.getCalories(), aiResult.getProtein(), aiResult.getCarbs(), aiResult.getFat());
             if (portionG == null && bestMatch.isPresent()) {
                 FoodItem food = foodItemRepository.findById(bestMatch.get().getId()).orElseThrow();
@@ -722,7 +721,6 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
         if (logDate != null && logDate.equals(today)) {
             MealPeriod period = requested != null ? requested : current;
             if (period != current) {
-                // Soft-correct stale client period so demo/AI flow không bị chặn
                 return current;
             }
             return period;

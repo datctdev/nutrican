@@ -203,7 +203,7 @@ public class DayPlanServiceImpl implements DayPlanService {
         return hasLoggedSlot ? "ALREADY_LOGGED" : null;
     }
 
-    /** Buổi đã chốt theo PT gốc → self draft còn lại = không được chọn (giữ lịch sử). */
+
     private void enrichChoiceRejectedFlags(List<DayPlanItemResponse> items, LocalDate planDate, List<DietLog> logs) {
         for (MealPeriod period : MealPeriod.values()) {
             List<DayPlanItemResponse> inPeriod = items.stream()

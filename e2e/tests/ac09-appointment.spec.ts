@@ -3,7 +3,6 @@ import { test, expect } from '@playwright/test';
 import { uiLogin, USERS } from '../fixtures/auth';
 
 
-
 test.describe('AC-9 Appointments', () => {
 
   test('customer profile shows appointment booking section', async ({ page }) => {
@@ -16,7 +15,6 @@ test.describe('AC-9 Appointments', () => {
     await expect(page.getByText(/lịch hẹn|đặt lịch/i).first()).toBeVisible({ timeout: 10_000 });
 
   });
-
 
 
   test('PT appointments page loads', async ({ page }) => {

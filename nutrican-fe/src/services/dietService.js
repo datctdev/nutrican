@@ -1,4 +1,3 @@
-// src/services/dietService.js
 import api from './api';
 
 export const dietService = {

@@ -11,13 +11,11 @@ export default function SettingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Notification Preferences States
   const [postMealRatingOptIn, setPostMealRatingOptIn] = useState(true);
   const [hireResultEmail, setHireResultEmail] = useState(true);
   const [weeklySummaryEmail, setWeeklySummaryEmail] = useState(true);
   const [bodyMetricReminder, setBodyMetricReminder] = useState(true);
 
-  // Keep existing preferences to not overwrite them when saving only notifications
   const [dietPreference, setDietPreference] = useState('NORMAL');
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
   const [pregnancyTrimester, setPregnancyTrimester] = useState(1);

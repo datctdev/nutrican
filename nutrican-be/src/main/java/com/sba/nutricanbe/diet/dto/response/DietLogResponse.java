@@ -52,7 +52,7 @@ public class DietLogResponse {
     private UUID foodItemId;
     private java.util.List<FoodItemResponse> suggestedFoodMatches;
     private java.util.List<DietLogItemResponse> items;
-    /** Total portion grams: sum(items.quantityG) or AI-adjusted portion from aiRawJson. */
+
     private BigDecimal totalGrams;
     private String dietPrefWarning;
     private IntakeStatus intakeStatus;

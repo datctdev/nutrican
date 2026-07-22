@@ -20,7 +20,7 @@ public class PtAvailabilityWindow extends BaseEntity {
     @JoinColumn(name = "pt_profile_id", nullable = false)
     private PtProfile ptProfile;
 
-    /** 1 = Monday … 7 = Sunday (java.time.DayOfWeek) */
+
     @Column(name = "day_of_week", nullable = false)
     private Integer dayOfWeek;
 

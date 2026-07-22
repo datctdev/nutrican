@@ -28,7 +28,7 @@ public class VNPayConfig {
     @Value("${vnpay.returnUrl}")
     private String returnUrl;
 
-    /** Optional. When blank, rely on IPN URL configured in the VNPay merchant portal. */
+
     @Value("${vnpay.ipnUrl:}")
     private String ipnUrl;
 

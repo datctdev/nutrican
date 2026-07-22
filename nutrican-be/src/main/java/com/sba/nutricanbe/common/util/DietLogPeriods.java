@@ -5,9 +5,7 @@ import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealType;
 
-/**
- * Mirrors FE {@code resolveLogMealPeriod} in dietUtils.js for consistent grouping.
- */
+
 public final class DietLogPeriods {
 
     private DietLogPeriods() {}

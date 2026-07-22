@@ -16,10 +16,10 @@ import java.util.List;
 public class DayTimelinePeriodResponse {
     private MealPeriod mealPeriod;
     private String labelVi;
-    /** past | current | future */
+
     private String windowStatus;
     private boolean settled;
-    /** LOGGED | PT_EATEN | ALL_SKIPPED | SELF_EATEN | null */
+
     private String settledReason;
     @Builder.Default
     private List<DayPlanItemResponse> plannedItems = new ArrayList<>();

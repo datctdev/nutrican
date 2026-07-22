@@ -1,4 +1,3 @@
-// src/components/common/ImageLightbox.jsx
 import { useState, useEffect } from 'react';
 import { X, ZoomIn, ZoomOut, RotateCcw, Download } from 'lucide-react';
 
@@ -70,7 +69,6 @@ export default function ImageLightbox({ isOpen, imageUrl, onClose }) {
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Failed to download image', error);
-            // Fallback download opening in new tab
             window.open(imageUrl, '_blank');
         }
     };
@@ -83,7 +81,7 @@ export default function ImageLightbox({ isOpen, imageUrl, onClose }) {
             aria-modal="true"
             aria-label="Xem ảnh lớn"
         >
-            {/* Top Toolbar */}
+
             <div className="absolute top-0 inset-x-0 h-16 bg-gradient-to-b from-black/50 to-transparent flex items-center justify-between px-6 z-10">
                 <span className="text-white/60 text-xs font-semibold select-none truncate max-w-[60%]">
                     Xem hình ảnh
@@ -142,7 +140,7 @@ export default function ImageLightbox({ isOpen, imageUrl, onClose }) {
                 </div>
             </div>
 
-            {/* Main Image Viewport */}
+
             <div className="relative flex-1 w-full flex items-center justify-center p-4 overflow-hidden select-none">
                 <img
                     src={imageUrl}

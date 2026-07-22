@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2, ChevronDown } from 'lucide-react';
 import { locationService } from '../../services/locationService';
 
-/**
- * Combobox chọn/tìm tỉnh - thành phố Việt Nam (gọi API provinces.open-api.vn).
- * Giá trị lưu là tên tỉnh/thành (string), khớp với field `location` phía BE.
- */
+
 export default function ProvinceSelect({
   value,
   onChange,

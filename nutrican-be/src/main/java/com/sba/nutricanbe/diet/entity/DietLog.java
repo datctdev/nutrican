@@ -55,7 +55,7 @@ public class DietLog extends BaseEntity {
     @Column(name = "meal_period", length = 20)
     private MealPeriod mealPeriod;
 
-    /** Optional catch-up tag: period already past today; log still belongs to {@link #mealPeriod}. */
+
     @Enumerated(EnumType.STRING)
     @Column(name = "makeup_for_period", length = 20)
     private MealPeriod makeupForPeriod;

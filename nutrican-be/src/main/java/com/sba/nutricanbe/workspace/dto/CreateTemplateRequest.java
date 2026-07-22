@@ -22,7 +22,7 @@ public class CreateTemplateRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class TemplateItemDto {
-        private Integer dayOffset; // 0 to 6
+        private Integer dayOffset;
         private String mealType;
         private String foodCode;
         private String freeText;

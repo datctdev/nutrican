@@ -1,4 +1,3 @@
-// src/pages/customer/components/MealSection.jsx
 import { useMemo } from 'react';
 import { FileText } from 'lucide-react';
 import { Skeleton } from '../../../components/ui/skeleton';

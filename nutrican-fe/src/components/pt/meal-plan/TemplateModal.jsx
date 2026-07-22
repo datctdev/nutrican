@@ -5,11 +5,10 @@ import { toast } from 'sonner';
 import { Loader2, X, FileText, CheckCircle2 } from 'lucide-react';
 
 export default function TemplateModal({ isOpen, onClose, onApply, onSaveAsTemplate, items, weekStart }) {
-  const [tab, setTab] = useState('apply'); // 'apply' | 'save'
+  const [tab, setTab] = useState('apply');
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   
-  // For Save
   const [templateName, setTemplateName] = useState('');
   const [templateDesc, setTemplateDesc] = useState('');
 

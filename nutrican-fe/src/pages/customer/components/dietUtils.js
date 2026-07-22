@@ -1,4 +1,3 @@
-// src/pages/customer/components/dietUtils.js
 
 export const getFullImageUrl = (url) => {
     if (!url) return '';
@@ -7,7 +6,7 @@ export const getFullImageUrl = (url) => {
     return `${minioUrl}/${url}`;
 };
 
-/** Display macro numbers — max 2 decimals, no float artifacts (975.8700000000001 → 975.87). */
+
 export function formatMacroDisplay(value, maxDecimals = 2) {
     const n = Number(value);
     if (!Number.isFinite(n)) return '0';
@@ -53,7 +52,7 @@ export function formatAiConfidence(score) {
     return label === '—' ? null : label;
 }
 
-/** 199-class Top-1 ~44% is normal — show qualitative labels, not raw %. */
+
 export function formatPredictionConfidence(score) {
     if (score == null || Number.isNaN(Number(score))) return '—';
     const pct = Math.round(Number(score) <= 1 ? Number(score) * 100 : Number(score));
@@ -88,10 +87,7 @@ export function resolveResnetFoodCode(dish) {
     return null;
 }
 
-/**
- * Dominant macro tag from kcal contribution (pro×4, carb×4, fat×9).
- * Returns one label if max share ≥ 45%; null if total kcal is 0 / missing.
- */
+
 export function getDominantMacroTag({ protein, carb, fat } = {}) {
     const p = Number(protein) || 0;
     const c = Number(carb) || 0;
@@ -116,7 +112,7 @@ export function getManualDishOptions(resnetDishes) {
     return [];
 }
 
-/** Up to 8 default hints from resnetDishes (alphabet), preferring names matching llavaFoodName. */
+
 export function getDefaultDishHints(resnetDishes, llavaFoodName, limit = 8) {
     const dishes = getManualDishOptions(resnetDishes);
     if (!dishes.length) return [];
@@ -203,7 +199,7 @@ export const calculateProgress = (current, target) => {
     return Math.min(100, (current / target) * 100);
 };
 
-/** Local calendar YYYY-MM-DD (not UTC). */
+
 export function formatLocalDate(date = new Date()) {
     const d = date instanceof Date ? date : new Date(date);
     const year = d.getFullYear();
@@ -224,7 +220,7 @@ export function addDaysIso(iso, delta) {
     return formatLocalDate(d);
 }
 
-/** localStorage key — FE sends same value as X-Nutrican-Demo-Vn-Clock to BE. */
+
 export const DEMO_VN_CLOCK_KEY = 'nutrican.demoVnClock';
 
 export function getDemoVnClock() {
@@ -239,7 +235,7 @@ export function setDemoVnClock(value) {
     try {
         if (!value) localStorage.removeItem(DEMO_VN_CLOCK_KEY);
         else localStorage.setItem(DEMO_VN_CLOCK_KEY, value);
-    } catch { /* ignore */ }
+    } catch
 }
 
 function vnWallParts(date = new Date()) {
@@ -264,7 +260,7 @@ function vnWallParts(date = new Date()) {
     };
 }
 
-/** Parse demo clock: `HH:mm` / `HH:mm:ss` / `yyyy-MM-ddTHH:mm[:ss]` as VN wall time. */
+
 export function parseDemoVnClock(raw, baseDate = new Date()) {
     if (!raw || typeof raw !== 'string') return null;
     const value = raw.trim();
@@ -316,14 +312,14 @@ export function monthKeyFromIso(iso) {
     return iso.slice(0, 7);
 }
 
-/** Minutes since local midnight from Date or ISO (UTC → local). */
+
 export function toLocalMinutes(isoOrDate = new Date()) {
     const d = isoOrDate instanceof Date ? isoOrDate : new Date(isoOrDate);
     if (Number.isNaN(d.getTime())) return 0;
     return d.getHours() * 60 + d.getMinutes();
 }
 
-/** UI meal periods (5) — not API meal types. */
+
 export const MEAL_PERIODS = ['MORNING', 'NOON', 'AFTERNOON', 'EVENING', 'LATE'];
 
 export const MEAL_PERIOD_LABELS = {
@@ -338,7 +334,7 @@ export const MEAL_TYPE_LABELS = {
     BREAKFAST: 'Buổi sáng',
     LUNCH: 'Buổi trưa',
     DINNER: 'Buổi tối',
-    /** API chỉ có SNACK — gộp chiều/khuya trên UI plan/nhật ký */
+
     SNACK: 'Buổi chiều / khuya',
 };
 
@@ -353,7 +349,7 @@ export function periodToMealType(period) {
     }
 }
 
-/** Best-effort reverse of periodToMealType when mealPeriod is missing. */
+
 export function mealTypeToPeriod(mealType, mealPeriod) {
     if (mealPeriod) return mealPeriod;
     switch (mealType) {
@@ -365,7 +361,7 @@ export function mealTypeToPeriod(mealType, mealPeriod) {
     }
 }
 
-/** Buổi có self-plan PENDING chờ PT duyệt (theo ngày). */
+
 export function getPendingSelfPeriodsForDate(submissions, planDate) {
     const periods = new Set();
     (submissions || [])
@@ -379,11 +375,7 @@ export function getPendingSelfPeriodsForDate(submissions, planDate) {
     return periods;
 }
 
-/**
- * Một món / buổi cho macro hiệu lực:
- * - override > PT gốc
- * - buổi có đề xuất PENDING: bỏ PT gốc (chưa thay thế)
- */
+
 export function pickEffectivePlanItemsByPeriod(items, { pendingSelfPeriods = new Set() } = {}) {
     const byPeriod = new Map();
     (items || []).forEach((item) => {
@@ -403,10 +395,7 @@ export function pickEffectivePlanItemsByPeriod(items, { pendingSelfPeriods = new
     return [...byPeriod.values()];
 }
 
-/**
- * MORNING 04:00–10:59, NOON 11:00–12:59, AFTERNOON 13:00–17:59,
- * EVENING 18:00–21:59, LATE 22:00–03:59 (wrap).
- */
+
 export function mealPeriodFromMinutes(minutes) {
     const m = ((Number(minutes) % (24 * 60)) + (24 * 60)) % (24 * 60);
     if (m >= 4 * 60 && m < 11 * 60) return 'MORNING';
@@ -420,10 +409,9 @@ export function getCurrentMealPeriod(date = nowInVn()) {
     return mealPeriodFromMinutes(toLocalMinutes(date));
 }
 
-/** Periods whose window has fully ended (AI lock on today). */
+
 export function getLockedMealPeriods(date = nowInVn()) {
     const minutes = toLocalMinutes(date);
-    // Before 04:00: overnight LATE belongs to yesterday — nothing on today's calendar is locked yet.
     if (minutes < 4 * 60) return new Set();
     const current = mealPeriodFromMinutes(minutes);
     const order = MEAL_PERIODS;
@@ -437,7 +425,6 @@ export function getLockedMealPeriods(date = nowInVn()) {
 export function isFutureMealPeriod(period, date = new Date()) {
     const nowDate = date instanceof Date ? date : new Date(date);
     const minutes = toLocalMinutes(nowDate);
-    // Soft start of calendar day: all of today's windows are still upcoming.
     if (minutes < 4 * 60) return MEAL_PERIODS.includes(period);
     const order = MEAL_PERIODS;
     const current = getCurrentMealPeriod(nowDate);
@@ -456,7 +443,7 @@ export function getLockedMealTypes(date = new Date()) {
     return locked;
 }
 
-/** SNACK → Buổi chiều / Buổi khuya theo giờ; không rõ giờ → Buổi chiều / khuya. */
+
 export function formatMealTypeLabel(mealType, createdAt) {
     if (mealType === 'SNACK' && createdAt) {
         const period = mealPeriodFromMinutes(toLocalMinutes(createdAt));
@@ -466,7 +453,7 @@ export function formatMealTypeLabel(mealType, createdAt) {
     return MEAL_TYPE_LABELS[mealType] || mealType || 'Bữa ăn';
 }
 
-/** Group diary into 5 period sections. Prefer persisted mealPeriod (SoT). */
+
 export function resolveLogMealPeriod(log) {
     if (log?.mealPeriod && MEAL_PERIODS.includes(log.mealPeriod)) {
         return log.mealPeriod;
@@ -485,7 +472,7 @@ export function resolveLogMealPeriod(log) {
     return 'AFTERNOON';
 }
 
-/** Plan item grouping — prefer persisted mealPeriod (SoT). */
+
 export function resolvePlanItemPeriod(item) {
     if (item?.mealPeriod && MEAL_PERIODS.includes(item.mealPeriod)) return item.mealPeriod;
     if (item?.mealType === 'BREAKFAST') return 'MORNING';
@@ -495,10 +482,7 @@ export function resolvePlanItemPeriod(item) {
     return 'AFTERNOON';
 }
 
-/**
- * Mark-eaten gate. LATE spans midnight:
- * open for planDate=today when hour>=22, or planDate=yesterday when hour<4.
- */
+
 export function isMealPeriodOpen(planDate, period, now = nowInVn()) {
     if (!planDate || !period) return false;
     const nowDate = now instanceof Date ? now : new Date(now);
@@ -515,7 +499,7 @@ export function isMealPeriodOpen(planDate, period, now = nowInVn()) {
     return plan === today && getCurrentMealPeriod(nowDate) === period;
 }
 
-/** Buổi đã qua trong cùng ngày (ordinal), dùng cho tick trễ — không gồm buổi tương lai. */
+
 export function isMealPeriodPast(planDate, period, now = nowInVn()) {
     if (!planDate || !period) return false;
     const plan = typeof planDate === 'string' ? planDate.slice(0, 10) : formatLocalDate(planDate);
@@ -528,7 +512,7 @@ export function isMealPeriodPast(planDate, period, now = nowInVn()) {
     return periodIdx < currentIdx;
 }
 
-/** Tick trễ: hôm nay, buổi đã qua, không phải khung đang mở. */
+
 export function canLateTickMealPeriod(planDate, period, now = nowInVn()) {
     if (!planDate || !period) return false;
     return isTodayIso(typeof planDate === 'string' ? planDate.slice(0, 10) : formatLocalDate(planDate))
@@ -536,7 +520,7 @@ export function canLateTickMealPeriod(planDate, period, now = nowInVn()) {
         && isMealPeriodPast(planDate, period, now);
 }
 
-/** Chờ PT duyệt nhật ký không được coi là buổi đã chốt. */
+
 function isActualIntakeLog(log) {
     if (!log) return false;
     if (log.status && log.status !== 'LOGGED') return false;
@@ -544,12 +528,7 @@ function isActualIntakeLog(log) {
     return !rs || rs === 'NOT_REQUIRED' || rs === 'APPROVED';
 }
 
-/**
- * Buổi đã chốt khi: có diet log buổi đó, món PT/override eaten, toàn bộ PT skip, hoặc self eaten.
- * @param {string} mealPeriod
- * @param {Array} items day-plan items for the date
- * @param {Array} [logs] optional diet logs for the date
- */
+
 export function isMealPeriodSettled(mealPeriod, items = [], logs = []) {
     if (!mealPeriod) return false;
     const inPeriod = (items || []).filter((i) => resolvePlanItemPeriod(i) === mealPeriod);
@@ -563,7 +542,7 @@ export function isMealPeriodSettled(mealPeriod, items = [], logs = []) {
     return false;
 }
 
-/** Periods already past today (for makeup select). Empty when hour < 4 (soft UX). */
+
 export function getPastMealPeriodsForMakeup(date = nowInVn()) {
     const minutes = toLocalMinutes(date);
     if (minutes < 4 * 60) return [];
@@ -575,7 +554,7 @@ export function getPastMealPeriodsForMakeup(date = nowInVn()) {
     return past;
 }
 
-/** Mirror IntakeControlLoopServiceImpl (calo only). */
+
 export function computeIntakeStatus(projectedCalories, targetCalories, date = new Date()) {
     const projected = Number(projectedCalories) || 0;
     const target = Number(targetCalories) || 0;
@@ -609,9 +588,7 @@ export function scaleFoodMacros(food, quantityG) {
     };
 }
 
-/**
- * Whether eaten plan item macros are already included in diet-log summary totals.
- */
+
 export function isPlanItemInDietLogTotals(item) {
     if (!item?.eaten) return false;
     if (item.source === 'SELF') return true;
@@ -667,14 +644,7 @@ function emptyMacros() {
     return { calories: 0, protein: 0, carb: 0, fat: 0 };
 }
 
-/**
- * Plan progress for nutrition bars:
- * - pending: uneaten plan counted toward projection (gray)
- * - compliance: eaten PT tuân thủ chưa có diet log (vivid)
- * - fullPlan: pending + compliance + eaten đã log (informational)
- *
- * Coached mode: PT gốc chưa tick không cộng; self chờ duyệt / buổi đã chốt không cộng.
- */
+
 export function computePlanProgressBreakdown(items = [], {
     draftItem = null,
     excludeItemId = null,
@@ -735,18 +705,14 @@ export function computePlanProgressBreakdown(items = [], {
     };
 }
 
-/**
- * plannedTotals: mealType with active SELF → only SELF; else include PT.
- * Optional draftItem replaces excludeItemId macros when editing.
- * @deprecated Prefer computePlanProgressBreakdown for UI progress.
- */
+
 export function computePlannedTotals(items = [], options = {}) {
     return computePlanProgressBreakdown(items, options).pending;
 }
 
-/** Page size for diet log list fetches (documented contract). */
+
 export const DIET_LOG_PAGE_SIZE = 50;
-/** Safety cap for pagination loops. */
+
 export const DIET_LOG_MAX_PAGES = 20;
 
 export async function fetchAllDietLogsForRange(dietService, { startDate, endDate }) {

@@ -72,7 +72,7 @@ public class PtClientMapping extends BaseEntity {
     @Column(name = "termination_reason", length = 30)
     private com.sba.nutricanbe.user.enums.TerminationReason terminationReason;
 
-    /** Offline hire snapshot — immutable after hire */
+
     @Column(name = "venue_id")
     private java.util.UUID venueId;
 

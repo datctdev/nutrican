@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react';
 
-/** Shared activity level options — keys match BE ActivityLevel enum. */
+
 export const ACTIVITY_LEVEL_OPTIONS = [
   {
     value: 'SEDENTARY',

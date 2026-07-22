@@ -19,7 +19,6 @@ test.describe('Deep self-plan override SP-01…SP-14', () => {
       await ensurePublishedPlanForCustomer(request, clientId, today);
       const foodId = await searchFoodId(request, token);
 
-      // cleanup any leftover pending by canceling
       const existing = await request.get(`${API_BASE}/diet/self-plan/submissions`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { date: today, status: 'PENDING' },
@@ -100,7 +99,6 @@ test.describe('Deep self-plan override SP-01…SP-14', () => {
       await ensurePublishedPlanForCustomer(request, clientId, today);
       const foodId = await searchFoodId(request, token);
 
-      // cancel leftover pending
       const existing = await request.get(`${API_BASE}/diet/self-plan/submissions`, {
         headers: { Authorization: `Bearer ${token}` },
         params: { date: today },
@@ -113,7 +111,6 @@ test.describe('Deep self-plan override SP-01…SP-14', () => {
         }
       }
 
-      // REJECT path first on a separate submission
       const createR = await createSelfPlanItem(request, token, {
         mealType: 'LUNCH',
         foodItemId: foodId,
@@ -139,7 +136,6 @@ test.describe('Deep self-plan override SP-01…SP-14', () => {
       expect(reject.ok(), await reject.text()).toBeTruthy();
       expect((await reject.json()).data.status).toBe('REJECTED');
 
-      // APPROVE breakfast-only
       const createA = await createSelfPlanItem(request, token, {
         mealType: 'BREAKFAST',
         foodItemId: foodId,
@@ -184,7 +180,6 @@ test.describe('Deep self-plan override SP-01…SP-14', () => {
       expect(bfOverride.length).toBeGreaterThan(0);
       expect(bfOverride[0].foodItemId).toBeTruthy();
 
-      // SP-07 tick SELF_OVERRIDE → DietLog
       const overrideId = (await dayPlan.json()).data.items.find(
         (i: { sourceType?: string; eaten?: boolean }) => i.sourceType === 'SELF_OVERRIDE' && !i.eaten,
       )?.id;
@@ -193,7 +188,6 @@ test.describe('Deep self-plan override SP-01…SP-14', () => {
           headers: { Authorization: `Bearer ${token}` },
           params: { eaten: true },
         });
-        // some APIs use body
         const mark2 = mark.ok()
           ? mark
           : await request.put(`${API_BASE}/meal-plans/items/${overrideId}/eaten`, {
@@ -207,7 +201,6 @@ test.describe('Deep self-plan override SP-01…SP-14', () => {
     test('[BAD] SP-10 submit without published plan → 400', async ({ request }) => {
       const token = await customerRequest(request);
       const foodId = await searchFoodId(request, token);
-      // far future week unlikely to have plan
       const far = localDateOffsetIso(60);
       await createSelfPlanItem(request, token, {
         mealType: 'DINNER',

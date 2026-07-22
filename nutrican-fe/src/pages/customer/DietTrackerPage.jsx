@@ -1,4 +1,3 @@
-// src/pages/customer/DietTrackerPage.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '../../components/ui/button';
 import { dietService } from '../../services/dietService';
@@ -10,7 +9,6 @@ import { Link, useSearchParams } from 'react-router-dom';
 import useWebSocket from '../../hooks/useWebSocket';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 
-// Import subcomponents
 import NutritionProgress from './components/NutritionProgress';
 import FoodInputCard from './components/FoodInputCard';
 import DayPlanCard from './components/DayPlanCard';
@@ -50,7 +48,7 @@ function maxPlanDateIso() {
     return addDaysIso(todayLocalIso(), 14);
 }
 
-/** Past + today + near future (day-plan). Invalid → today. */
+
 function clampDateParam(raw) {
     const today = todayLocalIso();
     if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return today;
@@ -67,7 +65,7 @@ function schedulePostMealPrompt(logId) {
             logId,
             at: Date.now() + 30 * 60 * 1000,
         }));
-    } catch { /* ignore */ }
+    } catch
 }
 
 export default function DietTrackerPage() {
@@ -125,11 +123,10 @@ export default function DietTrackerPage() {
     const isToday = isTodayIso(selectedDate);
     const isFuture = isFutureIso(selectedDate);
     const isPast = isPastIso(selectedDate);
-    // AI + Manual: hôm nay chỉ khung hiện tại
     const applyAiPeriodLock = isToday;
     const [makeupForPeriod, setMakeupForPeriod] = useState(null);
 
-    /** Hôm nay: luôn đồng bộ khung theo giờ VN (tránh stale EVENING khi đã sang LATE). */
+
     useEffect(() => {
         if (!isToday) {
             setMakeupForPeriod(null);
@@ -303,7 +300,7 @@ export default function DietTrackerPage() {
                     setPostMealPrompt(parsed.logId);
                     localStorage.removeItem(POST_MEAL_PROMPT_KEY);
                 }
-            } catch { /* ignore */ }
+            } catch
         };
         checkPrompt();
         const id = setInterval(checkPrompt, 60000);
@@ -481,7 +478,7 @@ export default function DietTrackerPage() {
             if (analyzed?.manualRequired || analyzed?.gateResult === 'OUT_OF_CLASS') {
                 toast.warning(analyzed?.message || 'Món này chưa được hỗ trợ. Vui lòng nhập tay.');
                 if (analyzed?.logId) {
-                    try { await dietService.deleteLog(analyzed.logId); } catch { /* orphan cleanup best-effort */ }
+                    try { await dietService.deleteLog(analyzed.logId); } catch
                 }
                 setInputMode('manual');
                 setSelectedFile(null);
@@ -626,7 +623,6 @@ export default function DietTrackerPage() {
                 mealSource: 'HOME_COOKED',
                 logDate: selectedDate,
                 items: ingredientItems.map((it) => (
-                    // Custom: không gửi foodItemId — chỉ gắn vào nhật ký, không ghi catalog FoodItem
                     it.isCustom || !it.foodItemId
                         ? {
                             itemName: it.itemName,
@@ -850,7 +846,7 @@ export default function DietTrackerPage() {
             />
 
             <div className="grid lg:grid-cols-12 gap-8">
-                {/* Cột trái: Nhập liệu & Nhật ký hành trình */}
+
                 <div className="lg:col-span-8 space-y-8">
                     {!isFuture && (
                     <FoodInputCard
@@ -915,7 +911,7 @@ export default function DietTrackerPage() {
                     />
                 </div>
 
-                {/* Cột phải: Thống kê calo */}
+
                 <div className="lg:col-span-4 space-y-6">
                     <NutritionProgress
                         summary={summary}
@@ -927,7 +923,7 @@ export default function DietTrackerPage() {
                 </div>
             </div>
 
-            {/* Modal Xác nhận món ăn */}
+
             <ConfirmFoodModal
                 confirmModal={confirmModal}
                 resnetDishes={resnetDishes}

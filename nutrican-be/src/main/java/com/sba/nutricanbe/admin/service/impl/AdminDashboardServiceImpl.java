@@ -38,7 +38,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 .totalCustomers(totalCustomers)
                 .totalPts(totalPts)
                 .pendingPtVerifications(pendingPts)
-                .pendingKycVerifications(0) // KYC được VNPT verify tự động
+                .pendingKycVerifications(0)
                 .totalDietLogs(0)
                 .averageRating(BigDecimal.valueOf(4.5))
                 .build();

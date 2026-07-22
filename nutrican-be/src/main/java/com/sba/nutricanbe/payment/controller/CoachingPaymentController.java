@@ -75,10 +75,7 @@ public class CoachingPaymentController {
         response.sendRedirect(redirectUrl);
     }
 
-    /**
-     * Server-to-server Instant Payment Notification from VNPay.
-     * Configure this URL on the merchant portal (and optionally via {@code VNPAY_IPN_URL}).
-     */
+
     @GetMapping("/vnpay/ipn")
     public ResponseEntity<VnPayIpnResponse> handleVnPayIpn(
             @RequestParam Map<String, String> params) {

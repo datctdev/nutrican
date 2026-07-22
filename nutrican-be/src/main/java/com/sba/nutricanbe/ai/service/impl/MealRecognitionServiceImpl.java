@@ -91,7 +91,6 @@ public class MealRecognitionServiceImpl implements MealRecognitionService {
                 ? BigDecimal.valueOf(data.getConfidenceMargin()).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP)
                 : null;
 
-        // LLaVA vision analysis (Ollama) — corrects ResNet on dishes like com tam suon
         LlavaMealAnalysisResult llava = llavaMealAnalysisService.analyzeMealImage(file, resnetName, resnetCode);
         if (llava.isSuccess() && !llava.isFood()) {
             throw new BadRequestException("GATE_FAIL_NOT_FOOD: Ảnh không phải thực phẩm. Vui lòng chụp lại bữa ăn.");

@@ -219,7 +219,6 @@ public class PtReviewServiceImpl implements PtReviewService {
             if (request.getPtNote() == null || request.getPtNote().isBlank()) {
                 throw new BadRequestException("ptNote là bắt buộc khi từ chối");
             }
-            // Giữ submissionId → customer thấy "PT từ chối", không trả món về giỏ draft
             items.forEach(item -> item.setLockedByReview(false));
             selfPlanItemRepository.saveAll(items);
             submission.setStatus(SelfPlanSubmissionStatus.REJECTED);
@@ -305,7 +304,7 @@ public class PtReviewServiceImpl implements PtReviewService {
                 .toList();
     }
 
-    /** Chỉ buổi chưa ăn / chưa chốt — tránh hiểu nhầm PT duyệt sẽ đổi món đã tick. */
+
     private boolean isReviewableSubmissionItem(
             LocalDate planDate,
             SelfPlanItem item,

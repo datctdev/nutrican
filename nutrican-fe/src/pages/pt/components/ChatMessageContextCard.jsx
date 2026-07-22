@@ -1,4 +1,3 @@
-// src/pages/pt/components/ChatMessageContextCard.jsx
 import { FileText, Utensils, Calendar } from 'lucide-react';
 
 const TYPE_CONFIG = {

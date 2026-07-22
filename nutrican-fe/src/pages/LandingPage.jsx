@@ -1,4 +1,3 @@
-// src/pages/LandingPage.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -7,7 +6,6 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 
-// Import generated mockup assets
 import heroMockup from '../assets/nutrican_hero_mockup.png';
 import healthySalad from '../assets/ai_scanner_illustration.png';
 
@@ -41,8 +39,7 @@ const benefits = [
 ];
 
 export default function LandingPage() {
-  // Scanner interactive demo states
-  const [scanState, setScanState] = useState('idle'); // 'idle', 'scanning', 'completed'
+  const [scanState, setScanState] = useState('idle');
   const [scanProgress, setScanProgress] = useState(0);
 
   useEffect(() => {
@@ -70,14 +67,14 @@ export default function LandingPage() {
   return (
     <div className="space-y-24 selection:bg-blue-100 selection:text-blue-900 pb-16">
       
-      {/* Hero Section */}
+
       <section className="relative pt-8 pb-12 lg:pt-16 lg:pb-20 overflow-hidden">
-        {/* Background glow ambient effects */}
+
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-200/20 rounded-full blur-[100px] -z-10" />
         <div className="absolute bottom-0 left-1/4 w-[500px] h-[500px] bg-emerald-200/20 rounded-full blur-[100px] -z-10" />
 
         <div className="grid lg:grid-cols-12 gap-12 items-center">
-          {/* Hero Left Content */}
+
           <div className="lg:col-span-7 space-y-8 text-left">
             <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/60 text-blue-700 text-xs font-bold shadow-sm animate-fade-in">
               <Zap className="w-3.5 h-3.5 fill-blue-600 animate-pulse text-blue-600" />
@@ -95,7 +92,7 @@ export default function LandingPage() {
               Không còn phải tính calo thủ công. Chụp ảnh đĩa thức ăn của bạn, tính toán macros ngay lập tức và làm việc với các huấn luyện viên cá nhân chuyên nghiệp để đạt mục tiêu.
             </p>
 
-            {/* CTA Group */}
+
             <div className="flex flex-col sm:flex-row gap-4 pt-2">
               <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl h-14 px-8 text-base shadow-lg shadow-blue-500/25 font-bold transition-all duration-300 hover:scale-[1.02]">
                 <Link to="/register">
@@ -109,7 +106,7 @@ export default function LandingPage() {
               </Button>
             </div>
 
-            {/* Social Trust Metrics */}
+
             <div className="flex items-center gap-5 pt-4 border-t border-slate-100 max-w-md">
               <div className="flex -space-x-3">
                 {[1, 2, 3, 4].map((i) => (
@@ -129,12 +126,12 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Hero Right Visual Column */}
+
           <div className="lg:col-span-5 relative flex justify-center items-center">
-            {/* Soft decorative background circles */}
+
             <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 to-emerald-500/10 rounded-full blur-3xl -z-10 animate-pulse" style={{ animationDuration: '4s' }} />
             
-            {/* Phone Frame Wrap */}
+
             <div className="relative group p-4 bg-slate-900/5 rounded-[40px] border border-slate-900/5 shadow-2xl hover:scale-[1.01] transition-transform duration-500">
               <img 
                 src={heroMockup} 
@@ -142,7 +139,7 @@ export default function LandingPage() {
                 className="w-full max-w-[340px] rounded-[32px] shadow-lg border-4 border-slate-900/90 object-cover"
               />
 
-              {/* Floating Macro badge card */}
+
               <div className="absolute -top-4 -right-6 glass-panel rounded-2xl p-4 shadow-xl border border-slate-200/40 flex items-center gap-3 animate-bounce" style={{ animationDuration: '6s' }}>
                 <span className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-emerald-600" />
@@ -153,7 +150,7 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Floating Scan Tag */}
+
               <div className="absolute bottom-12 -left-8 glass-panel rounded-2xl p-3.5 shadow-xl border border-slate-200/40 flex items-center gap-3">
                 <span className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white">
                   <Camera className="w-4 h-4" />
@@ -165,7 +162,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Interactive AI Scanner Demo Section */}
+
       <section className="bg-white border border-slate-100 rounded-3xl p-8 md:p-12 shadow-xl shadow-slate-100/50 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-indigo-100/30 to-blue-100/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -178,7 +175,7 @@ export default function LandingPage() {
         </div>
 
         <div className="grid md:grid-cols-12 gap-10 items-center">
-          {/* Scanner Visual Frame */}
+
           <div className="md:col-span-6 flex flex-col items-center space-y-6">
             <div className="relative rounded-3xl overflow-hidden border border-slate-200 shadow-lg group w-full max-w-[340px] aspect-square bg-slate-50">
               <img 
@@ -187,7 +184,7 @@ export default function LandingPage() {
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
 
-              {/* Scan laser line */}
+
               {scanState === 'scanning' && (
                 <div 
                   className="absolute left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] z-20"
@@ -198,12 +195,12 @@ export default function LandingPage() {
                 />
               )}
 
-              {/* Holographic overlay */}
+
               {scanState === 'scanning' && (
                 <div className="absolute inset-0 bg-emerald-500/5 backdrop-brightness-110 z-10 transition-all duration-300 pointer-events-none" />
               )}
 
-              {/* Status Tag on image */}
+
               <div className="absolute top-4 left-4 bg-slate-900/80 backdrop-blur-md text-white px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 border border-white/10 z-20">
                 <span className={`w-2 h-2 rounded-full ${
                   scanState === 'scanning' ? 'bg-amber-400 animate-ping' : 
@@ -224,7 +221,7 @@ export default function LandingPage() {
             </Button>
           </div>
 
-          {/* Scanner Output results */}
+
           <div className="md:col-span-6 space-y-6">
             <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 min-h-[300px] flex flex-col justify-between shadow-inner">
               
@@ -247,7 +244,7 @@ export default function LandingPage() {
                     <span className="text-xs font-extrabold text-blue-600">{scanProgress}%</span>
                   </div>
                   
-                  {/* Progress bar */}
+
                   <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
                     <div 
                       className="bg-blue-600 h-full rounded-full transition-all duration-100"
@@ -271,7 +268,7 @@ export default function LandingPage() {
 
               {scanState === 'completed' && (
                 <div className="space-y-6">
-                  {/* Food title */}
+
                   <div className="flex items-center justify-between border-b border-slate-200/60 pb-4">
                     <div>
                       <h4 className="text-xl font-black text-slate-900">Salad gà hảo hạng</h4>
@@ -280,7 +277,7 @@ export default function LandingPage() {
                     <span className="text-2xl font-black text-blue-600">450 <span className="text-xs font-bold text-slate-400">kcal</span></span>
                   </div>
 
-                  {/* Macros lists progress */}
+
                   <div className="space-y-3">
                     <div>
                       <div className="flex justify-between text-xs font-bold mb-1">
@@ -311,7 +308,7 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Coach advice tip */}
+
                   <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex gap-3">
                     <span className="text-base text-emerald-600">💡</span>
                     <p className="text-xs font-semibold text-slate-700 leading-relaxed">
@@ -335,7 +332,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* How it Works Step-by-Step */}
+
       <section className="text-center space-y-16">
         <div className="max-w-3xl mx-auto space-y-4">
           <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-600">Quy trình hoạt động</span>
@@ -386,7 +383,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features Grid */}
+
       <section className="py-8 text-center space-y-16">
         <header className="max-w-3xl mx-auto space-y-4">
           <span className="text-xs font-extrabold uppercase tracking-widest text-indigo-600">Tính năng nổi bật</span>
@@ -412,14 +409,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PT-Client Chat Interface Showcase */}
+
       <section className="bg-slate-950 border border-slate-850 rounded-[40px] p-8 md:p-14 relative overflow-hidden">
-        {/* Glow gradients */}
+
         <div className="absolute top-1/2 left-0 w-80 h-80 bg-blue-600/15 rounded-full blur-[100px] pointer-events-none" />
         
         <div className="grid lg:grid-cols-12 gap-12 items-center relative z-10">
           
-          {/* Text Left */}
+
           <div className="lg:col-span-6 space-y-6 text-left">
             <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950 border border-emerald-900 text-emerald-400 text-xs font-bold">
               <MessageSquare className="w-3.5 h-3.5" /> Hỗ trợ trực tiếp từ PT
@@ -445,10 +442,10 @@ export default function LandingPage() {
             </ul>
           </div>
 
-          {/* Interactive Chat bubble visual layout right */}
+
           <div className="lg:col-span-6 flex flex-col space-y-4 max-w-md mx-auto w-full">
             
-            {/* PT Bubble */}
+
             <div className="flex gap-3.5">
               <div className="w-10 h-10 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white border border-indigo-500 shadow-md">
                 <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=coach" alt="Coach Avatar" className="rounded-full" />
@@ -462,7 +459,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Client Bubble */}
+
             <div className="flex gap-3.5 flex-row-reverse">
               <div className="w-10 h-10 rounded-full bg-slate-800 flex-shrink-0 flex items-center justify-center text-white border border-slate-700 shadow-md">
                 <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=user2" alt="User Avatar" className="rounded-full" />
@@ -476,7 +473,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* System Log Bubble */}
+
             <div className="text-center font-bold text-[10px] text-slate-500 uppercase tracking-widest pt-2">
               • Đã quét thành công hộp sữa chua •
             </div>
@@ -486,12 +483,12 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Benefits & Social Proof */}
+
       <section className="py-20 bg-slate-900 relative overflow-hidden rounded-[32px] px-6 md:px-12 text-left">
         <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-500/10 rounded-full blur-[100px] -translate-y-1/2 pointer-events-none" />
         
         <div className="grid lg:grid-cols-2 gap-16 items-center relative z-10">
-          {/* Left Content */}
+
           <div className="space-y-6">
             <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">Tại sao chọn Nutrican?</h2>
             <p className="text-slate-400 text-base font-semibold leading-relaxed">
@@ -509,7 +506,7 @@ export default function LandingPage() {
             </ul>
           </div>
 
-          {/* Right Interactive Card */}
+
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-3xl transform rotate-3 scale-[1.02] opacity-50 blur-sm" />
             <article className="bg-slate-800 border border-slate-700 rounded-3xl p-10 text-center relative shadow-2xl backdrop-blur-xl">
@@ -534,7 +531,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer CTA */}
+
       <footer className="bg-white border border-slate-100 rounded-3xl p-8 md:p-14 shadow-lg text-center space-y-12">
         <section className="bg-slate-50 border border-slate-100 rounded-2xl p-8 md:p-16 flex flex-col items-center max-w-5xl mx-auto space-y-6">
           <Shield className="w-12 h-12 text-blue-500 animate-pulse" />

@@ -62,7 +62,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DietLogServiceImpl implements DietLogService {
 
-    /** Dual-state: only {@link DietLogStatus#LOGGED} counts toward daily summary; PT review uses reviewStatus. */
+
     private static final Set<DietLogStatus> SUMMARY_STATUSES = Set.of(DietLogStatus.LOGGED);
     private final DietLogRepository dietLogRepository;
     private final DietLogImageRepository dietLogImageRepository;
@@ -424,7 +424,7 @@ public class DietLogServiceImpl implements DietLogService {
         }
     }
 
-    /** Cho phép gửi PT duyệt log bù ngày cũ mà không sửa nội dung món. */
+
     private boolean isReviewSubmissionOnly(CreateDietLogRequest request) {
         if (!Boolean.TRUE.equals(request.getSendToPt())) {
             return false;
@@ -471,11 +471,7 @@ public class DietLogServiceImpl implements DietLogService {
         return trimmed.length() >= 10;
     }
 
-    /**
-     * Today VN: mealPeriod must equal current window (defaults to current if omitted),
-     * except same-day late tick with a valid reason for a past period.
-     * Past logDate: any period allowed; derive from mealType when unambiguous.
-     */
+
     private MealPeriod resolveAndValidateMealPeriod(
             MealPeriod requested, MealType mealType, LocalDate logDate, String lateTickReason) {
         LocalDate today = DietDates.todayVn();
@@ -488,7 +484,6 @@ public class DietLogServiceImpl implements DietLogService {
                         && MealPeriods.isPastPeriodForLateTick(period)) {
                     return period;
                 }
-                // Client stale period (e.g. EVENING after 22:00) → soft-correct to current window
                 return current;
             }
             return period;

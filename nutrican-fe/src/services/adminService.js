@@ -1,23 +1,18 @@
 import api from './api';
 
 export const adminService = {
-    // Dashboard stats
     getStats: () => api.get('/admin/stats'),
 
-    // Users
     getUsers: (params = {}) => api.get('/admin/users', { params }),
     updateUserStatus: (userId, status) => api.put(`/admin/users/${userId}/status`, { status }),
 
-    // PT Management
     getPendingPts: (params = {}) => api.get('/admin/pts/pending', { params }),
     verifyPt: (userId, data) => api.put(`/admin/pts/${userId}/verify`, data),
     getPtDocuments: (ptId) => api.get(`/admin/pts/${ptId}/documents`),
 
-    // PT Update Requests (MỚI THÊM)
     getPendingUpdateRequests: (params = {}) => api.get('/admin/pts/update-requests/pending', { params }),
     reviewUpdateRequest: (requestId, data) => api.put(`/admin/pts/update-requests/${requestId}/review`, data),
 
-    // RBL Research & Refunds
     getRblStats: (params) => api.get('/admin/rbl/stats', { params }),
     getRblExportPreview: (params) => api.get('/admin/rbl/export/preview', { params }),
     downloadRblExport: (params) => api.get('/admin/rbl/export', { params, responseType: 'blob' }),

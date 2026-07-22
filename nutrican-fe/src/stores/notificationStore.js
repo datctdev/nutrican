@@ -1,4 +1,3 @@
-// src/stores/notificationStore.js
 import { create } from 'zustand';
 
 export const useNotificationStore = create((set) => ({

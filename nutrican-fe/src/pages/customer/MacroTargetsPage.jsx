@@ -21,7 +21,6 @@ import { validateInbodyFile } from '../../utils/inbodyUpload';
 export default function MacroTargetsPage() {
   const fileInputRef = useRef(null);
 
-  // States
   const [isLoading, setIsLoading] = useState(true);
   const [macros, setMacros] = useState({ dailyCalories: 0, protein: 0, carb: 0, fat: 0 });
   const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
@@ -36,7 +35,6 @@ export default function MacroTargetsPage() {
   const [isAnalyzingInbody, setIsAnalyzingInbody] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Update Station Form
   const [updateForm, setUpdateForm] = useState({
     weight: '',
     bodyFatPercent: '',
@@ -45,13 +43,11 @@ export default function MacroTargetsPage() {
   });
   const [inBodyPreview, setInBodyPreview] = useState(null);
 
-  // Confirm Recalculate Modal State
   const [showRecalcConfirm, setShowRecalcConfirm] = useState(false);
   const [previewMacros, setPreviewMacros] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [recalcMenuOpen, setRecalcMenuOpen] = useState(false);
 
-  // Edit Goal Modal State
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [editGoalForm, setEditGoalForm] = useState({
     nutritionGoal: 'MAINTAIN',
@@ -468,7 +464,7 @@ export default function MacroTargetsPage() {
         </div>
       )}
 
-      {/* DASHBOARD CARD */}
+
       <Card className="bg-slate-900 border-0 text-white shadow-xl overflow-hidden rounded-3xl relative">
         <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
           <Target className="w-48 h-48" />
@@ -521,7 +517,7 @@ export default function MacroTargetsPage() {
         </CardContent>
       </Card>
 
-      {/* ACTIVITY LEVEL → recalculate macros */}
+
       <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl">
         <CardContent className="p-6 space-y-4">
           <div className="flex items-center gap-2">
@@ -586,7 +582,7 @@ export default function MacroTargetsPage() {
         </CardContent>
       </Card>
 
-      {/* UPDATE STATION */}
+
       <Card className="bg-white border border-slate-200 shadow-sm rounded-3xl">
         <CardContent className="p-6">
           <div className="flex items-center gap-2 mb-6">
@@ -657,7 +653,7 @@ export default function MacroTargetsPage() {
         </CardContent>
       </Card>
 
-      {/* TIMELINE CHART */}
+
       <div className="pt-2">
         <div className="flex justify-between items-center mb-4 px-2">
           <h3 className="text-lg font-bold text-slate-900">Biểu Đồ Theo Dõi</h3>
@@ -678,7 +674,7 @@ export default function MacroTargetsPage() {
         />
       </div>
 
-      {/* MODAL: CONFIRM RECALCULATE MACROS */}
+
       {showRecalcConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up relative">
@@ -732,7 +728,7 @@ export default function MacroTargetsPage() {
         </div>
       )}
 
-      {/* MODAL: EDIT GOAL */}
+
       {showGoalModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up relative">

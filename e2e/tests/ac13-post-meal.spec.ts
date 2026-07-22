@@ -5,7 +5,6 @@ import { uiLogin, USERS } from '../fixtures/auth';
 import { createManualLog } from '../fixtures/api';
 
 
-
 test.describe('AC-13 Post-meal rating', () => {
 
   test('scheduled prompt opens rating sheet', async ({ page, request }) => {
@@ -15,7 +14,6 @@ test.describe('AC-13 Post-meal rating', () => {
     const logId = logRes?.data?.id;
 
     test.skip(!logId, 'Could not create log for rating test');
-
 
 
     await uiLogin(page, USERS.customer.email, USERS.customer.password);
@@ -33,7 +31,6 @@ test.describe('AC-13 Post-meal rating', () => {
     await expect(page.getByText(/đánh giá sau bữa|năng lượng|no sau ăn/i).first()).toBeVisible({ timeout: 12_000 });
 
   });
-
 
 
   test('diet tracker loads rating hook area', async ({ page }) => {

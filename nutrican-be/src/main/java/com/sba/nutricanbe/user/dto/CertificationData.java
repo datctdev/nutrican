@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
 public class CertificationData {
     private String name;
     private String issuingOrganization;
-    private String issueDate;        // "YYYY-MM" format
-    private String expiryDate;       // "YYYY-MM" or null
+    private String issueDate;
+    private String expiryDate;
     private Boolean neverExpires;
     private String certificateImageUrl;
 }

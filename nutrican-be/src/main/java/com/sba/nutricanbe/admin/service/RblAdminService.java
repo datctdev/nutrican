@@ -24,6 +24,6 @@ public interface RblAdminService {
 
     ApiResponse<RblStatsResponse> getPtStats(UUID ptId, LocalDate from, LocalDate to);
 
-    /** G0 / ops: RBL snapshot for any diet log (reviewed or pending). */
+
     ApiResponse<RblExportRowDto> getLogSnapshot(UUID logId);
 }

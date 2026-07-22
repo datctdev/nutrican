@@ -23,10 +23,7 @@ export function getSubmissionStatusLabel(status) {
     }
 }
 
-/**
- * Tóm tắt phạm vi yêu cầu theo buổi + tên món.
- * vd: "Buổi tối: Bánh Chưng, Rau giền cơm · Buổi sáng: Cơm Tấm"
- */
+
 export function formatSubmissionScope(items, periodLabels = {}) {
     if (!items?.length) return '';
     const byPeriod = new Map();
@@ -58,7 +55,7 @@ export function getSettledPeriodLabel() {
     return 'Buổi đã chốt — không cần duyệt';
 }
 
-/** Gạch ngang = phương án không được chọn (không phải "đã bỏ ăn"). */
+
 export function isPlanChoiceRejected(item) {
     if (!item) return false;
     if (item.skipReason === 'SUPERSEDED') return true;

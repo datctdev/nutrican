@@ -1,4 +1,3 @@
-// src/services/marketplaceService.js
 import api from './api';
 
 export const marketplaceService = {

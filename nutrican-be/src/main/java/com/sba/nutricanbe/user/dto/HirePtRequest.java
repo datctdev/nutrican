@@ -14,13 +14,13 @@ public class HirePtRequest {
     @NotNull(message = "Training mode is required")
     private TrainingMode trainingMode;
 
-    /** Required when trainingMode is OFFLINE */
+
     private UUID venueId;
 
-    /** OFFLINE: one or more session start times (package hire) */
+
     private List<LocalDateTime> sessionStarts;
 
-    /** Prefer {@code sessionStarts}; retained for older clients. */
+
     private LocalDateTime firstSessionStart;
 
     public List<LocalDateTime> resolvedSessionStarts() {

@@ -1,4 +1,3 @@
-// src/components/common/Input.jsx
 import { Input as InputRoot } from '../ui/input';
 import { Label } from '../ui/label';
 

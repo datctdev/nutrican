@@ -20,5 +20,5 @@ public class PtClientAlertDto {
     private String reason;
     private LocalDate logDate;
     private int consecutiveAtRiskDays;
-    private String alertType; // DIET_VIOLATION, PLAN_EXPIRED, WEIGHT_CHANGED
+    private String alertType;
 }

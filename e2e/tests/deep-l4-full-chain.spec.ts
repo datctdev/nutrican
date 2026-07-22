@@ -8,11 +8,7 @@ import {
   customerUserId,
 } from '../fixtures/selfPlan';
 
-/**
- * L4 — full business chain (hybrid BE+FE):
- * login → (seeded) onboarding/macros → manual log → self-plan → submit → PT approve →
- * tick SELF_OVERRIDE → DietLog + summary numbers move.
- */
+
 test.describe('L4 full chain login→log→self-plan→approve→tick', () => {
   test('[HAPPY] end-to-end override creates DietLog and updates UI summary', async ({ page, request }) => {
     const token = await customerRequest(request);
@@ -20,7 +16,6 @@ test.describe('L4 full chain login→log→self-plan→approve→tick', () => {
     const clientId = await customerUserId(request);
     const today = localDateOffsetIso(0);
 
-    // Profile / macros present (seeded onboarding)
     const me = await request.get(`${API_BASE}/profile/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -30,10 +25,8 @@ test.describe('L4 full chain login→log→self-plan→approve→tick', () => {
 
     await ensurePublishedPlanForCustomer(request, clientId, today);
 
-    // Manual log (actual layer)
     await createManualLog(request, 300, false);
 
-    // Cancel leftover pending
     const existing = await request.get(`${API_BASE}/diet/self-plan/submissions`, {
       headers: { Authorization: `Bearer ${token}` },
       params: { date: today },
@@ -68,7 +61,6 @@ test.describe('L4 full chain login→log→self-plan→approve→tick', () => {
     });
     expect(approve.ok(), await approve.text()).toBeTruthy();
 
-    // Find SELF_OVERRIDE item on day-plan / meal-plan
     const dayPlan = await request.get(`${API_BASE}/diet/day-plan`, {
       headers: { Authorization: `Bearer ${token}` },
       params: { date: today },
@@ -105,7 +97,6 @@ test.describe('L4 full chain login→log→self-plan→approve→tick', () => {
     const calAfter = Number((await summaryAfter.json()).data?.totalCalories ?? 0);
     expect(calAfter).toBeGreaterThanOrEqual(calBefore);
 
-    // FE: diet page shows plan + progress after refresh
     await seedAuthCookie(page, USERS.customer.email, USERS.customer.password, request);
     await page.goto('/diet');
     await expect(page.getByText(/plan ăn ngày/i)).toBeVisible({ timeout: 15_000 });

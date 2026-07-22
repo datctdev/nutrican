@@ -135,7 +135,6 @@ export const useAuthStore = create(
         try {
           await authService.logout();
   } catch {
-    // Logout API failure is non-critical; clear local state anyway
   }
         set({
           user: null,

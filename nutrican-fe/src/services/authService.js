@@ -9,7 +9,6 @@ export const authService = {
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/profile/me'),
 
-  // VNPT-based KYC flow
   startKycSession: () => api.post('/kyc/sessions:start'),
   uploadKycImage: (sessionId, file, title, type) => {
     const form = new FormData();
@@ -21,7 +20,6 @@ export const authService = {
   compareKyc: (sessionId) => api.post(`/kyc/sessions/${sessionId}/compare`),
   getKycSession: (sessionId) => api.get(`/kyc/sessions/${sessionId}`),
 
-  // Password reset
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, newPassword) => api.post('/auth/reset-password', { token, newPassword }),
 };

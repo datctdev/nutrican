@@ -6,13 +6,11 @@ import { toast } from 'sonner';
 export default function GroceryListModal({ isOpen, onClose, items, weekStart }) {
   const [copied, setCopied] = useState(false);
 
-  // Gom nhóm danh sách thực phẩm theo tên món
   const groceryList = useMemo(() => {
     if (!items || items.length === 0) return [];
     
     const map = new Map();
     items.forEach(item => {
-      // Bỏ qua các món rỗng
       if (!item.foodCode && !item.freeText) return;
       
       const key = item.nameVi || item.freeText || item.foodCode;
@@ -30,7 +28,6 @@ export default function GroceryListModal({ isOpen, onClose, items, weekStart }) 
       totalGrams: Math.round(totalGrams)
     }));
 
-    // Sắp xếp giảm dần theo số lượng gram
     return result.sort((a, b) => b.totalGrams - a.totalGrams);
   }, [items]);
 

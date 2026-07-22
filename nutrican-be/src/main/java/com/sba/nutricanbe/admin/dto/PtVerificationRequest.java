@@ -7,6 +7,6 @@ public class PtVerificationRequest {
     private String action;
     private String ptType;
     private Boolean isVerified;
-    private Boolean approved;  // Alternative field name from frontend
+    private Boolean approved;
     private String adminNote;
 }

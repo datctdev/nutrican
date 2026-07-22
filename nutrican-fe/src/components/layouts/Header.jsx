@@ -1,4 +1,3 @@
-// src/components/layouts/Header.jsx
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useNotificationStore } from '../../stores/notificationStore';
@@ -62,7 +61,6 @@ export default function Header() {
         try {
             useNotificationStore.setState(await fetchNotificationSnapshot());
         } catch {
-            // Keep the latest in-memory snapshot if the refresh fails.
         } finally {
             setLoadingNotifications(false);
         }
@@ -74,7 +72,7 @@ export default function Header() {
             try {
                 const res = await workspaceService.getClients({ page: 0, size: 10, status: 'PENDING' });
                 setPendingHiresCount(res.data.data.totalElements || res.data.data.content?.length || 0);
-            } catch { /* ignore */ }
+            } catch
         };
         fetchPendingCount();
         const handleAlert = () => fetchPendingCount();

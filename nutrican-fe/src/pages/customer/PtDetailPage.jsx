@@ -1,4 +1,3 @@
-// src/pages/customer/PtDetailPage.jsx
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
@@ -82,7 +81,6 @@ const LinkedinIcon = ({ className }) => (
     </svg>
 );
 
-// HẰNG SỐ MAPPING TEXT CHO ĐẸP
 const GOAL_LABELS = { 'WEIGHT_LOSS': 'Giảm cân', 'WEIGHT_GAIN': 'Tăng cân', 'MAINTAIN': 'Duy trì', 'PREGNANT': 'Mang thai', 'RECOVERY': 'Phục hồi' };
 const DIET_LABELS = { 'NORMAL': 'Ăn thường', 'VEGETARIAN': 'Ăn chay', 'VEGAN': 'Thuần chay', 'KETO': 'Keto', 'EAT_CLEAN': 'Eat clean' };
 const RATE_UNIT_LABELS = { 'SESSION_60': 'buổi 60 phút', 'SESSION_90': 'buổi 90 phút', 'HOUR': 'giờ', 'MONTH': 'tháng' };
@@ -429,7 +427,7 @@ export default function PtDetailPage() {
     return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50/40 to-slate-50 pb-24 animate-fade-in relative">
 
-            {/* HERO SECTION */}
+
             <div className="relative h-[350px] md:h-[420px] w-full overflow-hidden shadow-inner bg-slate-100">
                 <img src={coverPhoto} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/10"></div>
@@ -438,11 +436,11 @@ export default function PtDetailPage() {
                 </button>
             </div>
 
-            {/* CONTAINER CHÍNH */}
+
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 -mt-32 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
 
-                    {/* CỘT TRÁI: PROFILE CARD CƠ BẢN */}
+
                     <div className="lg:col-span-4 xl:col-span-3 sticky top-24 pt-16">
                         <div className="bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 p-8 text-center relative backdrop-blur-xl">
 
@@ -562,7 +560,7 @@ export default function PtDetailPage() {
                         </div>
                     </div>
 
-                    {/* CỘT PHẢI: NỘI DUNG CHI TIẾT */}
+
                     <div className="lg:col-span-8 xl:col-span-9 space-y-8 lg:mt-24">
 
                         {pt.trainingPhilosophy && (
@@ -588,10 +586,10 @@ export default function PtDetailPage() {
                             </div>
                         )}
 
-                        {/* MỚI: BẢNG THÔNG TIN CHI TIẾT & CHUYÊN MÔN */}
+
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                            {/* Cột 1: Thông tin Dịch vụ */}
+
                             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
                                 <div>
                                     <h3 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-3">
@@ -623,7 +621,7 @@ export default function PtDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Cột 2: Chuyên môn & Tags */}
+
                             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
                                 <div>
                                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Chuyên môn</h3>
@@ -653,7 +651,7 @@ export default function PtDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Dòng full-width cho Bằng cấp & Chứng chỉ */}
+
                             {pt.certifications?.length > 0 && (
                                 <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                                     <h3 className="text-xl font-black text-slate-800 mb-6 flex items-center justify-between">
@@ -685,7 +683,7 @@ export default function PtDetailPage() {
                             )}
                         </div>
 
-                        {/* Transformation Gallery */}
+
                         {transformations.length > 0 && (
                             <div className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
                                 <h3 className="text-2xl font-black text-slate-800 mb-8 flex items-center gap-3">
@@ -697,7 +695,7 @@ export default function PtDetailPage() {
                                         <div key={t.id || idx} className="rounded-[2rem] border border-slate-100 overflow-hidden group shadow-md hover:shadow-xl transition-all duration-300 bg-white flex flex-col md:flex-row">
 
                                             <div className="relative w-full md:w-5/12 xl:w-2/5 flex shrink-0 bg-slate-100 overflow-hidden min-h-[300px]">
-                                                {/* Before */}
+
                                                 <div className="w-1/2 h-full border-r-[2px] border-white relative z-10">
                                                     {t.beforeUrl ? (
                                                         <img src={getPermanentUrl(t.beforeUrl)} alt="Before" className="w-full h-full object-cover" />
@@ -706,7 +704,7 @@ export default function PtDetailPage() {
                                                     )}
                                                     <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm">Before</div>
                                                 </div>
-                                                {/* After */}
+
                                                 <div className="w-1/2 h-full relative">
                                                     {t.afterUrl ? (
                                                         <img src={getPermanentUrl(t.afterUrl)} alt="After" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
@@ -727,7 +725,7 @@ export default function PtDetailPage() {
                             </div>
                         )}
 
-                        {/* Đánh giá (Reviews) */}
+
                         <div id="review-form-section" className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-10 pb-8 border-b border-slate-100">
                                 <div>

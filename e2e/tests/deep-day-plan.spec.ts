@@ -52,7 +52,6 @@ test.describe('Deep day plan DP-01…DP-10', () => {
       await page.goto(`/diet?date=${tomorrow}`);
       await expect(page.getByText(/plan ăn ngày/i)).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(/không thể ghi nhật ký cho ngày trong tương lai/i)).toBeVisible();
-      // Eat buttons for plan should not appear on future (no items yet) — card must still show add
       await expect(page.getByRole('button', { name: /thêm món/i })).toBeVisible();
     });
 
@@ -82,14 +81,12 @@ test.describe('Deep day plan DP-01…DP-10', () => {
       const selfBf = items.filter((i) => i.mealType === 'BREAKFAST' && i.source === 'SELF');
       const ptBf = items.filter((i) => i.mealType === 'BREAKFAST' && i.source === 'PT');
       expect(selfBf.length).toBeGreaterThan(0);
-      // BE still returns PT for audit; FE mutes — assert both present so FE has data to mute
       expect(ptBf.length + selfBf.length).toBeGreaterThan(0);
     });
   });
 
   test.describe('BE-only SABOTAGE', () => {
     test('[SABOTAGE] DP-09 double eaten; DP-10 future eaten blocked when hasActivePt or no-PT', async ({ request }) => {
-      // customer2 may have no ACTIVE PT (PENDING mapping) — use for no-PT eaten if possible
       const token = await customerRequest(request);
       const hasPt = await request.get(`${API_BASE}/profile/has-active-pt`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -110,7 +107,6 @@ test.describe('Deep day plan DP-01…DP-10', () => {
       if (active) {
         expect([400, 409]).toContain(eaten.status());
       } else {
-        // future eaten should be blocked
         expect([400, 409]).toContain(eaten.status());
       }
       await request.delete(`${API_BASE}/diet/self-plan/${id}`, {

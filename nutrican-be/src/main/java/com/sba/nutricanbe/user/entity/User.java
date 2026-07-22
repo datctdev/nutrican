@@ -94,7 +94,7 @@ public class User extends BaseEntity {
     @Column(name = "nutrition_goal", length = 20)
     private NutritionGoal nutritionGoal;
 
-    /** TDEE activity multiplier level (forward-only; null → MODERATE). */
+
     @Enumerated(EnumType.STRING)
     @Column(name = "activity_level", length = 20)
     @Builder.Default
@@ -106,7 +106,7 @@ public class User extends BaseEntity {
     @Column(name = "allergy_notes", columnDefinition = "TEXT")
     private String allergyNotes;
 
-    /** NFR-14: e.g. {"postMealRating": true} */
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "notification_opt_in", columnDefinition = "jsonb")
     private Map<String, Boolean> notificationOptIn;

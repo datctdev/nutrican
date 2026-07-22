@@ -17,7 +17,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class DayPlanItemResponse {
     private UUID id;
-    /** SELF | PT */
+
     private String source;
     private boolean locked;
     private MealType mealType;
@@ -37,6 +37,6 @@ public class DayPlanItemResponse {
     private UUID submissionId;
     private String reconcileStatus;
     private String lateTickReason;
-    /** Self đề xuất bị PT từ chối — hiển thị gạch ngang, giữ lịch sử. */
+
     private Boolean choiceRejected;
 }

@@ -1,4 +1,3 @@
-// src/pages/customer/CoachingPage.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { userService } from '../../services/userService';
@@ -83,7 +82,6 @@ export default function CoachingPage() {
     navigate('/coaching', { replace: true });
   }, [navigate, searchParams]);
 
-  // Reset pay button if user returns via browser back/forward cache from VNPay.
   useEffect(() => {
     const resetPaymentUi = () => setStartingPayment(false);
     const onPageShow = (event) => {
@@ -102,16 +100,13 @@ export default function CoachingPage() {
   
   useWebSocket();
 
-  // Tab navigation state
-  const [activeTab, setActiveTab] = useState('chat'); // chat, meal-plan, appointments, contract
+  const [activeTab, setActiveTab] = useState('chat');
 
-  // References to active PT and mapping
   const [ptThreads, setPtThreads] = useState([]);
   const [mappingStatus, setMappingStatus] = useState(null);
   const [endRequestedBy, setEndRequestedBy] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Chat-specific states
   const [activeMappingId, setActiveMappingId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
@@ -126,7 +121,6 @@ export default function CoachingPage() {
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
 
-  // Meal plan states
   const [mealPlan, setMealPlan] = useState(null);
   const [mealPlanItems, setMealPlanItems] = useState([]);
   const [mealPlanWeeks, setMealPlanWeeks] = useState([]);
@@ -146,13 +140,11 @@ export default function CoachingPage() {
   const [cancelApptId, setCancelApptId] = useState(null);
   const [cancellingAppt, setCancellingAppt] = useState(false);
 
-  // Appointment states
   const [appointments, setAppointments] = useState([]);
   const [loadingAppts, setLoadingAppts] = useState(false);
   const [apptForm, setApptForm] = useState({ ptId: '', startTime: '', endTime: '', note: '' });
   const [bookingAppt, setBookingAppt] = useState(false);
 
-  // End coaching & Refund states
   const [endCoachingLoading, setEndCoachingLoading] = useState(false);
   const [endCoachingModalOpen, setEndCoachingModalOpen] = useState(false);
   const [refundForm, setRefundForm] = useState({ mappingId: '', reason: 'CUSTOMER_REQUEST', note: '' });
@@ -164,14 +156,12 @@ export default function CoachingPage() {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [payingWithWallet, setPayingWithWallet] = useState(false);
 
-  // Parse URL tab parameter
   useEffect(() => {
     if (tabParam) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
 
-  // Load basic status
   useEffect(() => {
     fetchCoachingStatus();
     const onRefundUpdate = () => {
@@ -213,7 +203,6 @@ export default function CoachingPage() {
         setApptForm((f) => ({ ...f, ptId: activeThreads[0].participantId }));
         setRefundForm((f) => ({ ...f, mappingId: activeThreads[0].mappingId }));
         
-        // Fetch meal plan & appointments
         fetchMealPlan();
         fetchAppointments();
       }
@@ -258,7 +247,6 @@ export default function CoachingPage() {
     }
   };
 
-  // Chat logic Integration
   const loadChatThreads = useCallback(async () => {
     try {
       setLoadingThreads(true);
@@ -457,7 +445,6 @@ export default function CoachingPage() {
 
   const activeThread = ptThreads.find(t => t.mappingId === activeMappingId);
 
-  // Meal plan & Appointment service loads
   const fetchMealPlan = async (requestedWeekStart) => {
     setLoadingMealPlan(true);
     try {
@@ -565,7 +552,6 @@ export default function CoachingPage() {
       const response = await mealPlanService.getSuggestions(selectedMealPlanWeek);
       setMealPlanSuggestions(response.data.data || []);
     } catch {
-      // Keep the current snapshot if a background refresh fails.
     }
   };
 
@@ -584,7 +570,6 @@ export default function CoachingPage() {
         setMealPlanPrefWarnings(planData?.dietPrefWarnings || []);
         setMealPlanSuggestions(suggestionsResponse.data.data || []);
       } catch {
-        // The persisted notification remains available if this live refresh fails.
       }
     };
 
@@ -766,7 +751,7 @@ export default function CoachingPage() {
 
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-fade-in px-4">
-      {/* Header */}
+
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Coaching Của Tôi</h1>
@@ -915,7 +900,7 @@ export default function CoachingPage() {
         </div>
       ) : (
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left Navigation Sidebar */}
+
           <div className="w-full lg:w-72 shrink-0">
             <div className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm space-y-1">
               {[
@@ -943,10 +928,10 @@ export default function CoachingPage() {
             </div>
           </div>
 
-          {/* Right Panel Content */}
+
           <div className="flex-1 min-w-0">
             
-            {/* TAB 0: MESSAGING (CHAT) */}
+
             {activeTab === 'chat' && (
               <Card 
                 className="w-full h-[600px] flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden relative animate-fade-in"
@@ -954,7 +939,7 @@ export default function CoachingPage() {
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
               >
-                {/* Drag Overlay */}
+
                 {dragActive && (
                   <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm z-50 flex flex-col items-center justify-center border-2 border-dashed border-primary m-4 rounded-2xl pointer-events-none animate-in fade-in duration-100">
                     <UploadCloud className="w-12 h-12 text-primary animate-bounce mb-2" />
@@ -1117,7 +1102,7 @@ export default function CoachingPage() {
               </Card>
             )}
 
-            {/* TAB 1: MEAL PLAN */}
+
             {activeTab === 'meal-plan' && (
               <div className="space-y-6 animate-fade-in">
                 {weeklySummaries.length > 0 && (
@@ -1210,7 +1195,7 @@ export default function CoachingPage() {
               </div>
             )}
 
-            {/* TAB 2: APPOINTMENTS */}
+
             {activeTab === 'appointments' && (
               <Card className="border-slate-200 shadow-sm rounded-3xl bg-white animate-fade-in">
                 <CardContent className="p-6 space-y-6">
@@ -1303,7 +1288,7 @@ export default function CoachingPage() {
               </Card>
             )}
 
-            {/* TAB 3: CONTRACT & REFUND */}
+
             {activeTab === 'contract' && (
               <div className="space-y-6 animate-fade-in">
                 <Card className="border-blue-100 shadow-sm rounded-3xl bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -1320,7 +1305,7 @@ export default function CoachingPage() {
                   </CardContent>
                 </Card>
 
-                {/* Coaching status */}
+
                 <Card className="border-slate-200 shadow-sm rounded-3xl bg-white">
                   <CardContent className="p-6 space-y-4">
                     <h3 className="text-lg font-bold text-slate-900 pb-3 border-b border-slate-100">Coaching với PT</h3>
@@ -1375,7 +1360,7 @@ export default function CoachingPage() {
                   </CardContent>
                 </Card>
 
-                {/* Refund Form */}
+
                 <Card className="border-slate-200 shadow-sm rounded-3xl bg-white">
                   <CardContent className="p-6 space-y-4">
                     <div>
@@ -1422,7 +1407,7 @@ export default function CoachingPage() {
         </div>
       )}
 
-      {/* End coaching modal */}
+
       <Modal isOpen={endCoachingModalOpen} onClose={() => setEndCoachingModalOpen(false)}
         title={mappingStatus === 'END_REQUESTED' ? 'Xác nhận kết thúc coaching?' : 'Yêu cầu kết thúc coaching?'}>
         <div className="space-y-4">
@@ -1467,7 +1452,7 @@ export default function CoachingPage() {
         />
       )}
 
-      {/* Skip meal warning modal */}
+
       {skipModalContext && (
         <MealPlanSkipModal
           open={true}
@@ -1480,7 +1465,7 @@ export default function CoachingPage() {
         />
       )}
 
-      {/* Late tick reason — replaces window.prompt */}
+
       <LateTickReasonModal
         open={!!lateTickTarget}
         forPt
@@ -1502,7 +1487,7 @@ export default function CoachingPage() {
         onConfirm={confirmCancelAppointment}
       />
 
-      {/* Lightbox Preview */}
+
       <ImageLightbox
         isOpen={!!lightboxImage}
         imageUrl={lightboxImage}

@@ -1,10 +1,9 @@
-// src/pages/customer/components/FoodSearchInput.jsx
 import { useEffect, useRef, useState } from 'react';
 import { dietService } from '../../../services/dietService';
 import { CATEGORY_GROUPS, getCategoryColors, getCategoryLabel } from './categoryColors';
 import { Button } from '../../../components/ui/button';
 
-/** Một quy tắc duy nhất: chỉ search khi ≥ 2 ký tự. Chip nhóm chỉ lọc kết quả sau khi đã gõ. */
+
 const SEARCH_MIN_LEN = 2;
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -66,10 +65,7 @@ function SkeletonRows() {
     );
 }
 
-/**
- * Tìm thực phẩm — luôn yêu cầu ≥ 2 ký tự trước khi hiện danh sách.
- * Chip nhóm (Đạm/Tinh bột/…) chỉ lọc kết quả sau khi đã gõ đủ.
- */
+
 export default function FoodSearchInput({
     dietFilter = true,
     onSelect,
@@ -164,7 +160,6 @@ export default function FoodSearchInput({
     const onPickGroup = (key) => {
         setCategoryGroup(key);
         setOpen(true);
-        // Chỉ lọc lại khi đã gõ đủ — không bao giờ hiện list khi chưa gõ
         if ((query || '').trim().length >= SEARCH_MIN_LEN) {
             scheduleSearch(query, key);
         }

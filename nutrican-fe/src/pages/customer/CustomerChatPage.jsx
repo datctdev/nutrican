@@ -1,4 +1,3 @@
-// src/pages/customer/CustomerChatPage.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
@@ -237,7 +236,7 @@ export default function CustomerChatPage() {
     return (
         <div className="max-w-[1600px] mx-auto h-[calc(100vh-120px)] min-h-[600px] flex gap-6 animate-fade-in pb-6 mt-6">
 
-            {/* CỘT TRÁI: DANH SÁCH PT */}
+
             <Card className="w-80 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden flex-shrink-0">
                 <div className="p-5 border-b border-slate-100 bg-slate-50/50">
                     <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
@@ -306,14 +305,14 @@ export default function CustomerChatPage() {
                 </div>
             </Card>
 
-            {/* CỘT PHẢI: KHUNG CHAT */}
+
             <Card 
                 className="flex-1 flex flex-col bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden relative"
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
             >
-                {/* Drag Overlay */}
+
                 {dragActive && (
                     <div className="absolute inset-0 bg-primary/10 backdrop-blur-sm z-50 flex flex-col items-center justify-center border-2 border-dashed border-primary m-4 rounded-2xl pointer-events-none animate-in fade-in duration-100">
                         <UploadCloud className="w-16 h-16 text-primary animate-bounce mb-3" />
@@ -457,7 +456,7 @@ export default function CustomerChatPage() {
                 )}
             </Card>
 
-            {/* Lightbox Preview */}
+
             <ImageLightbox
                 isOpen={!!lightboxImage}
                 imageUrl={lightboxImage}

@@ -12,10 +12,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Maps multipart analyze-meal form fields into {@link AnalyzeMealContext}.
- * Kept out of the controller so HTTP layer stays thin.
- */
+
 public final class AnalyzeMealContextFactory {
 
     private AnalyzeMealContextFactory() {

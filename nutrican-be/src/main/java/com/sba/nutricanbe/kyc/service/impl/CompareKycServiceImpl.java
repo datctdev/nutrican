@@ -49,7 +49,6 @@ public class CompareKycServiceImpl implements CompareKycService {
         boolean passed = matched && prob >= 95.0;
 
         s.setStatus(passed ? KycStatus.VERIFIED : KycStatus.REJECTED);
-        // lưu trace tối giản để debug
         s.setProviderTrace(toJsonSafe(res));
         sessions.save(s);
 

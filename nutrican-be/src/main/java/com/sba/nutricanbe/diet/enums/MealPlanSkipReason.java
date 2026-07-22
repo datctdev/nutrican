@@ -5,6 +5,6 @@ public enum MealPlanSkipReason {
     DONT_LIKE,
     ALLERGY,
     OTHER,
-    /** PT gốc bị thay bởi đề xuất học viên đã duyệt — giữ lịch sử, không xóa. */
+
     SUPERSEDED
 }

@@ -7,12 +7,11 @@ export default function FoodSearchModal({ isOpen, onClose, onSelect }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState('ALL'); // ALL, HIGH_PROTEIN, LOW_FAT, CERTIFIED
+  const [filter, setFilter] = useState('ALL');
 
   const searchFoods = useCallback(async (q) => {
     setLoading(true);
     try {
-      // Gọi API, bỏ dietFilter = false để lấy tất cả món ăn (không bị ảnh hưởng bởi PT preference)
       const res = await dietService.searchFoods(q, { dietFilter: false });
       setResults(res.data.data || []);
     } catch (error) {
@@ -30,7 +29,7 @@ export default function FoodSearchModal({ isOpen, onClose, onSelect }) {
       setResults([]);
       setFilter('ALL');
     }
-  }, [isOpen, searchFoods]); // trigger initial load if needed
+  }, [isOpen, searchFoods]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -43,21 +42,17 @@ export default function FoodSearchModal({ isOpen, onClose, onSelect }) {
 
   if (!isOpen) return null;
 
-  // Frontend filtering logic
   const filteredResults = results.filter((item) => {
     if (filter === 'ALL') return true;
     const cals = Number(item.calories) || 0;
     const pro = Number(item.protein) || 0;
     if (filter === 'HIGH_PROTEIN') {
-      // Giàu Protein: > 30% năng lượng từ protein
       return cals > 0 && ((pro * 4) / cals) >= 0.3;
     }
     if (filter === 'LOW_FAT') {
-      // Phù hợp giảm mỡ: ít calo (< 150kcal / portion)
       return cals < 150;
     }
     if (filter === 'CERTIFIED') {
-      // Chứng nhận Viện Dinh Dưỡng: Mô phỏng qua tag hoặc data source (tạm dùng tag EAT_CLEAN)
       return item.dietTags?.includes('EAT_CLEAN') || item.category === 'Món ResNet50';
     }
     return true;
@@ -66,7 +61,7 @@ export default function FoodSearchModal({ isOpen, onClose, onSelect }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col h-[80vh] overflow-hidden">
-        {/* Header */}
+
         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-slate-800 text-lg">Tìm kiếm món ăn</h3>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200 transition-colors">
@@ -74,7 +69,7 @@ export default function FoodSearchModal({ isOpen, onClose, onSelect }) {
           </button>
         </div>
 
-        {/* Search Input & Filters */}
+
         <div className="p-4 space-y-3 border-b border-slate-100">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -114,7 +109,7 @@ export default function FoodSearchModal({ isOpen, onClose, onSelect }) {
           </div>
         </div>
 
-        {/* Results List */}
+
         <div className="flex-1 overflow-y-auto p-2">
           {loading ? (
             <div className="flex justify-center items-center h-full">

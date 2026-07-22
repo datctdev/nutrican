@@ -1,5 +1,4 @@
-// src/pages/customer/components/categoryColors.js
-/** Colors + labels for FoodCategoryGroup (BE SoT). Do not remap 14 seed categories here. */
+
 
 export const CATEGORY_GROUPS = [
     { key: null, label: 'Tất cả' },

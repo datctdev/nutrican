@@ -29,7 +29,6 @@ test.describe('AC-11 Recipe builder', () => {
     await uiLogin(page, USERS.customer.email, USERS.customer.password);
     await page.goto('/diet');
     await expect(page.getByText(/plan ăn ngày|nhật ký/i).first()).toBeVisible({ timeout: 15_000 });
-    // Manual path remains the ingredient builder used by recipes
     await page.getByRole('button', { name: /nhập thủ công/i }).click();
     await expect(page.getByText(/tìm thực phẩm|nguyên liệu|lọc theo chế độ ăn/i).first()).toBeVisible({
       timeout: 10_000,

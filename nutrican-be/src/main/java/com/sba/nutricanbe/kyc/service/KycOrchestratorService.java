@@ -7,7 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Map;
 import java.util.UUID;
 
-/** Orchestrates KYC session lifecycle and VNPT document steps. */
+
 public interface KycOrchestratorService {
 
     Map<String, Object> uploadFileAndAttach(

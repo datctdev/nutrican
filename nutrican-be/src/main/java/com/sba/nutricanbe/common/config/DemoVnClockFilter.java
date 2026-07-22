@@ -14,10 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.LocalDateTime;
 
-/**
- * Local/demo only: honor {@link DietDates#DEMO_CLOCK_HEADER} so FE can simulate VN wall clock
- * (e.g. 21:00) without changing the OS timezone.
- */
+
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public class DemoVnClockFilter extends OncePerRequestFilter {

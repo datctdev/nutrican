@@ -1,4 +1,3 @@
-// src/components/common/Card.jsx
 import { Card as CardRoot, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/card';
 
 function Card({ children, className = '', padding = true, ...props }) {

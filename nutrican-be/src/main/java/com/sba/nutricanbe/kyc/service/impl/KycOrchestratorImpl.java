@@ -133,7 +133,6 @@ public class KycOrchestratorImpl implements KycOrchestratorService {
             s.setSelfieHash(fileHash);
         }
 
-        // tối giản: cứ attach xong là IN_PROGRESS
         s.setStatus(KycStatus.IN_PROGRESS);
         sessions.save(s);
 

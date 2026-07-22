@@ -18,7 +18,7 @@ public class OnboardingRequest {
     private NutritionGoal nutritionGoal;
     private DietPreference dietPreference;
     private Boolean wantsPt;
-    /** Preferred: enum. Legacy BigDecimal factor still accepted via activityFactor. */
+
     private ActivityLevel activityLevel;
     private BigDecimal activityFactor;
     private Integer pregnancyTrimester;

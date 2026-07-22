@@ -10,9 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/**
- * Shared guard for PT workspace services: verifies a PT is allowed to act on / read a client's data.
- */
+
 @Component
 @RequiredArgsConstructor
 public class PtWorkspaceAccessGuard {

@@ -11,10 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 
-/**
- * MinIO implementation of {@link StorageService}.
- * Handles bucket auto-creation, temp-file upload pattern, presigned URL generation.
- */
+
 @Slf4j
 @Service
 public class MinioStorageService implements StorageService {

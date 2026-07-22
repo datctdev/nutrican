@@ -1,4 +1,3 @@
-// src/pages/pt/components/ChatContextCard.jsx
 import { Card, CardContent } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Flame, Target, TrendingUp } from 'lucide-react';

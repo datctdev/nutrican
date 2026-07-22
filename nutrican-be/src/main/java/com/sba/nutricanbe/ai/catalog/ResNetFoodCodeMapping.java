@@ -4,9 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Maps ResNet50 food_code to catalog display names — delegates to {@link ResNetClassManifest}.
- */
+
 public final class ResNetFoodCodeMapping {
 
     private ResNetFoodCodeMapping() {

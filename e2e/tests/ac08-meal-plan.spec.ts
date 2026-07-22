@@ -3,7 +3,6 @@ import { test, expect } from '@playwright/test';
 import { uiLogin, USERS } from '../fixtures/auth';
 
 
-
 test.describe('AC-8 Meal plan', () => {
 
   test('customer profile shows meal plan with skip action', async ({ page }) => {
@@ -27,7 +26,6 @@ test.describe('AC-8 Meal plan', () => {
     }
 
   });
-
 
 
   test('PT meal plan page loads with suggestion section when applicable', async ({ page }) => {

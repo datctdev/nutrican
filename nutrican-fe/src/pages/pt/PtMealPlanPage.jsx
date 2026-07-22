@@ -91,11 +91,9 @@ export default function PtMealPlanPage() {
   
   const [profile, setProfile] = useState(null);
   
-  // Week state
   const [weekStart, setWeekStart] = useState(getStartOfWeek(new Date()));
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
   
-  // Plan state
   const [planId, setPlanId] = useState(null);
   const [isPublished, setIsPublished] = useState(false);
   const [notes, setNotes] = useState('');
@@ -107,7 +105,6 @@ export default function PtMealPlanPage() {
   const [clientIntakeLoading, setClientIntakeLoading] = useState(false);
   const [clientTimeline, setClientTimeline] = useState(null);
   
-  // Modal state
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [targetMealType, setTargetMealType] = useState(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
@@ -184,7 +181,6 @@ export default function PtMealPlanPage() {
         setPrefWarnCodes(new Set());
       }
 
-      // Suggestions
       workspaceService.getPendingMealPlanSuggestions(clientId)
         .then((res) => setPendingSuggestions(res.data.data || []))
         .catch(() => setPendingSuggestions([]));
@@ -360,7 +356,6 @@ export default function PtMealPlanPage() {
       return;
     }
 
-    // Try to fetch from previous week
     const prevWeekStartStr = formatDate(getStartOfWeek(curr));
     try {
       const planRes = await workspaceService.getClientMealPlan(clientId, prevWeekStartStr);
@@ -462,12 +457,10 @@ export default function PtMealPlanPage() {
     await workspaceService.applyTemplateToClient(clientId, templateId, {
       weekStart: formatDate(weekStart)
     });
-    // Refresh
     loadData();
   };
 
   const handleSaveAsTemplate = async (templateData) => {
-    // Transform items to dayOffset format
     const transformedItems = items.filter(i => i.foodCode || i.freeText).map(i => {
       const pDate = new Date(i.planDate);
       const wStart = new Date(weekStart);
@@ -516,7 +509,6 @@ export default function PtMealPlanPage() {
 
   const isOverCal = targetCals > 0 && consumedCals > targetCals * 1.1;
 
-  // Render items with warnings injected
   const itemsWithWarnings = items.map(i => ({
     ...i,
     warning: prefWarnCodes.has(i.foodCode) ? true : false
@@ -711,7 +703,6 @@ export default function PtMealPlanPage() {
             date={selectedDate}
             items={itemsWithWarnings}
             onUpdateItems={(newItems) => {
-              // Strip warning property before saving to state
               const cleanItems = newItems.map((item) => {
                 const clean = { ...item };
                 delete clean.warning;

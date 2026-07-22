@@ -13,10 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Customer-facing meal-plan interactions: viewing the published plan and reacting to it
- * (mark eaten, skip, request replacements).
- */
+
 public interface MealPlanInteractionService {
 
     MealPlanDetailResponse getCurrentPlan(UUID customerId, LocalDate weekStart);

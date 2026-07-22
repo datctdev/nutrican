@@ -1,4 +1,3 @@
-// src/components/diet/LogCard.jsx
 import { useState, useEffect } from 'react';
 import {
     Camera, Trash2, CheckCircle2, Clock, XCircle,

@@ -19,7 +19,7 @@ public interface UserProfileService {
 
     ApiResponse<MacroTargetResponse> setMacroTarget(UUID userId, MacroTargetRequest request);
 
-    /** Customer self-service: blocked when an active PT owns macros. */
+
     ApiResponse<MacroTargetResponse> setMacroTargetForSelf(UUID userId, MacroTargetRequest request);
 
     ApiResponse<PtProfileSummary> registerAsPt(UUID userId, PtRegistrationRequest request);

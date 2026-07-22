@@ -51,10 +51,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Rich fixtures for demo.solo (no PT) and demo.coached (ACTIVE PT).
- * Idempotent via SystemSetting {@value #FLAG_KEY}.
- */
+
 @Slf4j
 @Component
 @Order(30)
@@ -78,7 +75,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
     private final ClientGoalRepository clientGoalRepository;
     private final MacroTargetRepository macroTargetRepository;
 
-    /** Calorie share per meal period — sums to 1.0 */
+
     private static final double[] MEAL_CAL_SHARE = {0.22, 0.28, 0.18, 0.27, 0.05};
 
     @Override
@@ -141,7 +138,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
         }));
     }
 
-    /** Keeps only yesterday's morning log for backfill demos. */
+
     private void refreshYesterdayBackfillDemo(User user, FoodItem food, LocalDate today) {
         if (food == null) {
             return;
@@ -171,11 +168,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
         log.info("Yesterday {} backfill demo: {} + {} — only MORNING log", yesterday, SOLO_EMAIL, COACHED_EMAIL);
     }
 
-    /**
-     * Full plan for yesterday so overnight LATE (0–4h) is tickable, while diary stays morning-only (backfill).
-     * Solo: 5 self-plan periods (MORNING eaten + linked log; LATE uneaten).
-     * Coached: full PT day including LATE uneaten.
-     */
+
     private void refreshYesterdayOvernightDemo(User user, FoodItem food, LocalDate today, User pt) {
         if (food == null) {
             return;
@@ -183,7 +176,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
         LocalDate yesterday = today.minusDays(1);
         boolean coached = COACHED_EMAIL.equalsIgnoreCase(user.getEmail());
 
-        // LATE must stay open for overnight tick — no LATE log settling the period.
         dietLogRepository.findByCustomerIdAndLogDate(user.getId(), yesterday).stream()
                 .filter(l -> l.getMealPeriod() == MealPeriod.LATE)
                 .forEach(dietLogRepository::delete);
@@ -243,8 +235,6 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                         item.setLateTickReason(null);
                         mealPlanItemRepository.save(item);
                     } else if (item.getMealPeriod() == MealPeriod.MORNING) {
-                        // Morning diary exists for backfill; leave PT morning unticked so PT tick/late-tick still demoable
-                        // except we want LATE as the overnight hero — morning can stay uneaten too for PT mark.
                         item.setEaten(false);
                         item.setLateTickReason(null);
                         mealPlanItemRepository.save(item);
@@ -353,7 +343,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
         };
         for (int daysAgo = 13; daysAgo >= 1; daysAgo--) {
             LocalDate logDate = today.minusDays(daysAgo);
-            int count = 2 + (daysAgo % 3); // 2–4 logs
+            int count = 2 + (daysAgo % 3);
             for (int i = 0; i < count; i++) {
                 MealPeriod period = dayPeriods[i % dayPeriods.length];
                 if (daysAgo % 5 == 0 && i == count - 1) {
@@ -465,7 +455,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                 .anyMatch(i -> period.equals(i.getMealPeriod()));
     }
 
-    /** Keeps the submission-linked item; removes duplicate drafts in the same period. */
+
     private void cleanupDuplicateSelfItems(java.util.UUID customerId, LocalDate day, MealPeriod period) {
         List<SelfPlanItem> periodItems = selfPlanItemRepository
                 .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(customerId, day)
@@ -622,7 +612,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
         }
     }
 
-    /** Ensures tonight remains open for a pending self-plan review. */
+
     private void refreshTodayEveningReviewDemo(User coached, User pt, FoodItem food, LocalDate today) {
         if (!COACHED_EMAIL.equalsIgnoreCase(coached.getEmail())) {
             return;

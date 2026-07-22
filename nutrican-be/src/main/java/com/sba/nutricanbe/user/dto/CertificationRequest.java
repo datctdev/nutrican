@@ -20,9 +20,9 @@ public class CertificationRequest {
     private String issuingOrganization;
 
     @NotBlank(message = "Ngày cấp là bắt buộc")
-    private String issueDate;        // "YYYY-MM"
+    private String issueDate;
 
-    private String expiryDate;       // "YYYY-MM" or null
+    private String expiryDate;
 
     private Boolean neverExpires;
 

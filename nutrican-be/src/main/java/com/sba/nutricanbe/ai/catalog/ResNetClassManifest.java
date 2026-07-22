@@ -11,10 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Loads ResNet class manifest profiles from classpath JSON.
- * Default profile {@code resnet_unified} — 199 classes (VTN-10 + 100 dishes + Food-101).
- */
+
 @Slf4j
 public final class ResNetClassManifest {
 
@@ -33,7 +30,7 @@ public final class ResNetClassManifest {
             Map<String, String> displayNames,
             Map<String, String> classAliases) {
 
-        /** Only when classpath JSON is missing — normal startup loads 199 classes from resnet_unified.json. */
+
         static ManifestData emergencyEmpty() {
             return new ManifestData(
                     "resnet_unified",
@@ -44,7 +41,7 @@ public final class ResNetClassManifest {
         }
     }
 
-    /** Called from Spring config when {@code ai.resnet.class-profile} is set. */
+
     public static void setActiveProfile(String profile) {
         if (profile == null || profile.isBlank()) {
             return;

@@ -82,10 +82,7 @@ public class DietLogHelperImpl implements DietLogHelper {
         dietLog.setMacrosJson(macros);
     }
 
-    /**
-     * Custom free-text items (no valid foodItemId) are stored only on {@link DietLogItem}
-     * and are never inserted into the FoodItem catalog.
-     */
+
     @Override
     public DietLogItem buildLogItem(DietLog dietLog, DietLogItemRequest req) {
         FoodItem food = null;
@@ -353,7 +350,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .build();
     }
 
-    /** Presigned URLs expire; regenerate from durable object name on each read. */
+
     private String resolveImageUrl(String objectName, String storedUrl) {
         if (objectName != null && !objectName.isBlank()) {
             return minioService.getPresignedUrl(objectName);

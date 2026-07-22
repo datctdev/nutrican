@@ -20,7 +20,7 @@ public class DayTimelineResponse {
     private DayTimelineMacroBreakdown fromCompliance;
     private DayTimelineMacroBreakdown pending;
     private DayTimelineMacroBreakdown targets;
-    /** Primary self-plan submission for the date (PENDING preferred). */
+
     private SelfPlanSubmissionResponse selfPlanSubmission;
     @Builder.Default
     private List<DayTimelinePeriodResponse> periods = new ArrayList<>();

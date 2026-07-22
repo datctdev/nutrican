@@ -12,5 +12,5 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ApplyTemplateRequest {
-    private String weekStart; // YYYY-MM-DD
+    private String weekStart;
 }

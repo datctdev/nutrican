@@ -5,9 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Display-only reconciliation for day timeline (not {@code SubmissionReconciler} which writes DB).
- */
+
 @Data
 @Builder
 @NoArgsConstructor

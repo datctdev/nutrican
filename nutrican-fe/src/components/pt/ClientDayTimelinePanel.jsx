@@ -1,4 +1,3 @@
-// src/components/pt/ClientDayTimelinePanel.jsx
 import DayTimelineView from '../diet/DayTimelineView';
 
 export default function ClientDayTimelinePanel({

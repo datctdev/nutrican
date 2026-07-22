@@ -11,10 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * A1.0 baseline: fixed 1-serving macros per food code (no portion scaling).
- * Loaded from {@code /data/a1_0_fixed_macros.json} for RBL {@code ai_predicted_macros}.
- */
+
 @Slf4j
 public final class A1_0FixedMacros {
 
@@ -69,7 +66,7 @@ public final class A1_0FixedMacros {
         }
     }
 
-    /** Fixed serving macros for RBL A1.0 snapshot — never scaled by portion_ratio. */
+
     public static MacroNutrients forCode(String foodCode) {
         ensureLoaded();
         if (foodCode == null || foodCode.isBlank()) {

@@ -1,4 +1,3 @@
-// src/services/websocketService.js
 import { useNotificationStore } from '../stores/notificationStore';
 import { toast } from 'sonner';
 

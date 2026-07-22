@@ -1,4 +1,3 @@
-// src/hooks/useWebSocket.js
 import { useEffect } from 'react';
 import { createWebSocketConnection, closeWebSocketConnection } from '../services/websocketService';
 import { useAuthStore } from '../stores/authStore';

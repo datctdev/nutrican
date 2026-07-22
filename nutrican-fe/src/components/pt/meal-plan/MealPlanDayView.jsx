@@ -9,9 +9,7 @@ const MEAL_TYPES = [
 ];
 
 export default function MealPlanDayView({ date, items = [], onUpdateItems, onOpenSearch }) {
-  // item shape: { id(temp), planDate, mealType, foodCode, nameVi, portionGrams, calories, protein, carb, fat, ... }
 
-  // Filter items for the specific date passed via props
   const dayItems = items.filter(i => i.planDate === date);
 
   const handleRemove = (globalIndex) => {

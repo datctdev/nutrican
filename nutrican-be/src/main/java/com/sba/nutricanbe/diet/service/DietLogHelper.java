@@ -22,7 +22,7 @@ public interface DietLogHelper {
     DietLogItem buildLogItem(DietLog dietLog, DietLogItemRequest req);
     MacroNutrients macrosForFood(FoodItem food, BigDecimal quantityG);
     BigDecimal scale(BigDecimal value, BigDecimal ratio);
-    /** PENDING only when sendToPt and customer has an ACTIVE PT mapping; else NOT_REQUIRED. */
+
     DietLogReviewStatus resolveReviewStatus(UUID customerId, boolean sendToPt);
     boolean hasActivePt(UUID customerId);
     void assignPtReviewerIfNeeded(DietLog dietLog, UUID customerId);

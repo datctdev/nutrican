@@ -60,7 +60,6 @@ class MealPeriodsTest {
 
     @Test
     void validateMakeup_current_rejected() {
-        // At noon, makeup=NOON (current) should fail — depends on wall clock; use pastPeriods logic directly
         assertTrue(MealPeriods.pastPeriods(MealPeriod.NOON, LocalDateTime.of(2026, 7, 20, 12, 0))
                 .contains(MealPeriod.MORNING));
         assertFalse(MealPeriods.pastPeriods(MealPeriod.NOON, LocalDateTime.of(2026, 7, 20, 12, 0))

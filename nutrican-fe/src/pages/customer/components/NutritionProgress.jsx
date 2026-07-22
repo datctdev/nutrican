@@ -1,4 +1,3 @@
-// src/pages/customer/components/NutritionProgress.jsx
 import { Activity } from 'lucide-react';
 import { Card, CardContent } from '../../../components/ui/card';
 import { calculateProgress, computeIntakeStatus, formatMacroDisplay } from './dietUtils';

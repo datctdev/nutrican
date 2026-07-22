@@ -20,10 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Seeds / updates ResNet manifest dish entries for A1.1 hybrid Food DB matching.
- * VTN-10 + 100 VN dishes use NutriHome PDF; Food-101 uses nutrition.csv macros.
- */
+
 @Slf4j
 @Component
 @Order(20)
@@ -104,7 +101,7 @@ public class ResNetFoodCatalogInitializer implements CommandLineRunner {
         return new ArrayList<>(aliases);
     }
 
-    /** Only match rows already seeded for ResNet / NutriHome — never VTN_FCT_2007 rows. */
+
     private Optional<FoodItem> findResNetCatalogItem(String code) {
         Optional<FoodItem> current = findBySourceAndCode(ResNetFoodDefaults.SOURCE, code);
         if (current.isPresent()) {

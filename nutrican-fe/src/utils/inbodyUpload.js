@@ -1,10 +1,7 @@
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
 const MAX_BYTES = 10 * 1024 * 1024;
 
-/**
- * Client-side gate for InBody image uploads.
- * @returns {{ ok: true } | { ok: false, message: string }}
- */
+
 export function validateInbodyFile(file) {
   if (!file) {
     return { ok: false, message: 'Vui lòng chọn ảnh InBody' };

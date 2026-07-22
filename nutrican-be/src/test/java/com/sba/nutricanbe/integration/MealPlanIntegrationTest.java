@@ -126,7 +126,6 @@ class MealPlanIntegrationTest extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        // We need to fetch the plan id and publish it so the customer can see it
         String planId = objectMapper.readTree(postRes).get("data").get("plan").get("id").asText();
 
         mockMvc.perform(post("/api/v1/workspace/meal-plans/" + planId + "/publish")

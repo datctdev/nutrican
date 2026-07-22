@@ -4,10 +4,7 @@ import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * ResNet50 10-class macro defaults — delegates to {@link NutriHomeCatalog} (NutriHome PDF JSON).
- * Fallback hardcoded values if JSON not on classpath.
- */
+
 public final class ResNetFoodDefaults {
 
     public static final String SOURCE = "NUTRIHOME_PDF";
@@ -27,7 +24,7 @@ public final class ResNetFoodDefaults {
             Map.entry("pho", new MacroServing(414, 18, 59, 12, 500, "1 tô"))
     );
 
-    /** Generic per-100g estimate for unified classes without NutriHome mapping yet. */
+
     private static final MacroServing GENERIC_FALLBACK = new MacroServing(300, 15, 35, 10, 100, "100g");
 
     private static final Map<String, String> ALIASES = Map.ofEntries(

@@ -123,7 +123,7 @@ public class VnptClientImpl implements VnptClient {
             return Objects.requireNonNull(res, "VNPT ocrFront returned null");
 
         } catch (ResourceAccessException e) {
-            Throwable root = e.getMostSpecificCause(); // rất quan trọng
+            Throwable root = e.getMostSpecificCause();
             log.error("[VNPT] ResourceAccessException rootCause={}", root, e);
             throw e;
         } catch (RestClientException e) {

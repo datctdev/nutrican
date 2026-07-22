@@ -1,6 +1,6 @@
 import { stripMealPeriodSuffix } from '../../../pages/customer/components/planLabels';
 
-/** Strip demo/PT prefixes for cleaner display titles. */
+
 export function stripDisplayPrefix(value) {
     if (!value) return '';
     return stripMealPeriodSuffix(String(value))
@@ -51,7 +51,7 @@ export function getPlanBadgeShort(item, coachedMode = false) {
     };
 }
 
-/** Icon-only reconciliation for coached users with PT plan. */
+
 export function getReconciliationVisual(reconciliation, coachedMode = false) {
     if (!coachedMode || !reconciliation?.hintVi) return null;
     if (reconciliation.bothLogAndPlan) {

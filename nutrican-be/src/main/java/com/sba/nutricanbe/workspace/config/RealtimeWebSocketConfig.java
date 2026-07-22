@@ -16,7 +16,6 @@ public class RealtimeWebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        // Shared realtime endpoint for workspace notifications and chat events.
         registry.addHandler(workspaceWebSocketHandler, "/ws/workspace").setAllowedOrigins("*");
     }
 }

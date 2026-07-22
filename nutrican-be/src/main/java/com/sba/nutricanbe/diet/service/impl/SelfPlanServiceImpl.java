@@ -201,7 +201,6 @@ public class SelfPlanServiceImpl implements SelfPlanService {
                 throw new BadRequestException("Chỉ đánh dấu đã ăn trong khung giờ của buổi đó");
             }
         }
-        // Reject future plan dates before creating a diet log
         DietDates.resolveLogDate(item.getPlanDate());
 
         CreateDietLogRequest logReq = new CreateDietLogRequest();
@@ -476,7 +475,7 @@ public class SelfPlanServiceImpl implements SelfPlanService {
         }
     }
 
-    /** Idempotent key per customer/day/meal-period batch. */
+
     private String buildPendingUniqueKey(UUID customerId, LocalDate planDate, List<SelfPlanItem> items) {
         String periods = items.stream()
                 .map(SelfPlanItem::getMealPeriod)

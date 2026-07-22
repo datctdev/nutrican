@@ -11,10 +11,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Vietnam meal-period windows — mirrors FE {@code dietUtils.js}.
- * MORNING 04–10:59, NOON 11–12:59, AFTERNOON 13–17:59, EVENING 18–21:59, LATE 22–03:59.
- */
+
 public final class MealPeriods {
 
     private static final MealPeriod[] ORDER = MealPeriod.values();
@@ -56,10 +53,7 @@ public final class MealPeriods {
         return fromMinutes(nowVn.getHour() * 60 + nowVn.getMinute()) == period;
     }
 
-    /**
-     * Mark-eaten gate. LATE spans midnight: open for planDate=today when hour&gt;=22,
-     * or planDate=yesterday when hour&lt;4.
-     */
+
     public static boolean isMealPeriodOpen(LocalDate planDate, MealPeriod period, LocalDateTime nowVn) {
         if (planDate == null || period == null) return false;
         LocalDateTime n = nowVn != null ? nowVn : DietDates.nowVn();
@@ -77,7 +71,7 @@ public final class MealPeriods {
         return isMealPeriodOpen(planDate, period, DietDates.nowVn());
     }
 
-    /** Periods whose window has fully ended before {@code current} (same-day ordinal). */
+
     public static Set<MealPeriod> pastPeriods(MealPeriod current) {
         return pastPeriods(current, DietDates.nowVn());
     }
@@ -86,7 +80,6 @@ public final class MealPeriods {
         Set<MealPeriod> past = EnumSet.noneOf(MealPeriod.class);
         if (current == null) return past;
         LocalDateTime n = nowVn != null ? nowVn : DietDates.nowVn();
-        // Before 04:00 (overnight LATE): no calendar-day periods have ended yet
         if (n.getHour() < 4) {
             return past;
         }
@@ -108,7 +101,7 @@ public final class MealPeriods {
         return pastPeriods(current());
     }
 
-    /** Ordinal past periods for late tick — excludes future windows (e.g. EVENING during AFTERNOON). */
+
     public static boolean isPastPeriodForLateTick(MealPeriod period, LocalDateTime nowVn) {
         if (period == null) return false;
         LocalDateTime n = nowVn != null ? nowVn : DietDates.nowVn();
@@ -121,10 +114,7 @@ public final class MealPeriods {
         return isPastPeriodForLateTick(period, DietDates.nowVn());
     }
 
-    /**
-     * Validate makeup_for_period: must be past vs current, != mealPeriod, only for today logs.
-     * @return null if valid (including when makeup is null); otherwise error message
-     */
+
     public static String validateMakeup(MealPeriod mealPeriod, MealPeriod makeup, LocalDate logDate) {
         if (makeup == null) return null;
         LocalDate today = DietDates.todayVn();
@@ -144,14 +134,14 @@ public final class MealPeriods {
         return null;
     }
 
-    /** Derive mealPeriod from mealType when period missing (legacy / backfill best-effort). */
+
     public static MealPeriod deriveFromMealType(MealType mealType) {
         if (mealType == null) return null;
         return switch (mealType) {
             case BREAKFAST -> MealPeriod.MORNING;
             case LUNCH -> MealPeriod.NOON;
             case DINNER -> MealPeriod.EVENING;
-            case SNACK -> null; // ambiguous AFTERNOON vs LATE
+            case SNACK -> null;
         };
     }
 

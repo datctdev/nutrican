@@ -89,10 +89,9 @@ test.describe('L5 SABOTAGE race + IDOR sweep', () => {
         data: { action: 'APPROVE' },
       }),
     ]);
-    // Exactly one should succeed; the other 400/409
     const success = [cancel.ok(), approve.ok()].filter(Boolean).length;
     expect(success).toBeGreaterThanOrEqual(1);
-    expect(success).toBeLessThanOrEqual(2); // rare both-ok if non-atomic — still check final status
+    expect(success).toBeLessThanOrEqual(2);
 
     const detail = await request.get(`${API_BASE}/diet/self-plan/submissions`, {
       headers: { Authorization: `Bearer ${token}` },

@@ -70,8 +70,6 @@ public class PtHireServiceImpl implements PtHireService {
             throw new BadRequestException("PT must be verified before accepting clients");
         }
 
-        // Serialize hire requests per customer so double-clicks cannot create
-        // two concurrent open contracts.
         User customer = userRepository.findByIdForUpdate(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", customerId));
         if (!customer.hasCustomerPrivileges()) {
@@ -97,8 +95,6 @@ public class PtHireServiceImpl implements PtHireService {
         mappingRepository.findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, customerId)
                 .ifPresent(this::assertExistingMappingNotOpen);
 
-        // Each new hire is a separate coaching contract. Keeping the previous
-        // mapping immutable preserves its payment and escrow history.
         PtClientMapping mapping = buildPendingMapping(pt, customer, selectedMode, comp);
         mapping = mappingRepository.save(mapping);
         if (selectedMode == TrainingMode.OFFLINE && comp.validatedOffline() != null && comp.selectedVenue() != null) {

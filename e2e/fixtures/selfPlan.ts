@@ -42,7 +42,7 @@ export async function createSelfPlanItem(
   });
 }
 
-/** Ensure PT has published plan covering today (and optionally tomorrow). */
+
 export async function ensurePublishedPlanForCustomer(
   request: APIRequestContext,
   clientId: string,
@@ -50,7 +50,6 @@ export async function ensurePublishedPlanForCustomer(
 ) {
   const ptToken = await ptRequest(request);
   const weekStart = mondayOfWeek(0);
-  // If current week doesn't cover planDate, use next week
   const planDate = new Date(planDateIso + 'T12:00:00');
   const ws = new Date(weekStart + 'T12:00:00');
   const we = new Date(ws);
@@ -85,7 +84,6 @@ export async function ensurePublishedPlanForCustomer(
     body.data?.plan?.id || body.data?.id;
 
   if (!createRes.ok()) {
-    // maybe already exists — try update path or get existing
     const existing = await request.get(`${API_BASE}/workspace/meal-plans/${clientId}`, {
       headers: { Authorization: `Bearer ${ptToken}` },
       params: { weekStart: useWeek },
@@ -101,7 +99,6 @@ export async function ensurePublishedPlanForCustomer(
         return planId as string;
       }
     }
-    // upsert via PUT if create conflicted
     const updateRes = await request.put(`${API_BASE}/workspace/meal-plans/${clientId}`, {
       headers: { Authorization: `Bearer ${ptToken}` },
       data: {

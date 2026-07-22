@@ -1,4 +1,3 @@
-// src/pages/admin/UserManagementPage.jsx
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -14,7 +13,6 @@ export default function UserManagementPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   
-  // Filters
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('');
   const [status, setStatus] = useState('');
@@ -38,7 +36,6 @@ export default function UserManagementPage() {
       let totalCount = 0;
       let pagesCount = 1;
 
-      // CƠ CHẾ PARSING BỌC THÉP
       if (resData) {
         if (Array.isArray(resData)) {
           parsedUsers = resData;
@@ -127,7 +124,7 @@ export default function UserManagementPage() {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in">
-      {/* Header */}
+
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Quản Lý Người Dùng</h1>
@@ -138,7 +135,7 @@ export default function UserManagementPage() {
         </div>
       </div>
 
-      {/* Modern Filter Bar */}
+
       <Card className="bg-white border-slate-200 shadow-sm">
         <CardContent className="p-4">
           <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
@@ -183,7 +180,7 @@ export default function UserManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Users Data Table */}
+
       <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
           <div className="p-6 space-y-4">
@@ -254,7 +251,7 @@ export default function UserManagementPage() {
           </div>
         )}
 
-        {/* Pagination Footer */}
+
         {(totalPages > 1 || page > 0) && (
           <div className="flex justify-between items-center px-6 py-4 border-t border-slate-100 bg-slate-50/50">
             <span className="text-sm font-semibold text-slate-500">

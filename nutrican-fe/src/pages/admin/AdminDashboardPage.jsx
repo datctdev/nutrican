@@ -1,4 +1,3 @@
-// src/pages/admin/AdminDashboardPage.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
@@ -134,7 +133,7 @@ export default function AdminDashboardPage() {
         <p className="text-slate-500 mt-1 font-medium">Bảng quản trị hệ thống Nutrican</p>
       </div>
 
-      {/* Main KPIs */}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {mainStats.map((stat, idx) => (
           <Card key={idx} className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow">
@@ -154,7 +153,7 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        {/* Engagement Stats */}
+
         <Card className="bg-slate-900 border-slate-800 text-white shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl" />
           <CardContent className="p-8 relative z-10">
@@ -183,12 +182,12 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Action Center */}
+
         <div className="lg:col-span-2 space-y-6">
           <h3 className="text-xl font-bold text-slate-800">Trung tâm xử lý</h3>
           <div className="grid sm:grid-cols-2 gap-6">
             
-            {/* PT Approvals */}
+
             <Card className="bg-white border-slate-200 shadow-sm flex flex-col justify-between">
               <CardContent className="p-6">
                 <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mb-4">
@@ -244,7 +243,7 @@ export default function AdminDashboardPage() {
 
           </div>
 
-          {/* Cấu hình hệ thống */}
+
           <h3 className="text-xl font-bold text-slate-800 pt-2">Cấu hình hệ thống</h3>
           <Card className="bg-white border-slate-200 shadow-sm">
             <CardContent className="p-6">
@@ -277,7 +276,7 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* RBL Research Section */}
+
       <Card className="bg-white border-slate-200 shadow-sm">
         <CardContent className="p-8">
           <div className="flex items-center gap-3 mb-6">

@@ -15,17 +15,14 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Fuses ResNet50 + LLaVA + NutriHome into final food code, grams, and macros.
- * Production target: auto-suggest error rate &lt;= 10% — gate via {@link #AUTO_ACCEPT_RELIABILITY}.
- */
+
 public final class MealAnalysisFusion {
 
     public static final String SOURCE_HYBRID_LLAVA = "HYBRID_LLAVA_NUTRIHOME";
     public static final String SOURCE_RESNET_NUTRIHOME = "RESNET_NUTRIHOME";
     public static final String SOURCE_LLAVA_ONLY = "LLAVA_NUTRIHOME";
 
-    /** Minimum reliability (0–1) to skip mandatory user confirmation warning. */
+
     public static final BigDecimal AUTO_ACCEPT_RELIABILITY = BigDecimal.valueOf(0.90);
 
     private static final BigDecimal LLAVA_OVERRIDE_THRESHOLD = BigDecimal.valueOf(0.55);
@@ -47,7 +44,7 @@ public final class MealAnalysisFusion {
         private BigDecimal protein;
         private BigDecimal carbs;
         private BigDecimal fat;
-        /** Production reliability score 0–1 (not raw softmax). */
+
         private BigDecimal confidenceScore;
         private boolean needsConfirmation;
         private boolean llavaUsed;

@@ -8,6 +8,6 @@ import org.springframework.web.multipart.MultipartFile;
 public interface FoodGateService {
     FoodGateResult check(MealRecognitionResult aiResult);
 
-    /** GATE-01: ResNet-only pre-check before full ResNet+LLaVA pipeline. */
+
     FoodGatePreCheckResult preCheck(MultipartFile file);
 }

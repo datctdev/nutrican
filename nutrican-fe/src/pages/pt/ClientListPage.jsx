@@ -1,4 +1,3 @@
-// src/pages/pt/ClientListPage.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FoodAllergySelector from '../../components/common/FoodAllergySelector';
@@ -19,10 +18,10 @@ export default function ClientListPage() {
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState(''); // Bộ lọc local: GREEN, YELLOW, RED
-    const [activeTab, setActiveTab] = useState('ACTIVE'); // Tab API: ACTIVE hoặc PENDING
-    const [processingId, setProcessingId] = useState(null); // Trạng thái loading khi bấm Duyệt
-    const [endCoachingModal, setEndCoachingModal] = useState(null); // { clientId, mappingStatus, fullName }
+    const [statusFilter, setStatusFilter] = useState('');
+    const [activeTab, setActiveTab] = useState('ACTIVE');
+    const [processingId, setProcessingId] = useState(null);
+    const [endCoachingModal, setEndCoachingModal] = useState(null);
     const [pendingCount, setPendingCount] = useState(0);
 
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -252,7 +251,7 @@ export default function ClientListPage() {
                 </Button>
             </div>
 
-            {/* HỆ THỐNG TAB */}
+
             <div className="flex gap-6 border-b border-slate-200">
                 <button
                     className={`pb-4 px-2 font-bold text-sm transition-colors relative flex items-center gap-2 ${activeTab === 'ACTIVE' ? 'text-blue-600' : 'text-slate-500 hover:text-slate-800'}`}
@@ -295,7 +294,7 @@ export default function ClientListPage() {
                         />
                     </div>
 
-                    {/* Chỉ hiện Dropdown lọc khi ở Tab ACTIVE */}
+
                     {activeTab === 'ACTIVE' && (
                         <div className="relative min-w-[180px]" ref={dropdownRef}>
                             <button
@@ -356,7 +355,6 @@ export default function ClientListPage() {
             ) : (
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredClients.map((client) => {
-                        // Nếu đang ở tab PENDING, ghi đè status thành PENDING để load UI màu xanh lơ
                         const currentStatus = activeTab === 'PENDING'
                             ? 'PENDING'
                             : activeTab === 'AWAITING_PAYMENT' ? 'AWAITING_PAYMENT' : client.status;
@@ -369,7 +367,7 @@ export default function ClientListPage() {
                                 <CardContent className="p-6 flex-1 flex flex-col">
                                     <div className="flex items-center gap-4 mb-5">
                                         <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center font-black text-xl shadow-sm group-hover:scale-105 transition-transform flex-shrink-0 ${activeTab === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                                            {client.avatarUrl ? ( // Chú ý: Backend trả về avatarUrl, không phải clientAvatarUrl
+                                            {client.avatarUrl ? (
                                                 <img src={client.avatarUrl} alt={client.clientName} className="w-full h-full rounded-2xl object-cover" />
                                             ) : (
                                                 getInitials(client.clientName)
@@ -469,7 +467,7 @@ export default function ClientListPage() {
                                         )}
                                     </div>
 
-                                    {/* NÚT ACTION */}
+
                                     {activeTab === 'ACTIVE' ? (
                                         <div className="flex flex-col gap-2">
                                             <div className="flex gap-2">

@@ -1,4 +1,3 @@
-// src/pages/pt/ReviewDietLogPage.jsx
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
@@ -345,7 +344,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                     </Button>
                 </div>
             )}
-            {/* HEADER */}
+
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -431,7 +430,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                 </div>
             )}
 
-            {/* THỐNG KÊ RBL CỦA PT */}
+
             {!clientPage && ptRblStats && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="p-5 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100/50 rounded-3xl shadow-sm flex flex-col justify-center">
@@ -453,7 +452,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                 </div>
             )}
 
-            {/* DANH SÁCH BỮA ĂN CHỜ DUYỆT */}
+
             {listLoading ? (
                 <div className="space-y-6">
                     {[1, 2, 3].map(i => <Skeleton key={i} className="h-64 w-full rounded-3xl bg-slate-200" />)}
@@ -491,7 +490,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                         >
                             <div className="flex flex-col md:flex-row">
 
-                                {/* Cột Ảnh */}
+
                                 {reviewImage && (
                                     <div className="md:w-80 h-64 md:h-auto bg-slate-100 flex flex-col items-center justify-center text-slate-400 border-b md:border-b-0 md:border-r border-slate-200 relative overflow-hidden">
                                         <button
@@ -520,10 +519,10 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                     </div>
                                 )}
 
-                                {/* Cột Thông tin & Hành động */}
+
                                 <div className="flex-1 p-6 md:p-8 flex flex-col justify-between bg-white">
                                     <div>
-                                        {/* Tiêu đề thẻ */}
+
                                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-blue-700 font-black text-lg border border-blue-200/50 shadow-sm">
@@ -584,12 +583,12 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                             </div>
                                         )}
 
-                                        {/* Tên món & Chế độ Blind */}
+
                                         <div className="mt-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
                                             <div className="flex flex-wrap items-center gap-3 mb-4 border-b border-slate-200/60 pb-4">
                                                 <p className="text-slate-800 font-black text-xl capitalize flex-1 truncate">{log.foodDescription || 'Bữa ăn không có mô tả'}</p>
 
-                                                {/* Nút bật/tắt Blind Mode */}
+
                                                 {!isReviewedList && <Button
                                                     size="sm"
                                                     variant="outline"
@@ -609,7 +608,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                                 </p>
                                             )}
 
-                                            {/* Logic hiển thị RBL hoặc Lưới Macros */}
+
                                             {blindMode[log.id] && !blindRevealed[log.id] && !log.blindSubmitted ? (
                                                 <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl animate-fade-in shadow-sm">
                                                     <p className="text-sm font-bold text-amber-900 mb-4 flex items-center gap-2"><EyeOff className="w-4 h-4" /> Hãy dự đoán Macros mà không nhìn kết quả của AI.</p>
@@ -646,7 +645,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                                 </>
                                             )}
 
-                                            {/* Thư viện ảnh đầy đủ */}
+
                                             {(() => {
                                                 const allImages = getReviewImages(log);
 
@@ -686,7 +685,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                             })()}
                                         </div>
 
-                                        {/* FORM ĐIỀU CHỈNH MACROS */}
+
                                         {!isReviewedList && adjustingLog === log.id && (
                                             <div className="mt-4 p-6 bg-blue-50 border border-blue-100 rounded-2xl animate-fade-in shadow-inner">
                                                 <div className="flex items-center gap-2 mb-4">
@@ -765,7 +764,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                         )}
                                     </div>
 
-                                    {/* THANH HÀNH ĐỘNG CHÍNH */}
+
                                     {!isReviewedList && !adjustingLog && (
                                         <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-3 mt-6 pt-6 border-t border-slate-100">
 
@@ -820,7 +819,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                     })}
                 </div>
             )}
-            {/* Modal Từ chối */}
+
             <Modal
                 isOpen={!!rejectModalLog}
                 onClose={() => setRejectModalLog(null)}

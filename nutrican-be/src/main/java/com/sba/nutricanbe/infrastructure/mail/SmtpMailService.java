@@ -9,10 +9,7 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
-/**
- * SMTP implementation of {@link MailService} using Spring Mail + Thymeleaf templates.
- * Moved from core.service.impl.EmailServiceImpl to infrastructure.mail.SmtpMailService.
- */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

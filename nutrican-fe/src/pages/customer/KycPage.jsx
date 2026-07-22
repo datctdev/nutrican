@@ -1,4 +1,3 @@
-// src/pages/customer/KycPage.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
@@ -19,7 +18,6 @@ import PtVenueAvailabilityEditor, { newVenue, weekScheduleToAvailabilityWindows 
 import ProvinceSelect from '../../components/common/ProvinceSelect';
 import { createDefaultWeekSchedule, sessionMinutesFromRateUnit, DAY_LABELS } from '../../utils/offlineHireSlots';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
 const GOAL_OPTIONS_KYC = [
   { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
   { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
@@ -59,7 +57,6 @@ const modeIncludes = (selectedMode, optionMode) =>
 const hasPositiveRate = (value) =>
   value !== '' && value !== null && value !== undefined && Number(value) > 0;
 
-// Chỉ giữ chữ số (ô phí là số nguyên VNĐ, không âm, không phần thập phân)
 const digitsOnly = (value) => (value ?? '').toString().replace(/\D/g, '');
 
 const newEmptyCert = () => ({
@@ -74,7 +71,6 @@ const newEmptyCert = () => ({
   isUploading: false,
 });
 
-// ─── Validation ────────────────────────────────────────────────────────────
 function validatePtForm(form, certList, venues, weekSchedule) {
   if (!form.preferredTrack) return 'Vui lòng chọn hướng đăng ký';
   if (!form.bio.trim() || form.bio.trim().length < 100)
@@ -132,7 +128,6 @@ function validatePtForm(form, certList, venues, weekSchedule) {
   return null;
 }
 
-// ─── Computed helpers ──────────────────────────────────────────────────────
 function calcExperience(dateStr) {
   if (!dateStr) return null;
   const normalized = dateStr.length === 7 ? `${dateStr}-01` : dateStr;
@@ -149,7 +144,6 @@ function calcExperience(dateStr) {
   return `${years} năm ${months} tháng`;
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────
 function SectionHeader({ icon: Icon, title, subtitle, step, color = 'blue' }) {
   const colors = {
     blue: 'from-blue-500 to-indigo-500 text-blue-600 bg-blue-50',
@@ -212,7 +206,7 @@ function CertCard({ cert, index, onChange, onRemove, onImageUpload }) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Name */}
+
         <div>
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">
             Tên chứng chỉ *
@@ -226,7 +220,7 @@ function CertCard({ cert, index, onChange, onRemove, onImageUpload }) {
           />
         </div>
 
-        {/* Org */}
+
         <div>
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">
             Tổ chức cấp *
@@ -240,7 +234,7 @@ function CertCard({ cert, index, onChange, onRemove, onImageUpload }) {
           />
         </div>
 
-        {/* Issue Date */}
+
         <div>
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">
             Ngày cấp *
@@ -254,7 +248,7 @@ function CertCard({ cert, index, onChange, onRemove, onImageUpload }) {
           />
         </div>
 
-        {/* Expiry Date */}
+
         <div>
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">
             Ngày hết hạn
@@ -287,7 +281,7 @@ function CertCard({ cert, index, onChange, onRemove, onImageUpload }) {
         </div>
       </div>
 
-      {/* Certificate Image Upload */}
+
       <div className="mt-4">
         <label className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 block">
           Ảnh chứng chỉ * <span className="text-slate-400 normal-case font-normal">(JPG/PNG/PDF, tối đa 5MB)</span>
@@ -363,7 +357,6 @@ function CertCard({ cert, index, onChange, onRemove, onImageUpload }) {
   );
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────
 export default function KycPage() {
   const navigate = useNavigate();
   const { user, checkAuth } = useAuthStore();
@@ -373,7 +366,6 @@ export default function KycPage() {
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const [requireKyc, setRequireKyc] = useState(true);
 
-  // KYC Session state
   const [sessionId, setSessionId] = useState(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -388,7 +380,6 @@ export default function KycPage() {
   const [comparing, setComparing] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
-  // PT Registration form state
   const [ptForm, setPtForm] = useState({
     preferredTrack: null,
     bio: '',
@@ -419,7 +410,6 @@ export default function KycPage() {
   const backInputRef = useRef(null);
   const selfieInputRef = useRef(null);
 
-  // Load status on mount
   useEffect(() => {
     const checkStatus = async () => {
       setIsLoadingStatus(true);
@@ -444,7 +434,6 @@ export default function KycPage() {
     checkStatus();
   }, []);
 
-  // ── KYC functions ──────────────────────────────────────────────────────
   const resetKyc = () => {
     setSessionId(null);
     setCurrentStep(0);
@@ -491,7 +480,7 @@ export default function KycPage() {
       setCompareResult(result);
       if (result?.status === 'VERIFIED') {
         toast.success('Xác thực KYC thành công!');
-        await checkAuth(); // reload user.isKycVerified
+        await checkAuth();
       } else {
         toast.error('Xác thực thất bại, vui lòng kiểm tra lại ảnh.');
       }
@@ -508,7 +497,6 @@ export default function KycPage() {
     }
   };
 
-  // ── PT Registration functions ──────────────────────────────────────────
   const toggleSpec = (spec) =>
     setPtForm(p => ({
       ...p,
@@ -557,7 +545,6 @@ export default function KycPage() {
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
     if (!allowedTypes.includes(file.type)) { toast.error('Chỉ chấp nhận ảnh JPG, PNG hoặc PDF'); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error('Ảnh không được vượt quá 5MB'); return; }
-    // Show local preview immediately
     const preview = URL.createObjectURL(file);
     setCertList(prev => prev.map((c, i) => i === index ? { ...c, isUploading: true, imagePreview: preview } : c));
     try {
@@ -648,7 +635,6 @@ export default function KycPage() {
     }
   };
 
-  // ── KYC helpers ────────────────────────────────────────────────────────
   const getSessionStatus = () => {
     if (comparing || uploading) return 'IN_PROGRESS';
     if (compareResult?.status === 'VERIFIED') return 'VERIFIED';
@@ -757,7 +743,6 @@ export default function KycPage() {
     );
   };
 
-  // ── Render loading ─────────────────────────────────────────────────────
   if (isLoadingStatus) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -766,7 +751,6 @@ export default function KycPage() {
     );
   }
 
-  // ── Render KYC page (when KYC is required and user is not verified) ──────
   if (requireKyc && !user?.isKycVerified) {
     return (
       <div className="max-w-3xl mx-auto space-y-8 pb-12 animate-fade-in">
@@ -834,10 +818,9 @@ export default function KycPage() {
     );
   }
 
-  // ── Render PT Registration page ─────────────────────────────────────────
   return (
     <div className="max-w-5xl mx-auto pb-16 animate-fade-in">
-      {/* Page header */}
+
       <div className="text-center mb-10">
         <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
           <GraduationCap className="w-8 h-8 text-white" />
@@ -846,7 +829,7 @@ export default function KycPage() {
         <p className="text-slate-500 font-medium">Xây dựng hồ sơ chuyên nghiệp để kết nối với học viên</p>
       </div>
 
-      {/* Status banner if already has profile */}
+
       {hasPtProfile && (
         <Card className={`mb-8 ${
           ptProfileStatus === 'ACTIVE' || ptProfileStatus === 'VERIFIED'
@@ -895,7 +878,7 @@ export default function KycPage() {
         </Card>
       )}
 
-      {/* Registration form (show if no profile OR if rejected) */}
+
       {(!hasPtProfile || ptProfileStatus === 'SUSPENDED') && (
         !ptForm.preferredTrack ? (
           <div className="max-w-4xl mx-auto">
@@ -905,7 +888,7 @@ export default function KycPage() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* CERTIFIED Track */}
+
               <button 
                 onClick={() => setPtForm(p => ({ ...p, preferredTrack: 'CERTIFIED' }))}
                 className="group relative bg-white border-2 border-emerald-100 hover:border-emerald-500 rounded-3xl p-8 text-left transition-all hover:shadow-xl hover:-translate-y-1 overflow-hidden"
@@ -943,7 +926,7 @@ export default function KycPage() {
                 </div>
               </button>
 
-              {/* FREELANCE Track */}
+
               <button 
                 onClick={() => setPtForm(p => ({ ...p, preferredTrack: 'FREELANCE' }))}
                 className="group relative bg-white border-2 border-blue-100 hover:border-blue-500 rounded-3xl p-8 text-left transition-all hover:shadow-xl hover:-translate-y-1 overflow-hidden"
@@ -988,10 +971,10 @@ export default function KycPage() {
           </div>
         ) : (
         <div className="grid grid-cols-12 gap-6">
-          {/* Left — Form */}
+
           <div className="col-span-12 lg:col-span-8 space-y-6">
             
-            {/* Form Header with Back Button */}
+
             <div className="flex items-center justify-between bg-white rounded-2xl p-4 border border-slate-200">
               <div>
                 <span className="text-sm text-slate-500">Đang đăng ký dưới tư cách:</span>
@@ -1007,7 +990,7 @@ export default function KycPage() {
               </button>
             </div>
 
-            {/* Section 1: Basic Info */}
+
             <Card className="bg-white border-slate-200 shadow-sm">
               <CardContent className="p-6">
                 <SectionHeader icon={User} title="Thông Tin Cơ Bản" subtitle="Giới thiệu bản thân với học viên" step="1" color="blue" />
@@ -1057,12 +1040,12 @@ export default function KycPage() {
               </CardContent>
             </Card>
 
-            {/* Section 2: Experience & Specializations */}
+
             <Card className="bg-white border-slate-200 shadow-sm">
               <CardContent className="p-6">
                 <SectionHeader icon={Briefcase} title="Kinh Nghiệm & Chuyên Môn" subtitle="Hệ thống tự tính số năm dựa trên ngày bắt đầu" step="2" color="emerald" />
                 <div className="space-y-4">
-                  {/* Experience Start Date */}
+
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Bắt Đầu Làm PT Từ Ngày *</label>
                     <div className="flex gap-3 items-center">
@@ -1086,7 +1069,7 @@ export default function KycPage() {
                     </p>
                   </div>
 
-                  {/* Specializations */}
+
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-2 block">
                       Chuyên Môn * <span className="font-normal text-slate-400">(chọn ít nhất 1)</span>
@@ -1141,7 +1124,7 @@ export default function KycPage() {
                     </div>
                   </div>
 
-                  {/* Training Mode */}
+
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-2 block">Hình Thức Huấn Luyện *</label>
                     <div className="grid grid-cols-3 gap-3">
@@ -1159,7 +1142,7 @@ export default function KycPage() {
                     </div>
                   </div>
 
-                  {/* Location */}
+
                   {modeIncludes(ptForm.trainingMode, 'OFFLINE') && (
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Địa Điểm Hoạt Động *</label>
@@ -1171,7 +1154,7 @@ export default function KycPage() {
                   </div>
                   )}
 
-                  {/* Hourly Rate + Unit */}
+
                   {modeIncludes(ptForm.trainingMode, 'ONLINE') && (
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">Phí Huấn Luyện ONLINE *</label>
@@ -1231,7 +1214,7 @@ export default function KycPage() {
               </CardContent>
             </Card>
 
-            {/* Section 3: Certifications */}
+
             <Card className="bg-white border-slate-200 shadow-sm">
               <CardContent className="p-6">
                 <SectionHeader 
@@ -1260,12 +1243,12 @@ export default function KycPage() {
               </CardContent>
             </Card>
 
-            {/* Section 4: Portfolio & Social */}
+
             <Card className="bg-white border-slate-200 shadow-sm">
               <CardContent className="p-6">
                 <SectionHeader icon={FileUp} title="Hồ Sơ & Liên Kết" subtitle="Tùy chọn — giúp tăng độ tin cậy" step="4" color="purple" />
                 <div className="space-y-4">
-                  {/* CV Upload */}
+
                   <div>
                     <label className="text-sm font-semibold text-slate-600 mb-1.5 block">CV (PDF hoặc Word, tối đa 10MB)</label>
                     <input ref={cvInputRef} type="file" accept=".pdf,.doc,.docx" onChange={handleCvUpload} className="hidden" />
@@ -1313,7 +1296,7 @@ export default function KycPage() {
               </CardContent>
             </Card>
 
-            {/* Submit */}
+
             <Button onClick={handleRegisterPt} disabled={isSubmittingPt}
               className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white rounded-2xl py-6 text-lg font-bold shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2">
               {isSubmittingPt
@@ -1322,9 +1305,9 @@ export default function KycPage() {
             </Button>
           </div>
 
-          {/* Right sidebar */}
+
           <div className="col-span-12 lg:col-span-4 space-y-5">
-            {/* Benefits */}
+
             <Card className="bg-gradient-to-br from-slate-800 to-slate-900 border-0 text-white">
               <CardContent className="p-6">
                 <h3 className="text-base font-bold mb-4 flex items-center gap-2">
@@ -1348,7 +1331,7 @@ export default function KycPage() {
               </CardContent>
             </Card>
 
-            {/* Process */}
+
             <Card className="bg-white border-slate-200">
               <CardContent className="p-6">
                 <h3 className="text-base font-bold text-slate-800 mb-4">Quy Trình Duyệt</h3>
@@ -1370,7 +1353,7 @@ export default function KycPage() {
               </CardContent>
             </Card>
 
-            {/* Tips */}
+
             <Card className="bg-blue-50 border-blue-200">
               <CardContent className="p-5">
                 <h3 className="text-sm font-bold text-blue-800 mb-2 flex items-center gap-1.5">
@@ -1392,7 +1375,7 @@ export default function KycPage() {
               </CardContent>
             </Card>
 
-            {/* Contact */}
+
             <Card className="bg-slate-50 border-slate-200">
               <CardContent className="p-5">
                 <h3 className="text-sm font-bold text-slate-700 mb-2">Cần hỗ trợ?</h3>

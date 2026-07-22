@@ -9,11 +9,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
-/**
- * Business "today" / "now" for diet — Vietnam wall clock, not JVM default.
- * Optional demo override: property {@code nutrican.demo.vn-clock} or request header
- * {@code X-Nutrican-Demo-Vn-Clock} (when {@code nutrican.demo.allow-client-clock=true}).
- */
+
 public final class DietDates {
 
     public static final ZoneId VN = ZoneId.of("Asia/Ho_Chi_Minh");
@@ -25,7 +21,7 @@ public final class DietDates {
 
     private DietDates() {}
 
-    /** Fixed override from application property (startup). Pass null to clear. */
+
     public static void setFixedOverride(LocalDateTime override) {
         fixedOverride = override;
     }
@@ -42,10 +38,7 @@ public final class DietDates {
         REQUEST_OVERRIDE.remove();
     }
 
-    /**
-     * Parse demo clock: {@code HH:mm}, {@code HH:mm:ss}, or {@code yyyy-MM-dd'T'HH:mm[:ss]} (VN wall).
-     * Bare time uses the real VN calendar date.
-     */
+
     public static LocalDateTime parseDemoClock(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
@@ -77,7 +70,7 @@ public final class DietDates {
         return nowVn().toLocalDate();
     }
 
-    /** Null → today VN. Rejects dates after today VN. */
+
     public static LocalDate resolveLogDate(LocalDate logDate) {
         LocalDate today = todayVn();
         LocalDate resolved = logDate != null ? logDate : today;
@@ -87,10 +80,7 @@ public final class DietDates {
         return resolved;
     }
 
-    /**
-     * Plan dates may be today or future (self day-plan). Null → today VN.
-     * Rejects dates before today (cannot plan the past).
-     */
+
     public static LocalDate resolvePlanDate(LocalDate planDate) {
         LocalDate today = todayVn();
         LocalDate resolved = planDate != null ? planDate : today;

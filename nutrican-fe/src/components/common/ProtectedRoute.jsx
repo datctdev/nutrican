@@ -1,4 +1,3 @@
-// src/components/common/ProtectedRoute.jsx
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -9,7 +8,6 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Define role hierarchy: what a role is allowed to act as
   const roleHierarchy = {
     'ADMIN': ['ADMIN', 'CUSTOMER'],
     'PT_CERTIFIED': ['PT_CERTIFIED', 'CUSTOMER'],
@@ -19,12 +17,8 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   if (allowedRoles && user) {
     const effectiveRoles = roleHierarchy[user.role] || [user.role];
-    // Check if the user has any of the allowedRoles according to hierarchy
     const hasPermission = effectiveRoles.some(r => allowedRoles.includes(r));
     
-    // For PTs, if they are navigating to a CUSTOMER route, they should be allowed.
-    // (Optional: we could strictly enforce activeRole here, but for smooth navigation
-    // it's better to just check the hierarchy. If they go to /diet, it renders.)
 
     if (!hasPermission) {
       const dashboardMap = {

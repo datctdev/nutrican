@@ -19,6 +19,6 @@ public class MealPlanLateTickItemDto {
     private String mealPeriod;
     private String foodLabel;
     private String lateTickReason;
-    /** PT_ORIGINAL | SELF_OVERRIDE | DIET_LOG */
+
     private String source;
 }

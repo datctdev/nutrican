@@ -14,7 +14,6 @@ public class EKycConfig {
     private String tokenId = "";
     private String tokenKey = "";
 
-    // ===== computed URLs =====
 
     public String getLivenessUrl() {
         return baseUrl + "/ai/v1/card/liveness";

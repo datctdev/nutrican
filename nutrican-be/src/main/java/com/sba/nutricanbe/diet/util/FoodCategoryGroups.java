@@ -5,9 +5,7 @@ import com.sba.nutricanbe.diet.enums.FoodCategoryGroup;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Single source of truth: seed/catalog {@code category} string → {@link FoodCategoryGroup}.
- */
+
 public final class FoodCategoryGroups {
 
     private static final Set<String> PROTEIN = Set.of(

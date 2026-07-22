@@ -8,9 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/**
- * LLaVA prompts with NutriHome macros and visual disambiguation (VN + Food-101).
- */
+
 public final class LlavaMealPromptBuilder {
 
     private static final Map<String, DishGuide> DISH_GUIDES = buildGuides();

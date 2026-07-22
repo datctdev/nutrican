@@ -451,7 +451,7 @@ export default function ClientProgressPage() {
             </Card>
           )}
 
-          {/* Hồ sơ sức khỏe & Mục tiêu */}
+
           {profile && (
             <Card className="bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden">
               <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
@@ -687,7 +687,7 @@ export default function ClientProgressPage() {
             </Card>
           )}
 
-          {/* Thiết Lập Mục Tiêu Dinh Dưỡng & Macro */}
+
           {profile && (
             <Card className="bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden mt-6">
               <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">

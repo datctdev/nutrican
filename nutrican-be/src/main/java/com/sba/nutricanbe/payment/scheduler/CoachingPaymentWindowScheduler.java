@@ -65,10 +65,7 @@ public class CoachingPaymentWindowScheduler {
         }
     }
 
-    /**
-     * Cancels abandoned VNPay attempts after {@code Payment.expiresAt}
-     * (e.g. user opened VNPay then pressed back / closed the tab).
-     */
+
     @Scheduled(cron = "${app.payment.attempt-expiry-scan-cron:0 */5 * * * *}")
     @Transactional
     public void expireStalePaymentAttempts() {

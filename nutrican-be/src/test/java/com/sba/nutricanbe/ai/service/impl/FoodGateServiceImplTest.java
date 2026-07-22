@@ -1,7 +1,6 @@
 package com.sba.nutricanbe.ai.service.impl;
 
 
-
 import com.sba.nutricanbe.ai.catalog.ResNetClassManifest;
 
 import com.sba.nutricanbe.ai.dto.FoodGatePreCheckResult;
@@ -29,9 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 
-
 import java.math.BigDecimal;
-
 
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,17 +40,14 @@ import static org.mockito.Mockito.when;
 import org.springframework.mock.web.MockMultipartFile;
 
 
-
 @ExtendWith(MockitoExtension.class)
 
 class FoodGateServiceImplTest {
 
 
-
     @Mock private ResNetFoodRecognitionClient resNetClient;
 
     @InjectMocks private FoodGateServiceImpl gate;
-
 
 
     @BeforeAll
@@ -65,7 +59,6 @@ class FoodGateServiceImplTest {
     }
 
 
-
     @org.junit.jupiter.api.BeforeEach
 
     void setMinConfidence() {
@@ -73,7 +66,6 @@ class FoodGateServiceImplTest {
         ReflectionTestUtils.setField(gate, "minFoodConfidence", BigDecimal.valueOf(0.12));
 
     }
-
 
 
     @Test
@@ -89,11 +81,9 @@ class FoodGateServiceImplTest {
                 .build();
 
 
-
         assertEquals(FoodGateResult.NOT_FOOD, gate.check(result));
 
     }
-
 
 
     @Test
@@ -109,11 +99,9 @@ class FoodGateServiceImplTest {
                 .build();
 
 
-
         assertEquals(FoodGateResult.OUT_OF_CLASS, gate.check(result));
 
     }
-
 
 
     @Test
@@ -129,11 +117,9 @@ class FoodGateServiceImplTest {
                 .build();
 
 
-
         assertEquals(FoodGateResult.PASS, gate.check(result));
 
     }
-
 
 
     @Test
@@ -155,9 +141,7 @@ class FoodGateServiceImplTest {
         when(resNetClient.analyze(any())).thenReturn(response);
 
 
-
         FoodGatePreCheckResult pre = gate.preCheck(new MockMultipartFile("file", "meal.jpg", "image/jpeg", new byte[]{1}));
-
 
 
         assertEquals(FoodGateResult.PASS, pre.gateResult());
@@ -167,7 +151,6 @@ class FoodGateServiceImplTest {
     }
 
 
-
     @Test
 
     void preCheckNotFoodWhenResNetFails() {
@@ -175,9 +158,7 @@ class FoodGateServiceImplTest {
         when(resNetClient.analyze(any())).thenReturn(new ResNetAnalyzeResponse());
 
 
-
         FoodGatePreCheckResult pre = gate.preCheck(new MockMultipartFile("file", "meal.jpg", "image/jpeg", new byte[]{1}));
-
 
 
         assertEquals(FoodGateResult.NOT_FOOD, pre.gateResult());

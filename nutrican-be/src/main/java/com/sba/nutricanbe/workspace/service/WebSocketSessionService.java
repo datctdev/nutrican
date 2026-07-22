@@ -60,7 +60,7 @@ public class WebSocketSessionService {
     public void sendToUserOnly(UUID userId, String event, Object data) {
         CopyOnWriteArrayList<WebSocketSession> userSessions = sessions.get(userId);
         if (userSessions == null || userSessions.isEmpty()) {
-            return; // PT đang không online
+            return;
         }
 
         try {
@@ -85,7 +85,6 @@ public class WebSocketSessionService {
         }
     }
 
-    // Các hàm Helper chuẩn hóa Event
     public void notifyPtOfNewDietLog(UUID ptId, Object dietLogInfo) {
         sendToUser(ptId, "NEW_DIET_LOG", dietLogInfo);
     }

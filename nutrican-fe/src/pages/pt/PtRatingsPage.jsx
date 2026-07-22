@@ -1,4 +1,3 @@
-// src/pages/pt/PtRatingsPage.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -20,14 +19,13 @@ export default function PtRatingsPage() {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [lightboxImage, setLightboxImage] = useState('');
-    const [timeFilter, setTimeFilter] = useState('ALL'); // ALL, MONTH, YEAR
+    const [timeFilter, setTimeFilter] = useState('ALL');
 
     useEffect(() => {
         const fetchReviews = async () => {
             if (!user?.id) return;
             try {
                 setLoading(true);
-                // Lấy tối đa 100 review mới nhất để thống kê
                 const res = await marketplaceService.getPtReviews(user.id, { page: 0, size: 100 });
                 setReviews(res.data?.data?.content || []);
             } catch (error) {
@@ -40,7 +38,6 @@ export default function PtRatingsPage() {
         fetchReviews();
     }, [user?.id]);
 
-    // Lọc review theo thời gian
     const filteredReviews = useMemo(() => {
         const now = new Date();
         return reviews.filter(r => {
@@ -56,7 +53,6 @@ export default function PtRatingsPage() {
         });
     }, [reviews, timeFilter]);
 
-    // Tính toán thống kê từ dữ liệu đã lọc
     const stats = useMemo(() => {
         const total = filteredReviews.length;
         if (total === 0) return { average: 0, total: 0, distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 } };
@@ -86,7 +82,7 @@ export default function PtRatingsPage() {
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Đánh giá từ Học viên</h1>
                     <p className="text-slate-500 mt-1 font-medium">Báo cáo chi tiết phản hồi và mức độ hài lòng của khách hàng.</p>
                 </div>
-                {/* Bộ lọc thời gian */}
+
                 <div className="flex items-center gap-2 bg-white border border-slate-200 p-1.5 rounded-xl shadow-sm">
                     <Calendar className="w-4 h-4 text-slate-400 ml-2" />
                     <select
@@ -101,10 +97,10 @@ export default function PtRatingsPage() {
                 </div>
             </div>
 
-            {/* Thẻ Thống kê Tổng quan & Phân bổ Sao */}
+
             <Card className="bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden">
                 <div className="flex flex-col lg:flex-row">
-                    {/* Cột Tổng điểm */}
+
                     <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-8 lg:w-1/3 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-amber-100">
                         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm text-amber-500 mb-4">
                             <ThumbsUp className="w-8 h-8" />
@@ -119,7 +115,7 @@ export default function PtRatingsPage() {
                         <p className="text-sm font-bold text-amber-800 bg-white/60 px-3 py-1 rounded-lg">Dựa trên {stats.total} đánh giá</p>
                     </div>
 
-                    {/* Cột Phân bổ sao (Progress Bars) */}
+
                     <div className="p-8 lg:w-2/3 flex flex-col justify-center space-y-3">
                         {[5, 4, 3, 2, 1].map((star) => {
                             const count = stats.distribution[star];
@@ -146,7 +142,7 @@ export default function PtRatingsPage() {
                 </div>
             </Card>
 
-            {/* Danh sách Đánh giá chi tiết */}
+
             <div className="space-y-4">
                 {loading ? (
                     [1, 2].map(i => <Skeleton key={i} className="h-40 w-full rounded-3xl bg-slate-200" />)
@@ -192,7 +188,7 @@ export default function PtRatingsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Hiển thị ảnh đính kèm nếu có */}
+
                                     {review.imageUrl && (
                                         <div className="bg-slate-50 border-t border-slate-100 p-4 flex items-center gap-3">
                                             <ImageIcon className="w-5 h-5 text-slate-400" />

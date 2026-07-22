@@ -44,10 +44,7 @@ public class SelfPlanSubmission extends BaseEntity {
     @Column(name = "pt_note", columnDefinition = "TEXT")
     private String ptNote;
 
-    /**
-     * Set only while status=PENDING (customerId|planDate|mealPeriods). Unique so concurrent
-     * double-submit of the same batch cannot create duplicate rows.
-     */
+
     @Column(name = "pending_unique_key", unique = true, length = 80)
     private String pendingUniqueKey;
 }

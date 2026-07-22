@@ -58,8 +58,6 @@ public class RefundServiceImpl implements RefundService {
         if (refundRepository.existsByMappingIdAndStatus(mapping.getId(), RefundStatus.PENDING_REVIEW)) {
             throw new BadRequestException("A refund request is already pending review");
         }
-        // A customer-selected reason is a claim, not system evidence. Keep the
-        // escrow held until an admin verifies and approves the request.
         if (!coachingWalletService.markEscrowDisputedIfPresent(mapping.getId())) {
             throw new BadRequestException("No held coaching payment is available for refund");
         }

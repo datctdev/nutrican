@@ -1,6 +1,6 @@
 import { Button } from '../ui/button';
 
-/** Styled confirm dialog — replaces window.confirm for demos / product UI. */
+
 export default function ConfirmModal({
     open,
     title = 'Xác nhận',

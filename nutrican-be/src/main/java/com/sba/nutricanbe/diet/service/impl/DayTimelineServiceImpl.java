@@ -335,7 +335,7 @@ public class DayTimelineServiceImpl implements DayTimelineService {
                         .orElse(list.get(0)));
     }
 
-    /** PENDING đã lấy riêng; còn lại ưu tiên APPROVED/REJECTED hơn CANCELLED. */
+
     private static int statusRank(SelfPlanSubmissionStatus status) {
         if (status == null) return 0;
         return switch (status) {

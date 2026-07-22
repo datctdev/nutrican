@@ -233,7 +233,6 @@ public class NotificationServiceImpl implements NotificationService {
                 try {
                     return UUID.fromString(String.valueOf(value));
                 } catch (IllegalArgumentException ignored) {
-                    // try next key
                 }
             }
         }

@@ -20,9 +20,9 @@ public class MealPlanTemplateItem extends BaseEntity {
     private UUID templateId;
 
     @Column(name = "day_offset", nullable = false)
-    private Integer dayOffset; // 0 to 6 representing the day of the week
+    private Integer dayOffset;
 
-    /** Stored as diet MealType name (BREAKFAST/LUNCH/DINNER/SNACK) without cross-module enum coupling. */
+
     @Column(name = "meal_type", nullable = false, length = 20)
     private String mealType;
 
