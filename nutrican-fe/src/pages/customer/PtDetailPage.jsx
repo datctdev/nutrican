@@ -7,7 +7,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { marketplaceService } from '../../services/marketplaceService';
 import { coachingPaymentService } from '../../services/coachingPaymentService';
-import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, Quote, UserCircle, Edit, Trash2, Camera, EyeOff, AlertTriangle, Target, MapPin, Banknote, ShieldCheck, GraduationCap, LinkIcon, Wifi, CreditCard } from 'lucide-react';
+import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, Quote, UserCircle, Edit, Trash2, Camera, EyeOff, AlertTriangle, Target, MapPin, Banknote, ShieldCheck, GraduationCap, LinkIcon, Wifi, CreditCard, Wallet } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import Modal from '../../components/common/Modal';
@@ -107,6 +107,8 @@ export default function PtDetailPage() {
     const [hireStatus, setHireStatus] = useState('NONE');
     const [hiring, setHiring] = useState(false);
     const [paying, setPaying] = useState(false);
+    const [payingWithWallet, setPayingWithWallet] = useState(false);
+    const [coachingWallet, setCoachingWallet] = useState(null);
     const [showHireModal, setShowHireModal] = useState(false);
     const [selectedMode, setSelectedMode] = useState(null);
     const [selectedVenueId, setSelectedVenueId] = useState(null);
@@ -151,6 +153,16 @@ export default function PtDetailPage() {
         window.addEventListener('hire_request_updated', refreshHireState);
         return () => window.removeEventListener('hire_request_updated', refreshHireState);
     }, [fetchAllData]);
+
+    const refreshWallet = useCallback(() => {
+        coachingPaymentService.getMyWallet()
+            .then((r) => setCoachingWallet(r.data?.data || null))
+            .catch(() => setCoachingWallet(null));
+    }, []);
+
+    useEffect(() => {
+        if (hireStatus === 'AWAITING_PAYMENT') refreshWallet();
+    }, [hireStatus, refreshWallet]);
 
     useEffect(() => {
         const resetPaying = () => setPaying(false);
@@ -361,6 +373,25 @@ export default function PtDetailPage() {
         }
     };
 
+    const handlePayWithWallet = async () => {
+        if (!pt.mappingId) {
+            toast.error('Không tìm thấy yêu cầu coaching');
+            return;
+        }
+        try {
+            setPayingWithWallet(true);
+            const res = await coachingPaymentService.payWithWallet(pt.mappingId);
+            toast.success(res.data?.message || 'Thanh toán bằng số dư ví thành công');
+            await fetchAllData();
+            refreshWallet();
+            window.dispatchEvent(new Event('hire_request_updated'));
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Thanh toán bằng số dư ví thất bại');
+        } finally {
+            setPayingWithWallet(false);
+        }
+    };
+
     const renderStars = (rating, interactive = false) => {
         return (
             <div className="flex gap-1.5">
@@ -448,10 +479,31 @@ export default function PtDetailPage() {
                                         </Button>
                                     ) : hireStatus === 'AWAITING_PAYMENT' ? (
                                         <div className="space-y-2">
-                                            <Button onClick={handlePayment} disabled={paying} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-black rounded-xl shadow-lg shadow-emerald-500/20">
+                                            <Button onClick={handlePayment} disabled={paying || payingWithWallet} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-black rounded-xl shadow-lg shadow-emerald-500/20">
                                                 <CreditCard className="w-4 h-4 mr-2" />
-                                                {paying ? 'Đang chuyển đến VNPay...' : 'Thanh toán để bắt đầu'}
+                                                {paying ? 'Đang chuyển đến VNPay...' : 'Thanh toán qua VNPay'}
                                             </Button>
+                                            {(() => {
+                                                const balance = Number(coachingWallet?.availableBalance) || 0;
+                                                const amount = Number(pt.agreedAmount) || 0;
+                                                const enough = balance >= amount && amount > 0;
+                                                return (
+                                                    <>
+                                                        <Button
+                                                            onClick={handlePayWithWallet}
+                                                            disabled={!enough || paying || payingWithWallet}
+                                                            className="w-full h-12 bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-base font-black rounded-xl disabled:opacity-50"
+                                                        >
+                                                            <Wallet className="w-4 h-4 mr-2" />
+                                                            {payingWithWallet ? 'Đang xử lý...' : 'Thanh toán bằng số dư ví'}
+                                                        </Button>
+                                                        <p className="text-xs font-semibold text-slate-500">
+                                                            Số dư ví: {balance.toLocaleString('vi-VN')}đ
+                                                            {!enough && amount > 0 && <span className="text-amber-600"> · không đủ</span>}
+                                                        </p>
+                                                    </>
+                                                );
+                                            })()}
                                             <p className="text-xs font-semibold text-slate-500">
                                                 PT đã chấp nhận · {Number(pt.agreedAmount || 0).toLocaleString('vi-VN')}đ
                                                 {pt.selectedTrainingMode === 'OFFLINE' && pt.sessionCount
