@@ -33,7 +33,7 @@
         <java.version>17</java.version>
         <jjwt.version>0.12.6</jjwt.version>
         <minio.version>8.5.12</minio.version>
-        <springdoc.version>2.5.0</springdoc.version>
+        <springdoc.version>3.0.3</springdoc.version>
         <bucket4j.version>8.10.1</bucket4j.version>
         <firebase-admin.version>9.3.0</firebase-admin.version>
     </properties>
