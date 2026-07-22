@@ -11,12 +11,16 @@ import com.sba.nutricanbe.user.dto.NotificationPayload;
 import com.sba.nutricanbe.user.dto.CoachingHistoryDto;
 import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
+import com.sba.nutricanbe.user.entity.PtMappingSession;
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.CoachingEndRequestedBy;
+import com.sba.nutricanbe.user.enums.MappingSessionStatus;
 import com.sba.nutricanbe.user.enums.NotificationLinkType;
 import com.sba.nutricanbe.user.enums.TerminationReason;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.ReviewRepository;
 import com.sba.nutricanbe.user.service.CoachingLifecycleService;
@@ -27,7 +31,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +52,7 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
     private final SelfPlanSubmissionRepository selfPlanSubmissionRepository;
     private final SelfPlanItemRepository selfPlanItemRepository;
     private final NotificationService notificationService;
+    private final PtMappingSessionRepository mappingSessionRepository;
 
     @Override
     @Transactional
@@ -89,11 +97,24 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
         if (requester == CoachingEndRequestedBy.CUSTOMER && confirmByCustomer) {
             throw new BadRequestException("Waiting for PT confirmation");
         }
+
+        if (mapping.getSelectedTrainingMode() == TrainingMode.OFFLINE) {
+            long blocking = mappingSessionRepository.countByMappingIdAndStatusIn(
+                    mapping.getId(),
+                    List.of(MappingSessionStatus.AWAITING_CONFIRM, MappingSessionStatus.DISPUTED));
+            if (blocking > 0) {
+                throw new BadRequestException(
+                        "Cannot end coaching while sessions are awaiting confirmation or disputed");
+            }
+        }
+
         mapping.setStatus(ClientMappingStatus.COMPLETED);
         mapping.setCompletedAt(LocalDateTime.now());
         mapping.setTerminationReason(TerminationReason.NORMAL_COMPLETION);
         PtClientMapping saved = mappingRepository.save(mapping);
-        coachingWalletService.releaseEscrowIfPresent(saved.getId());
+
+        settleEscrowOnCompletion(saved);
+
         autoRejectPendingSubmissions(saved);
         Map<String, Object> completedPayload = new HashMap<>();
         completedPayload.put("mappingId", saved.getId());
@@ -103,6 +124,80 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
         webSocketSessionService.sendToUser(saved.getClient().getId(), "COACHING_COMPLETED", completedPayload);
         webSocketSessionService.sendToUser(saved.getPt().getId(), "COACHING_COMPLETED", completedPayload);
         return PtClientMappingResponse.toMappingResponse(saved);
+    }
+
+    private void settleEscrowOnCompletion(PtClientMapping mapping) {
+        if (mapping.getSelectedTrainingMode() == TrainingMode.ONLINE) {
+            settleOnlineEarlyOrFull(mapping);
+            return;
+        }
+        if (mapping.getSelectedTrainingMode() == TrainingMode.OFFLINE) {
+            settleOfflineRemaining(mapping);
+            return;
+        }
+        // Fallback for legacy mappings without mode
+        coachingWalletService.releaseEscrowIfPresent(mapping.getId());
+    }
+
+    private void settleOnlineEarlyOrFull(PtClientMapping mapping) {
+        BigDecimal remaining = coachingWalletService.getRemainingEscrow(mapping.getId());
+        if (remaining.signum() <= 0) {
+            return;
+        }
+        LocalDateTime started = mapping.getCoachingStartedAt();
+        LocalDateTime periodEnd = mapping.getPeriodEndsAt();
+        if (started == null) {
+            coachingWalletService.releaseToPt(mapping.getId(), remaining,
+                    "COACHING_ESCROW", mapping.getId(), "Online settle without start date");
+            return;
+        }
+        if (periodEnd == null) {
+            periodEnd = started.plusMonths(1);
+        }
+        long totalDays = Math.max(1, ChronoUnit.DAYS.between(started.toLocalDate(), periodEnd.toLocalDate()));
+        long servedDays = ChronoUnit.DAYS.between(started.toLocalDate(), mapping.getCompletedAt().toLocalDate());
+        if (servedDays < 0) {
+            servedDays = 0;
+        }
+        if (servedDays > totalDays) {
+            servedDays = totalDays;
+        }
+
+        BigDecimal agreed = mapping.getAgreedAmount() != null ? mapping.getAgreedAmount() : remaining;
+        BigDecimal ptGross = agreed.multiply(BigDecimal.valueOf(servedDays))
+                .divide(BigDecimal.valueOf(totalDays), 0, RoundingMode.HALF_UP);
+        if (ptGross.compareTo(remaining) > 0) {
+            ptGross = remaining;
+        }
+        BigDecimal customerGross = remaining.subtract(ptGross);
+        coachingWalletService.settleSplit(
+                mapping.getId(),
+                ptGross,
+                customerGross,
+                "COACHING_ESCROW",
+                mapping.getId(),
+                "Online early/end settle D/N days=" + servedDays + "/" + totalDays);
+    }
+
+    private void settleOfflineRemaining(PtClientMapping mapping) {
+        List<PtMappingSession> unfinished = mappingSessionRepository.findByMappingIdAndStatusIn(
+                mapping.getId(),
+                List.of(MappingSessionStatus.SCHEDULED, MappingSessionStatus.CANCELLED));
+        // Refund remaining escrow (unconfirmed sessions). Confirmed sessions already released.
+        BigDecimal remaining = coachingWalletService.getRemainingEscrow(mapping.getId());
+        if (remaining.signum() <= 0) {
+            return;
+        }
+        // Cancel scheduled sessions and refund remaining package balance to customer
+        for (PtMappingSession session : unfinished) {
+            if (session.getStatus() == MappingSessionStatus.SCHEDULED) {
+                session.setStatus(MappingSessionStatus.CANCELLED);
+            }
+        }
+        mappingSessionRepository.saveAll(unfinished);
+        coachingWalletService.refundRemainingIfPresent(
+                mapping.getId(),
+                "Offline early end — refund unconfirmed sessions to customer");
     }
 
     @Override

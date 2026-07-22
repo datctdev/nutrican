@@ -116,7 +116,7 @@ export default function Header() {
                 return isPtMode ? '/pt/clients' : '/coaching';
             case 'REFUND':
                 return role === 'ADMIN'
-                    ? '/admin/refunds'
+                    ? '/admin/finance'
                     : isPtMode ? '/pt/clients' : '/coaching?tab=contract';
             case 'WEEKLY_SUMMARY':
                 return '/profile';
@@ -187,7 +187,7 @@ export default function Header() {
         ADMIN: [
             { label: 'Bảng điều khiển', href: '/admin' },
             { label: 'Duyệt PT', href: '/admin/pts' },
-            { label: 'Hoàn tiền', href: '/admin/refunds' },
+            { label: 'Dòng tiền', href: '/admin/finance' },
             { label: 'Người dùng', href: '/admin/users' },
         ],
     };

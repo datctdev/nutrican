@@ -8,6 +8,7 @@ import com.sba.nutricanbe.payment.dto.CreateCoachingPaymentResponse;
 import com.sba.nutricanbe.payment.dto.VnPayIpnResponse;
 import com.sba.nutricanbe.payment.entity.Payment;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentMethod;
+import com.sba.nutricanbe.payment.enums.CoachingPaymentPurpose;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentStatus;
 import com.sba.nutricanbe.payment.repository.CoachingPaymentRepository;
 import com.sba.nutricanbe.payment.service.CoachingPaymentService;
@@ -17,7 +18,9 @@ import com.sba.nutricanbe.user.dto.NotificationPayload;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.NotificationLinkType;
+import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.user.service.ExtraSessionService;
 import com.sba.nutricanbe.user.service.NotificationService;
 import com.sba.nutricanbe.user.service.OfflinePackageAppointmentService;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
@@ -53,6 +56,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
     private final NotificationService notificationService;
     private final WebSocketSessionService webSocketSessionService;
     private final OfflinePackageAppointmentService offlinePackageAppointmentService;
+    private final ExtraSessionService extraSessionService;
 
     @Override
     @Transactional
@@ -67,10 +71,11 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime attemptExpiresAt = now.plusMinutes(30);
-        cancelPendingPayment(mappingId);
+        cancelPendingHirePayment(mappingId);
         Payment payment = paymentRepository.save(Payment.builder()
                 .mappingId(mapping.getId())
                 .method(CoachingPaymentMethod.VNPAY)
+                .purpose(CoachingPaymentPurpose.HIRE)
                 .status(CoachingPaymentStatus.PENDING)
                 .amount(mapping.getAgreedAmount())
                 .currency("VND")
@@ -98,10 +103,11 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         validatePayable(mapping, customerId);
 
         LocalDateTime now = LocalDateTime.now();
-        cancelPendingPayment(mappingId);
+        cancelPendingHirePayment(mappingId);
         Payment payment = paymentRepository.save(Payment.builder()
                 .mappingId(mapping.getId())
                 .method(CoachingPaymentMethod.WALLET)
+                .purpose(CoachingPaymentPurpose.HIRE)
                 .status(CoachingPaymentStatus.SUCCESS)
                 .amount(mapping.getAgreedAmount())
                 .currency("VND")
@@ -116,6 +122,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         mapping.setStatus(ClientMappingStatus.ACTIVE);
         mapping.setCoachingStartedAt(now);
         mapping.setPaymentDueAt(null);
+        applyOnlinePeriodEnd(mapping, now);
         mappingRepository.save(mapping);
         offlinePackageAppointmentService.materializeOfflinePackageIfNeeded(mapping);
         notifyPaymentSuccessAfterCommit(mapping, payment);
@@ -191,8 +198,25 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
             }
             return result(payment, mapping, false, "Payment attempt has expired");
         }
-        if (paymentRepository.existsByMappingIdAndStatus(
-                mapping.getId(), CoachingPaymentStatus.SUCCESS)) {
+
+        CoachingPaymentPurpose purpose = payment.getPurpose() != null
+                ? payment.getPurpose()
+                : CoachingPaymentPurpose.HIRE;
+
+        if (purpose == CoachingPaymentPurpose.EXTRA_SESSIONS) {
+            if (mapping.getStatus() != ClientMappingStatus.ACTIVE) {
+                throw new BadRequestException("Extra sessions require ACTIVE coaching");
+            }
+            payment.setStatus(CoachingPaymentStatus.SUCCESS);
+            payment.setPaidAt(LocalDateTime.now());
+            paymentRepository.save(payment);
+            extraSessionService.fulfillFromPayment(payment, mapping);
+            notifyPaymentSuccessAfterCommit(mapping, payment);
+            return result(payment, mapping, true, "Extra sessions payment completed");
+        }
+
+        if (paymentRepository.existsByMappingIdAndPurposeAndStatus(
+                mapping.getId(), CoachingPaymentPurpose.HIRE, CoachingPaymentStatus.SUCCESS)) {
             throw new BadRequestException("Another payment for this coaching request already succeeded");
         }
         if (mapping.getStatus() != ClientMappingStatus.AWAITING_PAYMENT) {
@@ -207,10 +231,17 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         mapping.setStatus(ClientMappingStatus.ACTIVE);
         mapping.setCoachingStartedAt(LocalDateTime.now());
         mapping.setPaymentDueAt(null);
+        applyOnlinePeriodEnd(mapping, mapping.getCoachingStartedAt());
         mappingRepository.save(mapping);
         offlinePackageAppointmentService.materializeOfflinePackageIfNeeded(mapping);
         notifyPaymentSuccessAfterCommit(mapping, payment);
         return result(payment, mapping, true, "Coaching payment completed");
+    }
+
+    private void applyOnlinePeriodEnd(PtClientMapping mapping, LocalDateTime startedAt) {
+        if (mapping.getSelectedTrainingMode() == TrainingMode.ONLINE && startedAt != null) {
+            mapping.setPeriodEndsAt(startedAt.plusMonths(1));
+        }
     }
 
     @Override
@@ -338,16 +369,16 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         } catch (ArithmeticException exception) {
             throw new BadRequestException("VND coaching price must be a whole number");
         }
-        if (paymentRepository.existsByMappingIdAndStatus(
-                mapping.getId(), CoachingPaymentStatus.SUCCESS)) {
+        if (paymentRepository.existsByMappingIdAndPurposeAndStatus(
+                mapping.getId(), CoachingPaymentPurpose.HIRE, CoachingPaymentStatus.SUCCESS)) {
             throw new BadRequestException("This coaching request has already been paid");
         }
     }
 
-    private void cancelPendingPayment(UUID mappingId) {
+    private void cancelPendingHirePayment(UUID mappingId) {
         paymentRepository
-                .findFirstByMappingIdAndStatusOrderByCreatedAtDesc(
-                        mappingId, CoachingPaymentStatus.PENDING)
+                .findFirstByMappingIdAndPurposeAndStatusOrderByCreatedAtDesc(
+                        mappingId, CoachingPaymentPurpose.HIRE, CoachingPaymentStatus.PENDING)
                 .ifPresent(pending -> {
                     pending.setStatus(CoachingPaymentStatus.CANCELLED);
                     paymentRepository.save(pending);

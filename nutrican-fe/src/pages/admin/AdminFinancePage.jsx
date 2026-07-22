@@ -1,0 +1,307 @@
+import { useEffect, useState } from 'react';
+import { Card, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { adminService } from '../../services/adminService';
+import { toast } from 'sonner';
+import { Loader2, RefreshCw } from 'lucide-react';
+import useWebSocket from '../../hooks/useWebSocket';
+
+const TYPE_LABEL = {
+  PAYMENT: 'Thanh toán',
+  HOLD: 'Giữ escrow',
+  RELEASE: 'Chi PT',
+  COMMISSION: 'Hoa hồng',
+  REFUND: 'Hoàn khách',
+  WITHDRAWAL: 'Rút tiền',
+};
+
+const REFUND_STATUS = {
+  PENDING_REVIEW: 'Chờ duyệt',
+  AUTO_APPROVED: 'Tự động duyệt',
+  APPROVED: 'Đã duyệt',
+  REJECTED: 'Từ chối',
+};
+
+const TABS = [
+  { id: 'overview', label: 'Tổng quan & sổ cái' },
+  { id: 'refunds', label: 'Hoàn tiền' },
+  { id: 'disputes', label: 'Tranh chấp buổi' },
+];
+
+export default function AdminFinancePage() {
+  const [tab, setTab] = useState('overview');
+  const [overview, setOverview] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [refunds, setRefunds] = useState([]);
+  const [disputes, setDisputes] = useState([]);
+  const [typeFilter, setTypeFilter] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState(null);
+  const [splitForm, setSplitForm] = useState({});
+
+  useWebSocket();
+
+  const loadOverview = async () => {
+    const [ov, tx] = await Promise.all([
+      adminService.getFinanceOverview(),
+      adminService.getFinanceTransactions({ page: 0, size: 30, ...(typeFilter ? { type: typeFilter } : {}) }),
+    ]);
+    setOverview(ov.data?.data || null);
+    setTransactions(tx.data?.data?.content || tx.data?.data?.items || []);
+  };
+
+  const loadRefunds = async () => {
+    const res = await adminService.getRefunds();
+    setRefunds(res.data?.data || []);
+  };
+
+  const loadDisputes = async () => {
+    const res = await adminService.getSessionDisputes({ status: 'PENDING' });
+    setDisputes(res.data?.data || []);
+  };
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      if (tab === 'overview') await loadOverview();
+      else if (tab === 'refunds') await loadRefunds();
+      else await loadDisputes();
+    } catch {
+      toast.error('Không tải được dữ liệu dòng tiền');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [tab, typeFilter]);
+
+  useEffect(() => {
+    const refresh = () => {
+      if (tab === 'refunds') loadRefunds().catch(() => {});
+      if (tab === 'disputes') loadDisputes().catch(() => {});
+      if (tab === 'overview') loadOverview().catch(() => {});
+    };
+    window.addEventListener('refund_update', refresh);
+    window.addEventListener('session_confirm_updated', refresh);
+    return () => {
+      window.removeEventListener('refund_update', refresh);
+      window.removeEventListener('session_confirm_updated', refresh);
+    };
+  }, [tab, typeFilter]);
+
+  const reviewRefund = async (id, action) => {
+    setActing(id + action);
+    try {
+      await adminService.reviewRefund(id, {
+        action,
+        adminNote: action === 'APPROVE' ? 'Approved by admin' : 'Rejected',
+      });
+      toast.success(action === 'APPROVE' ? 'Đã duyệt hoàn tiền' : 'Đã từ chối');
+      await loadRefunds();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Thao tác thất bại');
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const resolveDispute = async (id, decision) => {
+    setActing(id + decision);
+    try {
+      const body = { decision, adminNote: `Admin: ${decision}` };
+      if (decision === 'SPLIT') {
+        const form = splitForm[id] || {};
+        body.ptAmount = Number(form.ptAmount || 0);
+        body.customerAmount = Number(form.customerAmount || 0);
+      }
+      await adminService.resolveSessionDispute(id, body);
+      toast.success('Đã xử lý tranh chấp');
+      await loadDisputes();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Thao tác thất bại');
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const money = (v) => `${Number(v || 0).toLocaleString('vi-VN')}đ`;
+
+  return (
+    <div className="max-w-5xl mx-auto pb-12 space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Dòng tiền</h1>
+          <p className="text-sm text-slate-500">Escrow · Platform · Hoàn tiền · Tranh chấp buổi · Sổ cái</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+              tab === t.id
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
+      ) : tab === 'overview' ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="border-amber-200 bg-amber-50/60"><CardContent className="p-5">
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Escrow đang giữ</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{money(overview?.escrowLockedBalance)}</p>
+              <p className="text-xs text-slate-500 mt-1">{overview?.heldEscrowCount || 0} escrow active</p>
+            </CardContent></Card>
+            <Card className="border-emerald-200 bg-emerald-50/60"><CardContent className="p-5">
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Ví Platform</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{money(overview?.platformAvailableBalance)}</p>
+              <p className="text-xs text-slate-500 mt-1">Hoa hồng kỳ: {money(overview?.totalCommission)}</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Hoàn tiền</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{money(overview?.totalRefunds)}</p>
+            </CardContent></Card>
+            <Card><CardContent className="p-5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Rút tiền</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{money(overview?.totalWithdrawals)}</p>
+              <p className="text-xs text-rose-600 mt-1">Dispute escrow: {overview?.disputedEscrowCount || 0}</p>
+            </CardContent></Card>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="">Tất cả loại</option>
+              {Object.keys(TYPE_LABEL).map((k) => (
+                <option key={k} value={k}>{TYPE_LABEL[k]}</option>
+              ))}
+            </select>
+          </div>
+
+          <Card>
+            <CardContent className="p-0 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Thời gian</th>
+                    <th className="px-4 py-3">Loại</th>
+                    <th className="px-4 py-3">Số tiền</th>
+                    <th className="px-4 py-3">Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.length === 0 ? (
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">Chưa có giao dịch</td></tr>
+                  ) : transactions.map((t) => (
+                    <tr key={t.id} className="border-t border-slate-100">
+                      <td className="px-4 py-3 whitespace-nowrap">{t.createdAt ? new Date(t.createdAt).toLocaleString('vi-VN') : '—'}</td>
+                      <td className="px-4 py-3 font-semibold">{TYPE_LABEL[t.type] || t.type}</td>
+                      <td className="px-4 py-3 font-bold">{money(t.amount)}</td>
+                      <td className="px-4 py-3 text-slate-600 max-w-md truncate">{t.note || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </>
+      ) : tab === 'refunds' ? (
+        refunds.length === 0 ? (
+          <Card><CardContent className="p-8 text-center text-slate-500">Không có yêu cầu hoàn tiền.</CardContent></Card>
+        ) : (
+          <div className="space-y-3">
+            {refunds.map((r) => (
+              <Card key={r.id}>
+                <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{r.reason} — {REFUND_STATUS[r.status] || r.status}</p>
+                    <p className="text-sm text-slate-500">{r.note || '—'}</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : r.createdAt}
+                    </p>
+                  </div>
+                  {r.status === 'PENDING_REVIEW' && (
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => reviewRefund(r.id, 'APPROVE')} disabled={!!acting}>Duyệt</Button>
+                      <Button size="sm" variant="outline" onClick={() => reviewRefund(r.id, 'REJECT')} disabled={!!acting}>Từ chối</Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+        disputes.length === 0 ? (
+          <Card><CardContent className="p-8 text-center text-slate-400">Không có tranh chấp chờ xử lý</CardContent></Card>
+        ) : (
+          <div className="space-y-4">
+            {disputes.map((d) => (
+              <Card key={d.id}>
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase text-amber-700">PENDING</p>
+                      <p className="font-semibold text-slate-900 mt-1">{d.reason}</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Session {d.sessionId?.slice(0, 8)}… · Mapping {d.mappingId?.slice(0, 8)}…
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-400 whitespace-nowrap">
+                      {d.createdAt ? new Date(d.createdAt).toLocaleString('vi-VN') : ''}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-end">
+                    <Button size="sm" className="bg-emerald-600 text-white" disabled={!!acting} onClick={() => resolveDispute(d.id, 'TO_PT')}>
+                      Về PT
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={!!acting} onClick={() => resolveDispute(d.id, 'TO_CUSTOMER')}>
+                      Về khách
+                    </Button>
+                    <div className="flex items-end gap-2 border-l border-slate-200 pl-3">
+                      <input
+                        placeholder="PT nhận"
+                        className="w-28 rounded-lg border px-2 py-1.5 text-sm"
+                        value={splitForm[d.id]?.ptAmount || ''}
+                        onChange={(e) => setSplitForm((s) => ({
+                          ...s,
+                          [d.id]: { ...s[d.id], ptAmount: e.target.value },
+                        }))}
+                      />
+                      <input
+                        placeholder="Khách nhận"
+                        className="w-28 rounded-lg border px-2 py-1.5 text-sm"
+                        value={splitForm[d.id]?.customerAmount || ''}
+                        onChange={(e) => setSplitForm((s) => ({
+                          ...s,
+                          [d.id]: { ...s[d.id], customerAmount: e.target.value },
+                        }))}
+                      />
+                      <Button size="sm" className="bg-slate-900 text-white" disabled={!!acting} onClick={() => resolveDispute(d.id, 'SPLIT')}>
+                        Chia
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}

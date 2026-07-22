@@ -16,6 +16,7 @@ public class AppointmentResponse {
     private UUID clientId;
     private UUID ptId;
     private UUID mappingId;
+    private UUID mappingSessionId;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String type;
@@ -39,6 +40,7 @@ public class AppointmentResponse {
                 .clientId(a.getClientId())
                 .ptId(a.getPtId())
                 .mappingId(a.getMappingId())
+                .mappingSessionId(a.getMappingSessionId())
                 .startTime(a.getStartTime())
                 .endTime(a.getEndTime())
                 .type(a.getType())

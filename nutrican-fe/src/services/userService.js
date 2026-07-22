@@ -32,6 +32,8 @@ export const userService = {
   },
   getRequireKycSetting: () => api.get('/settings/require-kyc'),
   updateRequireKycSetting: (value) => api.put(`/admin/settings/require-kyc?value=${value}`),
+  getPlatformFeeRate: () => api.get('/settings/platform-fee-rate'),
+  updatePlatformFeeRate: (value) => api.put(`/admin/settings/platform-fee-rate?value=${value}`),
     uploadPortfolioImage: (file) => {
         const formData = new FormData();
         formData.append('file', file);

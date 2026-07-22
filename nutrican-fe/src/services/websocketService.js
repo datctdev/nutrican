@@ -204,6 +204,26 @@ const handleWebSocketMessage = (message) => {
             window.dispatchEvent(new CustomEvent('hire_request_updated', { detail: data }));
             break;
 
+        case 'SESSION_AWAITING_CONFIRM':
+            toast.info(data?.message || 'PT vừa xác nhận xong buổi tập. Vui lòng xác nhận.');
+            window.dispatchEvent(new CustomEvent('session_confirm_updated', { detail: data }));
+            break;
+
+        case 'SESSION_CONFIRMED':
+            toast.success(data?.message || 'Buổi tập đã được xác nhận.');
+            window.dispatchEvent(new CustomEvent('session_confirm_updated', { detail: data }));
+            break;
+
+        case 'SESSION_DISPUTED':
+            toast.warning(data?.message || 'Có khiếu nại buổi tập cần xử lý.');
+            window.dispatchEvent(new CustomEvent('session_confirm_updated', { detail: data }));
+            break;
+
+        case 'SESSION_DISPUTE_RESOLVED':
+            toast.success(data?.message || 'Tranh chấp buổi tập đã được xử lý.');
+            window.dispatchEvent(new CustomEvent('session_confirm_updated', { detail: data }));
+            break;
+
         default:
             console.log('Unhandled WebSocket event:', event);
     }

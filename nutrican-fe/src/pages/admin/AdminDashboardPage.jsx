@@ -5,8 +5,9 @@ import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { adminService } from '../../services/adminService';
 import { userService } from '../../services/userService';
-import { Users, Award, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3, UserPlus, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
+import { Users, Award, ChevronRight, ShieldCheck, HeartPulse, Star, Download, BarChart3, UserPlus, ToggleLeft, ToggleRight, Loader2, Wallet, Percent } from 'lucide-react';
 import { toast } from 'sonner';
+import { coachingPaymentService } from '../../services/coachingPaymentService';
 
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
@@ -18,6 +19,10 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [requireKyc, setRequireKyc] = useState(true);
   const [updatingKycSetting, setUpdatingKycSetting] = useState(false);
+  const [platformWallet, setPlatformWallet] = useState(null);
+  const [platformFeeRate, setPlatformFeeRate] = useState('');
+  const [currentPlatformFeeRate, setCurrentPlatformFeeRate] = useState(null);
+  const [savingFeeRate, setSavingFeeRate] = useState(false);
 
   const rblParams = () => {
     const p = { cvOnly: true };
@@ -31,14 +36,58 @@ export default function AdminDashboardPage() {
     fetchStats(); 
     fetchRbl(); 
     fetchRequireKycSetting();
+    fetchPlatformFeeRate();
+    fetchPlatformWallet();
   }, []);
 
+  const fetchPlatformWallet = async () => {
+    try {
+      const res = await coachingPaymentService.getSystemWallet('PLATFORM');
+      setPlatformWallet(res.data?.data || null);
+    } catch (err) {
+      console.error('Failed to fetch platform wallet:', err);
+    }
+  };
   const fetchRequireKycSetting = async () => {
     try {
       const res = await userService.getRequireKycSetting();
       setRequireKyc(res.data.data);
     } catch (err) {
       console.error('Failed to fetch requireKyc setting:', err);
+    }
+  };
+
+  const fetchPlatformFeeRate = async () => {
+    try {
+      const res = await userService.getPlatformFeeRate();
+      const rate = res.data?.data;
+      if (rate != null) {
+        setPlatformFeeRate(String(rate));
+        setCurrentPlatformFeeRate(Number(rate));
+      }
+    } catch (err) {
+      console.error('Failed to fetch platform fee rate:', err);
+    }
+  };
+
+  const handleSavePlatformFeeRate = async () => {
+    const parsed = Number(platformFeeRate);
+    if (Number.isNaN(parsed) || parsed < 0 || parsed > 100) {
+      toast.error('Hoa hồng phải từ 0 đến 100%');
+      return;
+    }
+    try {
+      setSavingFeeRate(true);
+      const res = await userService.updatePlatformFeeRate(parsed);
+      const saved = res.data?.data != null ? Number(res.data.data) : parsed;
+      setPlatformFeeRate(String(saved));
+      setCurrentPlatformFeeRate(saved);
+      toast.success('Đã cập nhật phí hoa hồng nền tảng');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể cập nhật hoa hồng');
+      console.error(err);
+    } finally {
+      setSavingFeeRate(false);
     }
   };
 
@@ -124,6 +173,16 @@ export default function AdminDashboardPage() {
     { label: 'Tổng người dùng', value: stats?.totalUsers || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
     { label: 'PT hoạt động', value: stats?.totalPts || 0, icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
     { label: 'PT chờ duyệt', value: stats?.pendingPtVerifications || 0, icon: UserPlus, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+    {
+      label: 'Ví Platform',
+      value: `${Number(platformWallet?.availableBalance || 0).toLocaleString('vi-VN')}đ`,
+      icon: Wallet,
+      color: 'text-violet-600',
+      bg: 'bg-violet-50',
+      border: 'border-violet-100',
+      href: '/admin/finance',
+      isMoney: true,
+    },
   ];
 
   return (
@@ -135,21 +194,26 @@ export default function AdminDashboardPage() {
 
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {mainStats.map((stat, idx) => (
-          <Card key={idx} className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        {mainStats.map((stat, idx) => {
+          const body = (
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{stat.label}</p>
-                  <p className="text-4xl font-black text-slate-900">{stat.value}</p>
+                  <p className={`font-black text-slate-900 ${stat.isMoney ? 'text-2xl' : 'text-4xl'}`}>{stat.value}</p>
                 </div>
                 <div className={`p-3 rounded-2xl ${stat.bg} border ${stat.border}`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
               </div>
             </CardContent>
-          </Card>
-        ))}
+          );
+          return (
+            <Card key={idx} className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+              {stat.href ? <Link to={stat.href} className="block">{body}</Link> : body}
+            </Card>
+          );
+        })}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -245,34 +309,80 @@ export default function AdminDashboardPage() {
 
 
           <h3 className="text-xl font-bold text-slate-800 pt-2">Cấu hình hệ thống</h3>
-          <Card className="bg-white border-slate-200 shadow-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <h4 className="font-bold text-slate-900 mb-1">Yêu cầu xác thực KYC khi đăng ký PT</h4>
-                  <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                    {requireKyc 
-                      ? 'Hiện tại hệ thống yêu cầu người dùng phải hoàn thành xác thực danh tính (CCCD) trước khi được đăng ký làm huấn luyện viên.' 
-                      : 'Hiện tại hệ thống cho phép người dùng tự do đăng ký làm huấn luyện viên mà không cần xác thực danh tính.'}
-                  </p>
+          <div className="space-y-4">
+            <Card className="bg-white border-slate-200 shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-slate-900 mb-1">Yêu cầu xác thực KYC khi đăng ký PT</h4>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                      {requireKyc 
+                        ? 'Hiện tại hệ thống yêu cầu người dùng phải hoàn thành xác thực danh tính (CCCD) trước khi được đăng ký làm huấn luyện viên.' 
+                        : 'Hiện tại hệ thống cho phép người dùng tự do đăng ký làm huấn luyện viên mà không cần xác thực danh tính.'}
+                    </p>
+                  </div>
+                  <button 
+                    type="button"
+                    disabled={updatingKycSetting}
+                    onClick={handleToggleRequireKyc}
+                    className="focus:outline-none transition-all disabled:opacity-50 text-primary border-none bg-transparent"
+                  >
+                    {updatingKycSetting ? (
+                      <Loader2 className="w-10 h-10 animate-spin text-slate-400" />
+                    ) : requireKyc ? (
+                      <ToggleRight className="w-12 h-12 text-primary" />
+                    ) : (
+                      <ToggleLeft className="w-12 h-12 text-slate-350" />
+                    )}
+                  </button>
                 </div>
-                <button 
-                  type="button"
-                  disabled={updatingKycSetting}
-                  onClick={handleToggleRequireKyc}
-                  className="focus:outline-none transition-all disabled:opacity-50 text-primary border-none bg-transparent"
-                >
-                  {updatingKycSetting ? (
-                    <Loader2 className="w-10 h-10 animate-spin text-slate-400" />
-                  ) : requireKyc ? (
-                    <ToggleRight className="w-12 h-12 text-primary" />
-                  ) : (
-                    <ToggleLeft className="w-12 h-12 text-slate-350" />
-                  )}
-                </button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-slate-200 shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div className="flex-1 min-w-[220px]">
+                    <h4 className="font-bold text-slate-900 mb-1 flex items-center gap-2">
+                      <Percent className="w-4 h-4 text-violet-600" />
+                      Phí hoa hồng nền tảng
+                      {currentPlatformFeeRate != null && (
+                        <span className="text-violet-600 font-black">
+                          {currentPlatformFeeRate}%
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                      {currentPlatformFeeRate != null
+                        ? `Hiện tại hoa hồng nền tảng là ${currentPlatformFeeRate}%, trừ trên phần PT nhận mỗi lần giải ngân từ escrow. PT sẽ thấy mức này khi đăng ký.`
+                        : 'Tỷ lệ (%) trừ trên phần PT nhận mỗi lần giải ngân từ escrow. PT sẽ thấy mức này khi đăng ký.'}
+                    </p>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div>
+                      <label className="text-xs font-bold uppercase text-slate-500">Hoa hồng (%)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.1"
+                        value={platformFeeRate}
+                        onChange={(e) => setPlatformFeeRate(e.target.value)}
+                        className="mt-1 block w-28 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleSavePlatformFeeRate}
+                      disabled={savingFeeRate}
+                      className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-10"
+                    >
+                      {savingFeeRate ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Lưu'}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 

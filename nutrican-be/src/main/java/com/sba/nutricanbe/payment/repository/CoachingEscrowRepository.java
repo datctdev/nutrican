@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.payment.repository;
 
 import com.sba.nutricanbe.payment.entity.CoachingEscrow;
+import com.sba.nutricanbe.payment.enums.CoachingEscrowStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -13,6 +14,10 @@ import java.util.UUID;
 public interface CoachingEscrowRepository extends JpaRepository<CoachingEscrow, UUID> {
 
     Optional<CoachingEscrow> findByMappingId(UUID mappingId);
+
+    long countByStatus(CoachingEscrowStatus status);
+
+    long countByStatusIn(java.util.Collection<CoachingEscrowStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

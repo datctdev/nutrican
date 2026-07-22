@@ -52,8 +52,11 @@ public class OfflinePackageAppointmentService {
             }
 
             AppointmentStatus status = AppointmentStatus.CONFIRMED;
-            if (appointmentSlotHelper.hasOverlap(
-                    mapping.getPt().getId(), session.getStartTime(), session.getEndTime(), null)) {
+            if (appointmentSlotHelper.hasOverlapExcludingMapping(
+                    mapping.getPt().getId(),
+                    session.getStartTime(),
+                    session.getEndTime(),
+                    mapping.getId())) {
                 log.warn("Session {} overlap for mapping {} — PENDING fallback",
                         session.getStartTime(), mapping.getId());
                 status = AppointmentStatus.PENDING;
@@ -67,6 +70,7 @@ public class OfflinePackageAppointmentService {
                     .clientId(mapping.getClient().getId())
                     .ptId(mapping.getPt().getId())
                     .mappingId(mapping.getId())
+                    .mappingSessionId(session.getId())
                     .startTime(session.getStartTime())
                     .endTime(session.getEndTime())
                     .type("OFFLINE")
@@ -96,7 +100,8 @@ public class OfflinePackageAppointmentService {
                 : appointmentSlotHelper.computeSessionEnd(start, mapping.getAgreedRateUnit());
 
         AppointmentStatus status = AppointmentStatus.CONFIRMED;
-        if (appointmentSlotHelper.hasOverlap(mapping.getPt().getId(), start, end, null)) {
+        if (appointmentSlotHelper.hasOverlapExcludingMapping(
+                mapping.getPt().getId(), start, end, mapping.getId())) {
             status = AppointmentStatus.PENDING;
         }
 

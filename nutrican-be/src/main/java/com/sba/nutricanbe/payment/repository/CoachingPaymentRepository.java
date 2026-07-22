@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.payment.repository;
 
 import com.sba.nutricanbe.payment.entity.Payment;
+import com.sba.nutricanbe.payment.enums.CoachingPaymentPurpose;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -25,8 +26,14 @@ public interface CoachingPaymentRepository extends JpaRepository<Payment, UUID> 
 
     boolean existsByMappingIdAndStatus(UUID mappingId, CoachingPaymentStatus status);
 
+    boolean existsByMappingIdAndPurposeAndStatus(
+            UUID mappingId, CoachingPaymentPurpose purpose, CoachingPaymentStatus status);
+
     Optional<Payment> findFirstByMappingIdAndStatusOrderByCreatedAtDesc(
             UUID mappingId, CoachingPaymentStatus status);
+
+    Optional<Payment> findFirstByMappingIdAndPurposeAndStatusOrderByCreatedAtDesc(
+            UUID mappingId, CoachingPaymentPurpose purpose, CoachingPaymentStatus status);
 
     List<Payment> findByStatusAndExpiresAtBefore(
             CoachingPaymentStatus status, LocalDateTime expiresAt);

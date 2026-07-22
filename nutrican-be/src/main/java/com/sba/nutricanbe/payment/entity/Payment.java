@@ -2,6 +2,7 @@ package com.sba.nutricanbe.payment.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentMethod;
+import com.sba.nutricanbe.payment.enums.CoachingPaymentPurpose;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -33,6 +34,11 @@ public class Payment extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private CoachingPaymentStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    @Builder.Default
+    private CoachingPaymentPurpose purpose = CoachingPaymentPurpose.HIRE;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;

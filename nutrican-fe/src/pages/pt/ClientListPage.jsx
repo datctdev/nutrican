@@ -437,6 +437,7 @@ export default function ClientListPage() {
                                                                 {client.sessions.map((s) => (
                                                                     <li key={s.id || s.sequence} className="text-xs font-semibold text-slate-700">
                                                                         #{s.sequence}: {new Date(s.startTime).toLocaleString('vi-VN')}
+                                                                        {s.status ? ` · ${s.status}` : ''}
                                                                     </li>
                                                                 ))}
                                                             </ul>
@@ -463,6 +464,25 @@ export default function ClientListPage() {
                                                     <Activity className={`w-4 h-4 ${client.status === 'RED' ? 'text-red-500' : client.status === 'YELLOW' ? 'text-amber-500' : 'text-emerald-500'}`} />
                                                     {client.status === 'RED' ? 'Kém' : client.status === 'YELLOW' ? 'Trung bình' : 'Tuyệt vời'}
                                                 </div>
+                                            </div>
+                                        )}
+
+                                        {activeTab === 'ACTIVE' && client.selectedTrainingMode === 'OFFLINE' && (client.sessions || []).length > 0 && (
+                                            <div className="mt-3 rounded-xl border border-emerald-100 bg-white p-3 space-y-2">
+                                                <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Buổi tập offline</p>
+                                                <p className="text-[11px] text-slate-500 font-medium">
+                                                    Mở <span className="font-bold text-slate-700">Lịch hẹn</span> → nhấn buổi trên thời khóa biểu để bấm «Đã dạy xong».
+                                                </p>
+                                                <ul className="space-y-1.5">
+                                                    {client.sessions.map((s) => (
+                                                        <li key={s.id || s.sequence} className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700">
+                                                            <span>
+                                                                #{s.sequence}: {new Date(s.startTime).toLocaleString('vi-VN')}
+                                                                {s.status ? ` · ${s.status}` : ''}
+                                                            </span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
                                             </div>
                                         )}
                                     </div>

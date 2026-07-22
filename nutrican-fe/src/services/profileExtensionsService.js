@@ -23,6 +23,9 @@ export const profileExtensionsService = {
   hasActivePt: () => api.get('/profile/has-active-pt'),
   requestEndCoaching: () => api.post('/profile/end-coaching'),
   confirmEndCoaching: () => api.put('/profile/end-coaching/confirm'),
+  getMySessions: () => api.get('/profile/sessions'),
+  confirmSession: (sessionId) => api.post(`/profile/sessions/${sessionId}/confirm`),
+  disputeSession: (sessionId, data) => api.post(`/profile/sessions/${sessionId}/dispute`, data),
   setMaxClients: (maxClients) => api.put('/profile/pt/max-clients', { maxClients }),
 };
 

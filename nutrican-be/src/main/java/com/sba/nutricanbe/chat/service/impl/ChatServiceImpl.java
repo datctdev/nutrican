@@ -18,6 +18,7 @@ import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
+import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class ChatServiceImpl implements ChatService {
 
     private final ChatMessageRepository chatMessageRepository;
     private final PtClientMappingRepository mappingRepository;
+    private final PtProfileRepository ptProfileRepository;
     private final UserRepository userRepository;
     private final StorageService storageService;
     private final WebSocketSessionService webSocketSessionService;
@@ -215,6 +217,9 @@ public class ChatServiceImpl implements ChatService {
         ChatMessageResponse lastMessage = chatMessageRepository.findTopByMappingIdOrderByCreatedAtDesc(mapping.getId())
                 .map(this::toMessageResponse)
                 .orElse(null);
+        UUID ptProfileId = ptProfileRepository.findByUserId(mapping.getPt().getId())
+                .map(p -> p.getId())
+                .orElse(null);
         return ChatThreadResponse.builder()
                 .mappingId(mapping.getId())
                 .participantId(participant.getId())
@@ -225,6 +230,15 @@ public class ChatServiceImpl implements ChatService {
                 .unreadCount(chatMessageRepository.countByMappingIdAndRecipientIdAndReadAtIsNull(mapping.getId(), userId))
                 .linkedAt(mapping.getAssignedAt())
                 .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
+                .selectedTrainingMode(mapping.getSelectedTrainingMode() != null
+                        ? mapping.getSelectedTrainingMode().name() : null)
+                .perSessionAmount(mapping.getPerSessionAmount())
+                .agreedAmount(mapping.getAgreedAmount())
+                .agreedRateUnit(mapping.getAgreedRateUnit())
+                .sessionCount(mapping.getSessionCount())
+                .venueName(mapping.getVenueName())
+                .periodEndsAt(mapping.getPeriodEndsAt())
+                .ptProfileId(ptProfileId)
                 .build();
     }
 

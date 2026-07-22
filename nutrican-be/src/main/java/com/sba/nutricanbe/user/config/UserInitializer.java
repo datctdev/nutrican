@@ -5,6 +5,7 @@ import com.sba.nutricanbe.common.enums.RequestStatus;
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
 import com.sba.nutricanbe.common.repository.SystemSettingRepository;
+import com.sba.nutricanbe.common.service.impl.SystemSettingServiceImpl;
 import com.sba.nutricanbe.user.dto.CertificationData;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
@@ -60,6 +61,7 @@ public class UserInitializer implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         ensureRequireKycSetting();
+        ensurePlatformFeeRateSetting();
         seedDemoAccounts();
         seedBackgroundAccounts();
     }
@@ -180,6 +182,17 @@ public class UserInitializer implements CommandLineRunner {
                     .key("REQUIRE_KYC_FOR_PT")
                     .value("false")
                     .build());
+        }
+    }
+
+    private void ensurePlatformFeeRateSetting() {
+        if (!systemSettingRepository.existsById(SystemSettingServiceImpl.PLATFORM_FEE_RATE)) {
+            systemSettingRepository.save(SystemSetting.builder()
+                    .key(SystemSettingServiceImpl.PLATFORM_FEE_RATE)
+                    .value(SystemSettingServiceImpl.PLATFORM_FEE_RATE_DEFAULT)
+                    .build());
+            log.info("Seeded SYSTEM setting PLATFORM_FEE_RATE={}",
+                    SystemSettingServiceImpl.PLATFORM_FEE_RATE_DEFAULT);
         }
     }
 

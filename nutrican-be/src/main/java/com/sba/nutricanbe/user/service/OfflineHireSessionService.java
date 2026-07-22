@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.user.dto.PtAvailabilityWindowResponse;
 import com.sba.nutricanbe.user.entity.PtMappingSession;
 import com.sba.nutricanbe.user.entity.PtVenue;
+import com.sba.nutricanbe.user.enums.MappingSessionStatus;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -85,10 +86,57 @@ public class OfflineHireSessionService {
                     .venueName(venue.getName())
                     .venueAddress(venue.getAddress())
                     .venueMapsUrl(venue.getMapsUrl())
+                    .status(MappingSessionStatus.SCHEDULED)
                     .build());
         }
 
         slotHoldService.releaseByMapping(mappingId);
+        slotHoldService.createHolds(ptUserId, mappingId, validated.slots());
+    }
+
+    /**
+     * Append extra paid sessions without deleting existing package sessions.
+     * Venue snapshot comes from the active mapping (same gym as the package).
+     * Does not create slot holds — caller already holds the slots for pending payment.
+     */
+    @Transactional
+    public void appendSessionsWithoutHolds(
+            UUID mappingId,
+            UUID venueId,
+            String venueName,
+            String venueAddress,
+            String venueMapsUrl,
+            ValidatedOfflineHire validated) {
+        int sequence = mappingSessionRepository.findByMappingIdOrderBySequenceAsc(mappingId).stream()
+                .mapToInt(PtMappingSession::getSequence)
+                .max()
+                .orElse(0) + 1;
+
+        for (LocalDateTime[] slot : validated.slots()) {
+            mappingSessionRepository.save(PtMappingSession.builder()
+                    .mappingId(mappingId)
+                    .sequence(sequence++)
+                    .startTime(slot[0])
+                    .endTime(slot[1])
+                    .venueId(venueId)
+                    .venueName(venueName)
+                    .venueAddress(venueAddress)
+                    .venueMapsUrl(venueMapsUrl)
+                    .status(MappingSessionStatus.SCHEDULED)
+                    .build());
+        }
+    }
+
+    @Transactional
+    public void appendSessionsAndHolds(
+            UUID mappingId,
+            UUID ptUserId,
+            String venueName,
+            String venueAddress,
+            String venueMapsUrl,
+            UUID venueId,
+            ValidatedOfflineHire validated) {
+        appendSessionsWithoutHolds(mappingId, venueId, venueName, venueAddress, venueMapsUrl, validated);
         slotHoldService.createHolds(ptUserId, mappingId, validated.slots());
     }
 

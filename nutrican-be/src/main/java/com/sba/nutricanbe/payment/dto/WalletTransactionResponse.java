@@ -39,4 +39,18 @@ public class WalletTransactionResponse {
                 .createdAt(transaction.getCreatedAt())
                 .build();
     }
+
+    public static WalletTransactionResponse fromAdmin(WalletTransaction transaction) {
+        return WalletTransactionResponse.builder()
+                .id(transaction.getId())
+                .direction("LEDGER")
+                .type(transaction.getType().name())
+                .status(transaction.getStatus().name())
+                .amount(transaction.getAmount())
+                .referenceType(transaction.getReferenceType())
+                .referenceId(transaction.getReferenceId())
+                .note(transaction.getNote())
+                .createdAt(transaction.getCreatedAt())
+                .build();
+    }
 }
