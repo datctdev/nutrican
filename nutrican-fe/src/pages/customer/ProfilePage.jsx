@@ -94,8 +94,6 @@ export default function ProfilePage() {
   const [appointments, setAppointments] = useState([]);
   const [loadingAppts, setLoadingAppts] = useState(false);
   const [ptThreads, setPtThreads] = useState([]);
-  const [apptForm, setApptForm] = useState({ ptId: '', startTime: '', endTime: '', note: '' });
-  const [bookingAppt, setBookingAppt] = useState(false);
 
   const [refundForm, setRefundForm] = useState({ mappingId: '', reason: 'CUSTOMER_REQUEST', note: '' });
   const [submittingRefund, setSubmittingRefund] = useState(false);
@@ -164,8 +162,7 @@ export default function ProfilePage() {
       setMappingStatus(endReq ? 'END_REQUESTED' : activeThreads.length > 0 ? 'ACTIVE' : null);
       setEndRequestedBy(endReq ? endReq.endRequestedBy : null);
       profileExtensionsService.getCoachingHistory().then((r) => setCoachingHistory(r.data?.data || [])).catch(() => {});
-      if (activeThreads.length && !apptForm.ptId) {
-        setApptForm((f) => ({ ...f, ptId: activeThreads[0].participantId }));
+      if (activeThreads.length) {
         setRefundForm((f) => ({ ...f, mappingId: activeThreads[0].mappingId }));
       }
     } catch {
@@ -257,29 +254,6 @@ export default function ProfilePage() {
       setMealPlanItems((items) => items.map((i) => (i.id === itemId ? { ...i, eaten } : i)));
     } catch {
       toast.error('Không thể cập nhật món ăn');
-    }
-  };
-
-  const handleBookAppointment = async () => {
-    if (!apptForm.ptId || !apptForm.startTime || !apptForm.endTime) {
-      toast.error('Chọn PT và thời gian hẹn');
-      return;
-    }
-    setBookingAppt(true);
-    try {
-      await appointmentService.book(apptForm.ptId, {
-        startTime: apptForm.startTime?.length === 16 ? `${apptForm.startTime}:00` : apptForm.startTime,
-        endTime: apptForm.endTime?.length === 16 ? `${apptForm.endTime}:00` : apptForm.endTime,
-        type: 'ONLINE',
-        note: apptForm.note || undefined,
-      });
-      toast.success('Đã gửi yêu cầu đặt lịch');
-      setApptForm((f) => ({ ...f, startTime: '', endTime: '', note: '' }));
-      fetchAppointments();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Không thể đặt lịch');
-    } finally {
-      setBookingAppt(false);
     }
   };
 
@@ -569,28 +543,14 @@ export default function ProfilePage() {
           )}
 
           {ptThreads.length > 0 && (
-            <div className="pt-4 border-t border-slate-100 space-y-3">
-              <p className="text-xs font-bold text-slate-500 uppercase">Đặt lịch mới</p>
-              <select value={apptForm.ptId} onChange={(e) => setApptForm((f) => ({ ...f, ptId: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-                {ptThreads.map((t) => (
-                  <option key={t.mappingId} value={t.participantId}>{t.participantName}</option>
-                ))}
-              </select>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input type="datetime-local" value={apptForm.startTime}
-                  onChange={(e) => setApptForm((f) => ({ ...f, startTime: e.target.value }))}
-                  className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-                <input type="datetime-local" value={apptForm.endTime}
-                  onChange={(e) => setApptForm((f) => ({ ...f, endTime: e.target.value }))}
-                  className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-              </div>
-              <input type="text" placeholder="Ghi chú (tuỳ chọn)" value={apptForm.note}
-                onChange={(e) => setApptForm((f) => ({ ...f, note: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-              <Button onClick={handleBookAppointment} disabled={bookingAppt} className="w-full rounded-xl">
-                {bookingAppt ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Gửi yêu cầu đặt lịch'}
-              </Button>
+            <div className="pt-4 border-t border-slate-100">
+              <p className="text-sm text-slate-600">
+                Muốn mua thêm buổi offline? Vào{' '}
+                <Link to="/coaching?tab=appointments" className="font-bold text-blue-600 hover:underline">
+                  Coaching → Lịch buổi tập
+                </Link>
+                {' '}chọn slot trống và thanh toán.
+              </p>
             </div>
           )}
         </CardContent>

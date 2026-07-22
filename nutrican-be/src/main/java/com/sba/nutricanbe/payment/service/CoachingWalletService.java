@@ -15,6 +15,12 @@ public interface CoachingWalletService {
 
     void holdFromWalletBalance(Payment payment);
 
+    /** Add EXTRA_SESSIONS payment amount into existing escrow (VNPay credited then held). */
+    void topUpEscrowFromVnPay(Payment payment);
+
+    /** Add EXTRA_SESSIONS payment amount into existing escrow from customer wallet balance. */
+    void topUpEscrowFromWallet(Payment payment);
+
     void releaseEscrow(UUID mappingId);
 
     boolean releaseEscrowIfPresent(UUID mappingId);

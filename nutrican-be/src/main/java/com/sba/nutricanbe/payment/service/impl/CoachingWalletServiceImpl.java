@@ -168,6 +168,96 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
 
     @Override
     @Transactional
+    public void topUpEscrowFromVnPay(Payment payment) {
+        topUpEscrowInternal(payment, true);
+    }
+
+    @Override
+    @Transactional
+    public void topUpEscrowFromWallet(Payment payment) {
+        topUpEscrowInternal(payment, false);
+    }
+
+    private void topUpEscrowInternal(Payment payment, boolean creditFromVnPay) {
+        PtClientMapping mapping = mappingRepository.findById(payment.getMappingId())
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", payment.getMappingId()));
+        CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mapping.getId())
+                .orElseThrow(() -> new BadRequestException(
+                        "Cannot top up: coaching escrow does not exist for this mapping"));
+
+        if (escrow.getStatus() == CoachingEscrowStatus.DISPUTED) {
+            throw new BadRequestException("Cannot top up escrow while disputed");
+        }
+
+        BigDecimal amount = payment.getAmount();
+        if (amount == null || amount.signum() <= 0) {
+            throw new BadRequestException("Top-up amount must be greater than 0");
+        }
+
+        Wallet customerWallet = getOrCreateUserWalletForUpdate(mapping.getClient());
+        Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
+
+        if (creditFromVnPay) {
+            String paymentDedupe = "COACHING_PAYMENT:" + payment.getId();
+            if (!transactionRepository.existsByDedupeKey(paymentDedupe)) {
+                customerWallet.addAvailable(amount);
+                transactionRepository.save(WalletTransaction.builder()
+                        .fromWallet(null)
+                        .toWallet(customerWallet)
+                        .amount(amount)
+                        .type(WalletTransactionType.PAYMENT)
+                        .status(WalletTransactionStatus.SUCCESS)
+                        .dedupeKey(paymentDedupe)
+                        .referenceType("COACHING_PAYMENT")
+                        .referenceId(payment.getId())
+                        .providerTxnNo(payment.getProviderTxnNo())
+                        .note("VNPay extra sessions payment received")
+                        .build());
+            }
+        }
+
+        String holdDedupe = "COACHING_ESCROW_TOPUP:" + payment.getId();
+        if (!transactionRepository.existsByDedupeKey(holdDedupe)) {
+            try {
+                customerWallet.subtractAvailable(amount);
+            } catch (IllegalStateException exception) {
+                throw new BadRequestException(creditFromVnPay
+                        ? exception.getMessage()
+                        : "Số dư ví không đủ để thanh toán buổi thêm");
+            }
+            escrowWallet.addLocked(amount);
+            transactionRepository.save(WalletTransaction.builder()
+                    .fromWallet(customerWallet)
+                    .toWallet(escrowWallet)
+                    .amount(amount)
+                    .type(WalletTransactionType.HOLD)
+                    .status(WalletTransactionStatus.SUCCESS)
+                    .dedupeKey(holdDedupe)
+                    .referenceType("COACHING_PAYMENT")
+                    .referenceId(payment.getId())
+                    .note("Top-up escrow for extra offline sessions")
+                    .build());
+        }
+
+        escrow.setAmount(nullToZero(escrow.getAmount()).add(amount));
+        escrow.setRemainingAmount(escrow.effectiveRemaining().add(amount));
+        if (escrow.getStatus() == CoachingEscrowStatus.RELEASED
+                || escrow.getStatus() == CoachingEscrowStatus.REFUNDED) {
+            escrow.setStatus(CoachingEscrowStatus.HELD);
+            escrow.setReleasedAt(null);
+        } else if (escrow.getStatus() != CoachingEscrowStatus.HELD
+                && escrow.getStatus() != CoachingEscrowStatus.PARTIALLY_RELEASED) {
+            escrow.setStatus(CoachingEscrowStatus.HELD);
+        } else if (escrow.effectiveRemaining().compareTo(escrow.getAmount()) < 0) {
+            escrow.setStatus(CoachingEscrowStatus.PARTIALLY_RELEASED);
+        }
+
+        walletRepository.saveAll(List.of(customerWallet, escrowWallet));
+        escrowRepository.save(escrow);
+    }
+
+    @Override
+    @Transactional
     public void releaseEscrow(UUID mappingId) {
         CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));

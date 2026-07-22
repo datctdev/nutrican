@@ -23,4 +23,12 @@ public class ChatThreadResponse {
     private long unreadCount;
     private LocalDateTime linkedAt;
     private String endRequestedBy;
+    private String selectedTrainingMode;
+    private java.math.BigDecimal perSessionAmount;
+    private java.math.BigDecimal agreedAmount;
+    private String agreedRateUnit;
+    private Integer sessionCount;
+    private String venueName;
+    private LocalDateTime periodEndsAt;
+    private UUID ptProfileId;
 }

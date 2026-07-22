@@ -94,6 +94,52 @@ public class OfflineHireSessionService {
         slotHoldService.createHolds(ptUserId, mappingId, validated.slots());
     }
 
+    /**
+     * Append extra paid sessions without deleting existing package sessions.
+     * Venue snapshot comes from the active mapping (same gym as the package).
+     * Does not create slot holds — caller already holds the slots for pending payment.
+     */
+    @Transactional
+    public void appendSessionsWithoutHolds(
+            UUID mappingId,
+            UUID venueId,
+            String venueName,
+            String venueAddress,
+            String venueMapsUrl,
+            ValidatedOfflineHire validated) {
+        int sequence = mappingSessionRepository.findByMappingIdOrderBySequenceAsc(mappingId).stream()
+                .mapToInt(PtMappingSession::getSequence)
+                .max()
+                .orElse(0) + 1;
+
+        for (LocalDateTime[] slot : validated.slots()) {
+            mappingSessionRepository.save(PtMappingSession.builder()
+                    .mappingId(mappingId)
+                    .sequence(sequence++)
+                    .startTime(slot[0])
+                    .endTime(slot[1])
+                    .venueId(venueId)
+                    .venueName(venueName)
+                    .venueAddress(venueAddress)
+                    .venueMapsUrl(venueMapsUrl)
+                    .status(MappingSessionStatus.SCHEDULED)
+                    .build());
+        }
+    }
+
+    @Transactional
+    public void appendSessionsAndHolds(
+            UUID mappingId,
+            UUID ptUserId,
+            String venueName,
+            String venueAddress,
+            String venueMapsUrl,
+            UUID venueId,
+            ValidatedOfflineHire validated) {
+        appendSessionsWithoutHolds(mappingId, venueId, venueName, venueAddress, venueMapsUrl, validated);
+        slotHoldService.createHolds(ptUserId, mappingId, validated.slots());
+    }
+
     @Transactional(readOnly = true)
     public void revalidateForAccept(UUID ptUserId, UUID mappingId, String rateUnit) {
         List<PtMappingSession> sessions = mappingSessionRepository

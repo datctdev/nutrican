@@ -24,6 +24,8 @@ import LateTickReasonModal from './components/LateTickReasonModal';
 import { isMealPeriodOpen, canLateTickMealPeriod, nowInVn, todayLocalIso } from './components/dietUtils';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import WithdrawModal from '../../components/wallet/WithdrawModal';
+import PtWeeklyCalendarPicker from '../../components/pt/PtWeeklyCalendarPicker';
+import CoachingTimetable, { mergeTimetableSources } from '../../components/coaching/CoachingTimetable';
 import { formatVnd } from '../../utils/currency';
 import { toast } from 'sonner';
 import {
@@ -32,6 +34,7 @@ import {
 } from 'lucide-react';
 import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
 import useWebSocket from '../../hooks/useWebSocket';
+import { getWeekStart, addWeeks } from '../../utils/offlineHireSlots';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 
@@ -142,8 +145,11 @@ export default function CoachingPage() {
 
   const [appointments, setAppointments] = useState([]);
   const [loadingAppts, setLoadingAppts] = useState(false);
-  const [apptForm, setApptForm] = useState({ ptId: '', startTime: '', endTime: '', note: '' });
-  const [bookingAppt, setBookingAppt] = useState(false);
+  const [extraSessions, setExtraSessions] = useState([]);
+  const [extraCalendar, setExtraCalendar] = useState(null);
+  const [loadingExtraCalendar, setLoadingExtraCalendar] = useState(false);
+  const [buyingExtra, setBuyingExtra] = useState(false);
+  const [extraMappingId, setExtraMappingId] = useState('');
 
   const [endCoachingLoading, setEndCoachingLoading] = useState(false);
   const [endCoachingModalOpen, setEndCoachingModalOpen] = useState(false);
@@ -213,8 +219,9 @@ export default function CoachingPage() {
         .catch(() => setMySessions([]));
 
       if (activeThreads.length > 0) {
-        setApptForm((f) => ({ ...f, ptId: activeThreads[0].participantId }));
         setRefundForm((f) => ({ ...f, mappingId: activeThreads[0].mappingId }));
+        const offline = activeThreads.find((t) => t.selectedTrainingMode === 'OFFLINE') || activeThreads[0];
+        setExtraMappingId(offline.mappingId);
         
         fetchMealPlan();
         fetchAppointments();
@@ -526,9 +533,15 @@ export default function CoachingPage() {
     setCancellingAppt(true);
     try {
       await appointmentService.cancel(cancelApptId);
-      toast.success('Đã hủy lịch hẹn');
+      toast.success('Đã hủy lịch — hoàn tiền buổi chưa dạy vào ví (nếu còn trong escrow)');
       setCancelApptId(null);
       fetchAppointments();
+      profileExtensionsService.getMySessions()
+        .then((r) => setMySessions(r.data?.data || []))
+        .catch(() => {});
+      coachingPaymentService.getMyWallet()
+        .then((r) => setCoachingWallet(r.data?.data || null))
+        .catch(() => {});
     } catch (e) {
       toast.error(e.response?.data?.message || 'Không hủy được lịch hẹn');
     } finally {
@@ -536,26 +549,67 @@ export default function CoachingPage() {
     }
   };
 
-  const handleBookAppointment = async () => {
-    if (!apptForm.ptId || !apptForm.startTime || !apptForm.endTime) {
-      toast.error('Chọn PT và thời gian hẹn');
+  const offlineThread = ptThreads.find((t) => t.selectedTrainingMode === 'OFFLINE' && (t.status === 'ACTIVE' || t.status === 'END_REQUESTED'));
+  const onlineOnlyThreads = ptThreads.filter((t) => t.selectedTrainingMode === 'ONLINE');
+
+  const loadExtraCalendar = useCallback(async (mappingId) => {
+    const thread = ptThreads.find((t) => t.mappingId === mappingId);
+    if (!thread?.ptProfileId) {
+      setExtraCalendar(null);
       return;
     }
-    setBookingAppt(true);
+    setLoadingExtraCalendar(true);
     try {
-      await appointmentService.book(apptForm.ptId, {
-        startTime: apptForm.startTime?.length === 16 ? `${apptForm.startTime}:00` : apptForm.startTime,
-        endTime: apptForm.endTime?.length === 16 ? `${apptForm.endTime}:00` : apptForm.endTime,
-        type: 'ONLINE',
-        note: apptForm.note || undefined,
-      });
-      toast.success('Đã đặt lịch — buổi tập được chốt luôn với PT');
-      setApptForm((f) => ({ ...f, startTime: '', endTime: '', note: '' }));
-      fetchAppointments();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Không thể đặt lịch');
+      const from = getWeekStart(new Date()).toISOString().slice(0, 19);
+      const to = addWeeks(getWeekStart(new Date()), 8).toISOString().slice(0, 19);
+      const res = await marketplaceService.getPtCalendar(thread.ptProfileId, { from, to });
+      setExtraCalendar(res.data?.data || null);
+    } catch {
+      setExtraCalendar(null);
+      toast.error('Không tải được lịch trống của PT');
     } finally {
-      setBookingAppt(false);
+      setLoadingExtraCalendar(false);
+    }
+  }, [ptThreads]);
+
+  useEffect(() => {
+    if (activeTab !== 'appointments') return;
+    if (extraMappingId && offlineThread) {
+      loadExtraCalendar(extraMappingId);
+    }
+  }, [activeTab, extraMappingId, offlineThread?.mappingId, loadExtraCalendar]);
+
+  const handleBuyExtraSessions = async (payMethod) => {
+    if (!extraMappingId || extraSessions.length === 0) {
+      toast.error('Chọn ít nhất một buổi trống');
+      return;
+    }
+    setBuyingExtra(true);
+    try {
+      const res = await coachingPaymentService.purchaseExtraSessions(extraMappingId, {
+        sessionStarts: extraSessions,
+        payMethod,
+      });
+      const data = res.data?.data;
+      if (data?.paymentUrl) {
+        window.location.assign(data.paymentUrl);
+        return;
+      }
+      toast.success(data?.message || res.data?.message || 'Đã mua thêm buổi thành công');
+      setExtraSessions([]);
+      fetchAppointments();
+      profileExtensionsService.getMySessions()
+        .then((r) => setMySessions(r.data?.data || []))
+        .catch(() => {});
+      coachingPaymentService.getMyWallet()
+        .then((r) => setCoachingWallet(r.data?.data || null))
+        .catch(() => {});
+      loadExtraCalendar(extraMappingId);
+      window.dispatchEvent(new Event('hire_request_updated'));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không mua được buổi thêm');
+    } finally {
+      setBuyingExtra(false);
     }
   };
 
@@ -980,7 +1034,7 @@ export default function CoachingPage() {
               {[
                 { id: 'chat', label: 'Tin nhắn với PT', icon: MessageSquare, desc: 'Trò chuyện hỗ trợ trực tiếp' },
                 { id: 'meal-plan', label: 'Thực đơn tuần', icon: Utensils, desc: 'Thực đơn dinh dưỡng từ PT' },
-                { id: 'appointments', label: 'Lịch hẹn PT', icon: Calendar, desc: 'Đặt lịch và quản lý buổi hẹn' },
+                { id: 'appointments', label: 'Lịch buổi tập', icon: Calendar, desc: 'Buổi đã mua và mua thêm' },
                 { id: 'contract', label: 'Hợp đồng & Hoàn tiền', icon: BookOpen, desc: 'Yêu cầu kết thúc & Hoàn phí' }
               ].map((item) => (
                 <button
@@ -1274,90 +1328,112 @@ export default function CoachingPage() {
               <Card className="border-slate-200 shadow-sm rounded-3xl bg-white animate-fade-in">
                 <CardContent className="p-6 space-y-6">
                   <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 pb-4 border-b border-slate-100">
-                    <Calendar className="w-5 h-5 text-blue-600" /> Quản lý lịch hẹn với PT
+                    <Calendar className="w-5 h-5 text-blue-600" /> Lịch buổi tập
                   </h3>
 
                   {loadingAppts ? (
                     <div className="flex justify-center py-6">
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
                     </div>
-                  ) : appointments.length === 0 ? (
-                    <div className="text-center py-8 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                      <Calendar className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                      <p className="text-sm text-slate-500 font-bold">Chưa có lịch hẹn sắp tới</p>
-                      <p className="text-xs text-slate-400 mt-1">Sử dụng biểu mẫu bên dưới để tạo yêu cầu đặt lịch hẹn mới.</p>
-                    </div>
                   ) : (
-                    <div className="space-y-2">
-                      {appointments.map((a) => {
-                        const badge = APPT_STATUS_LABEL[a.status] || { text: a.status, cls: 'bg-slate-100 text-slate-655' };
-                        return (
-                          <div key={a.id} className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 gap-3 hover:bg-slate-50/30 transition-colors">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-800">
-                                {new Date(a.startTime).toLocaleString('vi-VN')}
-                              </p>
-                              {a.type === 'OFFLINE' && a.venueName && (
-                                <p className="text-xs font-semibold text-emerald-700 mt-0.5">
-                                  {a.venueName} · {a.venueAddress}
-                                </p>
-                              )}
-                              {a.note && <p className="text-xs text-slate-500 mt-0.5">{a.note}</p>}
-                              {a.cancelType && <p className="text-xs text-slate-400 mt-0.5">Hủy: {a.cancelType}</p>}
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${badge.cls}`}>{badge.text}</span>
-                              {(a.status === 'PENDING' || a.status === 'CONFIRMED') && (
-                                <Button size="sm" variant="outline" className="text-xs font-bold rounded-lg border-red-200 text-red-600 hover:bg-red-50" onClick={() => handleCancelAppointment(a.id)}>
-                                  Hủy lịch
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
+                    <CoachingTimetable
+                      items={mergeTimetableSources({
+                        sessions: mySessions.map((s) => {
+                          const thread = ptThreads.find((t) =>
+                            (appointments || []).some(
+                              (a) => a.mappingId === t.mappingId
+                                && a.startTime
+                                && s.startTime
+                                && Math.abs(new Date(a.startTime) - new Date(s.startTime)) < 60_000,
+                            ),
+                          ) || offlineThread || ptThreads[0];
+                          return { ...s, counterpartName: thread?.participantName };
+                        }),
+                        appointments: appointments.map((a) => {
+                          const thread = ptThreads.find((t) => t.mappingId === a.mappingId)
+                            || offlineThread
+                            || ptThreads[0];
+                          return { ...a, counterpartName: thread?.participantName };
+                        }),
                       })}
-                    </div>
+                      emptyText={offlineThread
+                        ? 'Tuần này chưa có buổi — mua thêm bên dưới nếu cần.'
+                        : 'Không có buổi offline để hiển thị.'}
+                      roleLabel="Huấn luyện viên"
+                      cancellingId={cancellingAppt ? cancelApptId : null}
+                      onCancel={(apptId) => handleCancelAppointment(apptId)}
+                    />
                   )}
 
-                  <div className="pt-6 border-t border-slate-100 space-y-4">
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Gửi yêu cầu lịch hẹn mới</p>
-                    
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-650">Huấn luyện viên nhận hẹn</label>
-                      <select value={apptForm.ptId} onChange={(e) => setApptForm((f) => ({ ...f, ptId: e.target.value }))}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white font-medium">
-                        {ptThreads.map((t) => (
-                          <option key={t.mappingId} value={t.participantId}>{t.participantName}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-650">Bắt đầu</label>
-                        <input type="datetime-local" value={apptForm.startTime}
-                          onChange={(e) => setApptForm((f) => ({ ...f, startTime: e.target.value }))}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                  {offlineThread ? (
+                    <div className="pt-6 border-t border-slate-100 space-y-4">
+                      <div>
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Mua thêm buổi offline</p>
+                        <p className="text-sm text-slate-500 mt-1">
+                          Chọn slot trống của {offlineThread.participantName}. Giá {Number(offlineThread.perSessionAmount || 0).toLocaleString('vi-VN')}đ/buổi — tiền nạp vào escrow, lịch chốt ngay sau thanh toán.
+                        </p>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-650">Kết thúc</label>
-                        <input type="datetime-local" value={apptForm.endTime}
-                          onChange={(e) => setApptForm((f) => ({ ...f, endTime: e.target.value }))}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                      {ptThreads.filter((t) => t.selectedTrainingMode === 'OFFLINE').length > 1 && (
+                        <select
+                          value={extraMappingId}
+                          onChange={(e) => {
+                            setExtraMappingId(e.target.value);
+                            setExtraSessions([]);
+                          }}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-white font-medium"
+                        >
+                          {ptThreads.filter((t) => t.selectedTrainingMode === 'OFFLINE').map((t) => (
+                            <option key={t.mappingId} value={t.mappingId}>{t.participantName}</option>
+                          ))}
+                        </select>
+                      )}
+                      {loadingExtraCalendar ? (
+                        <div className="flex justify-center py-6">
+                          <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                        </div>
+                      ) : extraCalendar ? (
+                        <PtWeeklyCalendarPicker
+                          availability={extraCalendar.availability || []}
+                          occupiedSlots={extraCalendar.occupiedSlots || []}
+                          rateUnit={offlineThread.agreedRateUnit || 'SESSION_60'}
+                          perSessionRate={Number(offlineThread.perSessionAmount || 0)}
+                          selectedSessions={extraSessions}
+                          onSelectedSessionsChange={setExtraSessions}
+                        />
+                      ) : (
+                        <p className="text-sm text-slate-500">Không có lịch trống để hiển thị.</p>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          onClick={() => handleBuyExtraSessions('WALLET')}
+                          disabled={buyingExtra || extraSessions.length === 0}
+                          className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-bold"
+                        >
+                          {buyingExtra ? <Loader2 className="w-4 h-4 animate-spin" /> : `Thanh toán ví (${extraSessions.length} buổi)`}
+                        </Button>
+                        <Button
+                          onClick={() => handleBuyExtraSessions('VNPAY')}
+                          disabled={buyingExtra || extraSessions.length === 0}
+                          variant="outline"
+                          className="flex-1 rounded-xl py-6 font-bold border-slate-200"
+                        >
+                          Thanh toán VNPay
+                        </Button>
                       </div>
                     </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-650">Ghi chú cuộc hẹn</label>
-                      <input type="text" placeholder="Ghi chú thêm nội dung (tuỳ chọn)..." value={apptForm.note}
-                        onChange={(e) => setApptForm((f) => ({ ...f, note: e.target.value }))}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                  ) : onlineOnlyThreads.length > 0 ? (
+                    <div className="pt-6 border-t border-slate-100">
+                      <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+                      <p className="text-sm font-bold text-slate-800">Gói online theo tháng</p>
+                      <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                        Coaching online không đặt buổi theo slot phòng tập. Tiền giữ theo kỳ tháng; hết kỳ hoặc kết thúc sớm sẽ quyết toán theo số ngày.
+                        {onlineOnlyThreads[0]?.periodEndsAt && (
+                          <> Kỳ hiện tại đến {new Date(onlineOnlyThreads[0].periodEndsAt).toLocaleString('vi-VN')}.</>
+                        )}
+                      </p>
+                      </div>
                     </div>
-
-                    <Button onClick={handleBookAppointment} disabled={bookingAppt} className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl py-6 font-bold shadow-md animate-fade-in">
-                      {bookingAppt ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Đặt lịch'}
-                    </Button>
-                  </div>
+                  ) : null}
                 </CardContent>
               </Card>
             )}

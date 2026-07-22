@@ -26,6 +26,9 @@ public class PtAppointment extends BaseEntity {
     @Column(name = "mapping_id")
     private UUID mappingId;
 
+    @Column(name = "mapping_session_id")
+    private UUID mappingSessionId;
+
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
 
