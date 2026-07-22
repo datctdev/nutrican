@@ -235,7 +235,9 @@ export function setDemoVnClock(value) {
     try {
         if (!value) localStorage.removeItem(DEMO_VN_CLOCK_KEY);
         else localStorage.setItem(DEMO_VN_CLOCK_KEY, value);
-    } catch
+    } catch {
+        // ignore storage failures (private mode / quota)
+    }
 }
 
 function vnWallParts(date = new Date()) {

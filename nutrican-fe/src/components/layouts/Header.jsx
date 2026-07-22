@@ -72,7 +72,9 @@ export default function Header() {
             try {
                 const res = await workspaceService.getClients({ page: 0, size: 10, status: 'PENDING' });
                 setPendingHiresCount(res.data.data.totalElements || res.data.data.content?.length || 0);
-            } catch
+            } catch {
+                // ignore pending count fetch failure
+            }
         };
         fetchPendingCount();
         const handleAlert = () => fetchPendingCount();

@@ -65,7 +65,9 @@ function schedulePostMealPrompt(logId) {
             logId,
             at: Date.now() + 30 * 60 * 1000,
         }));
-    } catch
+    } catch {
+        // ignore storage failures
+    }
 }
 
 export default function DietTrackerPage() {
@@ -300,7 +302,9 @@ export default function DietTrackerPage() {
                     setPostMealPrompt(parsed.logId);
                     localStorage.removeItem(POST_MEAL_PROMPT_KEY);
                 }
-            } catch
+            } catch {
+                // ignore storage / parse failures
+            }
         };
         checkPrompt();
         const id = setInterval(checkPrompt, 60000);
@@ -478,7 +482,7 @@ export default function DietTrackerPage() {
             if (analyzed?.manualRequired || analyzed?.gateResult === 'OUT_OF_CLASS') {
                 toast.warning(analyzed?.message || 'Món này chưa được hỗ trợ. Vui lòng nhập tay.');
                 if (analyzed?.logId) {
-                    try { await dietService.deleteLog(analyzed.logId); } catch
+                    try { await dietService.deleteLog(analyzed.logId); } catch { /* ignore */ }
                 }
                 setInputMode('manual');
                 setSelectedFile(null);

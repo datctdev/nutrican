@@ -154,7 +154,9 @@ export default function ProfilePage() {
       setBodyMetricReminder(optIn.bodyMetricReminder !== false);
       try {
         localStorage.setItem('nutrican_post_meal_opt_in', JSON.stringify(optIn.postMealRating !== false));
-      } catch
+      } catch {
+        // ignore storage failures
+      }
 
       const activeThreads = (threadsRes.data.data || []).filter((t) => t.status === 'ACTIVE' || t.status === 'END_REQUESTED');
       setPtThreads(activeThreads);

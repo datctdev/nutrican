@@ -54,7 +54,9 @@ export default function PtDashboardPage() {
                 const res = await userService.getProfile();
                 const max = res.data?.data?.maxClients;
                 if (max) setMaxClients(max);
-            } catch
+            } catch {
+                // ignore profile load failure for maxClients
+            }
         };
         init();
 

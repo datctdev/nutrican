@@ -22,7 +22,9 @@ api.interceptors.request.use(
             if (demoClock) {
                 config.headers['X-Nutrican-Demo-Vn-Clock'] = demoClock;
             }
-        } catch
+        } catch {
+            // ignore storage failures
+        }
         if (config.data instanceof FormData) {
             delete config.headers['Content-Type'];
         }
