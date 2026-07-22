@@ -528,15 +528,19 @@ export default function PtDetailPage() {
                                                 <OfflinePackageSummary pt={pt} tone="amber" />
                                             )}
                                         </div>
-                                    ) : hireStatus === 'COMPLETED' ? (
-                                        <Button disabled className="w-full h-14 bg-slate-100 text-slate-500 border border-slate-200 text-base font-bold rounded-2xl cursor-not-allowed">
-                                            <CheckCircle2 className="w-5 h-5 mr-2" /> Đã hoàn thành khóa
-                                        </Button>
                                     ) : (
-                                        <Button onClick={openHireModal} disabled={hiring} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-base font-black rounded-2xl shadow-lg shadow-blue-500/20 transition-all group hover:-translate-y-0.5">
-                                            <Send className={`w-5 h-5 mr-2 ${hiring ? 'animate-pulse' : 'group-hover:translate-x-1 transition-transform'}`} />
-                                            {hiring ? 'Đang gửi...' : 'Đăng ký Coaching'}
-                                        </Button>
+                                        <div className="space-y-2">
+                                            {hireStatus === 'COMPLETED' && (
+                                                <p className="text-xs font-semibold text-slate-500 flex items-center justify-center gap-1.5">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                                    Đã hoàn thành khóa trước đó — có thể đăng ký lại
+                                                </p>
+                                            )}
+                                            <Button onClick={openHireModal} disabled={hiring} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-base font-black rounded-2xl shadow-lg shadow-blue-500/20 transition-all group hover:-translate-y-0.5">
+                                                <Send className={`w-5 h-5 mr-2 ${hiring ? 'animate-pulse' : 'group-hover:translate-x-1 transition-transform'}`} />
+                                                {hiring ? 'Đang gửi...' : hireStatus === 'COMPLETED' ? 'Đăng ký lại Coaching' : 'Đăng ký Coaching'}
+                                            </Button>
+                                        </div>
                                     )}
                                 </div>
 
