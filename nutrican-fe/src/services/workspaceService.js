@@ -16,6 +16,7 @@ export const workspaceService = {
     publishMealPlan: (planId) => api.post(`/workspace/meal-plans/${planId}/publish`),
     getClientMealPlan: (clientId, weekStart) => api.get(`/workspace/meal-plans/${clientId}`, { params: { weekStart } }),
     setClientMacroTarget: (clientId, data) => api.put(`/workspace/clients/${clientId}/macro-target`, data),
+    setCoachingEvaluation: (clientId, data) => api.put(`/workspace/clients/${clientId}/coaching-evaluation`, data),
     reviewMealPlanSuggestion: (id, data) => api.put(`/workspace/meal-plan-suggestions/${id}`, data),
     getPendingMealPlanSuggestions: (clientId) => api.get(`/workspace/clients/${clientId}/meal-plan-suggestions`),
     listSelfPlanSubmissions: () => api.get('/workspace/self-plan-submissions'),

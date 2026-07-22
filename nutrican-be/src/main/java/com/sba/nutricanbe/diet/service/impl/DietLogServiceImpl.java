@@ -94,7 +94,9 @@ public class DietLogServiceImpl implements DietLogService {
 
         MealSource mealSource = request.getMealSource() != null ? request.getMealSource() : MealSource.HOME_COOKED;
         MealComplexity mealComplexity = request.getMealComplexity() != null ? request.getMealComplexity() : MealComplexity.SIMPLE;
-        boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
+        // Có PT ACTIVE: luôn PENDING (không tin FE bỏ tick sendToPt)
+        boolean hasActivePt = dietLogHelper.hasActivePt(customerId);
+        boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt()) || hasActivePt;
         var reviewStatus = dietLogHelper.resolveReviewStatus(customerId, sendToPt);
 
         DietLog dietLog = DietLog.builder()
@@ -296,7 +298,22 @@ public class DietLogServiceImpl implements DietLogService {
         }
 
         boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
-        if (sendToPt) {
+        boolean hasActivePt = dietLogHelper.hasActivePt(userId);
+        boolean macrosChanged = request.getCalories() != null
+                || request.getProtein() != null
+                || request.getCarb() != null
+                || request.getFat() != null;
+
+        // HV có PT: gửi PT hoặc sửa macro → luôn PENDING (không bypass bằng bỏ tick)
+        if (hasActivePt && (sendToPt || macrosChanged)) {
+            var reviewStatus = dietLogHelper.resolveReviewStatus(userId, true);
+            dietLog.setStatus(DietLogStatus.LOGGED);
+            dietLog.setReviewStatus(reviewStatus);
+            if (reviewStatus == com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING) {
+                dietLog.setIsPtNotified(true);
+                dietLogHelper.assignPtReviewerIfNeeded(dietLog, userId);
+            }
+        } else if (sendToPt) {
             var reviewStatus = dietLogHelper.resolveReviewStatus(userId, true);
             dietLog.setStatus(DietLogStatus.LOGGED);
             dietLog.setReviewStatus(reviewStatus);

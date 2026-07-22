@@ -10,6 +10,7 @@ import com.sba.nutricanbe.user.entity.PtUpdateRequest;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.MacroCalorieValidator;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.PtUpdateRequestRepository;
@@ -402,6 +403,9 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (request.getProtein() != null) target.setProtein(request.getProtein());
         if (request.getCarb() != null) target.setCarb(request.getCarb());
         if (request.getFat() != null) target.setFat(request.getFat());
+
+        MacroCalorieValidator.validateWithinTolerance(
+                target.getDailyCalories(), target.getProtein(), target.getCarb(), target.getFat());
 
         if (request.getNutritionGoal() != null) {
             user.setNutritionGoal(request.getNutritionGoal());

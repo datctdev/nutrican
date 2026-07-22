@@ -17,6 +17,15 @@ public class ClientStatusDto {
     private String status;
     private String statusLabel;
     private String statusColor;
+    /** True when PT has confirmed coachingStatus on the mapping. */
+    private boolean statusConfirmed;
+    /** System suggestion from today's logs (GREEN/YELLOW/RED). */
+    private String suggestedStatus;
+    /** System suggestion (EXCELLENT/AVERAGE/POOR). */
+    private String suggestedEvaluation;
+    /** Confirmed evaluation when statusConfirmed; otherwise null. */
+    private String evaluation;
+    private String coachingEvalNote;
     private String mappingStatus;
     private String lastLogTime;
     private java.math.BigDecimal avgCalories;
@@ -34,4 +43,7 @@ public class ClientStatusDto {
     private Integer sessionCount;
     private java.math.BigDecimal perSessionAmount;
     private java.util.List<com.sba.nutricanbe.user.dto.MappingSessionResponse> sessions;
+    /** Ngày bắt đầu coaching (neo tuần 7 ngày). */
+    private java.time.LocalDateTime coachingStartedAt;
+    private UUID mappingId;
 }

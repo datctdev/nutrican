@@ -154,6 +154,9 @@ export default function CoachingPage() {
 
   const [endCoachingLoading, setEndCoachingLoading] = useState(false);
   const [endCoachingModalOpen, setEndCoachingModalOpen] = useState(false);
+  const [reportPtOpen, setReportPtOpen] = useState(false);
+  const [reportPtReason, setReportPtReason] = useState('');
+  const [reportingPt, setReportingPt] = useState(false);
   const [refundForm, setRefundForm] = useState({ mappingId: '', reason: 'CUSTOMER_REQUEST', note: '' });
   const [submittingRefund, setSubmittingRefund] = useState(false);
   const [coachingHistory, setCoachingHistory] = useState([]);
@@ -533,8 +536,12 @@ export default function CoachingPage() {
     if (!cancelApptId) return;
     setCancellingAppt(true);
     try {
-      await appointmentService.cancel(cancelApptId);
-      toast.success('Đã hủy lịch — hoàn tiền buổi chưa dạy vào ví (nếu còn trong escrow)');
+      const res = await appointmentService.cancel(cancelApptId);
+      const msg = res?.data?.message;
+      const refunded = Number(res?.data?.data?.refundedAmount || 0);
+      if (msg) toast.success(msg);
+      else if (refunded > 0) toast.success(`Đã hủy buổi và hoàn ${refunded.toLocaleString('vi-VN')}đ vào ví`);
+      else toast.success('Đã hủy buổi (không còn tiền trong escrow để hoàn)');
       setCancelApptId(null);
       fetchAppointments();
       profileExtensionsService.getMySessions()
@@ -1499,6 +1506,15 @@ export default function CoachingPage() {
                             Yêu cầu kết thúc coaching
                           </Button>
                         )}
+                        {activeMappingId && (
+                          <Button
+                            variant="outline"
+                            onClick={() => { setReportPtReason(''); setReportPtOpen(true); }}
+                            className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 font-bold px-5"
+                          >
+                            Báo cáo PT lên admin
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -1595,6 +1611,45 @@ export default function CoachingPage() {
               }
             }} disabled={endCoachingLoading}>
               {endCoachingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Xác nhận'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={reportPtOpen} onClose={() => setReportPtOpen(false)} title="Báo cáo PT lên admin" size="sm">
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Dùng khi PT vi phạm cam kết, thái độ không phù hợp, hoặc vấn đề ngoài tranh chấp một buổi tập.
+            Admin sẽ nhận thông báo và xem xét.
+          </p>
+          <textarea
+            rows={4}
+            value={reportPtReason}
+            onChange={(e) => setReportPtReason(e.target.value)}
+            placeholder="Mô tả sự việc (tối thiểu 10 ký tự)…"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm resize-none"
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={() => setReportPtOpen(false)}>Hủy</Button>
+            <Button
+              className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              disabled={reportingPt}
+              onClick={async () => {
+                if (!activeMappingId) return;
+                setReportingPt(true);
+                try {
+                  await profileExtensionsService.reportPt(activeMappingId, { reason: reportPtReason.trim() });
+                  toast.success('Đã gửi báo cáo tới admin');
+                  setReportPtOpen(false);
+                  setReportPtReason('');
+                } catch (e) {
+                  toast.error(e.response?.data?.message || 'Không gửi được báo cáo');
+                } finally {
+                  setReportingPt(false);
+                }
+              }}
+            >
+              {reportingPt ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Gửi báo cáo'}
             </Button>
           </div>
         </div>

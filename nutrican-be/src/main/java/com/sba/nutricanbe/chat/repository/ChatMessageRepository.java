@@ -40,4 +40,22 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
     int markRead(@Param("mappingId") UUID mappingId, @Param("userId") UUID userId, @Param("readAt") LocalDateTime readAt);
 
     long countByMappingIdAndRecipientIdAndReadAtIsNull(UUID mappingId, UUID recipientId);
+
+    /**
+     * Spread demo messages across ~4 days (47 min steps) for day-separator + scroll pagination demos.
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+            UPDATE chat_messages c
+            SET created_at = NOW() - (((sub.cnt - 1) - sub.rn) * INTERVAL '47 minutes')
+            FROM (
+                SELECT id,
+                       ROW_NUMBER() OVER (ORDER BY created_at ASC, id ASC) - 1 AS rn,
+                       COUNT(*) OVER () AS cnt
+                FROM chat_messages
+                WHERE mapping_id = :mappingId
+            ) sub
+            WHERE c.id = sub.id
+            """, nativeQuery = true)
+    int stampDemoChatTimestamps(@Param("mappingId") UUID mappingId);
 }

@@ -1,17 +1,39 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import {
     Search, Activity, MessageSquare,
     Users, Clock, ShieldAlert, TrendingUp, Utensils,
-    ChevronDown, UserCheck, UserX, ClipboardCheck, Wifi, MapPin
+    ChevronDown, UserCheck, UserX, ClipboardCheck, Wifi, MapPin, Scale, AlertTriangle
 } from 'lucide-react';
 import { workspaceService } from '../../services/workspaceService';
 import { toast } from 'sonner';
 import Modal from '../../components/common/Modal';
+import WeeklySummaryForm from './components/WeeklySummaryForm';
+
+const ALERT_META = {
+    WEIGHT_CHANGED: { label: 'Cân nặng', icon: Scale, tone: 'border-sky-200 bg-sky-50 text-sky-900' },
+    DIET_VIOLATION: { label: 'Dinh dưỡng', icon: AlertTriangle, tone: 'border-amber-200 bg-amber-50 text-amber-900' },
+    PLAN_EXPIRED: { label: 'Thực đơn', icon: ClipboardCheck, tone: 'border-violet-200 bg-violet-50 text-violet-900' },
+};
+
+const SESSION_STATUS_VI = {
+    SCHEDULED: 'Chờ dạy',
+    AWAITING_CONFIRM: 'Chờ xác nhận',
+    CONFIRMED: 'Đã chốt',
+    AUTO_CONFIRMED: 'Tự xác nhận',
+    DISPUTED: 'Tranh chấp',
+    CANCELLED: 'Đã hủy',
+    PENDING: 'Chờ xử lý',
+    EXPIRED: 'Hết hạn',
+};
+
+function sessionStatusLabel(status) {
+    if (!status) return '';
+    return SESSION_STATUS_VI[status] || status;
+}
 
 export default function ClientListPage() {
     const navigate = useNavigate();
@@ -23,64 +45,10 @@ export default function ClientListPage() {
     const [processingId, setProcessingId] = useState(null);
     const [endCoachingModal, setEndCoachingModal] = useState(null);
     const [pendingCount, setPendingCount] = useState(0);
-
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [creatingClient, setCreatingClient] = useState(false);
-    const [createForm, setCreateForm] = useState({
-        email: '',
-        fullName: '',
-        phoneNumber: '',
-        heightCm: '',
-        gender: 'male',
-        dateOfBirth: '',
-        weight: '',
-        bodyFatPercent: '',
-        tdee: '',
-        allergicFoodCodes: [],
-        dietPreference: 'NORMAL',
-    });
-
-    const handleCreateClient = async (e) => {
-        e.preventDefault();
-        if (!createForm.email || !createForm.fullName) {
-            toast.error('Email và Họ tên là bắt buộc');
-            return;
-        }
-        setCreatingClient(true);
-        try {
-            const payload = {
-                ...createForm,
-                heightCm: createForm.heightCm ? Number(createForm.heightCm) : null,
-                weight: createForm.weight ? Number(createForm.weight) : null,
-                bodyFatPercent: createForm.bodyFatPercent ? Number(createForm.bodyFatPercent) : null,
-                tdee: createForm.tdee ? Number(createForm.tdee) : null,
-                dateOfBirth: createForm.dateOfBirth || null,
-                allergicFoodCodes: createForm.allergicFoodCodes,
-            };
-            await workspaceService.createClient(payload);
-            toast.success('Thêm học viên mới thành công!');
-            setIsCreateModalOpen(false);
-            setCreateForm({
-                email: '',
-                fullName: '',
-                phoneNumber: '',
-                heightCm: '',
-                gender: 'male',
-                dateOfBirth: '',
-                weight: '',
-                bodyFatPercent: '',
-                tdee: '',
-                allergicFoodCodes: [],
-                dietPreference: 'NORMAL',
-            });
-            fetchClients();
-        } catch (error) {
-            console.error(error);
-            toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi tạo học viên.');
-        } finally {
-            setCreatingClient(false);
-        }
-    };
+    const [evalModal, setEvalModal] = useState(null);
+    const [evalForm, setEvalForm] = useState({ status: 'GREEN', evaluation: 'EXCELLENT', note: '' });
+    const [savingEval, setSavingEval] = useState(false);
+    const [weeklyModalClient, setWeeklyModalClient] = useState(null);
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -210,7 +178,67 @@ export default function ClientListPage() {
         if (s === 'RED') return { label: 'Báo động', color: 'bg-red-100 text-red-700 border-red-200' };
         if (s === 'PENDING') return { label: 'Chờ duyệt', color: 'bg-blue-100 text-blue-700 border-blue-200' };
         if (s === 'AWAITING_PAYMENT') return { label: 'Chờ thanh toán', color: 'bg-violet-100 text-violet-700 border-violet-200' };
-        return { label: s || 'ACTIVE', color: 'bg-slate-100 text-slate-600 border-slate-200' };
+        if (s === 'ACTIVE') return { label: 'Đang hoạt động', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+        return { label: 'Đang quản lý', color: 'bg-slate-100 text-slate-600 border-slate-200' };
+    };
+
+    const rateUnitLabel = (unit) => {
+        const u = (unit || '').toUpperCase();
+        if (u === 'SESSION_60') return '/ buổi 60 phút';
+        if (u === 'SESSION_90') return '/ buổi 90 phút';
+        if (u === 'MONTH') return '/ tháng';
+        if (u === 'WEEK') return '/ tuần';
+        return unit ? `/ ${unit}` : '';
+    };
+
+    const intakeStatusLabel = (code) => {
+        const map = {
+            OK: 'Đúng mục tiêu',
+            ON_TARGET: 'Đúng mục tiêu',
+            UNDER: 'Ăn thiếu calo',
+            UNDER_INTAKE: 'Ăn thiếu calo',
+            OVER: 'Vượt calo',
+            OVER_MACRO: 'Vượt macro / calo',
+            AT_RISK: 'Cần chú ý',
+        };
+        return map[code] || null;
+    };
+
+    const getEvalLabel = (evaluation) => {
+        const e = (evaluation || '').toUpperCase();
+        if (e === 'POOR') return 'Kém';
+        if (e === 'AVERAGE') return 'Trung bình';
+        return 'Tuyệt vời';
+    };
+
+    const openEvalModal = (client) => {
+        setEvalForm({
+            status: client.statusConfirmed ? (client.status || 'GREEN') : (client.suggestedStatus || client.status || 'GREEN'),
+            evaluation: client.statusConfirmed
+                ? (client.evaluation || 'EXCELLENT')
+                : (client.suggestedEvaluation || 'EXCELLENT'),
+            note: client.coachingEvalNote || '',
+        });
+        setEvalModal(client);
+    };
+
+    const handleSaveEval = async () => {
+        if (!evalModal) return;
+        if ((evalForm.status === 'RED' || evalForm.evaluation === 'POOR') && !evalForm.note.trim()) {
+            toast.error('Ghi chú bắt buộc khi chọn Báo động hoặc Kém');
+            return;
+        }
+        setSavingEval(true);
+        try {
+            await workspaceService.setCoachingEvaluation(evalModal.clientId, evalForm);
+            toast.success('Đã cập nhật trạng thái / đánh giá');
+            setEvalModal(null);
+            fetchClients();
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Không lưu được đánh giá');
+        } finally {
+            setSavingEval(false);
+        }
     };
 
     const filterOptions = [
@@ -225,16 +253,49 @@ export default function ClientListPage() {
         <div className="max-w-[1600px] mx-auto space-y-8 pb-12 animate-fade-in mt-6 px-4 min-w-0 overflow-x-hidden">
 
             {alerts.length > 0 && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-2">
-                    <p className="font-bold text-amber-900 flex items-center gap-2">
-                        <ShieldAlert className="w-4 h-4" /> Cảnh báo học viên ({alerts.length})
-                    </p>
-                    {alerts.map((a) => (
-                        <div key={a.clientId} className="text-sm text-amber-800 flex justify-between gap-2">
-                            <span className="font-semibold">{a.clientName}</span>
-                            <span>{a.intakeStatus} — {a.reason}</span>
-                        </div>
-                    ))}
+                <div className="rounded-2xl border border-amber-200 bg-white shadow-sm overflow-hidden">
+                    <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/80 flex items-center gap-2">
+                        <ShieldAlert className="w-4 h-4 text-amber-700" />
+                        <p className="font-bold text-amber-900 text-sm">Cảnh báo học viên ({alerts.length})</p>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                        {alerts.map((a) => {
+                            const meta = ALERT_META[a.alertType] || ALERT_META.DIET_VIOLATION;
+                            const Icon = meta.icon;
+                            return (
+                                <div key={`${a.clientId}-${a.alertType || a.reason}`} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                                    <div className="flex items-start gap-3 min-w-0">
+                                        <span className={`shrink-0 inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${meta.tone}`}>
+                                            <Icon className="w-3 h-3" /> {meta.label}
+                                        </span>
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-slate-900 text-sm truncate">{a.clientName}</p>
+                                            <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">
+                                                {a.reason || intakeStatusLabel(a.intakeStatus) || 'Cần chú ý'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 shrink-0">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="rounded-lg h-8 text-xs font-semibold"
+                                            onClick={() => navigate('/pt/chat', { state: { targetClientId: a.clientId } })}
+                                        >
+                                            <MessageSquare className="w-3.5 h-3.5 mr-1" /> Nhắn tin
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="rounded-lg h-8 text-xs font-semibold bg-slate-900 text-white"
+                                            onClick={() => navigate(`/pt/progress/${a.clientId}`)}
+                                        >
+                                            <TrendingUp className="w-3.5 h-3.5 mr-1" /> Tiến độ
+                                        </Button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
@@ -243,12 +304,6 @@ export default function ClientListPage() {
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Danh sách Học viên</h1>
                     <p className="text-slate-500 mt-1 font-medium">Quản lý tiến độ và tương tác với các học viên của bạn.</p>
                 </div>
-                <Button 
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl h-11 px-6 shadow-md shadow-blue-500/10 self-start md:self-end"
-                >
-                    + Thêm học viên mới
-                </Button>
             </div>
 
 
@@ -361,8 +416,8 @@ export default function ClientListPage() {
                         const badge = getStatusBadge(currentStatus);
 
                         return (
-                            <Card key={client.clientId} className="bg-white border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 rounded-3xl overflow-hidden flex flex-col group">
-                                <div className={`h-3 ${activeTab === 'PENDING' ? 'bg-gradient-to-r from-amber-400 to-orange-400' : 'bg-gradient-to-r from-blue-500 to-indigo-500'}`} />
+                            <Card key={client.clientId} className="bg-white border-slate-200/80 shadow-md shadow-slate-200/50 hover:shadow-xl hover:shadow-blue-100/40 transition-all duration-300 rounded-3xl overflow-hidden flex flex-col group ring-1 ring-slate-100">
+                                <div className={`h-1.5 ${activeTab === 'PENDING' ? 'bg-gradient-to-r from-amber-400 to-orange-400' : 'bg-gradient-to-r from-sky-500 via-blue-500 to-indigo-500'}`} />
 
                                 <CardContent className="p-6 flex-1 flex flex-col">
                                     <div className="flex items-center gap-4 mb-5">
@@ -379,7 +434,7 @@ export default function ClientListPage() {
                                             </h3>
                                             {activeTab === 'ACTIVE' && pendingSelfPlanCounts[String(client.clientId)] > 0 && (
                                                 <span className="mt-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800">
-                                                    Self-plan chờ duyệt ({pendingSelfPlanCounts[String(client.clientId)]})
+                                                    Thực đơn tự chọn chờ duyệt ({pendingSelfPlanCounts[String(client.clientId)]})
                                                 </span>
                                             )}
                                             <div className="flex items-center gap-1.5 mt-0.5 text-xs font-semibold text-slate-500">
@@ -396,11 +451,16 @@ export default function ClientListPage() {
                                     </div>
 
                                     <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100 flex-1">
-                                        <div className="flex justify-between items-center mb-3">
+                                        <div className="flex justify-between items-center mb-3 gap-2">
                                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trạng thái</span>
-                                            <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-md border ${badge.color}`}>
-                                                {badge.label}
-                                            </span>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded-md border ${badge.color} ${!client.statusConfirmed && activeTab === 'ACTIVE' ? 'border-dashed opacity-90' : ''}`}>
+                                                    {badge.label}
+                                                </span>
+                                                {activeTab === 'ACTIVE' && !client.statusConfirmed && (
+                                                    <span className="text-[9px] font-semibold text-slate-400">Gợi ý hệ thống — chưa lưu</span>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {(activeTab === 'PENDING' || activeTab === 'AWAITING_PAYMENT') && (
@@ -416,7 +476,7 @@ export default function ClientListPage() {
                                                     {client.selectedTrainingMode === 'OFFLINE' && client.sessionCount ? (
                                                         <span className="ml-1 text-xs font-semibold text-slate-500">· gói {client.sessionCount} buổi</span>
                                                     ) : (
-                                                        <span className="ml-1 text-xs font-semibold text-slate-500">/ {client.agreedRateUnit}</span>
+                                                        <span className="ml-1 text-xs font-semibold text-slate-500">{rateUnitLabel(client.agreedRateUnit)}</span>
                                                     )}
                                                 </p>
                                                 {client.selectedTrainingMode === 'OFFLINE' && client.perSessionAmount && client.sessionCount && (
@@ -437,7 +497,7 @@ export default function ClientListPage() {
                                                                 {client.sessions.map((s) => (
                                                                     <li key={s.id || s.sequence} className="text-xs font-semibold text-slate-700">
                                                                         #{s.sequence}: {new Date(s.startTime).toLocaleString('vi-VN')}
-                                                                        {s.status ? ` · ${s.status}` : ''}
+                                                                        {s.status ? ` · ${sessionStatusLabel(s.status)}` : ''}
                                                                     </li>
                                                                 ))}
                                                             </ul>
@@ -458,12 +518,35 @@ export default function ClientListPage() {
                                         )}
 
                                         {activeTab === 'ACTIVE' && (
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Đánh giá chung</span>
-                                                <div className="flex items-center gap-1 text-sm font-bold text-slate-700">
-                                                    <Activity className={`w-4 h-4 ${client.status === 'RED' ? 'text-red-500' : client.status === 'YELLOW' ? 'text-amber-500' : 'text-emerald-500'}`} />
-                                                    {client.status === 'RED' ? 'Kém' : client.status === 'YELLOW' ? 'Trung bình' : 'Tuyệt vời'}
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center gap-2">
+                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Đánh giá chung</span>
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                        <div className={`flex items-center gap-1 text-sm font-bold ${!client.statusConfirmed ? 'text-slate-500' : 'text-slate-700'}`}>
+                                                            <Activity className={`w-4 h-4 ${
+                                                                (client.statusConfirmed ? client.evaluation : client.suggestedEvaluation) === 'POOR' || client.status === 'RED'
+                                                                    ? 'text-red-500'
+                                                                    : (client.statusConfirmed ? client.evaluation : client.suggestedEvaluation) === 'AVERAGE' || client.status === 'YELLOW'
+                                                                        ? 'text-amber-500'
+                                                                        : 'text-emerald-500'
+                                                            }`} />
+                                                            {client.statusConfirmed
+                                                                ? getEvalLabel(client.evaluation)
+                                                                : getEvalLabel(client.suggestedEvaluation || 'EXCELLENT')}
+                                                        </div>
+                                                        {!client.statusConfirmed && (
+                                                            <span className="text-[9px] font-semibold text-slate-400">Gợi ý hệ thống — chưa lưu</span>
+                                                        )}
+                                                    </div>
                                                 </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => openEvalModal(client)}
+                                                    className="w-full h-9 rounded-xl text-xs font-bold border-slate-200"
+                                                >
+                                                    Điều chỉnh trạng thái / đánh giá
+                                                </Button>
                                             </div>
                                         )}
 
@@ -478,7 +561,7 @@ export default function ClientListPage() {
                                                         <li key={s.id || s.sequence} className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700">
                                                             <span>
                                                                 #{s.sequence}: {new Date(s.startTime).toLocaleString('vi-VN')}
-                                                                {s.status ? ` · ${s.status}` : ''}
+                                                                {s.status ? ` · ${sessionStatusLabel(s.status)}` : ''}
                                                             </span>
                                                         </li>
                                                     ))}
@@ -489,7 +572,7 @@ export default function ClientListPage() {
 
 
                                     {activeTab === 'ACTIVE' ? (
-                                        <div className="flex flex-col gap-2">
+                                        <div className="flex flex-col gap-2.5">
                                             <div className="flex gap-2">
                                                 <Button
                                                     variant="outline"
@@ -500,55 +583,64 @@ export default function ClientListPage() {
                                                 </Button>
                                                 <Button
                                                     onClick={() => navigate(`/pt/progress/${client.clientId}`)}
-                                                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 shadow-sm font-bold transition-all"
+                                                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 shadow-md shadow-slate-900/15 font-bold transition-all"
                                                 >
                                                     Tiến độ <TrendingUp className="w-4 h-4 ml-1.5" />
                                                 </Button>
                                             </div>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => {
-                                                    const params = new URLSearchParams({ clientId: client.clientId });
-                                                    if (client.clientName) params.set('clientName', client.clientName);
-                                                    navigate(`/pt/clients/dietlog?${params.toString()}`);
-                                                }}
-                                                className="w-full border-amber-200 text-amber-700 hover:bg-amber-50 rounded-xl h-10 font-semibold text-sm"
-                                            >
-                                                <ClipboardCheck className="w-4 h-4 mr-2" /> Duyệt bữa ăn
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => navigate(`/pt/clients/${client.clientId}/meal-plan`)}
-                                                className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-xl h-10 font-semibold text-sm"
-                                            >
-                                                <Utensils className="w-4 h-4 mr-2" /> Thực đơn tuần
-                                            </Button>
-                                            {client.mappingStatus === 'END_REQUESTED' && client.endRequestedBy === 'PT' ? (
-                                                <Button
-                                                    disabled
-                                                    className="w-full bg-slate-100 text-slate-400 border border-slate-200 rounded-xl h-10 font-semibold text-sm cursor-not-allowed"
-                                                >
-                                                    Đang chờ học viên xác nhận kết thúc
-                                                </Button>
-                                            ) : (
+                                            <div className="grid grid-cols-2 gap-2">
                                                 <Button
                                                     variant="outline"
-                                                    onClick={() => setEndCoachingModal({
-                                                        clientId: client.clientId,
-                                                        mappingStatus: client.mappingStatus,
-                                                        fullName: client.fullName,
-                                                    })}
-                                                    className={`w-full rounded-xl h-10 font-semibold text-sm ${
-                                                        client.mappingStatus === 'END_REQUESTED'
-                                                            ? 'border-emerald-200 text-emerald-800 hover:bg-emerald-50 bg-emerald-50/30'
-                                                            : 'border-amber-200 text-amber-800 hover:bg-amber-50'
-                                                    }`}
+                                                    onClick={() => {
+                                                        const params = new URLSearchParams({ clientId: client.clientId });
+                                                        if (client.clientName) params.set('clientName', client.clientName);
+                                                        navigate(`/pt/clients/dietlog?${params.toString()}`);
+                                                    }}
+                                                    className="border-amber-200/80 text-amber-800 hover:bg-amber-50 rounded-xl h-10 font-semibold text-xs bg-amber-50/30"
                                                 >
-                                                    {client.mappingStatus === 'END_REQUESTED'
-                                                        ? 'Xác nhận kết thúc coaching'
-                                                        : 'Kết thúc coaching'}
+                                                    <ClipboardCheck className="w-3.5 h-3.5 mr-1.5" /> Duyệt bữa
                                                 </Button>
-                                            )}
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => navigate(`/pt/clients/${client.clientId}/meal-plan`)}
+                                                    className="border-emerald-200/80 text-emerald-800 hover:bg-emerald-50 rounded-xl h-10 font-semibold text-xs bg-emerald-50/30"
+                                                >
+                                                    <Utensils className="w-3.5 h-3.5 mr-1.5" /> Thực đơn
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => setWeeklyModalClient(client)}
+                                                    className="border-indigo-200/80 text-indigo-800 hover:bg-indigo-50 rounded-xl h-10 font-semibold text-xs bg-indigo-50/30"
+                                                >
+                                                    Tổng kết tuần
+                                                </Button>
+                                                {client.mappingStatus === 'END_REQUESTED' && client.endRequestedBy === 'PT' ? (
+                                                    <Button
+                                                        disabled
+                                                        className="bg-slate-100 text-slate-400 border border-slate-200 rounded-xl h-10 font-semibold text-xs cursor-not-allowed"
+                                                    >
+                                                        Chờ HV xác nhận
+                                                    </Button>
+                                                ) : (
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={() => setEndCoachingModal({
+                                                            clientId: client.clientId,
+                                                            mappingStatus: client.mappingStatus,
+                                                            clientName: client.clientName,
+                                                        })}
+                                                        className={`rounded-xl h-10 font-semibold text-xs ${
+                                                            client.mappingStatus === 'END_REQUESTED'
+                                                                ? 'border-emerald-200 text-emerald-800 hover:bg-emerald-50 bg-emerald-50/30'
+                                                                : 'border-rose-200/80 text-rose-700 hover:bg-rose-50 bg-rose-50/20'
+                                                        }`}
+                                                    >
+                                                        {client.mappingStatus === 'END_REQUESTED'
+                                                            ? 'Xác nhận kết thúc'
+                                                            : 'Kết thúc'}
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     ) : activeTab === 'PENDING' ? (
                                         <div className="flex gap-2">
@@ -585,8 +677,8 @@ export default function ClientListPage() {
             title={endCoachingModal?.mappingStatus === 'END_REQUESTED' ? 'Xác nhận kết thúc coaching?' : 'Kết thúc coaching?'}>
             <p className="text-sm text-slate-600 mb-4">
                 {endCoachingModal?.mappingStatus === 'END_REQUESTED'
-                    ? `Xác nhận kết thúc coaching với ${endCoachingModal?.fullName || 'khách hàng'}?`
-                    : `Gửi yêu cầu kết thúc coaching với ${endCoachingModal?.fullName || 'khách hàng'}? Khách hàng cần xác nhận.`}
+                    ? `Xác nhận kết thúc coaching với ${endCoachingModal?.clientName || 'học viên'}?`
+                    : `Gửi yêu cầu kết thúc coaching với ${endCoachingModal?.clientName || 'học viên'}? Học viên cần xác nhận.`}
             </p>
             <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setEndCoachingModal(null)}>Hủy</Button>
@@ -607,147 +699,68 @@ export default function ClientListPage() {
             </div>
         </Modal>
 
-        <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Thêm học viên mới">
-            <form onSubmit={handleCreateClient} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email *</label>
-                        <input
-                            type="email"
-                            required
-                            value={createForm.email}
-                            onChange={(e) => setCreateForm({...createForm, email: e.target.value})}
-                            placeholder="client@gmail.com"
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        />
+        <Modal isOpen={!!evalModal} onClose={() => setEvalModal(null)} title="Điều chỉnh trạng thái & đánh giá">
+            <div className="space-y-4">
+                {evalModal && !evalModal.statusConfirmed && (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        Gợi ý hệ thống: <strong>{evalModal.suggestedStatus || '—'}</strong>
+                        {' · '}
+                        <strong>{getEvalLabel(evalModal.suggestedEvaluation)}</strong>
+                        — bạn cần xác nhận để lưu chính thức.
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Họ và tên *</label>
-                        <input
-                            type="text"
-                            required
-                            value={createForm.fullName}
-                            onChange={(e) => setCreateForm({...createForm, fullName: e.target.value})}
-                            placeholder="Jane Doe"
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        />
-                    </div>
+                )}
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Trạng thái</label>
+                    <select
+                        value={evalForm.status}
+                        onChange={(e) => setEvalForm({ ...evalForm, status: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold"
+                    >
+                        <option value="GREEN">Tốt / Ổn định</option>
+                        <option value="YELLOW">Cần nhắc nhở</option>
+                        <option value="RED">Báo động</option>
+                    </select>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Số điện thoại</label>
-                        <input
-                            type="text"
-                            value={createForm.phoneNumber}
-                            onChange={(e) => setCreateForm({...createForm, phoneNumber: e.target.value})}
-                            placeholder="09xxxxxxxx"
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ngày sinh</label>
-                        <input
-                            type="date"
-                            value={createForm.dateOfBirth}
-                            onChange={(e) => setCreateForm({...createForm, dateOfBirth: e.target.value})}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        />
-                    </div>
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Đánh giá chung</label>
+                    <select
+                        value={evalForm.evaluation}
+                        onChange={(e) => setEvalForm({ ...evalForm, evaluation: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold"
+                    >
+                        <option value="EXCELLENT">Tuyệt vời</option>
+                        <option value="AVERAGE">Trung bình</option>
+                        <option value="POOR">Kém</option>
+                    </select>
                 </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chiều cao (cm)</label>
-                        <input
-                            type="number"
-                            value={createForm.heightCm}
-                            onChange={(e) => setCreateForm({...createForm, heightCm: e.target.value})}
-                            placeholder="170"
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Giới tính</label>
-                        <select
-                            value={createForm.gender}
-                            onChange={(e) => setCreateForm({...createForm, gender: e.target.value})}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        >
-                            <option value="male">Nam</option>
-                            <option value="female">Nữ</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cân nặng (kg)</label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            value={createForm.weight}
-                            onChange={(e) => setCreateForm({...createForm, weight: e.target.value})}
-                            placeholder="60"
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        />
-                    </div>
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                        Ghi chú {(evalForm.status === 'RED' || evalForm.evaluation === 'POOR') ? '*' : '(tuỳ chọn)'}
+                    </label>
+                    <textarea
+                        value={evalForm.note}
+                        onChange={(e) => setEvalForm({ ...evalForm, note: e.target.value })}
+                        rows={3}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        placeholder="Lý do điều chỉnh..."
+                    />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tỷ lệ mỡ (%)</label>
-                        <input
-                            type="number"
-                            step="0.1"
-                            value={createForm.bodyFatPercent}
-                            onChange={(e) => setCreateForm({...createForm, bodyFatPercent: e.target.value})}
-                            placeholder="20"
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mục tiêu Calo/TDEE</label>
-                        <input
-                            type="number"
-                            value={createForm.tdee}
-                            onChange={(e) => setCreateForm({...createForm, tdee: e.target.value})}
-                            placeholder="2000"
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chế độ ăn</label>
-                        <select
-                            value={createForm.dietPreference}
-                            onChange={(e) => setCreateForm({...createForm, dietPreference: e.target.value})}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all font-semibold"
-                        >
-                            <option value="NORMAL">Bình thường</option>
-                            <option value="VEGETARIAN">Ăn chay (Vegetarian)</option>
-                            <option value="VEGAN">Ăn thuần chay (Vegan)</option>
-                            <option value="KETO">Chế độ Keto</option>
-                            <option value="EAT_CLEAN">Ăn Eat Clean</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dị ứng</label>
-                        <div className="mt-2">
-                            <FoodAllergySelector 
-                                selectedFoodCodes={createForm.allergicFoodCodes} 
-                                onChange={(codes) => setCreateForm({ ...createForm, allergicFoodCodes: codes })} 
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
-                    <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>Hủy</Button>
-                    <Button type="submit" disabled={creatingClient} className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-5">
-                        {creatingClient ? 'Đang lưu...' : 'Lưu lại'}
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setEvalModal(null)}>Hủy</Button>
+                    <Button disabled={savingEval} onClick={handleSaveEval} className="bg-blue-600 text-white font-bold">
+                        {savingEval ? 'Đang lưu...' : 'Xác nhận lưu'}
                     </Button>
                 </div>
-            </form>
+            </div>
+        </Modal>
+        <Modal isOpen={!!weeklyModalClient} onClose={() => setWeeklyModalClient(null)} title={`Tổng kết tuần · ${weeklyModalClient?.clientName || ''}`}>
+            {weeklyModalClient && (
+                <WeeklySummaryForm
+                    clientId={weeklyModalClient.clientId}
+                    coachingStartedAt={weeklyModalClient.coachingStartedAt}
+                    onDone={() => setWeeklyModalClient(null)}
+                />
+            )}
         </Modal>
         </>
     );

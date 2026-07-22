@@ -9,7 +9,10 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "weekly_summaries")
+@Table(name = "weekly_summaries", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_weekly_summary_pt_client_week",
+                columnNames = {"pt_id", "client_id", "week_start_date"})
+})
 @Data
 @Builder
 @NoArgsConstructor

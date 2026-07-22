@@ -78,7 +78,33 @@ function statusMeta(status) {
 /** Enable «Đã dạy xong» when session has started (during or after). */
 export function canMarkSessionDone(item, now = new Date()) {
   if (!item || item.status !== 'SCHEDULED' || !item.sessionId || !item.start) return false;
-  return now.getTime() >= item.start.getTime();
+  return item.start.getTime() <= now.getTime();
+}
+
+/** Hủy chỉ khi buổi chưa bắt đầu và còn chờ dạy / lịch hẹn còn hiệu lực. */
+export function canCancelAppointment(item, now = new Date()) {
+  if (!item || !item.start) return false;
+  if (item.start.getTime() <= now.getTime()) return false;
+  if (item.sessionId) {
+    return item.status === 'SCHEDULED';
+  }
+  return ['PENDING', 'CONFIRMED'].includes(item.status);
+}
+
+/** Đổi lịch: chưa tới giờ + session SCHEDULED (hoặc appointment PENDING/CONFIRMED không session). */
+export function canRescheduleAppointment(item, now = new Date()) {
+  if (!item || !item.start) return false;
+  if (item.start.getTime() <= now.getTime()) return false;
+  if (item.sessionId) {
+    return item.status === 'SCHEDULED';
+  }
+  return ['PENDING', 'CONFIRMED'].includes(item.status);
+}
+
+function typeLabel(type) {
+  if (!type || type === 'OFFLINE') return 'Offline';
+  if (type === 'ONLINE') return 'Online';
+  return type;
 }
 
 /**
@@ -104,7 +130,7 @@ export function toTimetableItem(raw, extras = {}) {
     type: raw.type || 'OFFLINE',
     title: extras.title || raw.note || (raw.sequence != null ? `Buổi #${raw.sequence}` : 'Buổi offline'),
     counterpartName: extras.counterpartName || raw.counterpartName || raw.clientName || raw.ptName,
-    canCancel: extras.canCancel ?? ['PENDING', 'CONFIRMED'].includes(raw.status),
+    canCancel: extras.canCancel ?? false,
     confirmDeadlineAt: raw.confirmDeadlineAt,
     raw,
   };
@@ -139,7 +165,8 @@ export function mergeTimetableSources({ sessions = [], appointments = [], counte
       confirmDeadlineAt: s.confirmDeadlineAt,
     }, {
       counterpartName: s.counterpartName || counterpartName,
-      canCancel: match ? ['PENDING', 'CONFIRMED'].includes(match.status) : false,
+      // canCancel tính động theo now trong modal (canCancelAppointment)
+      canCancel: true,
     }));
   });
 
@@ -147,7 +174,7 @@ export function mergeTimetableSources({ sessions = [], appointments = [], counte
     if (usedAppt.has(a.id)) return;
     items.push(toTimetableItem(a, {
       counterpartName: a.counterpartName || counterpartName,
-      canCancel: ['PENDING', 'CONFIRMED'].includes(a.status),
+      canCancel: true,
       title: a.note || 'Buổi offline',
     }));
   });
@@ -165,6 +192,7 @@ export default function CoachingTimetable({
   onMarkDone,
   onConfirm,
   onDispute,
+  onReschedule,
   actingId,
 }) {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
@@ -225,6 +253,8 @@ export default function CoachingTimetable({
   const today = now;
   const meta = selected ? statusMeta(selected.status) : null;
   const selectedCanMarkDone = selected ? canMarkSessionDone(selected, now) : false;
+  const selectedCanCancel = selected ? canCancelAppointment(selected, now) : false;
+  const selectedCanReschedule = selected ? canRescheduleAppointment(selected, now) : false;
 
   return (
     <div className="space-y-4">
@@ -393,8 +423,8 @@ export default function CoachingTimetable({
               {selected.sequence != null && (
                 <span className="text-xs font-bold text-slate-500">Buổi #{selected.sequence}</span>
               )}
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                {selected.type || 'OFFLINE'}
+              <span className="text-xs font-semibold text-slate-500 tracking-wider">
+                {typeLabel(selected.type)}
               </span>
             </div>
 
@@ -516,7 +546,21 @@ export default function CoachingTimetable({
                 </>
               )}
 
-              {selected.canCancel && onCancel && (selected.appointmentId || selected.id) && (
+              {selectedCanReschedule && onReschedule && (selected.appointmentId || selected.id) && (
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
+                  onClick={() => {
+                    const snapshot = selected;
+                    setSelected(null);
+                    onReschedule(snapshot);
+                  }}
+                >
+                  Đổi lịch
+                </Button>
+              )}
+
+              {selectedCanCancel && onCancel && (selected.appointmentId || selected.id) && (
                 <Button
                   variant="outline"
                   className="w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 font-bold"
@@ -528,7 +572,9 @@ export default function CoachingTimetable({
                     onCancel(id, snapshot);
                   }}
                 >
-                  {cancellingId === (selected.appointmentId || selected.id) ? 'Đang hủy...' : 'Hủy buổi này'}
+                  {cancellingId === (selected.appointmentId || selected.id)
+                    ? 'Đang hủy...'
+                    : 'Hủy buổi & hoàn tiền'}
                 </Button>
               )}
             </div>

@@ -359,9 +359,9 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                             <>Theo dõi bữa ăn cần xử lý và lịch sử đã duyệt của học viên tại một nơi.</>
                         ) : (
                             <>
-                                {selectedClientId ? 'Đang hiển thị riêng ' : 'Bạn có '}
-                                <strong className="text-blue-600">{pendingLogs.length}</strong>
-                                {selectedClientId ? ' bữa ăn đang chờ duyệt của học viên này.' : ' bữa ăn đang chờ kiểm tra và phê duyệt.'}
+                                Hộp thư chung — chỉ log học viên ACTIVE của bạn.
+                                {selectedClientId ? ' Đang lọc theo học viên này.' : ''}{' '}
+                                <strong className="text-blue-600">{pendingLogs.length}</strong> bữa đang chờ.
                             </>
                         )}
                     </p>
@@ -370,6 +370,19 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                     {(clientPage || selectedClientId) && (
                         <Button onClick={() => navigate(clientPage ? '/pt/clients' : '/pt/reviews')} variant="outline" className="bg-white border-blue-200 text-blue-700 hover:bg-blue-50 shadow-sm rounded-xl font-bold h-11">
                             <ArrowLeft className="w-4 h-4 mr-2" /> {clientPage ? 'Danh sách học viên' : 'Xem tất cả'}
+                        </Button>
+                    )}
+                    {!clientPage && selectedClientId && (
+                        <Button
+                            onClick={() => {
+                                const params = new URLSearchParams({ clientId: selectedClientId });
+                                if (selectedClientName) params.set('clientName', selectedClientName);
+                                navigate(`/pt/clients/dietlog?${params.toString()}`);
+                            }}
+                            variant="outline"
+                            className="bg-white border-emerald-200 text-emerald-700 hover:bg-emerald-50 shadow-sm rounded-xl font-bold h-11"
+                        >
+                            Mở theo học viên
                         </Button>
                     )}
                     <Button
@@ -383,6 +396,18 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                     </Button>
                 </div>
             </div>
+
+            {!clientPage && !selectedClientId && logs.length === 0 && !listLoading && (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500">
+                    Không có bữa ăn chờ duyệt. Vào từng học viên để xem lịch sử đã duyệt.
+                </div>
+            )}
+
+            {clientPage && !selectedClientId && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-800 font-medium">
+                    Thiếu clientId — mở lại từ danh sách học viên hoặc chat.
+                </div>
+            )}
 
             {clientPage && selectedClientId && (
                 <div className="grid grid-cols-1 gap-3 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm sm:grid-cols-2" role="tablist" aria-label="Trạng thái bữa ăn">
@@ -515,6 +540,12 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                                     {isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
                                                 </span>
                                             </div>
+                                            {log.lateTickReason && (
+                                                <div className="bg-orange-50/95 backdrop-blur px-3 py-1.5 rounded-xl shadow-sm border border-orange-200 max-w-[14rem]">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-orange-800">Tick trễ</span>
+                                                    <p className="text-[10px] text-orange-900/80 line-clamp-2 mt-0.5">{log.lateTickReason}</p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

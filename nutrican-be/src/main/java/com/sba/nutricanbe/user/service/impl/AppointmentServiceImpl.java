@@ -3,20 +3,28 @@ package com.sba.nutricanbe.user.service.impl;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
+import com.sba.nutricanbe.user.dto.AddMappingSessionRequest;
 import com.sba.nutricanbe.user.dto.AppointmentActionRequest;
+import com.sba.nutricanbe.user.dto.AppointmentResponse;
 import com.sba.nutricanbe.user.dto.BookAppointmentRequest;
 import com.sba.nutricanbe.user.dto.CancelAppointmentRequest;
+import com.sba.nutricanbe.user.dto.RescheduleAppointmentRequest;
 import com.sba.nutricanbe.user.entity.PtAppointment;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.PtMappingSession;
+import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.enums.AppointmentCancelType;
 import com.sba.nutricanbe.user.enums.AppointmentStatus;
+import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.MappingSessionStatus;
 import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.PtAppointmentRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
+import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.service.AppointmentService;
+import com.sba.nutricanbe.user.service.AppointmentSlotHelper;
+import com.sba.nutricanbe.user.service.OfflinePackageAppointmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,12 +47,15 @@ public class AppointmentServiceImpl implements AppointmentService {
     private final PtClientMappingRepository mappingRepository;
     private final PtMappingSessionRepository mappingSessionRepository;
     private final CoachingWalletService walletService;
+    private final AppointmentSlotHelper appointmentSlotHelper;
+    private final PtProfileRepository ptProfileRepository;
+    private final OfflinePackageAppointmentService offlinePackageAppointmentService;
 
     @Override
     @Transactional
     public PtAppointment book(UUID customerId, UUID ptId, BookAppointmentRequest request) {
         throw new BadRequestException(
-                "Free appointment booking is disabled. For offline coaching, buy extra sessions from /coaching.");
+                "Không thể đặt lịch trống. Với coaching offline, vui lòng mua thêm buổi từ mục Coaching.");
     }
 
     @Override
@@ -64,92 +75,138 @@ public class AppointmentServiceImpl implements AppointmentService {
 
     @Override
     @Transactional
-    public PtAppointment updateByPt(UUID ptId, UUID appointmentId, AppointmentActionRequest request) {
+    public AppointmentResponse updateByPt(UUID ptId, UUID appointmentId, AppointmentActionRequest request) {
         PtAppointment appt = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", appointmentId));
         if (!appt.getPtId().equals(ptId)) {
-            throw new BadRequestException("Not your appointment");
+            throw new BadRequestException("Đây không phải lịch hẹn của bạn");
         }
 
+        BigDecimal refunded = BigDecimal.ZERO;
         if ("CONFIRM".equalsIgnoreCase(request.getAction())) {
+            if (appt.getStatus() != AppointmentStatus.PENDING) {
+                throw new BadRequestException("Chỉ xác nhận được lịch đang chờ");
+            }
             appt.setStatus(AppointmentStatus.CONFIRMED);
         } else if ("CANCEL".equalsIgnoreCase(request.getAction())) {
-            cancelLinkedSessionAndRefund(appt, "PT");
+            if (appt.getStatus() != AppointmentStatus.PENDING && appt.getStatus() != AppointmentStatus.CONFIRMED) {
+                throw new BadRequestException("Không thể hủy lịch hẹn ở trạng thái hiện tại");
+            }
+            if (appt.getStartTime() != null && !appt.getStartTime().isAfter(LocalDateTime.now())) {
+                throw new BadRequestException("Không thể hủy buổi đã bắt đầu hoặc đã qua giờ");
+            }
+            Optional<PtMappingSession> linked = resolveLinkedSession(appt);
+            if (linked.isPresent() && linked.get().getStatus() != MappingSessionStatus.SCHEDULED) {
+                throw new BadRequestException(
+                        "Buổi này không còn ở trạng thái chờ dạy — không thể hủy / hoàn tiền");
+            }
+            refunded = cancelLinkedSessionAndRefund(appt, "PT");
             appt.setStatus(AppointmentStatus.CANCELLED);
             appt.setCancelledBy("PT");
             appt.setCancelType(AppointmentCancelType.BY_PT);
         } else {
-            throw new BadRequestException("Invalid action");
+            throw new BadRequestException("Thao tác không hợp lệ");
         }
 
-        return appointmentRepository.save(appt);
+        PtAppointment saved = appointmentRepository.save(appt);
+        return AppointmentResponse.from(saved, refunded);
     }
 
     @Override
     @Transactional
-    public PtAppointment cancelByCustomer(UUID customerId, UUID appointmentId, CancelAppointmentRequest request) {
+    public AppointmentResponse cancelByCustomer(UUID customerId, UUID appointmentId, CancelAppointmentRequest request) {
         PtAppointment appt = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", appointmentId));
         if (!appt.getClientId().equals(customerId)) {
-            throw new BadRequestException("Not your appointment");
+            throw new BadRequestException("Đây không phải lịch hẹn của bạn");
         }
         if (appt.getStatus() != AppointmentStatus.PENDING && appt.getStatus() != AppointmentStatus.CONFIRMED) {
-            throw new BadRequestException("Appointment cannot be cancelled");
+            throw new BadRequestException("Không thể hủy lịch hẹn ở trạng thái hiện tại");
         }
-        if (appt.getStartTime().isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Cannot cancel past appointment");
+        if (appt.getStartTime() == null || !appt.getStartTime().isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("Không thể hủy buổi đã bắt đầu hoặc đã qua giờ");
+        }
+
+        Optional<PtMappingSession> linked = resolveLinkedSession(appt);
+        if (linked.isPresent() && linked.get().getStatus() != MappingSessionStatus.SCHEDULED) {
+            throw new BadRequestException(
+                    "Buổi này không còn ở trạng thái chờ dạy — không thể hủy / hoàn tiền");
         }
 
         long hoursUntil = Duration.between(LocalDateTime.now(), appt.getStartTime()).toHours();
+        boolean noFee = hoursUntil >= CUSTOMER_NO_FEE_CANCEL_HOURS;
         appt.setStatus(AppointmentStatus.CANCELLED);
         appt.setCancelledBy("CUSTOMER");
-        appt.setCancelType(hoursUntil >= CUSTOMER_NO_FEE_CANCEL_HOURS
-                ? AppointmentCancelType.NO_FEE
-                : AppointmentCancelType.LATE);
+        appt.setCancelType(noFee ? AppointmentCancelType.NO_FEE : AppointmentCancelType.LATE);
         if (request != null && request.getReason() != null) {
             appt.setCancelReason(request.getReason());
         }
 
-        // Refund unused paid session when cancelled before start (both NO_FEE and LATE forfeit→refund
-        // keeps escrow consistent: unused buổi chưa dạy returns to customer).
-        cancelLinkedSessionAndRefund(appt, "CUSTOMER");
-        return appointmentRepository.save(appt);
+        // ≥48h: hoàn ví HV. <48h (LATE): không hoàn — forfeit release cho PT (không tăng free capacity giả).
+        BigDecimal refunded = settleCancelledSession(
+                appt, "CUSTOMER", noFee ? CancelMoneyPolicy.REFUND_CUSTOMER : CancelMoneyPolicy.FORFEIT_TO_PT);
+        PtAppointment saved = appointmentRepository.save(appt);
+        return AppointmentResponse.from(saved, refunded);
     }
 
-    private void cancelLinkedSessionAndRefund(PtAppointment appt, String actor) {
+    private enum CancelMoneyPolicy {
+        REFUND_CUSTOMER,
+        FORFEIT_TO_PT
+    }
+
+    /** Hủy session SCHEDULED rồi hoàn ví HV hoặc forfeit cho PT. */
+    private BigDecimal settleCancelledSession(PtAppointment appt, String actor, CancelMoneyPolicy policy) {
         Optional<PtMappingSession> sessionOpt = resolveLinkedSession(appt);
         if (sessionOpt.isEmpty()) {
-            return;
+            return BigDecimal.ZERO;
         }
         PtMappingSession session = sessionOpt.get();
         if (session.getStatus() != MappingSessionStatus.SCHEDULED) {
-            return;
+            return BigDecimal.ZERO;
         }
         session.setStatus(MappingSessionStatus.CANCELLED);
         mappingSessionRepository.save(session);
 
         if (appt.getMappingId() == null) {
-            return;
+            return BigDecimal.ZERO;
         }
         PtClientMapping mapping = mappingRepository.findById(appt.getMappingId()).orElse(null);
         if (mapping == null || mapping.getSelectedTrainingMode() != TrainingMode.OFFLINE) {
-            return;
+            return BigDecimal.ZERO;
         }
         BigDecimal perSession = mapping.getPerSessionAmount();
         if (perSession == null || perSession.signum() <= 0) {
-            return;
+            return BigDecimal.ZERO;
         }
         BigDecimal remaining = walletService.getRemainingEscrow(mapping.getId());
         if (remaining.signum() <= 0) {
-            return;
+            return BigDecimal.ZERO;
         }
-        BigDecimal refund = perSession.min(remaining);
-        walletService.refundToCustomer(
+        BigDecimal amount = perSession.min(remaining);
+        if (policy == CancelMoneyPolicy.REFUND_CUSTOMER) {
+            walletService.refundToCustomer(
+                    mapping.getId(),
+                    amount,
+                    "MAPPING_SESSION",
+                    session.getId(),
+                    "Cancel unused offline session (" + actor + ")");
+            return amount;
+        }
+        // LATE forfeit — tiền về PT, không hoàn HV, không để free capacity ảo
+        walletService.releaseToPt(
                 mapping.getId(),
-                refund,
-                "MAPPING_SESSION",
+                amount,
+                "MAPPING_SESSION_LATE",
                 session.getId(),
-                "Cancel unused offline session (" + actor + ")");
+                "Late cancel — forfeit offline session to PT (" + actor + ")");
+        session.setReleasedAmount(amount);
+        mappingSessionRepository.save(session);
+        return BigDecimal.ZERO;
+    }
+
+    /** @deprecated use settleCancelledSession — giữ tên cũ cho PT cancel path */
+    private BigDecimal cancelLinkedSessionAndRefund(PtAppointment appt, String actor) {
+        return settleCancelledSession(appt, actor, CancelMoneyPolicy.REFUND_CUSTOMER);
     }
 
     private Optional<PtMappingSession> resolveLinkedSession(PtAppointment appt) {
@@ -173,5 +230,161 @@ public class AppointmentServiceImpl implements AppointmentService {
         }
         stale.forEach(a -> a.setStatus(AppointmentStatus.EXPIRED));
         appointmentRepository.saveAll(stale);
+    }
+
+    @Override
+    @Transactional
+    public AppointmentResponse rescheduleByPt(UUID ptId, UUID appointmentId, RescheduleAppointmentRequest request) {
+        if (request == null || request.getStartTime() == null) {
+            throw new BadRequestException("Vui lòng chọn thời gian bắt đầu buổi tập mới");
+        }
+        PtAppointment appt = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", appointmentId));
+        if (!appt.getPtId().equals(ptId)) {
+            throw new BadRequestException("Đây không phải lịch hẹn của bạn");
+        }
+        if (appt.getStatus() != AppointmentStatus.PENDING && appt.getStatus() != AppointmentStatus.CONFIRMED) {
+            throw new BadRequestException("Không thể đổi lịch buổi ở trạng thái hiện tại");
+        }
+        if (appt.getStartTime() != null && !appt.getStartTime().isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("Không thể đổi lịch buổi đã bắt đầu hoặc đã qua giờ");
+        }
+
+        PtMappingSession session = resolveLinkedSession(appt)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy buổi coaching gắn với lịch hẹn này"));
+        if (session.getStatus() != MappingSessionStatus.SCHEDULED) {
+            throw new BadRequestException("Chỉ đổi được buổi đang ở trạng thái chờ dạy");
+        }
+
+        PtClientMapping mapping = appt.getMappingId() != null
+                ? mappingRepository.findById(appt.getMappingId()).orElse(null) : null;
+        if (mapping == null || mapping.getSelectedTrainingMode() != TrainingMode.OFFLINE) {
+            throw new BadRequestException("Chỉ đổi lịch được với gói coaching offline");
+        }
+        if (!mapping.getPt().getId().equals(ptId)) {
+            throw new BadRequestException("Bạn không quản lý học viên của lịch này");
+        }
+
+        LocalDateTime start = request.getStartTime();
+        LocalDateTime end = request.getEndTime() != null
+                ? request.getEndTime()
+                : appointmentSlotHelper.computeSessionEnd(start, mapping.getAgreedRateUnit());
+        appointmentSlotHelper.validateSlot(start, end);
+        appointmentSlotHelper.assertNoOverlap(ptId, start, end, appt.getId());
+
+        PtProfile profile = ptProfileRepository.findByUserId(ptId)
+                .orElseThrow(() -> new BadRequestException("PT chưa có hồ sơ để kiểm tra khung giờ nhận học viên"));
+        appointmentSlotHelper.assertSlotWithinAvailability(profile.getId(), start, end);
+
+        session.setStartTime(start);
+        session.setEndTime(end);
+        mappingSessionRepository.save(session);
+
+        appt.setStartTime(start);
+        appt.setEndTime(end);
+        PtAppointment saved = appointmentRepository.save(appt);
+        return AppointmentResponse.from(saved);
+    }
+
+    @Override
+    @Transactional
+    public AppointmentResponse addSessionByPt(UUID ptId, UUID mappingId, AddMappingSessionRequest request) {
+        if (request == null || request.getStartTime() == null) {
+            throw new BadRequestException("Vui lòng chọn thời gian bắt đầu buổi tập");
+        }
+        PtClientMapping mapping = mappingRepository.findById(mappingId)
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", mappingId));
+        if (!mapping.getPt().getId().equals(ptId)) {
+            throw new BadRequestException("Bạn không quản lý học viên này");
+        }
+        if (mapping.getStatus() != ClientMappingStatus.ACTIVE) {
+            throw new BadRequestException("Chỉ thêm buổi khi quan hệ coaching đang ACTIVE");
+        }
+        if (mapping.getSelectedTrainingMode() != TrainingMode.OFFLINE) {
+            throw new BadRequestException("Chỉ thêm buổi cho gói coaching offline");
+        }
+        BigDecimal perSession = mapping.getPerSessionAmount();
+        if (perSession == null || perSession.signum() <= 0) {
+            throw new BadRequestException("Gói offline thiếu đơn giá mỗi buổi");
+        }
+
+        // Buổi còn giữ tiền escrow: chưa dạy / chờ HV xác nhận / đang tranh chấp
+        long committedSessions = mappingSessionRepository.findByMappingIdOrderBySequenceAsc(mappingId).stream()
+                .filter(s -> s.getStatus() == MappingSessionStatus.SCHEDULED
+                        || s.getStatus() == MappingSessionStatus.AWAITING_CONFIRM
+                        || s.getStatus() == MappingSessionStatus.DISPUTED)
+                .count();
+        BigDecimal remaining = walletService.getRemainingEscrow(mappingId);
+        BigDecimal committed = perSession.multiply(BigDecimal.valueOf(committedSessions));
+        BigDecimal free = remaining.subtract(committed);
+        if (free.compareTo(perSession) < 0) {
+            throw new BadRequestException(
+                    "Escrow không đủ cho buổi mới. Nhờ học viên mua thêm buổi (Extra sessions) rồi thử lại.");
+        }
+
+        LocalDateTime start = request.getStartTime();
+        LocalDateTime end = request.getEndTime() != null
+                ? request.getEndTime()
+                : appointmentSlotHelper.computeSessionEnd(start, mapping.getAgreedRateUnit());
+        appointmentSlotHelper.validateSlot(start, end);
+        if (!start.isAfter(LocalDateTime.now())) {
+            throw new BadRequestException("Buổi mới phải bắt đầu trong tương lai");
+        }
+        appointmentSlotHelper.assertNoOverlap(ptId, start, end, null);
+        PtProfile profile = ptProfileRepository.findByUserId(ptId)
+                .orElseThrow(() -> new BadRequestException("PT chưa có hồ sơ để kiểm tra khung giờ nhận học viên"));
+        appointmentSlotHelper.assertSlotWithinAvailability(profile.getId(), start, end);
+
+        int nextSeq = mappingSessionRepository.findByMappingIdOrderBySequenceAsc(mappingId).stream()
+                .mapToInt(s -> s.getSequence() != null ? s.getSequence() : 0)
+                .max()
+                .orElse(0) + 1;
+
+        PtMappingSession session = mappingSessionRepository.save(PtMappingSession.builder()
+                .mappingId(mappingId)
+                .sequence(nextSeq)
+                .startTime(start)
+                .endTime(end)
+                .venueName(mapping.getVenueName())
+                .venueAddress(mapping.getVenueAddress())
+                .venueMapsUrl(mapping.getVenueMapsUrl())
+                .status(MappingSessionStatus.SCHEDULED)
+                .build());
+
+        int newCount = (int) mappingSessionRepository.findByMappingIdOrderBySequenceAsc(mappingId).stream()
+                .filter(s -> s.getStatus() != MappingSessionStatus.CANCELLED)
+                .count();
+        mapping.setSessionCount(newCount);
+        mappingRepository.save(mapping);
+
+        offlinePackageAppointmentService.materializeOfflinePackageIfNeeded(mapping);
+
+        PtAppointment appt = appointmentRepository.findByMappingId(mappingId).stream()
+                .filter(a -> a.getStatus() != AppointmentStatus.CANCELLED
+                        && a.getStatus() != AppointmentStatus.EXPIRED)
+                .filter(a -> session.getId().equals(a.getMappingSessionId())
+                        || (a.getStartTime() != null && a.getStartTime().equals(start)))
+                .findFirst()
+                .orElse(null);
+        if (appt == null) {
+            appt = appointmentRepository.save(PtAppointment.builder()
+                    .clientId(mapping.getClient().getId())
+                    .ptId(ptId)
+                    .mappingId(mappingId)
+                    .mappingSessionId(session.getId())
+                    .startTime(start)
+                    .endTime(end)
+                    .type("OFFLINE")
+                    .note(request.getNote() != null ? request.getNote() : "Buổi offline thêm bởi PT")
+                    .status(AppointmentStatus.CONFIRMED)
+                    .venueName(mapping.getVenueName())
+                    .venueAddress(mapping.getVenueAddress())
+                    .venueMapsUrl(mapping.getVenueMapsUrl())
+                    .build());
+        } else if (appt.getMappingSessionId() == null) {
+            appt.setMappingSessionId(session.getId());
+            appt = appointmentRepository.save(appt);
+        }
+        return AppointmentResponse.from(appt);
     }
 }

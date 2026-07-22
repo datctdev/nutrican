@@ -124,7 +124,14 @@ const handleWebSocketMessage = (message) => {
         }
 
         case 'PT_CLIENT_ALERT': {
-            const message = data?.reason || `Client ${data?.clientName || ''} cần chú ý (${data?.intakeStatus || 'AT_RISK'})`;
+            const statusVi = {
+                OK: 'đúng mục tiêu',
+                OVER_MACRO: 'vượt calo/macro',
+                UNDER_INTAKE: 'ăn thiếu calo',
+                AT_RISK: 'cần chú ý',
+            };
+            const intakeLabel = statusVi[data?.intakeStatus] || 'cần chú ý';
+            const message = data?.reason || `Học viên ${data?.clientName || ''} ${intakeLabel}`;
             addNotification({
                 id: `alert-${data?.clientId || Date.now()}`,
                 type: 'warning',

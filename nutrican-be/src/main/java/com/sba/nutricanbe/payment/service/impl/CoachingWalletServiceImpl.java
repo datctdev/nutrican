@@ -197,6 +197,12 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         Wallet customerWallet = getOrCreateUserWalletForUpdate(mapping.getClient());
         Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
 
+        String holdDedupe = "COACHING_ESCROW_TOPUP:" + payment.getId();
+        if (transactionRepository.existsByDedupeKey(holdDedupe)) {
+            // Đã top-up payment này — không cộng lại amount/remaining (tránh inflate escrow)
+            return;
+        }
+
         if (creditFromVnPay) {
             String paymentDedupe = "COACHING_PAYMENT:" + payment.getId();
             if (!transactionRepository.existsByDedupeKey(paymentDedupe)) {
@@ -216,28 +222,25 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
             }
         }
 
-        String holdDedupe = "COACHING_ESCROW_TOPUP:" + payment.getId();
-        if (!transactionRepository.existsByDedupeKey(holdDedupe)) {
-            try {
-                customerWallet.subtractAvailable(amount);
-            } catch (IllegalStateException exception) {
-                throw new BadRequestException(creditFromVnPay
-                        ? exception.getMessage()
-                        : "Số dư ví không đủ để thanh toán buổi thêm");
-            }
-            escrowWallet.addLocked(amount);
-            transactionRepository.save(WalletTransaction.builder()
-                    .fromWallet(customerWallet)
-                    .toWallet(escrowWallet)
-                    .amount(amount)
-                    .type(WalletTransactionType.HOLD)
-                    .status(WalletTransactionStatus.SUCCESS)
-                    .dedupeKey(holdDedupe)
-                    .referenceType("COACHING_PAYMENT")
-                    .referenceId(payment.getId())
-                    .note("Top-up escrow for extra offline sessions")
-                    .build());
+        try {
+            customerWallet.subtractAvailable(amount);
+        } catch (IllegalStateException exception) {
+            throw new BadRequestException(creditFromVnPay
+                    ? exception.getMessage()
+                    : "Số dư ví không đủ để thanh toán buổi thêm");
         }
+        escrowWallet.addLocked(amount);
+        transactionRepository.save(WalletTransaction.builder()
+                .fromWallet(customerWallet)
+                .toWallet(escrowWallet)
+                .amount(amount)
+                .type(WalletTransactionType.HOLD)
+                .status(WalletTransactionStatus.SUCCESS)
+                .dedupeKey(holdDedupe)
+                .referenceType("COACHING_PAYMENT")
+                .referenceId(payment.getId())
+                .note("Top-up escrow for extra offline sessions")
+                .build());
 
         escrow.setAmount(nullToZero(escrow.getAmount()).add(amount));
         escrow.setRemainingAmount(escrow.effectiveRemaining().add(amount));

@@ -525,6 +525,7 @@ export default function DietTrackerPage() {
                 llavaFoodName: analyzed?.llavaFoodName,
                 macroSource: analyzed?.macroSource,
                 estimatedTotalGrams: analyzed?.estimatedTotalGrams,
+                sendToPt: Boolean(hasActivePt),
             });
 
             setSelectedFile(null);
@@ -581,13 +582,14 @@ export default function DietTrackerPage() {
             llavaFoodName: raw.llavaFoodName,
             macroSource: raw.macroSource,
             estimatedTotalGrams: raw.estimatedTotalGrams,
+            sendToPt: Boolean(hasActivePt),
         });
     };
 
     const createAndSendMeal = async (payload) => {
         const createResponse = await dietService.createLog({
             ...payload,
-            sendToPt: false,
+            sendToPt: payload.sendToPt ?? Boolean(hasActivePt),
         });
         const logId = createResponse.data?.data?.id;
         if (!logId) throw new Error('Không nhận được mã bữa ăn sau khi tạo');
@@ -626,6 +628,7 @@ export default function DietTrackerPage() {
                 makeupForPeriod: makeupForPeriod || undefined,
                 mealSource: 'HOME_COOKED',
                 logDate: selectedDate,
+                sendToPt: Boolean(hasActivePt),
                 items: ingredientItems.map((it) => (
                     it.isCustom || !it.foodItemId
                         ? {
@@ -639,7 +642,7 @@ export default function DietTrackerPage() {
                         : { foodItemId: it.foodItemId, quantityG: it.quantityG }
                 )),
             });
-            toast.success('Đã lưu bữa ăn!');
+            toast.success(hasActivePt ? 'Đã ghi nhật ký và gửi PT duyệt!' : 'Đã lưu bữa ăn!');
             setIngredientItems([]);
             setMakeupForPeriod(null);
             clearMealImages();
@@ -707,19 +710,23 @@ export default function DietTrackerPage() {
                     protein: preview?.protein ?? dish?.protein ?? confirmModal.protein,
                     carb: preview?.carb ?? dish?.carb ?? confirmModal.carb,
                     fat: preview?.fat ?? dish?.fat ?? confirmModal.fat,
-                    sendToPt: false,
+                    sendToPt: confirmModal.sendToPt !== false && hasActivePt,
                 });
             } else {
                 res = await dietService.confirmRecognition(confirmModal.logId, {
                     foodCode: selected.type === 'code' ? selected.value : undefined,
                     foodItemId: selected.type === 'id' ? selected.value : undefined,
                     portionGrams: confirmModal.adjustedGrams,
-                    sendToPt: false,
+                    sendToPt: confirmModal.sendToPt !== false && hasActivePt,
                 });
             }
 
             const data = res.data?.data;
-            toast.success('Đã lưu bữa ăn!');
+            toast.success(
+                confirmModal.sendToPt !== false && hasActivePt
+                    ? 'Đã ghi nhật ký và gửi PT duyệt!'
+                    : 'Đã lưu bữa ăn!'
+            );
             if (data?.dietPrefWarning) {
                 toast.warning(data.dietPrefWarning);
                 setConfirmModal((prev) => prev ? { ...prev, dietPrefWarning: data.dietPrefWarning } : prev);
@@ -936,6 +943,7 @@ export default function DietTrackerPage() {
                 handleConfirmRecognition={handleConfirmRecognition}
                 setConfirmModal={setConfirmModal}
                 onSwitchToManual={handleSwitchConfirmToManual}
+                hasActivePt={hasActivePt}
             />
 
             <PostMealRatingSheet

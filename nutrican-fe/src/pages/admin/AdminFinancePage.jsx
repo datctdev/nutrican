@@ -26,6 +26,7 @@ const TABS = [
   { id: 'overview', label: 'Tổng quan & sổ cái' },
   { id: 'refunds', label: 'Hoàn tiền' },
   { id: 'disputes', label: 'Tranh chấp buổi' },
+  { id: 'pt-reports', label: 'Báo cáo PT' },
 ];
 
 export default function AdminFinancePage() {
@@ -34,10 +35,12 @@ export default function AdminFinancePage() {
   const [transactions, setTransactions] = useState([]);
   const [refunds, setRefunds] = useState([]);
   const [disputes, setDisputes] = useState([]);
+  const [ptReports, setPtReports] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(null);
   const [splitForm, setSplitForm] = useState({});
+  const [reportNotes, setReportNotes] = useState({});
 
   useWebSocket();
 
@@ -60,12 +63,18 @@ export default function AdminFinancePage() {
     setDisputes(res.data?.data || []);
   };
 
+  const loadPtReports = async () => {
+    const res = await adminService.getPtReports({ status: 'PENDING' });
+    setPtReports(res.data?.data || []);
+  };
+
   const load = async () => {
     setLoading(true);
     try {
       if (tab === 'overview') await loadOverview();
       else if (tab === 'refunds') await loadRefunds();
-      else await loadDisputes();
+      else if (tab === 'disputes') await loadDisputes();
+      else await loadPtReports();
     } catch {
       toast.error('Không tải được dữ liệu dòng tiền');
     } finally {
@@ -79,6 +88,7 @@ export default function AdminFinancePage() {
     const refresh = () => {
       if (tab === 'refunds') loadRefunds().catch(() => {});
       if (tab === 'disputes') loadDisputes().catch(() => {});
+      if (tab === 'pt-reports') loadPtReports().catch(() => {});
       if (tab === 'overview') loadOverview().catch(() => {});
     };
     window.addEventListener('refund_update', refresh);
@@ -117,6 +127,22 @@ export default function AdminFinancePage() {
       await adminService.resolveSessionDispute(id, body);
       toast.success('Đã xử lý tranh chấp');
       await loadDisputes();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Thao tác thất bại');
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const resolvePtReport = async (id, status) => {
+    setActing(id + status);
+    try {
+      await adminService.resolvePtReport(id, {
+        status,
+        adminNote: reportNotes[id] || (status === 'REVIEWED' ? 'Đã tiếp nhận' : 'Đóng báo cáo'),
+      });
+      toast.success(status === 'REVIEWED' ? 'Đã tiếp nhận báo cáo' : 'Đã đóng báo cáo');
+      await loadPtReports();
     } catch (e) {
       toast.error(e.response?.data?.message || 'Thao tác thất bại');
     } finally {
@@ -245,7 +271,7 @@ export default function AdminFinancePage() {
             ))}
           </div>
         )
-      ) : (
+      ) : tab === 'disputes' ? (
         disputes.length === 0 ? (
           <Card><CardContent className="p-8 text-center text-slate-400">Không có tranh chấp chờ xử lý</CardContent></Card>
         ) : (
@@ -295,6 +321,45 @@ export default function AdminFinancePage() {
                         Chia
                       </Button>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )
+      ) : (
+        ptReports.length === 0 ? (
+          <Card><CardContent className="p-8 text-center text-slate-400">Không có báo cáo PT chờ xử lý</CardContent></Card>
+        ) : (
+          <div className="space-y-4">
+            {ptReports.map((r) => (
+              <Card key={r.id}>
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase text-rose-700">Báo cáo PT</p>
+                      <p className="font-semibold text-slate-900 mt-1">
+                        {r.customerName || 'HV'} → {r.ptName || 'PT'}
+                      </p>
+                      <p className="text-sm text-slate-700 mt-2 whitespace-pre-wrap">{r.reason}</p>
+                    </div>
+                    <p className="text-xs text-slate-400 whitespace-nowrap">
+                      {r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : ''}
+                    </p>
+                  </div>
+                  <input
+                    placeholder="Ghi chú admin (tuỳ chọn)"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    value={reportNotes[r.id] || ''}
+                    onChange={(e) => setReportNotes((s) => ({ ...s, [r.id]: e.target.value }))}
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" className="bg-emerald-600 text-white" disabled={!!acting} onClick={() => resolvePtReport(r.id, 'REVIEWED')}>
+                      Tiếp nhận
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={!!acting} onClick={() => resolvePtReport(r.id, 'DISMISSED')}>
+                      Đóng
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

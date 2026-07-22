@@ -48,13 +48,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Invalid email or password"));
+                .body(ApiResponse.error("Email hoặc mật khẩu không đúng"));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbidden(ForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ex.getMessage()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("Access denied"));
+                .body(ApiResponse.error("Bạn không có quyền thực hiện thao tác này"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -65,34 +71,35 @@ public class GlobalExceptionHandler {
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
+        String first = errors.values().stream().findFirst().orElse("Dữ liệu không hợp lệ");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.<Map<String, String>>builder()
                         .success(false)
                         .data(errors)
-                        .message("Validation failed")
+                        .message(first)
                         .build());
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingPart(MissingServletRequestPartException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Missing file upload. Use multipart/form-data with field 'file', 'image', or 'files'."));
+                .body(ApiResponse.error("Thiếu tệp tải lên. Vui lòng chọn ảnh hoặc tệp rồi thử lại."));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("File too large. Maximum upload size is 5MB per file."));
+                .body(ApiResponse.error("Tệp quá lớn. Mỗi tệp tối đa 5MB."));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException ex) {
         String detail = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
-        String message = "Invalid request body";
+        String message = "Dữ liệu gửi lên không đúng định dạng";
         if (detail != null && detail.contains("ActivityLevel")) {
-            message = "Invalid activityLevel — use SEDENTARY|LIGHT|MODERATE|ACTIVE|VERY_ACTIVE";
+            message = "Mức vận động không hợp lệ. Chọn một trong: Ít vận động, Nhẹ, Trung bình, Năng động, Rất năng động.";
         } else if (detail != null && detail.toLowerCase().contains("enum")) {
-            message = "Invalid enum value in request body";
+            message = "Giá trị lựa chọn không hợp lệ. Vui lòng kiểm tra lại các trường trong biểu mẫu.";
         }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(message));
     }
@@ -110,6 +117,6 @@ public class GlobalExceptionHandler {
         log.error("[ERR-{}] Unhandled exception: {}", correlationId, ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(
-                        "An unexpected error occurred. Reference ID: " + correlationId));
+                        "Đã xảy ra lỗi hệ thống. Mã tham chiếu: " + correlationId + ". Vui lòng thử lại sau."));
     }
 }

@@ -31,4 +31,8 @@ public interface PtAppointmentRepository extends JpaRepository<PtAppointment, UU
     boolean existsByMappingIdAndStartTime(UUID mappingId, java.time.LocalDateTime startTime);
 
     long countByMappingId(UUID mappingId);
+
+    List<PtAppointment> findByMappingId(UUID mappingId);
+
+    void deleteByMappingId(UUID mappingId);
 }

@@ -11,7 +11,6 @@ import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlan
 import MealPlanWeekPicker from '../customer/components/MealPlanWeekPicker';
 import { toast } from 'sonner';
 import { ArrowLeft, TrendingUp, Utensils, Camera, Loader2 } from 'lucide-react';
-import { MEAL_PERIOD_LABELS } from '../customer/components/dietUtils';
 import { validateInbodyFile } from '../../utils/inbodyUpload';
 
 function AdherenceDonut({ percent }) {
@@ -76,50 +75,6 @@ function PostMealLineChart({ aggregate }) {
         <circle key={d.weekStart} cx={toX(i)} cy={toY(Number(d.avgEnergy) || 0)} r="3" fill="#10b981" />
       ))}
     </svg>
-  );
-}
-
-function WeeklySummaryForm({ clientId, adherence }) {
-  const [text, setText] = useState('');
-  const [nextNote, setNextNote] = useState('');
-  const [saving, setSaving] = useState(false);
-  const weekStart = new Date();
-  const day = weekStart.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  weekStart.setDate(weekStart.getDate() + diff);
-  const weekStartStr = weekStart.toISOString().slice(0, 10);
-
-  const submit = async () => {
-    setSaving(true);
-    try {
-      await workspaceService.createWeeklySummary({
-        clientId,
-        weekStartDate: weekStartStr,
-        summaryText: text,
-        adherenceRate: adherence != null ? Number(adherence) : undefined,
-        nextPlanNote: nextNote,
-      });
-      toast.success('Đã gửi tổng kết tuần');
-      setText('');
-      setNextNote('');
-    } catch {
-      toast.error('Không gửi được tổng kết');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Card>
-      <CardContent className="p-5 space-y-3">
-        <p className="text-sm font-bold text-slate-600">Tổng kết tuần cho học viên</p>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="Nhận xét tuần này..."
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-        <textarea value={nextNote} onChange={(e) => setNextNote(e.target.value)} rows={2} placeholder="Ghi chú thực đơn tuần tới..."
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-        <Button onClick={submit} disabled={saving || !text.trim()}>Gửi tổng kết</Button>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -319,13 +274,22 @@ export default function ClientProgressPage() {
 
   const handleUpdateMacros = async (e) => {
     e.preventDefault();
+    const calories = Number(macroForm.dailyCalories);
+    const protein = Number(macroForm.protein);
+    const carb = Number(macroForm.carb);
+    const fat = Number(macroForm.fat);
+    const fromMacros = protein * 4 + carb * 4 + fat * 9;
+    if (Math.abs(fromMacros - calories) > 50) {
+      toast.error('protein×4 + carb×4 + fat×9 phải lệch target tối đa ±50 kcal');
+      return;
+    }
     setSavingMacros(true);
     try {
       const payload = {
-        dailyCalories: Number(macroForm.dailyCalories),
-        protein: Number(macroForm.protein),
-        carb: Number(macroForm.carb),
-        fat: Number(macroForm.fat),
+        dailyCalories: calories,
+        protein,
+        carb,
+        fat,
         nutritionGoal: macroForm.nutritionGoal
       };
       await workspaceService.setClientMacroTarget(clientId, payload);
@@ -342,6 +306,19 @@ export default function ClientProgressPage() {
 
   const summary = data?.macroSummary;
   const weights = data?.bodyMetrics || [];
+  const calorieHistory = data?.calorieHistory || [];
+  const rolling7 = calorieHistory.slice(-7);
+  const rollingAvg = rolling7.length
+    ? Math.round(rolling7.reduce((s, d) => s + (Number(d.calories) || 0), 0) / rolling7.length)
+    : null;
+  const todayCal = rolling7.length ? Number(rolling7[rolling7.length - 1]?.calories) : null;
+  const calorieTarget = Number(rolling7[rolling7.length - 1]?.target)
+    || Number(profile?.tdee)
+    || Number(macroForm.dailyCalories)
+    || null;
+  const macroKcal = Number(macroForm.protein || 0) * 4 + Number(macroForm.carb || 0) * 4 + Number(macroForm.fat || 0) * 9;
+  const macroDiff = Math.abs(macroKcal - Number(macroForm.dailyCalories || 0));
+  const macroOk = !macroForm.dailyCalories || macroDiff <= 50;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
@@ -378,16 +355,14 @@ export default function ClientProgressPage() {
         <>
           <div className="grid md:grid-cols-4 gap-4">
             <Card><CardContent className="p-5">
-              <p className="text-sm text-slate-500">Calories TB/ngày trong tuần</p>
-              <p className="text-2xl font-bold">{summary?.avgCalories ?? '—'}</p>
-              <p className="mt-1 text-xs text-slate-400">Tổng các bữa theo ngày rồi lấy trung bình</p>
+              <p className="text-sm text-slate-500">Calo hôm nay</p>
+              <p className="text-2xl font-bold">{todayCal != null ? Math.round(todayCal) : '—'}</p>
+              <p className="mt-1 text-xs text-slate-400">Target: {calorieTarget != null ? `${Math.round(calorieTarget)} kcal/ngày` : '—'}</p>
             </CardContent></Card>
             <Card><CardContent className="p-5">
-              <p className="text-sm text-slate-500">Protein TB/ngày trong tuần</p>
-              <p className="text-2xl font-bold">
-                {summary?.avgProtein != null ? `${summary.avgProtein}g` : '—'}
-              </p>
-              <p className="mt-1 text-xs text-slate-400">Chỉ lấy nhật ký đã ghi nhận</p>
+              <p className="text-sm text-slate-500">TB calo 7 ngày gần nhất</p>
+              <p className="text-2xl font-bold">{rollingAvg ?? summary?.avgCalories ?? '—'}</p>
+              <p className="mt-1 text-xs text-slate-400">Rolling today−6 → today (không phải tuần coaching)</p>
             </CardContent></Card>
             <Card><CardContent className="flex flex-col items-center p-5">
               <AdherenceDonut percent={data?.mealPlanAdherence?.adherenceRate} />
@@ -787,13 +762,9 @@ export default function ClientProgressPage() {
                     </div>
 
                     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between text-xs font-bold">
-                      <span className="text-slate-500">Tổng Calo quy đổi từ Macro:</span>
-                      <span className={`text-sm ${
-                        Math.abs((Number(macroForm.protein || 0) * 4 + Number(macroForm.carb || 0) * 4 + Number(macroForm.fat || 0) * 9) - Number(macroForm.dailyCalories || 0)) > 20
-                          ? 'text-amber-600'
-                          : 'text-emerald-600'
-                      }`}>
-                        {Number(macroForm.protein || 0) * 4 + Number(macroForm.carb || 0) * 4 + Number(macroForm.fat || 0) * 9} kcal / {macroForm.dailyCalories || 0} kcal
+                      <span className="text-slate-500">Tổng Calo quy đổi từ Macro (±50 kcal):</span>
+                      <span className={`text-sm ${!macroOk ? 'text-amber-600' : 'text-emerald-600'}`}>
+                        {macroKcal} kcal / {macroForm.dailyCalories || 0} kcal
                       </span>
                     </div>
 
@@ -805,7 +776,7 @@ export default function ClientProgressPage() {
                         carb: profile.carb || '',
                         fat: profile.fat || '',
                       }); }}>Hủy</Button>
-                      <Button type="submit" disabled={savingMacros} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl px-5">
+                      <Button type="submit" disabled={savingMacros || !macroOk} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl px-5">
                         {savingMacros ? 'Đang lưu...' : 'Lưu chốt mục tiêu'}
                       </Button>
                     </div>
@@ -928,27 +899,6 @@ export default function ClientProgressPage() {
             </Card>
           )}
 
-          {data?.lateTickReasons?.length > 0 && (
-            <Card>
-              <CardContent className="p-5 space-y-2">
-                <p className="text-sm font-bold text-slate-600">Tick trễ trong tuần</p>
-                {data.lateTickReasons.map((t) => (
-                  <div key={`${t.itemId}-${t.planDate}-${t.mealPeriod}`} className="text-sm p-2 rounded-lg bg-orange-50 border border-orange-100">
-                    <strong>{t.foodLabel}</strong>
-                    {' · '}
-                    {t.planDate}
-                    {t.mealPeriod && MEAL_PERIOD_LABELS[t.mealPeriod] ? ` · ${MEAL_PERIOD_LABELS[t.mealPeriod]}` : ''}
-                    {' — '}
-                    {t.lateTickReason}
-                    {t.source && (
-                      <span className="text-slate-500 text-xs block mt-0.5">Nguồn: {t.source}</span>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
           {data?.skipReasons?.length > 0 && (
             <Card>
               <CardContent className="p-5 space-y-2">
@@ -975,8 +925,6 @@ export default function ClientProgressPage() {
               </CardContent>
             </Card>
           )}
-
-          <WeeklySummaryForm clientId={clientId} adherence={summary?.mealPlanAdherenceRate} />
         </>
       )}
     </div>

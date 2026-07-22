@@ -26,6 +26,7 @@ export const profileExtensionsService = {
   getMySessions: () => api.get('/profile/sessions'),
   confirmSession: (sessionId) => api.post(`/profile/sessions/${sessionId}/confirm`),
   disputeSession: (sessionId, data) => api.post(`/profile/sessions/${sessionId}/dispute`, data),
+  reportPt: (mappingId, data) => api.post(`/profile/mappings/${mappingId}/report-pt`, data),
   setMaxClients: (maxClients) => api.put('/profile/pt/max-clients', { maxClients }),
 };
 

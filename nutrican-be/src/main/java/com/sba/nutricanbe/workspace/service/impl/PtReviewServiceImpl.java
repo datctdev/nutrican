@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
+import com.sba.nutricanbe.common.util.CoachingWeeks;
 import com.sba.nutricanbe.common.util.DayPlanRules;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.diet.dto.request.SelfPlanSubmissionReviewRequest;
@@ -30,6 +31,7 @@ import com.sba.nutricanbe.diet.repository.SelfPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.SelfPlanSubmissionRepository;
 import com.sba.nutricanbe.diet.repository.WeeklySummaryRepository;
 import com.sba.nutricanbe.user.dto.NotificationPayload;
+import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.NotificationLinkType;
 import com.sba.nutricanbe.user.service.NotificationService;
 import com.sba.nutricanbe.workspace.dto.MealPlanSuggestionDto;
@@ -47,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -159,17 +162,44 @@ public class PtReviewServiceImpl implements PtReviewService {
     @Transactional
     public ApiResponse<WeeklySummaryDto> createWeeklySummary(UUID ptId, WeeklySummaryRequest request) {
         if (request.getClientId() == null || request.getWeekStartDate() == null) {
-            throw new BadRequestException("clientId and weekStartDate required");
+            throw new BadRequestException("Thiếu học viên hoặc ngày bắt đầu tuần coaching");
         }
-        accessGuard.assertActiveMapping(ptId, request.getClientId());
-        WeeklySummary summary = WeeklySummary.builder()
-                .ptId(ptId)
-                .clientId(request.getClientId())
-                .weekStartDate(request.getWeekStartDate())
-                .summaryText(request.getSummaryText())
-                .adherenceRate(request.getAdherenceRate())
-                .nextPlanNote(request.getNextPlanNote())
-                .build();
+        PtClientMapping mapping = accessGuard.requireActiveMapping(ptId, request.getClientId());
+        LocalDate todayVn = DietDates.todayVn();
+        CoachingWeeks.Window current = CoachingWeeks.from(mapping.getCoachingStartedAt(), todayVn);
+        if (!current.available()) {
+            throw new BadRequestException("Chưa bắt đầu coaching — không thể tạo tổng kết tuần");
+        }
+        LocalDate weekStart = request.getWeekStartDate();
+        LocalDate weekEnd = weekStart.plusDays(6);
+        if (!CoachingWeeks.canSubmitSummary(mapping.getCoachingStartedAt(), weekStart, todayVn)) {
+            LocalDate coachingStart = mapping.getCoachingStartedAt().toLocalDate();
+            long offsetDays = ChronoUnit.DAYS.between(coachingStart, weekStart);
+            if (weekStart.isBefore(coachingStart) || offsetDays % 7 != 0) {
+                throw new BadRequestException(
+                        "Ngày bắt đầu tuần phải trùng biên tuần coaching (tính từ ngày bắt đầu tập với PT, mỗi 7 ngày)");
+            }
+            throw new BadRequestException(
+                    "Tuần coaching chưa kết thúc. Ngày cuối tuần là "
+                            + weekEnd.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                            + " — chỉ gửi từ ngày hôm sau.");
+        }
+
+        WeeklySummary summary = weeklySummaryRepository
+                .findByPtIdAndClientIdAndWeekStartDate(ptId, request.getClientId(), weekStart)
+                .orElseGet(() -> WeeklySummary.builder()
+                        .ptId(ptId)
+                        .clientId(request.getClientId())
+                        .mappingId(mapping.getId())
+                        .weekStartDate(weekStart)
+                        .build());
+        summary.setSummaryText(request.getSummaryText());
+        summary.setAdherenceRate(request.getAdherenceRate());
+        summary.setNextPlanNote(request.getNextPlanNote());
+        if (summary.getMappingId() == null) {
+            summary.setMappingId(mapping.getId());
+        }
+
         WeeklySummary saved = weeklySummaryRepository.save(summary);
         WeeklySummaryDto dto = WeeklySummaryDto.builder()
                 .id(saved.getId())

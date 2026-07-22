@@ -375,7 +375,9 @@ public class MealAnalysisServiceImpl implements MealAnalysisService {
         aiRaw.put("fat", macros.fat());
         aiRaw.put("needsConfirmation", false);
         dietLog.setStatus(DietLogStatus.LOGGED);
-        boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
+        // Có PT ACTIVE: luôn PENDING (không tin FE bỏ tick)
+        boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt())
+                || dietLogHelper.hasActivePt(customerId);
         var reviewStatus = dietLogHelper.resolveReviewStatus(customerId, sendToPt);
         dietLog.setReviewStatus(reviewStatus);
         dietLog.setAiRawJson(aiRaw);

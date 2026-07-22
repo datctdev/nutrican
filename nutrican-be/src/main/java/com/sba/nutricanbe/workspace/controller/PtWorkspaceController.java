@@ -149,6 +149,14 @@ public class PtWorkspaceController {
         return ResponseEntity.ok(ptClientService.setClientMacroTarget(user.getId(), clientId, request));
     }
 
+    @PutMapping("/clients/{clientId}/coaching-evaluation")
+    public ResponseEntity<ApiResponse<ClientStatusDto>> setCoachingEvaluation(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestBody CoachingEvaluationRequest request) {
+        return ResponseEntity.ok(ptClientService.setCoachingEvaluation(user.getId(), clientId, request));
+    }
+
     @PutMapping("/meal-plan-suggestions/{id}")
     public ResponseEntity<ApiResponse<MealPlanSuggestionDto>> reviewMealPlanSuggestion(
             @PathVariable UUID id,

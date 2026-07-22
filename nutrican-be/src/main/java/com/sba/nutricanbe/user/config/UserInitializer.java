@@ -294,12 +294,20 @@ public class UserInitializer implements CommandLineRunner {
                 .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(pt.getId(), customer.getId())
                 .ifPresentOrElse(mapping -> {
                     mapping.setStatus(status);
+                    if (status == ClientMappingStatus.ACTIVE && mapping.getCoachingStartedAt() == null) {
+                        mapping.setCoachingStartedAt(java.time.LocalDateTime.now().minusDays(14));
+                    }
                     ptClientMappingRepository.save(mapping);
-                }, () -> ptClientMappingRepository.save(PtClientMapping.builder()
-                        .pt(pt)
-                        .client(customer)
-                        .status(status)
-                        .build()));
+                }, () -> {
+                    var builder = PtClientMapping.builder()
+                            .pt(pt)
+                            .client(customer)
+                            .status(status);
+                    if (status == ClientMappingStatus.ACTIVE) {
+                        builder.coachingStartedAt(java.time.LocalDateTime.now().minusDays(14));
+                    }
+                    ptClientMappingRepository.save(builder.build());
+                });
     }
 
     private void seedPtReviewsOnce(User pt, User reviewer, String comment) {

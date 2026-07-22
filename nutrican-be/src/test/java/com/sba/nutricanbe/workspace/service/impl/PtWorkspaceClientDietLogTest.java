@@ -1,6 +1,6 @@
 package com.sba.nutricanbe.workspace.service.impl;
 
-import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.common.exception.ForbiddenException;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
@@ -59,7 +59,7 @@ class PtWorkspaceClientDietLogTest {
         when(mappingRepository.existsByPt_IdAndClient_IdAndStatus(
                 ptId, clientId, ClientMappingStatus.ACTIVE)).thenReturn(false);
 
-        assertThrows(BadRequestException.class, () -> ptWorkspaceService.getClientDietLogs(
+        assertThrows(ForbiddenException.class, () -> ptWorkspaceService.getClientDietLogs(
                 ptId, clientId, 0, 20, DietLogReviewStatus.APPROVED));
 
         verify(dietLogRepository, never()).findByCustomerIdInAndReviewStatus(

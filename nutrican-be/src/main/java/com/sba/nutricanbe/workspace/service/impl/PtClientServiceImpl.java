@@ -16,6 +16,8 @@ import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.enums.CoachingEvaluation;
+import com.sba.nutricanbe.user.enums.CoachingHealthStatus;
 import com.sba.nutricanbe.user.enums.DietPreference;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
@@ -23,6 +25,7 @@ import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.UserProfileService;
 import com.sba.nutricanbe.workspace.dto.ClientStatusDto;
+import com.sba.nutricanbe.workspace.dto.CoachingEvaluationRequest;
 import com.sba.nutricanbe.workspace.dto.CreateClientRequest;
 import com.sba.nutricanbe.workspace.dto.PtClientProfileDto;
 import com.sba.nutricanbe.workspace.service.PtClientService;
@@ -37,7 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,7 +91,7 @@ public class PtClientServiceImpl implements PtClientService {
     @Transactional
     public ApiResponse<Void> assignClient(UUID ptId, UUID clientId) {
         if (mappingRepository.existsByPt_IdAndClient_Id(ptId, clientId)) {
-            throw new BadRequestException("Client already assigned to this PT");
+            throw new BadRequestException("Học viên này đã được gán với bạn rồi");
         }
 
         User pt = userRepository.findById(ptId)
@@ -163,13 +165,12 @@ public class PtClientServiceImpl implements PtClientService {
 
         userRepository.save(client);
 
-        LocalDate today = LocalDate.now();
         if (request.getWeight() != null) {
             BodyMetric metric = bodyMetricRepository
-                    .findByUser_IdAndRecordDate(client.getId(), today)
+                    .findByUser_IdAndRecordDate(client.getId(), DietDates.todayVn())
                     .orElseGet(() -> BodyMetric.builder()
                             .user(client)
-                            .recordDate(today)
+                            .recordDate(DietDates.todayVn())
                             .build());
             metric.setWeight(request.getWeight());
             if (request.getBodyFatPercent() != null) {
@@ -245,6 +246,32 @@ public class PtClientServiceImpl implements PtClientService {
         return userProfileService.setMacroTarget(clientId, request);
     }
 
+    @Override
+    @Transactional
+    public ApiResponse<ClientStatusDto> setCoachingEvaluation(
+            UUID ptId, UUID clientId, CoachingEvaluationRequest request) {
+        PtClientMapping mapping = accessGuard.requireActiveMapping(ptId, clientId);
+
+        CoachingHealthStatus status = parseHealthStatus(request.getStatus());
+        CoachingEvaluation evaluation = parseEvaluation(request.getEvaluation());
+        String note = request.getNote() != null ? request.getNote().trim() : null;
+        if (note != null && note.length() > 500) {
+            throw new BadRequestException("Ghi chú tối đa 500 ký tự");
+        }
+        if ((status == CoachingHealthStatus.RED || evaluation == CoachingEvaluation.POOR)
+                && (note == null || note.isBlank())) {
+            throw new BadRequestException("Khi trạng thái Đỏ hoặc đánh giá Kém, bạn cần nhập ghi chú giải thích");
+        }
+
+        mapping.setCoachingStatus(status);
+        mapping.setCoachingEvaluation(evaluation);
+        mapping.setCoachingEvalNote(note);
+        mapping.setCoachingEvalUpdatedAt(DietDates.nowVn());
+        mappingRepository.save(mapping);
+
+        return ApiResponse.success(toClientStatus(mapping), "Đã lưu trạng thái và đánh giá học viên");
+    }
+
     private MacroTargetRequest buildMacroTargetFromTdee(BigDecimal tdee) {
         MacroTargetRequest macroReq = new MacroTargetRequest();
         macroReq.setDailyCalories(tdee);
@@ -257,16 +284,34 @@ public class PtClientServiceImpl implements PtClientService {
     private ClientStatusDto toClientStatus(PtClientMapping mapping) {
         User client = mapping.getClient();
         List<DietLog> recentLogs = dietLogRepository.findByCustomerIdAndLogDate(
-                client.getId(), LocalDate.now());
+                client.getId(), DietDates.todayVn());
 
+        String suggestedStatus;
+        String suggestedLabel;
+        String suggestedEvaluation;
+        if (recentLogs.isEmpty()) {
+            suggestedStatus = CoachingHealthStatus.YELLOW.name();
+            suggestedLabel = "Chưa có nhật ký hôm nay";
+            suggestedEvaluation = CoachingEvaluation.AVERAGE.name();
+        } else {
+            suggestedStatus = CoachingHealthStatus.GREEN.name();
+            suggestedLabel = "Tốt / Ổn định";
+            suggestedEvaluation = CoachingEvaluation.EXCELLENT.name();
+        }
+
+        boolean statusConfirmed = mapping.getCoachingStatus() != null;
         String statusColor;
         String statusLabel;
-        if (recentLogs.isEmpty()) {
-            statusColor = "YELLOW";
-            statusLabel = "Missing Log";
+        String evaluation;
+        if (statusConfirmed) {
+            statusColor = mapping.getCoachingStatus().name();
+            statusLabel = labelForConfirmed(mapping.getCoachingStatus());
+            evaluation = mapping.getCoachingEvaluation() != null
+                    ? mapping.getCoachingEvaluation().name() : null;
         } else {
-            statusColor = "GREEN";
-            statusLabel = "On Track";
+            statusColor = suggestedStatus;
+            statusLabel = suggestedLabel;
+            evaluation = null;
         }
 
         return ClientStatusDto.builder()
@@ -276,6 +321,11 @@ public class PtClientServiceImpl implements PtClientService {
                 .status(statusColor)
                 .statusLabel(statusLabel)
                 .statusColor(statusColor)
+                .statusConfirmed(statusConfirmed)
+                .suggestedStatus(suggestedStatus)
+                .suggestedEvaluation(suggestedEvaluation)
+                .evaluation(evaluation)
+                .coachingEvalNote(mapping.getCoachingEvalNote())
                 .mappingStatus(mapping.getStatus() != null ? mapping.getStatus().name() : null)
                 .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
                 .selectedTrainingMode(mapping.getSelectedTrainingMode() != null
@@ -292,9 +342,41 @@ public class PtClientServiceImpl implements PtClientService {
                 .sessionCount(mapping.getSessionCount())
                 .perSessionAmount(mapping.getPerSessionAmount())
                 .sessions(loadMappingSessions(mapping.getId()))
+                .coachingStartedAt(mapping.getCoachingStartedAt())
+                .mappingId(mapping.getId())
                 .lastLogTime("N/A")
                 .avgCalories(BigDecimal.valueOf(1800.0))
                 .build();
+    }
+
+    private static String labelForConfirmed(CoachingHealthStatus status) {
+        return switch (status) {
+            case GREEN -> "Tốt / Ổn định";
+            case YELLOW -> "Cần chú ý";
+            case RED -> "Cảnh báo";
+        };
+    }
+
+    private static CoachingHealthStatus parseHealthStatus(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new BadRequestException("Vui lòng chọn trạng thái (Tốt, Cần chú ý, hoặc Cảnh báo)");
+        }
+        try {
+            return CoachingHealthStatus.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Trạng thái không hợp lệ. Chọn: Tốt / Ổn định, Cần chú ý, hoặc Cảnh báo");
+        }
+    }
+
+    private static CoachingEvaluation parseEvaluation(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new BadRequestException("Vui lòng chọn đánh giá chung (Tuyệt vời, Trung bình, hoặc Kém)");
+        }
+        try {
+            return CoachingEvaluation.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Đánh giá không hợp lệ. Chọn: Tuyệt vời, Trung bình, hoặc Kém");
+        }
     }
 
     private List<MappingSessionResponse> loadMappingSessions(UUID mappingId) {

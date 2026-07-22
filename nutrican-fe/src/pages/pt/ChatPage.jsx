@@ -3,7 +3,7 @@ import { useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
-import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X, UploadCloud, FileText } from 'lucide-react';
+import { Send, MessageSquare, Clock, ShieldAlert, ImagePlus, X, UploadCloud, FileText, Loader2 } from 'lucide-react';
 import { chatService } from '../../services/chatService';
 import { workspaceService } from '../../services/workspaceService';
 import { sendWebSocketMessage } from '../../services/websocketService';
@@ -11,9 +11,40 @@ import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import ChatContextCard from './components/ChatContextCard';
+import ChatPendingReviewCard from './components/ChatPendingReviewCard';
 import ChatMessageContextCard from './components/ChatMessageContextCard';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
+const MSG_PAGE_SIZE = 30;
+
+function dayKey(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayLabel(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '';
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (dayKey(dateStr) === dayKey(today.toISOString())) return 'Hôm nay';
+    if (dayKey(dateStr) === dayKey(yesterday.toISOString())) return 'Hôm qua';
+    return d.toLocaleDateString('vi-VN');
+}
+
+function mergeUniqueById(existing, incoming, mode = 'append') {
+    const map = new Map();
+    const ordered = mode === 'prepend' ? [...incoming, ...existing] : [...existing, ...incoming];
+    ordered.forEach((m) => {
+        if (m?.id != null) map.set(String(m.id), m);
+        else map.set(`tmp-${m.createdAt}-${m.content}`, m);
+    });
+    return Array.from(map.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
 
 export default function ChatPage() {
     const { user } = useAuthStore();
@@ -25,10 +56,17 @@ export default function ChatPage() {
     const [threads, setThreads] = useState([]);
     const [activeMappingId, setActiveMappingId] = useState(null);
     const [messages, setMessages] = useState([]);
+    const [msgPage, setMsgPage] = useState(0);
+    const [msgLast, setMsgLast] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [newMessage, setNewMessage] = useState('');
     const [selectedImage, setSelectedImage] = useState(null);
     const [selectedImagePreview, setSelectedImagePreview] = useState('');
     const [chatContext, setChatContext] = useState(null);
+    const [pendingLogs, setPendingLogs] = useState([]);
+    const [loadingPending, setLoadingPending] = useState(false);
+    const [reviewingLogId, setReviewingLogId] = useState(null);
+    const [mobileSideOpen, setMobileSideOpen] = useState(false);
 
     const [loadingThreads, setLoadingThreads] = useState(true);
     const [loadingMessages, setLoadingMessages] = useState(false);
@@ -37,6 +75,8 @@ export default function ChatPage() {
     const [lightboxImage, setLightboxImage] = useState('');
 
     const messagesEndRef = useRef(null);
+    const messagesContainerRef = useRef(null);
+    const stickToBottomRef = useRef(true);
     const imageInputRef = useRef(null);
     const pdfInputRef = useRef(null);
 
@@ -52,6 +92,35 @@ export default function ChatPage() {
             return [];
         } finally {
             setLoadingThreads(false);
+        }
+    }, []);
+
+    const refreshChatContext = useCallback(async (participantId) => {
+        if (!participantId) {
+            setChatContext(null);
+            return;
+        }
+        try {
+            const res = await workspaceService.getChatContext(participantId);
+            setChatContext(res.data?.data || null);
+        } catch {
+            setChatContext(null);
+        }
+    }, []);
+
+    const refreshPendingLogs = useCallback(async (clientId) => {
+        if (!clientId) {
+            setPendingLogs([]);
+            return;
+        }
+        setLoadingPending(true);
+        try {
+            const res = await workspaceService.getPendingLogs({ page: 0, size: 5, clientId });
+            setPendingLogs(res.data?.data?.content || []);
+        } catch {
+            setPendingLogs([]);
+        } finally {
+            setLoadingPending(false);
         }
     }, []);
 
@@ -84,14 +153,9 @@ export default function ChatPage() {
     const activeThread = threads.find(t => t.mappingId === activeMappingId);
 
     useEffect(() => {
-        if (!activeThread?.participantId) {
-            const t = setTimeout(() => setChatContext(null), 0);
-            return () => clearTimeout(t);
-        }
-        workspaceService.getChatContext(activeThread.participantId)
-            .then((res) => setChatContext(res.data?.data || null))
-            .catch(() => setChatContext(null));
-    }, [activeThread?.participantId]);
+        refreshChatContext(activeThread?.participantId);
+        refreshPendingLogs(activeThread?.participantId);
+    }, [activeThread?.participantId, refreshChatContext, refreshPendingLogs]);
 
     useEffect(() => {
         if (!activeMappingId) return;
@@ -99,9 +163,13 @@ export default function ChatPage() {
         const loadMessages = async () => {
             try {
                 setLoadingMessages(true);
-                const res = await chatService.getMessages(activeMappingId, { page: 0, size: 50 });
-                const msgs = res.data.data.content || [];
-                setMessages(msgs.reverse());
+                stickToBottomRef.current = true;
+                setMsgPage(0);
+                const res = await chatService.getMessages(activeMappingId, { page: 0, size: MSG_PAGE_SIZE });
+                const pageData = res.data.data || {};
+                const msgs = [...(pageData.content || [])].reverse();
+                setMessages(msgs);
+                setMsgLast(Boolean(pageData.last ?? true));
                 await chatService.markRead(activeMappingId);
             } catch (err) {
                 console.error("Fetch messages error:", err);
@@ -113,6 +181,41 @@ export default function ChatPage() {
         loadMessages();
     }, [activeMappingId]);
 
+    const loadOlderMessages = useCallback(async () => {
+        if (!activeMappingId || isLoadingMore || msgLast) return;
+        const container = messagesContainerRef.current;
+        const prevHeight = container?.scrollHeight || 0;
+        const prevTop = container?.scrollTop || 0;
+        const nextPage = msgPage + 1;
+        setIsLoadingMore(true);
+        stickToBottomRef.current = false;
+        try {
+            const res = await chatService.getMessages(activeMappingId, { page: nextPage, size: MSG_PAGE_SIZE });
+            const pageData = res.data.data || {};
+            const older = [...(pageData.content || [])].reverse();
+            setMessages((prev) => mergeUniqueById(prev, older, 'prepend'));
+            setMsgPage(nextPage);
+            setMsgLast(Boolean(pageData.last ?? true));
+            requestAnimationFrame(() => {
+                if (container) {
+                    container.scrollTop = container.scrollHeight - prevHeight + prevTop;
+                }
+            });
+        } catch {
+            toast.error('Không tải thêm được tin cũ');
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [activeMappingId, isLoadingMore, msgLast, msgPage]);
+
+    const handleMessagesScroll = (e) => {
+        const el = e.currentTarget;
+        stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        if (el.scrollTop < 48) {
+            loadOlderMessages();
+        }
+    };
+
     useEffect(() => {
         const handleNewMessage = (e) => {
             const newMsg = e.detail;
@@ -122,10 +225,8 @@ export default function ChatPage() {
             }
 
             if (newMsg.mappingId === activeMappingId) {
-                setMessages(prev => {
-                    if (prev.some(m => m.id === newMsg.id)) return prev;
-                    return [...prev, newMsg];
-                });
+                stickToBottomRef.current = true;
+                setMessages(prev => mergeUniqueById(prev, [newMsg], 'append'));
                 chatService.markRead(activeMappingId).catch(console.error);
             }
             loadThreads();
@@ -135,12 +236,10 @@ export default function ChatPage() {
         return () => window.removeEventListener('realtime_chat_message', handleNewMessage);
     }, [activeMappingId, loadThreads]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-
     useEffect(() => {
-        scrollToBottom();
+        if (stickToBottomRef.current) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
     }, [messages]);
 
     useEffect(() => {
@@ -150,6 +249,20 @@ export default function ChatPage() {
             }
         };
     }, [selectedImagePreview]);
+
+    const handleQuickReview = async (logId, action) => {
+        setReviewingLogId(logId);
+        try {
+            await workspaceService.reviewLog(logId, { action, note: action === 'APPROVE' ? 'Duyệt nhanh từ chat' : undefined });
+            toast.success(action === 'APPROVE' ? 'Đã duyệt bữa ăn' : 'Đã từ chối');
+            await refreshPendingLogs(activeThread?.participantId);
+            await refreshChatContext(activeThread?.participantId);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Không duyệt được');
+        } finally {
+            setReviewingLogId(null);
+        }
+    };
 
     const handleFile = (file) => {
         if (!file.type?.startsWith('image/')) {
@@ -255,6 +368,7 @@ export default function ChatPage() {
 
         try {
             setSending(true);
+            stickToBottomRef.current = true;
             if (selectedImage) {
                 const res = await chatService.sendImage(activeMappingId, selectedImage, newMessage);
                 const sentMessage = res.data?.data;
@@ -368,10 +482,24 @@ export default function ChatPage() {
             </Card>
 
             {activeThread && (
-                <div className="w-72 flex-shrink-0 hidden xl:block space-y-4">
+                <div className="w-72 flex-shrink-0 hidden lg:flex flex-col gap-4 overflow-y-auto max-h-full">
                     <ChatContextCard
                         context={chatContext}
                         onViewDiet={() => {
+                            const params = new URLSearchParams({
+                                clientId: activeThread.participantId,
+                                clientName: activeThread.participantName || 'Học viên',
+                            });
+                            navigate(`/pt/clients/dietlog?${params.toString()}`);
+                        }}
+                    />
+                    <ChatPendingReviewCard
+                        logs={pendingLogs}
+                        loading={loadingPending}
+                        reviewingLogId={reviewingLogId}
+                        onApprove={(id) => handleQuickReview(id, 'APPROVE')}
+                        onReject={(id) => handleQuickReview(id, 'REJECT')}
+                        onOpenFull={() => {
                             const params = new URLSearchParams({
                                 clientId: activeThread.participantId,
                                 clientName: activeThread.participantName || 'Học viên',
@@ -406,21 +534,40 @@ export default function ChatPage() {
                     </div>
                 ) : (
                     <>
-                        <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center gap-4 z-10 shadow-sm">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between gap-4 z-10 shadow-sm">
+                            <div className="flex items-center gap-4 min-w-0">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-indigo-50/50 flex items-center justify-center text-primary font-bold">
                                 {activeThread?.participantAvatarUrl ? (
                                     <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
                                 ) : getInitials(activeThread?.participantName)}
                             </div>
-                            <div>
-                                <h3 className="font-bold text-slate-800 text-lg">{activeThread?.participantName}</h3>
+                            <div className="min-w-0">
+                                <h3 className="font-bold text-slate-800 text-lg truncate">{activeThread?.participantName}</h3>
                                 <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Đang kết nối
                                 </p>
                             </div>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="lg:hidden rounded-xl text-xs font-bold shrink-0"
+                                onClick={() => setMobileSideOpen(true)}
+                            >
+                                Ngữ cảnh
+                            </Button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-4">
+                        <div
+                            ref={messagesContainerRef}
+                            onScroll={handleMessagesScroll}
+                            className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-4"
+                        >
+                            {isLoadingMore && (
+                                <div className="flex justify-center py-2">
+                                    <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                                </div>
+                            )}
                             {loadingMessages ? (
                                 <div className="flex flex-col gap-4">
                                     <Skeleton className="h-16 w-2/3 rounded-2xl rounded-tl-none self-start bg-slate-200" />
@@ -433,9 +580,18 @@ export default function ChatPage() {
                             ) : (
                                 messages.map((msg, index) => {
                                     const isMe = msg.senderId === user?.id;
+                                    const prev = messages[index - 1];
+                                    const showDay = !prev || dayKey(prev.createdAt) !== dayKey(msg.createdAt);
 
                                     return (
-                                        <div key={msg.id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                        <div key={msg.id || `idx-${index}`} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                                            {showDay && (
+                                                <div className="w-full flex justify-center my-2">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-white border border-slate-200 px-3 py-1 rounded-full">
+                                                        {dayLabel(msg.createdAt)}
+                                                    </span>
+                                                </div>
+                                            )}
                                             <div className={`max-w-[70%] px-5 py-3 text-sm ${
                                                 isMe
                                                     ? 'bg-primary text-white rounded-3xl rounded-tr-sm shadow-md shadow-primary/20'
@@ -564,6 +720,46 @@ export default function ChatPage() {
                 imageUrl={lightboxImage}
                 onClose={() => setLightboxImage('')}
             />
+
+            {mobileSideOpen && activeThread && (
+                <div className="fixed inset-0 z-[80] lg:hidden">
+                    <div className="absolute inset-0 bg-slate-900/50" onClick={() => setMobileSideOpen(false)} />
+                    <div className="absolute right-0 top-0 h-full w-[min(100%,20rem)] bg-white shadow-xl p-4 overflow-y-auto space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-slate-800">Ngữ cảnh & Duyệt</h3>
+                            <button type="button" onClick={() => setMobileSideOpen(false)} className="p-2 text-slate-500">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <ChatContextCard
+                            context={chatContext}
+                            onViewDiet={() => {
+                                setMobileSideOpen(false);
+                                const params = new URLSearchParams({
+                                    clientId: activeThread.participantId,
+                                    clientName: activeThread.participantName || 'Học viên',
+                                });
+                                navigate(`/pt/clients/dietlog?${params.toString()}`);
+                            }}
+                        />
+                        <ChatPendingReviewCard
+                            logs={pendingLogs}
+                            loading={loadingPending}
+                            reviewingLogId={reviewingLogId}
+                            onApprove={(id) => handleQuickReview(id, 'APPROVE')}
+                            onReject={(id) => handleQuickReview(id, 'REJECT')}
+                            onOpenFull={() => {
+                                setMobileSideOpen(false);
+                                const params = new URLSearchParams({
+                                    clientId: activeThread.participantId,
+                                    clientName: activeThread.participantName || 'Học viên',
+                                });
+                                navigate(`/pt/clients/dietlog?${params.toString()}`);
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

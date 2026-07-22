@@ -29,6 +29,7 @@ export default function ConfirmFoodModal({
     handleConfirmRecognition,
     setConfirmModal,
     onSwitchToManual,
+    hasActivePt = false,
 }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
@@ -406,6 +407,23 @@ export default function ConfirmFoodModal({
                 </div>
 
                 <div className="flex-shrink-0 px-5 py-4 border-t border-slate-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+                    {hasActivePt && (
+                        <label className="flex items-start gap-2 mb-3 rounded-xl border border-violet-100 bg-violet-50/70 px-3 py-2.5">
+                            <input
+                                type="checkbox"
+                                className="mt-0.5"
+                                checked
+                                disabled
+                                readOnly
+                            />
+                            <span className="text-xs text-violet-900">
+                                <strong>Ghi vào nhật ký & gửi PT duyệt</strong>
+                                <span className="block text-violet-700/80 mt-0.5">
+                                    Bạn đang có PT — mọi thay đổi calo/macro sẽ được gửi lại để PT xác nhận (không tắt được).
+                                </span>
+                            </span>
+                        </label>
+                    )}
                     {selectedPrediction && (
                         <p className="text-center text-sm font-semibold text-emerald-700 mb-3">
                             Tổng: {selectedPrediction.calories ?? '—'} kcal · {grams}g

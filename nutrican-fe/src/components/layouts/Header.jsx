@@ -159,6 +159,21 @@ export default function Header() {
         return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     };
 
+    const buildPtNav = () => {
+        const items = [
+            { label: 'Bảng điều khiển', href: '/pt' },
+            { label: 'Học viên của tôi', href: '/pt/clients' },
+            { label: 'Lịch hẹn', href: '/pt/appointments' },
+            { label: 'Tin nhắn', href: '/pt/chat' },
+            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
+            { label: 'Thống kê đánh giá', href: '/pt/ratings' },
+            { label: 'Portfolio', href: '/pt/portfolio' },
+        ];
+        // Gate offline thật nằm ở trang Lịch hẹn (empty state nếu không có HV offline).
+        // Không ẩn nav chỉ theo trainingMode ONLINE — PT BOTH/ONLINE vẫn có thể có mapping offline.
+        return items;
+    };
+
     const navItems = {
         CUSTOMER: [
             { label: 'Nhật ký ăn uống', href: '/diet' },
@@ -166,24 +181,8 @@ export default function Header() {
             { label: 'Tìm PT', href: '/marketplace' },
             { label: "Coaching Của Tôi", href: '/coaching' },
         ],
-        PT_CERTIFIED: [
-            { label: 'Bảng điều khiển', href: '/pt' },
-            { label: 'Học viên của tôi', href: '/pt/clients' },
-            { label: 'Lịch hẹn', href: '/pt/appointments' },
-            { label: 'Tin nhắn', href: '/pt/chat' },
-            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
-            { label: 'Thống kê đánh giá', href: '/pt/ratings' },
-            { label: 'Portfolio', href: '/pt/portfolio' },
-        ],
-        PT_FREELANCE: [
-            { label: 'Bảng điều khiển', href: '/pt' },
-            { label: 'Học viên của tôi', href: '/pt/clients' },
-            { label: 'Lịch hẹn', href: '/pt/appointments' },
-            { label: 'Tin nhắn', href: '/pt/chat' },
-            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
-            { label: 'Thống kê đánh giá', href: '/pt/ratings' },
-            { label: 'Portfolio', href: '/pt/portfolio' },
-        ],
+        PT_CERTIFIED: buildPtNav(),
+        PT_FREELANCE: buildPtNav(),
         ADMIN: [
             { label: 'Bảng điều khiển', href: '/admin' },
             { label: 'Duyệt PT', href: '/admin/pts' },
