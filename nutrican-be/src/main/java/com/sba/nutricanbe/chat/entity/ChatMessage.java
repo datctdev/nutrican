@@ -2,22 +2,16 @@ package com.sba.nutricanbe.chat.entity;
 
 import com.sba.nutricanbe.chat.enums.ChatMessageType;
 import com.sba.nutricanbe.common.entity.BaseEntity;
-import com.sba.nutricanbe.user.entity.PtClientMapping;
-import com.sba.nutricanbe.user.entity.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -29,20 +23,16 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
-@ToString(exclude = {"mapping", "sender", "recipient"})
 public class ChatMessage extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "mapping_id", nullable = false)
-    private PtClientMapping mapping;
+    @Column(name = "mapping_id", nullable = false)
+    private UUID mappingId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "sender_id", nullable = false)
-    private User sender;
+    @Column(name = "sender_id", nullable = false)
+    private UUID senderId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "recipient_id", nullable = false)
-    private User recipient;
+    @Column(name = "recipient_id", nullable = false)
+    private UUID recipientId;
 
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;

@@ -69,7 +69,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         LocalDateTime attemptExpiresAt = now.plusMinutes(30);
         cancelPendingPayment(mappingId);
         Payment payment = paymentRepository.save(Payment.builder()
-                .mapping(mapping)
+                .mappingId(mapping.getId())
                 .method(CoachingPaymentMethod.VNPAY)
                 .status(CoachingPaymentStatus.PENDING)
                 .amount(mapping.getAgreedAmount())
@@ -100,7 +100,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         LocalDateTime now = LocalDateTime.now();
         cancelPendingPayment(mappingId);
         Payment payment = paymentRepository.save(Payment.builder()
-                .mapping(mapping)
+                .mappingId(mapping.getId())
                 .method(CoachingPaymentMethod.WALLET)
                 .status(CoachingPaymentStatus.SUCCESS)
                 .amount(mapping.getAgreedAmount())
@@ -142,9 +142,9 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Coaching payment not found for transaction reference: " + txnRef));
         PtClientMapping mapping = mappingRepository.findByIdForUpdate(
-                        paymentSnapshot.getMapping().getId())
+                        paymentSnapshot.getMappingId())
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "PT-client mapping", paymentSnapshot.getMapping().getId()));
+                        "PT-client mapping", paymentSnapshot.getMappingId()));
         Payment payment = paymentRepository.findByTxnRefForUpdate(txnRef)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Coaching payment not found for transaction reference: " + txnRef));
@@ -193,7 +193,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
             }
             return result(payment, mapping, false, "Payment attempt has expired");
         }
-        if (paymentRepository.existsByMapping_IdAndStatus(
+        if (paymentRepository.existsByMappingIdAndStatus(
                 mapping.getId(), CoachingPaymentStatus.SUCCESS)) {
             throw new BadRequestException("Another payment for this coaching request already succeeded");
         }
@@ -340,7 +340,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         } catch (ArithmeticException exception) {
             throw new BadRequestException("VND coaching price must be a whole number");
         }
-        if (paymentRepository.existsByMapping_IdAndStatus(
+        if (paymentRepository.existsByMappingIdAndStatus(
                 mapping.getId(), CoachingPaymentStatus.SUCCESS)) {
             throw new BadRequestException("This coaching request has already been paid");
         }
@@ -348,7 +348,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
 
     private void cancelPendingPayment(UUID mappingId) {
         paymentRepository
-                .findFirstByMapping_IdAndStatusOrderByCreatedAtDesc(
+                .findFirstByMappingIdAndStatusOrderByCreatedAtDesc(
                         mappingId, CoachingPaymentStatus.PENDING)
                 .ifPresent(pending -> {
                     pending.setStatus(CoachingPaymentStatus.CANCELLED);

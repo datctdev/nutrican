@@ -70,7 +70,7 @@ public class ChatServiceImpl implements ChatService {
     public ApiResponse<PageResponse<ChatMessageResponse>> getMessages(UUID userId, UUID mappingId, int page, int size) {
         PtClientMapping mapping = getActiveMappingForUser(mappingId, userId);
         return ApiResponse.success(PageResponse.from(chatMessageRepository
-                .findByMappingIdWithUsers(mapping.getId(),
+                .findByMappingIdOrderByCreatedAtDesc(mapping.getId(),
                         PageRequest.of(page, size, Sort.by("createdAt").descending()))
                 .map(this::toMessageResponse)));
     }
@@ -91,9 +91,9 @@ public class ChatServiceImpl implements ChatService {
         User recipient = mapping.getPt().getId().equals(senderId) ? mapping.getClient() : mapping.getPt();
 
         ChatMessage message = chatMessageRepository.save(ChatMessage.builder()
-                .mapping(mapping)
-                .sender(sender)
-                .recipient(recipient)
+                .mappingId(mapping.getId())
+                .senderId(sender.getId())
+                .recipientId(recipient.getId())
                 .content(content != null ? content : "")
                 .messageType(imageUrl != null ? ChatMessageType.IMAGE : ChatMessageType.TEXT)
                 .imageUrl(imageUrl)
@@ -146,9 +146,9 @@ public class ChatServiceImpl implements ChatService {
         String normalizedContent = normalizeContent(content);
 
         ChatMessage message = chatMessageRepository.save(ChatMessage.builder()
-                .mapping(mapping)
-                .sender(sender)
-                .recipient(recipient)
+                .mappingId(mapping.getId())
+                .senderId(sender.getId())
+                .recipientId(recipient.getId())
                 .content(normalizedContent != null ? normalizedContent : "")
                 .messageType(ChatMessageType.FILE)
                 .attachmentUrl(attachmentUrl)
@@ -177,9 +177,9 @@ public class ChatServiceImpl implements ChatService {
         String normalizedContent = normalizeContent(content);
 
         ChatMessage message = chatMessageRepository.save(ChatMessage.builder()
-                .mapping(mapping)
-                .sender(sender)
-                .recipient(recipient)
+                .mappingId(mapping.getId())
+                .senderId(sender.getId())
+                .recipientId(recipient.getId())
                 .content(normalizedContent != null ? normalizedContent : "")
                 .messageType(ChatMessageType.IMAGE)
                 .imageUrl(imageUrl)
@@ -212,7 +212,7 @@ public class ChatServiceImpl implements ChatService {
 
     private ChatThreadResponse toThreadResponse(PtClientMapping mapping, UUID userId) {
         User participant = mapping.getPt().getId().equals(userId) ? mapping.getClient() : mapping.getPt();
-        ChatMessageResponse lastMessage = chatMessageRepository.findTopByMapping_IdOrderByCreatedAtDesc(mapping.getId())
+        ChatMessageResponse lastMessage = chatMessageRepository.findTopByMappingIdOrderByCreatedAtDesc(mapping.getId())
                 .map(this::toMessageResponse)
                 .orElse(null);
         return ChatThreadResponse.builder()
@@ -222,22 +222,24 @@ public class ChatServiceImpl implements ChatService {
                 .participantAvatarUrl(participant.getAvatarUrl())
                 .status(mapping.getStatus())
                 .lastMessage(lastMessage)
-                .unreadCount(chatMessageRepository.countByMapping_IdAndRecipient_IdAndReadAtIsNull(mapping.getId(), userId))
+                .unreadCount(chatMessageRepository.countByMappingIdAndRecipientIdAndReadAtIsNull(mapping.getId(), userId))
                 .linkedAt(mapping.getAssignedAt())
                 .endRequestedBy(mapping.getEndRequestedBy() != null ? mapping.getEndRequestedBy().name() : null)
                 .build();
     }
 
     private ChatMessageResponse toMessageResponse(ChatMessage message) {
+        User sender = userRepository.findById(message.getSenderId()).orElse(null);
+        User recipient = userRepository.findById(message.getRecipientId()).orElse(null);
         return ChatMessageResponse.builder()
                 .id(message.getId())
-                .mappingId(message.getMapping().getId())
-                .senderId(message.getSender().getId())
-                .senderName(message.getSender().getFullName())
-                .senderAvatarUrl(message.getSender().getAvatarUrl())
-                .recipientId(message.getRecipient().getId())
-                .recipientName(message.getRecipient().getFullName())
-                .recipientAvatarUrl(message.getRecipient().getAvatarUrl())
+                .mappingId(message.getMappingId())
+                .senderId(message.getSenderId())
+                .senderName(sender != null ? sender.getFullName() : null)
+                .senderAvatarUrl(sender != null ? sender.getAvatarUrl() : null)
+                .recipientId(message.getRecipientId())
+                .recipientName(recipient != null ? recipient.getFullName() : null)
+                .recipientAvatarUrl(recipient != null ? recipient.getAvatarUrl() : null)
                 .content(message.getContent())
                 .messageType(message.getMessageType())
                 .imageUrl(message.getImageUrl())

@@ -1,7 +1,6 @@
 package com.sba.nutricanbe.workspace.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
-import com.sba.nutricanbe.diet.enums.MealType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,9 +22,9 @@ public class MealPlanTemplateItem extends BaseEntity {
     @Column(name = "day_offset", nullable = false)
     private Integer dayOffset; // 0 to 6 representing the day of the week
 
-    @Enumerated(EnumType.STRING)
+    /** Stored as diet MealType name (BREAKFAST/LUNCH/DINNER/SNACK) without cross-module enum coupling. */
     @Column(name = "meal_type", nullable = false, length = 20)
-    private MealType mealType;
+    private String mealType;
 
     @Column(name = "food_code", length = 100)
     private String foodCode;

@@ -2,12 +2,12 @@ package com.sba.nutricanbe.payment.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
 import com.sba.nutricanbe.payment.enums.CoachingEscrowStatus;
-import com.sba.nutricanbe.user.entity.PtClientMapping;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "coaching_escrows")
@@ -19,9 +19,8 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
 public class CoachingEscrow extends BaseEntity {
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "mapping_id", nullable = false, unique = true)
-    private PtClientMapping mapping;
+    @Column(name = "mapping_id", nullable = false, unique = true)
+    private UUID mappingId;
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "payment_id", nullable = false, unique = true)

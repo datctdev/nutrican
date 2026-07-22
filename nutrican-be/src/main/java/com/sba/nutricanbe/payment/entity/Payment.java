@@ -3,12 +3,12 @@ package com.sba.nutricanbe.payment.entity;
 import com.sba.nutricanbe.common.entity.BaseEntity;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentMethod;
 import com.sba.nutricanbe.payment.enums.CoachingPaymentStatus;
-import com.sba.nutricanbe.user.entity.PtClientMapping;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "coaching_payments", indexes = {
@@ -23,9 +23,8 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
 public class Payment extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "mapping_id", nullable = false)
-    private PtClientMapping mapping;
+    @Column(name = "mapping_id", nullable = false)
+    private UUID mappingId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

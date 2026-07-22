@@ -12,15 +12,14 @@ import java.util.UUID;
 
 public interface CoachingEscrowRepository extends JpaRepository<CoachingEscrow, UUID> {
 
-    Optional<CoachingEscrow> findByMapping_Id(UUID mappingId);
+    Optional<CoachingEscrow> findByMappingId(UUID mappingId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select e from CoachingEscrow e
-            join fetch e.mapping
             join fetch e.ptWallet
             join fetch e.escrowWallet
-            where e.mapping.id = :mappingId
+            where e.mappingId = :mappingId
             """)
     Optional<CoachingEscrow> findByMappingIdForUpdate(@Param("mappingId") UUID mappingId);
 }

@@ -20,12 +20,12 @@ public interface CoachingPaymentRepository extends JpaRepository<Payment, UUID> 
     boolean existsByOrderNumber(String orderNumber);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select p from Payment p join fetch p.mapping where p.txnRef = :txnRef")
+    @Query("select p from Payment p where p.txnRef = :txnRef")
     Optional<Payment> findByTxnRefForUpdate(@Param("txnRef") String txnRef);
 
-    boolean existsByMapping_IdAndStatus(UUID mappingId, CoachingPaymentStatus status);
+    boolean existsByMappingIdAndStatus(UUID mappingId, CoachingPaymentStatus status);
 
-    Optional<Payment> findFirstByMapping_IdAndStatusOrderByCreatedAtDesc(
+    Optional<Payment> findFirstByMappingIdAndStatusOrderByCreatedAtDesc(
             UUID mappingId, CoachingPaymentStatus status);
 
     List<Payment> findByStatusAndExpiresAtBefore(

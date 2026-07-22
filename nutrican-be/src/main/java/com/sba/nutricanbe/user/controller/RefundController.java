@@ -2,8 +2,8 @@ package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.user.dto.RefundCreateRequest;
+import com.sba.nutricanbe.user.dto.RefundResponse;
 import com.sba.nutricanbe.user.dto.RefundReviewRequest;
-import com.sba.nutricanbe.user.entity.RefundRequest;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.service.RefundService;
 import lombok.RequiredArgsConstructor;
@@ -23,24 +23,27 @@ public class RefundController {
 
     @PostMapping("/api/v1/refunds")
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponse<RefundRequest>> requestRefund(
+    public ResponseEntity<ApiResponse<RefundResponse>> requestRefund(
             @AuthenticationPrincipal User customer,
             @RequestBody RefundCreateRequest request) {
-        RefundRequest refund = refundService.requestRefund(customer.getId(), request);
-        return ResponseEntity.ok(ApiResponse.success(refund, "Refund request submitted"));
+        return ResponseEntity.ok(ApiResponse.success(
+                RefundResponse.from(refundService.requestRefund(customer.getId(), request)),
+                "Refund request submitted"));
     }
 
     @GetMapping("/api/v1/admin/refunds")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<RefundRequest>>> listRefunds() {
-        return ResponseEntity.ok(ApiResponse.success(refundService.listAll()));
+    public ResponseEntity<ApiResponse<List<RefundResponse>>> listRefunds() {
+        return ResponseEntity.ok(ApiResponse.success(
+                refundService.listAll().stream().map(RefundResponse::from).toList()));
     }
 
     @PutMapping("/api/v1/admin/refunds/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<RefundRequest>> reviewRefund(
+    public ResponseEntity<ApiResponse<RefundResponse>> reviewRefund(
             @PathVariable UUID id,
             @RequestBody RefundReviewRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(refundService.review(id, request)));
+        return ResponseEntity.ok(ApiResponse.success(
+                RefundResponse.from(refundService.review(id, request))));
     }
 }

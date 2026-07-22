@@ -2,11 +2,11 @@ package com.sba.nutricanbe.payment.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
 import com.sba.nutricanbe.payment.enums.WalletType;
-import com.sba.nutricanbe.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Entity
 @Table(name = "coaching_wallets", uniqueConstraints = {
@@ -21,9 +21,8 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = true)
 public class Wallet extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id")
-    private User owner;
+    @Column(name = "owner_id")
+    private UUID ownerId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "wallet_type", nullable = false, length = 20)
@@ -50,9 +49,9 @@ public class Wallet extends BaseEntity {
     @PrePersist
     @PreUpdate
     private void assignWalletKey() {
-        walletKey = owner == null
+        walletKey = ownerId == null
                 ? "SYSTEM:" + walletType.name()
-                : "USER:" + owner.getId() + ":" + walletType.name();
+                : "USER:" + ownerId + ":" + walletType.name();
     }
 
     public void addAvailable(BigDecimal amount) {

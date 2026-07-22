@@ -7,10 +7,10 @@ import com.sba.nutricanbe.diet.dto.request.ConfirmRecognitionRequest;
 import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
 import com.sba.nutricanbe.diet.dto.request.DietLogFeedbackRequest;
 import com.sba.nutricanbe.diet.dto.response.AnalyzeMealResponse;
+import com.sba.nutricanbe.diet.dto.response.DietLogFeedbackResponse;
 import com.sba.nutricanbe.diet.dto.response.DietLogImageDto;
 import com.sba.nutricanbe.diet.dto.response.DietLogResponse;
 import com.sba.nutricanbe.diet.dto.response.DietSummaryResponse;
-import com.sba.nutricanbe.diet.entity.DietLogFeedback;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.service.DietLogFeedbackService;
 import com.sba.nutricanbe.diet.service.DietLogImageService;
@@ -140,12 +140,14 @@ public class DietLogController {
     }
 
     @PutMapping("/logs/{id}/feedback")
-    public ResponseEntity<ApiResponse<DietLogFeedback>> saveFeedback(
+    public ResponseEntity<ApiResponse<DietLogFeedbackResponse>> saveFeedback(
             @PathVariable UUID id,
             @AuthenticationPrincipal User user,
             @RequestBody DietLogFeedbackRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                dietLogFeedbackService.saveFeedback(user.getId(), id, request), "Feedback saved"));
+                DietLogFeedbackResponse.from(
+                        dietLogFeedbackService.saveFeedback(user.getId(), id, request)),
+                "Feedback saved"));
     }
 
     @PutMapping("/logs/{id}/confirm-recognition")

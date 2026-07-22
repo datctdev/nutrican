@@ -18,28 +18,26 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
 
     @Query(value = """
             SELECT m FROM ChatMessage m
-            JOIN FETCH m.sender
-            JOIN FETCH m.recipient
-            WHERE m.mapping.id = :mappingId
+            WHERE m.mappingId = :mappingId
             ORDER BY m.createdAt DESC
             """,
             countQuery = """
             SELECT COUNT(m) FROM ChatMessage m
-            WHERE m.mapping.id = :mappingId
+            WHERE m.mappingId = :mappingId
             """)
-    Page<ChatMessage> findByMappingIdWithUsers(@Param("mappingId") UUID mappingId, Pageable pageable);
+    Page<ChatMessage> findByMappingIdOrderByCreatedAtDesc(@Param("mappingId") UUID mappingId, Pageable pageable);
 
-    Optional<ChatMessage> findTopByMapping_IdOrderByCreatedAtDesc(UUID mappingId);
+    Optional<ChatMessage> findTopByMappingIdOrderByCreatedAtDesc(UUID mappingId);
 
     @Modifying
     @Query("""
             UPDATE ChatMessage m
             SET m.readAt = :readAt
-            WHERE m.mapping.id = :mappingId
-              AND m.recipient.id = :userId
+            WHERE m.mappingId = :mappingId
+              AND m.recipientId = :userId
               AND m.readAt IS NULL
             """)
     int markRead(@Param("mappingId") UUID mappingId, @Param("userId") UUID userId, @Param("readAt") LocalDateTime readAt);
 
-    long countByMapping_IdAndRecipient_IdAndReadAtIsNull(UUID mappingId, UUID recipientId);
+    long countByMappingIdAndRecipientIdAndReadAtIsNull(UUID mappingId, UUID recipientId);
 }

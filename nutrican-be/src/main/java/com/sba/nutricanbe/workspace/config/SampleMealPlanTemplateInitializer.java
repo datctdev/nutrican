@@ -210,7 +210,7 @@ public class SampleMealPlanTemplateInitializer implements CommandLineRunner {
         return MealPlanTemplateItem.builder()
                 .templateId(templateId)
                 .dayOffset(dayOffset)
-                .mealType(parseMealType(mealSet.mealType(), mealSet.key()))
+                .mealType(parseMealType(mealSet.mealType(), mealSet.key()).name())
                 .foodCode(item.foodCode())
                 .freeText(item.freeText())
                 .portionGrams(item.portionGrams())

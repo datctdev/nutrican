@@ -1,6 +1,5 @@
 package com.sba.nutricanbe.workspace.dto;
 
-import com.sba.nutricanbe.diet.enums.MealType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

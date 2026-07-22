@@ -13,16 +13,16 @@ import java.util.UUID;
 
 public interface WalletRepository extends JpaRepository<Wallet, UUID> {
 
-    Optional<Wallet> findByOwner_IdAndWalletType(UUID ownerId, WalletType walletType);
+    Optional<Wallet> findByOwnerIdAndWalletType(UUID ownerId, WalletType walletType);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select w from Wallet w where w.owner.id = :ownerId and w.walletType = :type")
+    @Query("select w from Wallet w where w.ownerId = :ownerId and w.walletType = :type")
     Optional<Wallet> findUserWalletForUpdate(
             @Param("ownerId") UUID ownerId, @Param("type") WalletType type);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select w from Wallet w where w.owner is null and w.walletType = :type")
+    @Query("select w from Wallet w where w.ownerId is null and w.walletType = :type")
     Optional<Wallet> findSystemWalletForUpdate(@Param("type") WalletType type);
 
-    Optional<Wallet> findFirstByOwnerIsNullAndWalletType(WalletType type);
+    Optional<Wallet> findFirstByOwnerIdIsNullAndWalletType(WalletType type);
 }

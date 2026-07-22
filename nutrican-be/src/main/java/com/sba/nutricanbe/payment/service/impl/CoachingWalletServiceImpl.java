@@ -17,6 +17,7 @@ import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,6 +41,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     private final WalletTransactionRepository transactionRepository;
     private final CoachingEscrowRepository escrowRepository;
     private final CoachingPaymentRepository paymentRepository;
+    private final PtClientMappingRepository mappingRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -49,8 +51,9 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     @Override
     @Transactional
     public void holdSuccessfulPayment(Payment payment) {
-        PtClientMapping mapping = payment.getMapping();
-        if (escrowRepository.findByMapping_Id(mapping.getId()).isPresent()) {
+        PtClientMapping mapping = mappingRepository.findById(payment.getMappingId())
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", payment.getMappingId()));
+        if (escrowRepository.findByMappingId(mapping.getId()).isPresent()) {
             return;
         }
 
@@ -67,7 +70,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         BigDecimal fee = amount.multiply(platformFeeRate)
                 .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
         CoachingEscrow escrow = escrowRepository.save(CoachingEscrow.builder()
-                .mapping(mapping)
+                .mappingId(mapping.getId())
                 .payment(payment)
                 .customerWallet(customerWallet)
                 .ptWallet(ptWallet)
@@ -122,8 +125,9 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     @Override
     @Transactional
     public void holdFromWalletBalance(Payment payment) {
-        PtClientMapping mapping = payment.getMapping();
-        if (escrowRepository.findByMapping_Id(mapping.getId()).isPresent()) {
+        PtClientMapping mapping = mappingRepository.findById(payment.getMappingId())
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", payment.getMappingId()));
+        if (escrowRepository.findByMappingId(mapping.getId()).isPresent()) {
             return;
         }
 
@@ -138,7 +142,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         BigDecimal fee = amount.multiply(platformFeeRate)
                 .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
         CoachingEscrow escrow = escrowRepository.save(CoachingEscrow.builder()
-                .mapping(mapping)
+                .mappingId(mapping.getId())
                 .payment(payment)
                 .customerWallet(customerWallet)
                 .ptWallet(ptWallet)
@@ -199,14 +203,16 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         if (escrow.getStatus() != CoachingEscrowStatus.HELD) {
             throw new BadRequestException("Escrow cannot be released in status " + escrow.getStatus());
         }
-        ClientMappingStatus mappingStatus = escrow.getMapping().getStatus();
+        PtClientMapping mapping = mappingRepository.findById(escrow.getMappingId())
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", escrow.getMappingId()));
+        ClientMappingStatus mappingStatus = mapping.getStatus();
         if (mappingStatus != ClientMappingStatus.COMPLETED) {
             throw new BadRequestException("Coaching must be confirmed as ended before escrow release");
         }
 
         Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
         Wallet platformWallet = getOrCreateSystemWalletForUpdate(WalletType.PLATFORM);
-        Wallet ptWallet = getOrCreateUserWalletForUpdate(escrow.getMapping().getPt());
+        Wallet ptWallet = getOrCreateUserWalletForUpdate(mapping.getPt());
 
         BigDecimal amount = escrow.getAmount();
         BigDecimal fee = escrow.getPlatformFeeAmount();
@@ -314,7 +320,9 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         }
 
         Wallet escrowWallet = getOrCreateSystemWalletForUpdate(WalletType.ESCROW);
-        Wallet customerWallet = getOrCreateUserWalletForUpdate(escrow.getMapping().getClient());
+        PtClientMapping mapping = mappingRepository.findById(escrow.getMappingId())
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", escrow.getMappingId()));
+        Wallet customerWallet = getOrCreateUserWalletForUpdate(mapping.getClient());
         BigDecimal amount = escrow.getAmount();
         try {
             escrowWallet.subtractLocked(amount);
@@ -440,7 +448,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     private Wallet getOrCreateUserWalletForUpdate(User user) {
         return walletRepository.findUserWalletForUpdate(user.getId(), WalletType.USER)
                 .orElseGet(() -> walletRepository.saveAndFlush(Wallet.builder()
-                        .owner(user)
+                        .ownerId(user.getId())
                         .walletType(WalletType.USER)
                         .currency("VND")
                         .availableBalance(BigDecimal.ZERO)
@@ -451,7 +459,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     private Wallet getOrCreateSystemWalletForUpdate(WalletType type) {
         return walletRepository.findSystemWalletForUpdate(type)
                 .orElseGet(() -> walletRepository.saveAndFlush(Wallet.builder()
-                        .owner(null)
+                        .ownerId(null)
                         .walletType(type)
                         .currency("VND")
                         .availableBalance(BigDecimal.ZERO)

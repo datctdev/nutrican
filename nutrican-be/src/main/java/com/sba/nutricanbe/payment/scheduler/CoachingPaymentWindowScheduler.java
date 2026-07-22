@@ -35,7 +35,7 @@ public class CoachingPaymentWindowScheduler {
                 ClientMappingStatus.AWAITING_PAYMENT, LocalDateTime.now());
         for (PtClientMapping mapping : expired) {
             Optional<Payment> pendingPayment = paymentRepository
-                    .findFirstByMapping_IdAndStatusOrderByCreatedAtDesc(
+                    .findFirstByMappingIdAndStatusOrderByCreatedAtDesc(
                             mapping.getId(), CoachingPaymentStatus.PENDING);
             boolean callbackStillExpected = pendingPayment
                     .map(payment -> payment.getExpiresAt() != null

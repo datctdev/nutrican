@@ -1,17 +1,12 @@
 package com.sba.nutricanbe.diet.enums;
 
+/**
+ * Lifecycle of a diet log entry.
+ * PT review is tracked separately via {@link DietLogReviewStatus}.
+ */
 public enum DietLogStatus {
     PENDING_AI,
     DRAFT,
     MANUAL_REQUIRED,
-    LOGGED,
-    /** Prefer {@link DietLogReviewStatus}. */
-    @Deprecated
-    PT_REVIEWING,
-    /** Prefer {@link DietLogReviewStatus}. */
-    @Deprecated
-    APPROVED,
-    /** Prefer {@link DietLogReviewStatus}. */
-    @Deprecated
-    REJECTED
+    LOGGED
 }
