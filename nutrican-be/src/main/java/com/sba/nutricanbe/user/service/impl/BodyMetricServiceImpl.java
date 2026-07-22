@@ -131,17 +131,22 @@ public class BodyMetricServiceImpl implements BodyMetricService {
                 .orElse(Integer.MAX_VALUE);
     }
 
+    private static final long INBODY_MAX_BYTES = 10L * 1024 * 1024;
+    private static final double INBODY_MIN_CONFIDENCE = 0.6;
+    private static final java.util.Set<String> INBODY_ALLOWED_CONTENT_TYPES = java.util.Set.of(
+            "image/jpeg", "image/jpg", "image/png", "image/webp");
+
     @Override
     public InbodyAnalysisResponse analyzeInbody(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BadRequestException("Tập tin hình ảnh là bắt buộc");
-        }
+        validateInbodyUpload(file);
+
         byte[] bytes;
         try {
             bytes = file.getBytes();
         } catch (Exception e) {
             throw new BadRequestException("Không thể đọc tệp hình ảnh: " + e.getMessage());
         }
+        assertImageMagicBytes(bytes);
         String base64 = java.util.Base64.getEncoder().encodeToString(bytes);
 
         if (!ollamaService.isAvailable()) {
@@ -149,19 +154,29 @@ public class BodyMetricServiceImpl implements BodyMetricService {
         }
 
         String prompt = """
-                You are an expert medical OCR assistant. Analyze the InBody sheet carefully.
-                Extract the following measurements:
+                You are an expert medical OCR assistant for InBody body composition result sheets.
+                First decide whether the image is a real InBody (or clearly branded InBody-compatible) result sheet.
+                Look for typical InBody layout: brand/logo "InBody", sections like Weight/SMM/PBF/BMI, segmental lean analysis, or Vietnamese labels such as Cân nặng / Khối lượng cơ xương / Tỷ lệ mỡ.
+
+                If it is NOT an InBody result sheet (selfie, random photo, screenshot unrelated to InBody, food image, etc.):
+                return ONLY:
+                {"is_inbody": false, "confidence": 0.0, "weight": null, "muscle_mass": null, "body_fat_percent": null, "lbm": null, "unit": null, "height": null, "age": null, "gender": null}
+
+                If it IS an InBody sheet, extract measurements carefully:
                 1. Weight (Cân nặng)
                 2. SMM (Skeletal Muscle Mass / Khối lượng cơ xương)
                 3. PBF (Percent Body Fat / Tỷ lệ phần trăm mỡ cơ thể)
                 4. Fat Free Mass / FFM / LBM (Lean Body Mass / Fat Free Mass)
-                5. The unit of measurement (either "kg" or "lb" as shown on the sheet, e.g. next to SMM or Weight)
-                6. Height (Chiều cao - convert to centimeters integer, e.g. "5ft 2in" is 157 cm, "175cm" is 175)
-                7. Age (Tuổi - integer)
-                8. Gender (Giới tính - "male" or "female")
+                5. The unit of measurement (either "kg" or "lb")
+                6. Height in centimeters (integer)
+                7. Age (integer)
+                8. Gender ("male" or "female")
+                9. confidence between 0 and 1 for how sure you are this is a readable InBody sheet
 
                 Return ONLY a valid JSON object matching this schema, no markdown or extra text:
                 {
+                  "is_inbody": true,
+                  "confidence": 0.92,
                   "weight": 130.3,
                   "muscle_mass": 43.4,
                   "body_fat_percent": 36.7,
@@ -201,21 +216,47 @@ public class BodyMetricServiceImpl implements BodyMetricService {
             int start = content.indexOf('{');
             int end = content.lastIndexOf('}');
             if (start == -1 || end == -1) {
-                throw new BadRequestException("Kết quả trả về không phải là JSON hợp lệ: " + content);
+                throw new BadRequestException("Kết quả trả về không phải là JSON hợp lệ");
             }
             String json = content.substring(start, end + 1);
 
             Map<String, Object> parsed = objectMapper.readValue(json, new TypeReference<>() {});
 
+            boolean isInbody = parseBoolean(parsed.get("is_inbody"));
+            Double confidence = getDouble(parsed.get("confidence"));
+            if (!isInbody) {
+                throw new BadRequestException(
+                        "Ảnh không phải phiếu InBody. Vui lòng tải ảnh kết quả đo InBody rõ nét.");
+            }
+            if (confidence == null || confidence < INBODY_MIN_CONFIDENCE) {
+                throw new BadRequestException(
+                        "Không đủ tin cậy đây là phiếu InBody hợp lệ. Hãy chụp lại rõ hơn hoặc nhập số liệu thủ công.");
+            }
+
             BigDecimal rawWeight = getBigDecimal(parsed.get("weight"));
             BigDecimal rawMuscle = getBigDecimal(parsed.get("muscle_mass"));
             BigDecimal rawPbf = getBigDecimal(parsed.get("body_fat_percent"));
             BigDecimal rawLbm = getBigDecimal(parsed.get("lbm"));
-            String unit = parsed.containsKey("unit") ? parsed.get("unit").toString().toLowerCase().trim() : "kg";
+            String unit = parsed.containsKey("unit") && parsed.get("unit") != null
+                    ? parsed.get("unit").toString().toLowerCase().trim() : "kg";
 
             Integer height = parsed.containsKey("height") ? getInteger(parsed.get("height")) : null;
             Integer age = parsed.containsKey("age") ? getInteger(parsed.get("age")) : null;
-            String gender = parsed.containsKey("gender") ? parsed.get("gender").toString().toLowerCase().trim() : null;
+            String gender = parsed.containsKey("gender") && parsed.get("gender") != null
+                    ? parsed.get("gender").toString().toLowerCase().trim() : null;
+
+            if (rawWeight == null && rawPbf == null && rawMuscle == null) {
+                throw new BadRequestException(
+                        "Không đọc được số đo từ phiếu InBody. Hãy chụp lại rõ hơn hoặc nhập thủ công.");
+            }
+            if (rawWeight != null && (rawWeight.compareTo(BigDecimal.valueOf(20)) < 0
+                    || rawWeight.compareTo(BigDecimal.valueOf(400)) > 0)) {
+                throw new BadRequestException("Cân nặng đọc từ ảnh không hợp lệ. Vui lòng kiểm tra lại ảnh InBody.");
+            }
+            if (rawPbf != null && (rawPbf.compareTo(BigDecimal.ZERO) < 0
+                    || rawPbf.compareTo(BigDecimal.valueOf(80)) > 0)) {
+                throw new BadRequestException("% mỡ cơ thể đọc từ ảnh không hợp lệ. Vui lòng kiểm tra lại ảnh InBody.");
+            }
 
             BigDecimal weight = rawWeight;
             BigDecimal muscle = rawMuscle;
@@ -229,6 +270,8 @@ public class BodyMetricServiceImpl implements BodyMetricService {
             }
 
             return InbodyAnalysisResponse.builder()
+                    .isInbody(true)
+                    .confidence(confidence)
                     .weight(weight)
                     .bodyFatPercent(rawPbf)
                     .muscleMass(muscle)
@@ -242,11 +285,56 @@ public class BodyMetricServiceImpl implements BodyMetricService {
                     .gender(gender)
                     .build();
 
+        } catch (BadRequestException e) {
+            throw e;
         } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
-            throw new BadRequestException("Không thể phân tích ảnh InBody bằng AI (Phản hồi lỗi từ Ollama): " 
+            throw new BadRequestException("Không thể phân tích ảnh InBody bằng AI (Phản hồi lỗi từ Ollama): "
                     + e.getResponseBodyAsString() + " | " + e.getMessage());
         } catch (Exception e) {
             throw new BadRequestException("Không thể phân tích ảnh InBody bằng AI: " + e.getMessage());
+        }
+    }
+
+    private void validateInbodyUpload(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Tập tin hình ảnh là bắt buộc");
+        }
+        if (file.getSize() > INBODY_MAX_BYTES) {
+            throw new BadRequestException("Ảnh InBody tối đa 10MB");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !INBODY_ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase().trim())) {
+            throw new BadRequestException("Ảnh InBody chỉ chấp nhận JPG, PNG hoặc WEBP");
+        }
+    }
+
+    private void assertImageMagicBytes(byte[] bytes) {
+        if (bytes == null || bytes.length < 12) {
+            throw new BadRequestException("Tệp không phải là ảnh hợp lệ");
+        }
+        boolean jpeg = (bytes[0] & 0xFF) == 0xFF && (bytes[1] & 0xFF) == 0xD8;
+        boolean png = (bytes[0] & 0xFF) == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47;
+        boolean webp = bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P';
+        if (!jpeg && !png && !webp) {
+            throw new BadRequestException("Tệp không phải là ảnh JPG/PNG/WEBP hợp lệ");
+        }
+    }
+
+    private boolean parseBoolean(Object obj) {
+        if (obj == null) return false;
+        if (obj instanceof Boolean b) return b;
+        String s = obj.toString().trim().toLowerCase();
+        return "true".equals(s) || "1".equals(s) || "yes".equals(s);
+    }
+
+    private Double getDouble(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(obj.toString().trim());
+        } catch (Exception e) {
+            return null;
         }
     }
 

@@ -12,6 +12,7 @@ import MealPlanWeekPicker from '../customer/components/MealPlanWeekPicker';
 import { toast } from 'sonner';
 import { ArrowLeft, TrendingUp, Utensils, Camera, Loader2 } from 'lucide-react';
 import { MEAL_PERIOD_LABELS } from '../customer/components/dietUtils';
+import { validateInbodyFile } from '../../utils/inbodyUpload';
 
 function AdherenceDonut({ percent }) {
   const hasValue = percent !== null && percent !== undefined && Number.isFinite(Number(percent));
@@ -251,6 +252,13 @@ export default function ClientProgressPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const check = validateInbodyFile(file);
+    if (!check.ok) {
+      toast.error(check.message);
+      e.target.value = '';
+      return;
+    }
+
     setAnalyzingInbody(true);
     try {
       const res = await profileExtensionsService.analyzeInbody(file);
@@ -259,7 +267,7 @@ export default function ClientProgressPage() {
         setEditForm((prev) => ({
           ...prev,
           weight: inbodyData.weight || prev.weight,
-          bodyFatPercent: inbodyData.body_fat_percent || prev.bodyFatPercent,
+          bodyFatPercent: inbodyData.bodyFatPercent ?? inbodyData.body_fat_percent ?? prev.bodyFatPercent,
           heightCm: inbodyData.height || prev.heightCm,
           gender: inbodyData.gender || prev.gender,
         }));
@@ -272,6 +280,7 @@ export default function ClientProgressPage() {
       toast.error(err.response?.data?.message || 'Không thể phân tích ảnh InBody.');
     } finally {
       setAnalyzingInbody(false);
+      e.target.value = '';
     }
   };
 
@@ -520,7 +529,7 @@ export default function ClientProgressPage() {
                         )}
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                           onChange={handleInbodyUpload}
                           className="hidden"
                           disabled={analyzingInbody}

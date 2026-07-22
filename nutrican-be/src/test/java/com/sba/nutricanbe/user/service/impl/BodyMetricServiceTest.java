@@ -130,7 +130,38 @@ class BodyMetricServiceTest {
     void analyzeInbody_throwsWhenFileEmpty() {
         org.springframework.web.multipart.MultipartFile mockFile = mock(org.springframework.web.multipart.MultipartFile.class);
         when(mockFile.isEmpty()).thenReturn(true);
-        assertThrows(BadRequestException.class, () -> service.analyzeInbody(mockFile));
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> service.analyzeInbody(mockFile));
+        assertTrue(ex.getMessage().contains("bắt buộc"));
+    }
+
+    @Test
+    void analyzeInbody_throwsWhenContentTypeInvalid() {
+        org.springframework.web.multipart.MultipartFile mockFile = mock(org.springframework.web.multipart.MultipartFile.class);
+        when(mockFile.isEmpty()).thenReturn(false);
+        when(mockFile.getSize()).thenReturn(1024L);
+        when(mockFile.getContentType()).thenReturn("application/pdf");
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> service.analyzeInbody(mockFile));
+        assertTrue(ex.getMessage().contains("JPG"));
+    }
+
+    @Test
+    void analyzeInbody_throwsWhenFileTooLarge() {
+        org.springframework.web.multipart.MultipartFile mockFile = mock(org.springframework.web.multipart.MultipartFile.class);
+        when(mockFile.isEmpty()).thenReturn(false);
+        when(mockFile.getSize()).thenReturn(11L * 1024 * 1024);
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> service.analyzeInbody(mockFile));
+        assertTrue(ex.getMessage().contains("10MB"));
+    }
+
+    @Test
+    void analyzeInbody_throwsWhenMagicBytesInvalid() throws Exception {
+        org.springframework.web.multipart.MultipartFile mockFile = mock(org.springframework.web.multipart.MultipartFile.class);
+        when(mockFile.isEmpty()).thenReturn(false);
+        when(mockFile.getSize()).thenReturn(20L);
+        when(mockFile.getContentType()).thenReturn("image/jpeg");
+        when(mockFile.getBytes()).thenReturn(new byte[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12});
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> service.analyzeInbody(mockFile));
+        assertTrue(ex.getMessage().toLowerCase().contains("ảnh") || ex.getMessage().toLowerCase().contains("hợp lệ"));
     }
 
     @Disabled

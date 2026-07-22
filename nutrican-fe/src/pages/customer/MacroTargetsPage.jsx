@@ -16,6 +16,7 @@ import {
   DEFAULT_ACTIVITY_LEVEL,
   ActivityLevelInfoTooltip,
 } from './components/activityLevelOptions';
+import { validateInbodyFile } from '../../utils/inbodyUpload';
 
 export default function MacroTargetsPage() {
   const fileInputRef = useRef(null);
@@ -201,8 +202,14 @@ export default function MacroTargetsPage() {
   const handleInbodyUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) return toast.error('Vui lòng chọn file hình ảnh');
-    
+
+    const check = validateInbodyFile(file);
+    if (!check.ok) {
+      toast.error(check.message);
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => setInBodyPreview(ev.target.result);
     reader.readAsDataURL(file);
@@ -222,7 +229,7 @@ export default function MacroTargetsPage() {
         toast.success('Phân tích thành công! Kiểm tra lại số liệu.', { id: 'inbody-ocr' });
       }
     } catch (err) {
-      toast.error('Không thể phân tích ảnh InBody.', { id: 'inbody-ocr' });
+      toast.error(err.response?.data?.message || 'Không thể phân tích ảnh InBody.', { id: 'inbody-ocr' });
       setInBodyPreview(null);
     } finally {
       setIsAnalyzingInbody(false);
@@ -604,11 +611,11 @@ export default function MacroTargetsPage() {
                   <>
                     <Upload className="w-8 h-8 text-slate-400 mb-2" />
                     <p className="text-slate-700 font-bold text-sm">Tải Lên Ảnh InBody</p>
-                    <p className="text-xs text-slate-500 mt-1">Hệ thống AI sẽ tự động đọc số liệu</p>
+                    <p className="text-xs text-slate-500 mt-1">JPG/PNG/WEBP · tối đa 10MB · chỉ chấp nhận phiếu InBody</p>
                   </>
                 )}
               </div>
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleInbodyUpload} className="hidden" />
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={handleInbodyUpload} className="hidden" />
             </div>
 
             <div className="md:col-span-7 space-y-4">

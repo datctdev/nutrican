@@ -12,6 +12,9 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class InbodyAnalysisResponse {
+    private Boolean isInbody;
+    private Double confidence;
+
     private BigDecimal weight;
     private BigDecimal bodyFatPercent;
     private BigDecimal muscleMass;
