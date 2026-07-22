@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { adminService } from '../../services/adminService';
+import SessionDisputeThread from '../../components/coaching/SessionDisputeThread';
 import { toast } from 'sonner';
 import { Loader2, RefreshCw } from 'lucide-react';
 import useWebSocket from '../../hooks/useWebSocket';
@@ -108,9 +109,12 @@ export default function AdminFinancePage() {
   const resolveDispute = async (id, decision) => {
     setActing(id + decision);
     try {
-      const body = { decision, adminNote: `Admin: ${decision}` };
+      const form = splitForm[id] || {};
+      const body = {
+        decision,
+        adminNote: (form.adminNote || '').trim() || undefined,
+      };
       if (decision === 'SPLIT') {
-        const form = splitForm[id] || {};
         body.ptAmount = Number(form.ptAmount || 0);
         body.customerAmount = Number(form.customerAmount || 0);
       }
@@ -124,31 +128,50 @@ export default function AdminFinancePage() {
     }
   };
 
+  const replyDispute = async (id, body) => {
+    setActing(id);
+    try {
+      await adminService.replySessionDispute(id, { body });
+      toast.success('Đã gửi ghi chú');
+      await loadDisputes();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Gửi ghi chú thất bại');
+    } finally {
+      setActing(null);
+    }
+  };
+
   const money = (v) => `${Number(v || 0).toLocaleString('vi-VN')}đ`;
+  const pendingDisputes = overview?.pendingSessionDisputeCount ?? 0;
 
   return (
     <div className="max-w-5xl mx-auto pb-12 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dòng tiền</h1>
-          <p className="text-sm text-slate-500">Escrow · Platform · Hoàn tiền · Tranh chấp buổi · Sổ cái</p>
+          <h1 className="text-2xl font-bold text-slate-900">Tài chính & tranh chấp</h1>
+          <p className="text-sm text-slate-500">Escrow, hoàn tiền, và tranh chấp buổi offline</p>
         </div>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="w-4 h-4" /></Button>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading} className="rounded-xl">
+          <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} /> Làm mới
+        </Button>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
-              tab === t.id
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+              tab === t.id ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             {t.label}
+            {t.id === 'disputes' && pendingDisputes > 0 && tab !== 'disputes' && (
+              <span className="ml-1.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] text-white">
+                {pendingDisputes}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -172,10 +195,12 @@ export default function AdminFinancePage() {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Hoàn tiền</p>
               <p className="mt-1 text-2xl font-black text-slate-900">{money(overview?.totalRefunds)}</p>
             </CardContent></Card>
-            <Card><CardContent className="p-5">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Rút tiền</p>
-              <p className="mt-1 text-2xl font-black text-slate-900">{money(overview?.totalWithdrawals)}</p>
-              <p className="text-xs text-rose-600 mt-1">Dispute escrow: {overview?.disputedEscrowCount || 0}</p>
+            <Card className="border-rose-200 bg-rose-50/50"><CardContent className="p-5">
+              <p className="text-xs font-bold uppercase tracking-wider text-rose-700">Tranh chấp buổi</p>
+              <p className="mt-1 text-2xl font-black text-slate-900">{pendingDisputes}</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Escrow hoàn tiền (khác): {overview?.disputedEscrowCount || 0}
+              </p>
             </CardContent></Card>
           </div>
 
@@ -251,53 +276,76 @@ export default function AdminFinancePage() {
         ) : (
           <div className="space-y-4">
             {disputes.map((d) => (
-              <Card key={d.id}>
-                <CardContent className="p-5 space-y-3">
-                  <div className="flex justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold uppercase text-amber-700">PENDING</p>
-                      <p className="font-semibold text-slate-900 mt-1">{d.reason}</p>
-                      <p className="text-xs text-slate-500 mt-1">
-                        Session {d.sessionId?.slice(0, 8)}… · Mapping {d.mappingId?.slice(0, 8)}…
-                      </p>
-                    </div>
-                    <p className="text-xs text-slate-400 whitespace-nowrap">
-                      {d.createdAt ? new Date(d.createdAt).toLocaleString('vi-VN') : ''}
+              <SessionDisputeThread
+                key={d.id}
+                dispute={d}
+                viewerRole="admin"
+                actingId={acting === d.id ? d.id : null}
+                onSendMessage={replyDispute}
+                resolveSlot={(
+                  <div className="space-y-3 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-black uppercase tracking-wider text-slate-500">
+                      Quyết định giải ngân · giá trị buổi {money(d.perSessionAmount)}
                     </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2 items-end">
-                    <Button size="sm" className="bg-emerald-600 text-white" disabled={!!acting} onClick={() => resolveDispute(d.id, 'TO_PT')}>
-                      Về PT
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={!!acting} onClick={() => resolveDispute(d.id, 'TO_CUSTOMER')}>
-                      Về khách
-                    </Button>
-                    <div className="flex items-end gap-2 border-l border-slate-200 pl-3">
-                      <input
-                        placeholder="PT nhận"
-                        className="w-28 rounded-lg border px-2 py-1.5 text-sm"
-                        value={splitForm[d.id]?.ptAmount || ''}
-                        onChange={(e) => setSplitForm((s) => ({
-                          ...s,
-                          [d.id]: { ...s[d.id], ptAmount: e.target.value },
-                        }))}
-                      />
-                      <input
-                        placeholder="Khách nhận"
-                        className="w-28 rounded-lg border px-2 py-1.5 text-sm"
-                        value={splitForm[d.id]?.customerAmount || ''}
-                        onChange={(e) => setSplitForm((s) => ({
-                          ...s,
-                          [d.id]: { ...s[d.id], customerAmount: e.target.value },
-                        }))}
-                      />
-                      <Button size="sm" className="bg-slate-900 text-white" disabled={!!acting} onClick={() => resolveDispute(d.id, 'SPLIT')}>
-                        Chia
+                    <textarea
+                      rows={2}
+                      placeholder="Ghi chú quyết định (hiển thị cho PT & khách)..."
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none"
+                      value={splitForm[d.id]?.adminNote || ''}
+                      onChange={(e) => setSplitForm((s) => ({
+                        ...s,
+                        [d.id]: { ...s[d.id], adminNote: e.target.value },
+                      }))}
+                    />
+                    <div className="flex flex-wrap gap-2 items-end">
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 text-white"
+                        disabled={!!acting}
+                        onClick={() => resolveDispute(d.id, 'TO_PT')}
+                      >
+                        Về PT (đủ buổi)
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!!acting}
+                        onClick={() => resolveDispute(d.id, 'TO_CUSTOMER')}
+                      >
+                        Về khách (hoàn đủ)
+                      </Button>
+                      <div className="flex flex-wrap items-end gap-2 border-l border-slate-200 pl-3">
+                        <input
+                          placeholder="PT nhận"
+                          className="w-28 rounded-lg border px-2 py-1.5 text-sm"
+                          value={splitForm[d.id]?.ptAmount || ''}
+                          onChange={(e) => setSplitForm((s) => ({
+                            ...s,
+                            [d.id]: { ...s[d.id], ptAmount: e.target.value },
+                          }))}
+                        />
+                        <input
+                          placeholder="Khách nhận"
+                          className="w-28 rounded-lg border px-2 py-1.5 text-sm"
+                          value={splitForm[d.id]?.customerAmount || ''}
+                          onChange={(e) => setSplitForm((s) => ({
+                            ...s,
+                            [d.id]: { ...s[d.id], customerAmount: e.target.value },
+                          }))}
+                        />
+                        <Button
+                          size="sm"
+                          className="bg-slate-900 text-white"
+                          disabled={!!acting}
+                          onClick={() => resolveDispute(d.id, 'SPLIT')}
+                        >
+                          Chia
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              />
             ))}
           </div>
         )

@@ -1,40 +1,53 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { appointmentService } from '../../services/appointmentService';
 import { workspaceService } from '../../services/workspaceService';
+import SessionDisputeThread from '../../components/coaching/SessionDisputeThread';
 import { toast } from 'sonner';
 import { Loader2, Calendar } from 'lucide-react';
 import CoachingTimetable, { mergeTimetableSources } from '../../components/coaching/CoachingTimetable';
+import useWebSocket from '../../hooks/useWebSocket';
 
 export default function PtAppointmentsPage() {
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
+  const [disputes, setDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState(null);
   const [actingId, setActingId] = useState(null);
+  const [disputeActing, setDisputeActing] = useState(null);
 
-  const fetchAppts = async () => {
+  useWebSocket();
+
+  const fetchAppts = useCallback(async () => {
     setLoading(true);
     try {
-      const [apptRes, clientsRes] = await Promise.all([
+      const [apptRes, clientsRes, disputesRes] = await Promise.all([
         appointmentService.getPtUpcoming(),
         workspaceService.getClients({ page: 0, size: 100, status: 'ACTIVE' }).catch(() => null),
+        workspaceService.getSessionDisputes({ status: 'PENDING' }).catch(() => null),
       ]);
       setAppointments(apptRes.data.data || []);
       const page = clientsRes?.data?.data;
       const list = page?.content || page?.items || (Array.isArray(page) ? page : []);
       setClients(list);
+      setDisputes(disputesRes?.data?.data || []);
     } catch {
       toast.error('Không thể tải lịch hẹn');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => fetchAppts(), 0);
-    return () => clearTimeout(t);
-  }, []);
+    const onUpdate = () => fetchAppts();
+    window.addEventListener('session_confirm_updated', onUpdate);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('session_confirm_updated', onUpdate);
+    };
+  }, [fetchAppts]);
 
   const items = useMemo(() => {
     const nameByClientId = {};
@@ -78,6 +91,20 @@ export default function PtAppointmentsPage() {
     }
   };
 
+  const handleDisputeReply = async (disputeId, body) => {
+    setDisputeActing(disputeId);
+    try {
+      await workspaceService.replySessionDispute(disputeId, { body });
+      toast.success('Đã gửi phản hồi tranh chấp');
+      const res = await workspaceService.getSessionDisputes({ status: 'PENDING' });
+      setDisputes(res.data?.data || []);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gửi phản hồi thất bại');
+    } finally {
+      setDisputeActing(null);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto pb-12 space-y-6">
       <div className="flex items-center gap-3">
@@ -85,10 +112,27 @@ export default function PtAppointmentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Lịch buổi tập</h1>
           <p className="text-sm text-slate-500">
-            Nút «Đã dạy xong» chỉ bật khi đã tới giờ buổi. Buổi đến hạn hiện ở khung nhắc phía trên lịch.
+            Nút «Đã dạy xong» chỉ bật khi đã tới giờ buổi. Nếu khách không đồng ý, phản hồi ngay bên dưới.
           </p>
         </div>
       </div>
+
+      {disputes.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-black uppercase tracking-wider text-rose-700">
+            Tranh chấp đang mở ({disputes.length})
+          </h2>
+          {disputes.map((d) => (
+            <SessionDisputeThread
+              key={d.id}
+              dispute={d}
+              viewerRole="pt"
+              actingId={disputeActing}
+              onSendMessage={handleDisputeReply}
+            />
+          ))}
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-5 sm:p-6">

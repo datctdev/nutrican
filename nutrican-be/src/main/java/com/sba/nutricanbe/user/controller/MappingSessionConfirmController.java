@@ -2,6 +2,7 @@ package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.user.dto.MappingSessionResponse;
+import com.sba.nutricanbe.user.dto.SessionDisputeMessageRequest;
 import com.sba.nutricanbe.user.dto.SessionDisputeRequest;
 import com.sba.nutricanbe.user.dto.SessionDisputeResponse;
 import com.sba.nutricanbe.user.dto.SessionDisputeReviewRequest;
@@ -32,6 +33,26 @@ public class MappingSessionConfirmController {
                 "Đã gửi xác nhận buổi tập cho khách hàng"));
     }
 
+    @GetMapping("/api/v1/workspace/session-disputes")
+    @PreAuthorize("hasAnyRole('PT_CERTIFIED', 'PT_FREELANCE')")
+    public ResponseEntity<ApiResponse<List<SessionDisputeResponse>>> listPtDisputes(
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponse.success(
+                confirmService.listDisputesForPt(user.getId(), status)));
+    }
+
+    @PostMapping("/api/v1/workspace/session-disputes/{id}/messages")
+    @PreAuthorize("hasAnyRole('PT_CERTIFIED', 'PT_FREELANCE')")
+    public ResponseEntity<ApiResponse<SessionDisputeResponse>> ptReply(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID id,
+            @RequestBody SessionDisputeMessageRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                confirmService.addDisputeMessage(user.getId(), id, request, false),
+                "Đã gửi phản hồi tranh chấp"));
+    }
+
     @PostMapping("/api/v1/profile/sessions/{sessionId}/confirm")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<ApiResponse<MappingSessionResponse>> confirm(
@@ -60,6 +81,26 @@ public class MappingSessionConfirmController {
         return ResponseEntity.ok(ApiResponse.success(confirmService.listSessionsForCustomer(user.getId())));
     }
 
+    @GetMapping("/api/v1/profile/session-disputes")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponse<List<SessionDisputeResponse>>> listCustomerDisputes(
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(ApiResponse.success(
+                confirmService.listDisputesForCustomer(user.getId(), status)));
+    }
+
+    @PostMapping("/api/v1/profile/session-disputes/{id}/messages")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponse<SessionDisputeResponse>> customerReply(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID id,
+            @RequestBody SessionDisputeMessageRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                confirmService.addDisputeMessage(user.getId(), id, request, false),
+                "Đã gửi bổ sung ý kiến"));
+    }
+
     @GetMapping("/api/v1/admin/session-disputes")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<SessionDisputeResponse>>> listDisputes(
@@ -67,13 +108,25 @@ public class MappingSessionConfirmController {
         return ResponseEntity.ok(ApiResponse.success(confirmService.listDisputes(status)));
     }
 
+    @PostMapping("/api/v1/admin/session-disputes/{id}/messages")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<SessionDisputeResponse>> adminMessage(
+            @AuthenticationPrincipal User user,
+            @PathVariable UUID id,
+            @RequestBody SessionDisputeMessageRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                confirmService.addDisputeMessage(user.getId(), id, request, true),
+                "Đã gửi ghi chú tranh chấp"));
+    }
+
     @PutMapping("/api/v1/admin/session-disputes/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<SessionDisputeResponse>> resolveDispute(
+            @AuthenticationPrincipal User user,
             @PathVariable UUID id,
             @RequestBody SessionDisputeReviewRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                confirmService.resolveDispute(id, request),
+                confirmService.resolveDispute(user.getId(), id, request),
                 "Đã xử lý tranh chấp buổi tập"));
     }
 }
