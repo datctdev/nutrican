@@ -181,7 +181,9 @@ public class DietLogHelperImpl implements DietLogHelper {
 
     @Override
     public boolean hasActivePt(UUID customerId) {
-        return ptClientMappingRepository.existsByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE);
+        return ptClientMappingRepository.existsByClient_IdAndStatusIn(
+                customerId,
+                List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED));
     }
 
     @Override
@@ -192,7 +194,9 @@ public class DietLogHelperImpl implements DietLogHelper {
 
     @Override
     public Optional<PtClientMapping> findActivePt(UUID customerId) {
-        return ptClientMappingRepository.findFirstByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE);
+        return ptClientMappingRepository.findFirstByClient_IdAndStatusIn(
+                customerId,
+                List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED));
     }
 
     @Override

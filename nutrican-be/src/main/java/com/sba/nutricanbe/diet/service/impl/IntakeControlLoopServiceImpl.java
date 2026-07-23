@@ -72,7 +72,8 @@ public class IntakeControlLoopServiceImpl implements IntakeControlLoopService {
             record.setConsecutiveAtRiskDays(consecutive);
             intakeDayStatusRepository.save(record);
 
-            boolean hasActivePt = mappingRepository.findFirstByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE).isPresent();
+            boolean hasActivePt = mappingRepository.existsByClient_IdAndStatusIn(
+                    customerId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED));
             boolean suggestSubmit = reviewNotRequired && hasActivePt
                     && (dayStatus == IntakeStatus.OVER_MACRO || dayStatus == IntakeStatus.UNDER_INTAKE
                     || dayStatus == IntakeStatus.AT_RISK);
@@ -106,7 +107,8 @@ public class IntakeControlLoopServiceImpl implements IntakeControlLoopService {
     @Transactional(readOnly = true)
     public List<PtClientAlertDto> getActiveAlertsForPt(UUID ptId) {
         return mappingRepository.findByPtIdWithClients(ptId).stream()
-                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                        || m.getStatus() == ClientMappingStatus.END_REQUESTED)
                 .map(PtClientMapping::getClient)
                 .map(client -> {
                     LocalDate today = LocalDate.now();
@@ -140,7 +142,8 @@ public class IntakeControlLoopServiceImpl implements IntakeControlLoopService {
 
     private boolean notifyPt(UUID customerId, LocalDate date, IntakeStatus status, int consecutive,
                              IntakeDayStatus record) {
-        List<PtClientMapping> mappings = mappingRepository.findFirstByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE)
+        List<PtClientMapping> mappings = mappingRepository.findFirstByClient_IdAndStatusIn(
+                        customerId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))
                 .map(List::of)
                 .orElse(List.of());
         if (mappings.isEmpty()) {

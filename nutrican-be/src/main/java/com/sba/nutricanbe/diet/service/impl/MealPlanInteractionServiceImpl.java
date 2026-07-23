@@ -2,6 +2,7 @@ package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.CoachingWeeks;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MealPeriods;
 import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
@@ -40,7 +41,10 @@ import com.sba.nutricanbe.diet.service.MealPlanInteractionService;
 import com.sba.nutricanbe.diet.service.MealPlanItemMacrosResolver;
 import com.sba.nutricanbe.diet.service.support.MealPlanDetailAssembler;
 import com.sba.nutricanbe.user.dto.NotificationPayload;
+import com.sba.nutricanbe.user.entity.PtClientMapping;
+import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.NotificationLinkType;
+import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.service.NotificationService;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
@@ -76,17 +80,60 @@ public class MealPlanInteractionServiceImpl implements MealPlanInteractionServic
     private final MealPlanItemMacrosResolver mealPlanItemMacrosResolver;
     private final SelfPlanItemRepository selfPlanItemRepository;
     private final MealPlanDetailAssembler mealPlanDetailAssembler;
+    private final PtClientMappingRepository mappingRepository;
 
     @Override
     @Transactional(readOnly = true)
     public MealPlanDetailResponse getCurrentPlan(UUID customerId, LocalDate weekStart) {
-        MealPlan plan = (weekStart == null
-                ? mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(customerId).stream()
-                        .findFirst()
-                : mealPlanRepository.findFirstByClientIdAndWeekStartAndIsPublishedTrueOrderByCreatedAtDesc(
-                        customerId, weekStart))
-                .orElseThrow(() -> new ResourceNotFoundException("MealPlan", customerId));
+        MealPlan plan;
+        if (weekStart != null) {
+            plan = mealPlanRepository
+                    .findFirstByClientIdAndWeekStartAndIsPublishedTrueOrderByCreatedAtDesc(customerId, weekStart)
+                    .orElseThrow(() -> new ResourceNotFoundException("MealPlan", customerId));
+        } else {
+            plan = resolveCurrentPublishedPlan(customerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("MealPlan", customerId));
+        }
         return mealPlanDetailAssembler.buildDetail(plan, customerId);
+    }
+
+    /**
+     * Dual-read: coaching week exact → Monday(today) exact → latest published.
+     */
+    private java.util.Optional<MealPlan> resolveCurrentPublishedPlan(UUID customerId) {
+        LocalDate today = DietDates.todayVn();
+        LocalDate coachingWeek = findCoachingWeekStart(customerId, today);
+        if (coachingWeek != null) {
+            var coachingPlan = mealPlanRepository
+                    .findFirstByClientIdAndWeekStartAndIsPublishedTrueOrderByCreatedAtDesc(customerId, coachingWeek);
+            if (coachingPlan.isPresent()) {
+                return coachingPlan;
+            }
+        }
+        LocalDate monday = today.with(java.time.DayOfWeek.MONDAY);
+        var mondayPlan = mealPlanRepository
+                .findFirstByClientIdAndWeekStartAndIsPublishedTrueOrderByCreatedAtDesc(customerId, monday);
+        if (mondayPlan.isPresent()) {
+            return mondayPlan;
+        }
+        return mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(customerId).stream()
+                .filter(p -> !p.getWeekStart().isAfter(today))
+                .findFirst()
+                .or(() -> mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(customerId).stream()
+                        .findFirst());
+    }
+
+    private LocalDate findCoachingWeekStart(UUID customerId, LocalDate todayVn) {
+        return mappingRepository.findByClient_Id(customerId, org.springframework.data.domain.PageRequest.of(0, 20))
+                .stream()
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                        || m.getStatus() == ClientMappingStatus.END_REQUESTED)
+                .filter(m -> m.getCoachingStartedAt() != null)
+                .map(PtClientMapping::getCoachingStartedAt)
+                .map(started -> CoachingWeeks.currentWeekStart(started, todayVn))
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     @Override

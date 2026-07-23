@@ -6,6 +6,7 @@ import com.sba.nutricanbe.user.dto.BodyMetricRequest;
 import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
@@ -29,6 +30,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,6 +59,37 @@ class BodyMetricServiceTest {
     }
 
     @Test
+    void allowsRecordWhenHasActivePt() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder().build();
+        org.springframework.test.util.ReflectionTestUtils.setField(user, "id", userId);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        LocalDate today = LocalDate.now();
+        when(bodyMetricRepository.findByUser_IdAndRecordDate(userId, today)).thenReturn(Optional.empty());
+        when(bodyMetricRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        BodyMetricRequest req = new BodyMetricRequest();
+        req.setRecordDate(today);
+        req.setWeight(BigDecimal.valueOf(65));
+
+        BodyMetric saved = service.recordMetric(userId, req);
+        assertEquals(BigDecimal.valueOf(65), saved.getWeight());
+        verify(bodyMetricRepository).save(any());
+    }
+
+    @Test
+    void rejectsInvalidWeight() {
+        UUID userId = UUID.randomUUID();
+
+        BodyMetricRequest req = new BodyMetricRequest();
+        req.setRecordDate(LocalDate.now());
+        req.setWeight(BigDecimal.ZERO);
+
+        assertThrows(BadRequestException.class, () -> service.recordMetric(userId, req));
+        verify(bodyMetricRepository, never()).save(any());
+    }
+
+    @Test
     void upsertsSameDayRecord() {
         UUID userId = UUID.randomUUID();
         User user = User.builder().build();
@@ -80,8 +113,10 @@ class BodyMetricServiceTest {
     void ptListRequiresActiveMapping() {
         UUID ptId = UUID.randomUUID();
         UUID clientId = UUID.randomUUID();
-        when(mappingRepository.existsByPt_IdAndClient_IdAndStatus(ptId, clientId,
-                com.sba.nutricanbe.user.enums.ClientMappingStatus.ACTIVE)).thenReturn(false);
+        when(mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                eq(ptId), eq(clientId),
+                eq(List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))))
+                .thenReturn(false);
 
         assertThrows(UnauthorizedException.class,
                 () -> service.listMetricsForClient(ptId, clientId, org.springframework.data.domain.PageRequest.of(0, 10)));

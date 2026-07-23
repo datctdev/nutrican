@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CalendarDays, Check, ChevronDown, Loader2 } from 'lucide-react';
+import { preferMealPlanWeekStartIso } from '../../../utils/coachingWeeks';
+import { nowInVn } from './dietUtils';
 
 function parseLocalDate(dateKey) {
   return new Date(`${dateKey}T00:00:00`);
@@ -12,8 +14,9 @@ function toLocalDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-function getCurrentWeekStart() {
-  const date = new Date();
+/** Monday fallback when no coaching / currentWeekStart prop. Uses VN demo clock. */
+function getMondayWeekStart() {
+  const date = nowInVn();
   const daysSinceMonday = (date.getDay() + 6) % 7;
   date.setHours(0, 0, 0, 0);
   date.setDate(date.getDate() - daysSinceMonday);
@@ -33,8 +36,8 @@ function formatWeekRange(weekStart, includeYear = false) {
   return `${shortFormat.format(start)} - ${endFormat.format(end)}`;
 }
 
-function getWeekMeta(weekStart) {
-  const current = parseLocalDate(getCurrentWeekStart());
+function getWeekMeta(weekStart, currentWeekStartKey) {
+  const current = parseLocalDate(currentWeekStartKey || getMondayWeekStart());
   const target = parseLocalDate(weekStart);
   const differenceInWeeks = Math.round((target - current) / (7 * 24 * 60 * 60 * 1000));
 
@@ -50,11 +53,27 @@ function getWeekMeta(weekStart) {
   return { label: 'Tuần thực đơn', badgeClass: 'bg-slate-100 text-slate-600' };
 }
 
-export default function MealPlanWeekPicker({ weeks, value, loading, onChange }) {
+/**
+ * @param {object} props
+ * @param {string} [props.currentWeekStart] - ISO date of "this week" (coaching or Monday). Prefer over coachingStartedAt.
+ * @param {string|Date} [props.coachingStartedAt] - When set (and no currentWeekStart), badge uses coaching week basis.
+ */
+export default function MealPlanWeekPicker({
+  weeks,
+  value,
+  loading,
+  onChange,
+  currentWeekStart,
+  coachingStartedAt,
+}) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const selectedWeek = weeks.find((week) => week.weekStart === value) || weeks[0];
-  const selectedMeta = selectedWeek ? getWeekMeta(selectedWeek.weekStart) : null;
+  const basisWeekStart =
+    currentWeekStart
+    || (coachingStartedAt ? preferMealPlanWeekStartIso(coachingStartedAt) : null)
+    || getMondayWeekStart();
+  const selectedMeta = selectedWeek ? getWeekMeta(selectedWeek.weekStart, basisWeekStart) : null;
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -110,7 +129,7 @@ export default function MealPlanWeekPicker({ weeks, value, loading, onChange }) 
           </div>
           <div className="max-h-64 space-y-1 overflow-y-auto">
             {weeks.map((week) => {
-              const meta = getWeekMeta(week.weekStart);
+              const meta = getWeekMeta(week.weekStart, basisWeekStart);
               const selected = week.weekStart === selectedWeek.weekStart;
               return (
                 <button

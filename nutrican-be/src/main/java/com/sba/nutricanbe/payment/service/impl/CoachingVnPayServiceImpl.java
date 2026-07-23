@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.payment.service.impl;
 
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.payment.config.VNPayConfig;
 import com.sba.nutricanbe.payment.entity.Payment;
 import com.sba.nutricanbe.payment.service.CoachingVnPayService;
@@ -24,7 +25,7 @@ public class CoachingVnPayServiceImpl implements CoachingVnPayService {
     @Override
     public String buildPaymentUrl(Payment payment) {
         vnPayConfig.validate();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DietDates.nowVn();
         Map<String, String> params = new TreeMap<>();
         params.put("vnp_Version", "2.1.0");
         params.put("vnp_Command", "pay");

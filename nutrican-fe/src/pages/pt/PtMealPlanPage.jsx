@@ -20,6 +20,7 @@ import SelfPlanSubmissionReviewList from '../../components/pt/meal-plan/SelfPlan
 import TemplateModal from '../../components/pt/meal-plan/TemplateModal';
 import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
 import ClientDayTimelinePanel from '../../components/pt/ClientDayTimelinePanel';
+import { preferMealPlanWeekStart, shiftCoachingOrMondayWeek } from '../../utils/coachingWeeks';
 
 const DAYS_OF_WEEK = [
   { id: 1, name: 'Thứ 2' },
@@ -90,9 +91,11 @@ export default function PtMealPlanPage() {
   const [saving, setSaving] = useState(false);
   
   const [profile, setProfile] = useState(null);
-  
-  const [weekStart, setWeekStart] = useState(getStartOfWeek(new Date()));
-  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+  const [coachingStartedAt, setCoachingStartedAt] = useState(null);
+  const [weekAnchorReady, setWeekAnchorReady] = useState(false);
+
+  const [weekStart, setWeekStart] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
   
   const [planId, setPlanId] = useState(null);
   const [isPublished, setIsPublished] = useState(false);
@@ -125,6 +128,7 @@ export default function PtMealPlanPage() {
   }
 
   const loadData = useCallback(async () => {
+    if (!clientId || !weekStart) return;
     setLoading(true);
     try {
       const profileRes = await workspaceService.getClientProfile(clientId);
@@ -199,11 +203,40 @@ export default function PtMealPlanPage() {
   }, [clientId, weekStart]);
 
   useEffect(() => {
+    if (!weekAnchorReady || !weekStart) return undefined;
     const timer = setTimeout(() => {
       loadData();
     }, 0);
     return () => clearTimeout(timer);
-  }, [clientId, weekStart, loadData]);
+  }, [clientId, weekStart, weekAnchorReady, loadData]);
+
+  useEffect(() => {
+    if (!clientId) return undefined;
+    let cancelled = false;
+    setWeekAnchorReady(false);
+    setCoachingStartedAt(null);
+    workspaceService.getClients({ page: 0, size: 100, status: 'ACTIVE' })
+      .then((res) => {
+        if (cancelled) return;
+        const list = res.data?.data?.content || [];
+        const c = list.find((x) => String(x.clientId) === String(clientId));
+        const started = c?.coachingStartedAt || null;
+        setCoachingStartedAt(started);
+        const next = preferMealPlanWeekStart(started);
+        setWeekStart(next);
+        setSelectedDate(formatDate(next));
+        setWeekAnchorReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const next = preferMealPlanWeekStart(null);
+        setCoachingStartedAt(null);
+        setWeekStart(next);
+        setSelectedDate(formatDate(next));
+        setWeekAnchorReady(true);
+      });
+    return () => { cancelled = true; };
+  }, [clientId]);
 
   const loadClientIntake = useCallback(async () => {
     if (!clientId || !selectedDate) return;
@@ -265,6 +298,7 @@ export default function PtMealPlanPage() {
   };
 
   const weekDates = useMemo(() => {
+    if (!weekStart) return [];
     const dates = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(weekStart);
@@ -288,14 +322,12 @@ export default function PtMealPlanPage() {
   );
 
   const handlePrevWeek = () => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() - 7);
+    const d = shiftCoachingOrMondayWeek(weekStart, -1, coachingStartedAt);
     setWeekStart(d);
     setSelectedDate(formatDate(d));
   };
   const handleNextWeek = () => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + 7);
+    const d = shiftCoachingOrMondayWeek(weekStart, 1, coachingStartedAt);
     setWeekStart(d);
     setSelectedDate(formatDate(d));
   };
@@ -356,7 +388,7 @@ export default function PtMealPlanPage() {
       return;
     }
 
-    const prevWeekStartStr = formatDate(getStartOfWeek(curr));
+    const prevWeekStartStr = formatDate(preferMealPlanWeekStart(coachingStartedAt, curr));
     try {
       const planRes = await workspaceService.getClientMealPlan(clientId, prevWeekStartStr);
       const data = planRes.data.data;
@@ -483,7 +515,7 @@ export default function PtMealPlanPage() {
     });
   };
 
-  if (loading) {
+  if (loading || !weekAnchorReady || !weekStart) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -597,7 +629,10 @@ export default function PtMealPlanPage() {
           <Button variant="outline" onClick={handlePrevWeek} className="rounded-xl border-slate-200 text-slate-600">&larr; Tuần trước</Button>
           <div className="flex items-center gap-2 text-slate-800 font-black">
             <CalendarIcon className="w-5 h-5 text-blue-500" />
-            Tuần {formatDate(weekStart)}
+            {coachingStartedAt ? 'Tuần coaching' : 'Tuần lịch'} {formatDate(weekStart)}
+            {coachingStartedAt && (
+              <span className="text-xs font-medium text-slate-400 ml-1">(neo ngày bắt đầu PT)</span>
+            )}
           </div>
           <Button variant="outline" onClick={handleNextWeek} className="rounded-xl border-slate-200 text-slate-600">Tuần tới &rarr;</Button>
         </div>

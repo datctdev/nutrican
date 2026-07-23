@@ -51,6 +51,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/kyc/**").authenticated()
                         .requestMatchers("/api/v1/auth/forgot-password").permitAll()
                         .requestMatchers("/api/v1/auth/reset-password").permitAll()
+                        .requestMatchers("/api/v1/auth/verify-email").permitAll()
+                        .requestMatchers("/api/v1/auth/resend-verification").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/payment/vnpay/return",
                                 "/api/v1/payment/vnpay/ipn").permitAll()

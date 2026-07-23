@@ -91,7 +91,7 @@ public class PtProfile extends BaseEntity {
 
     @Column(precision = 2, scale = 1)
     @Builder.Default
-    private BigDecimal rating = BigDecimal.valueOf(5.0);
+    private BigDecimal rating = BigDecimal.ZERO;
 
     @Column(name = "total_reviews")
     @Builder.Default

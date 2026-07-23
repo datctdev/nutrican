@@ -6,6 +6,7 @@ import com.sba.nutricanbe.user.enums.AppointmentStatus;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -30,8 +31,14 @@ public class AppointmentResponse {
     private String venueMapsUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    /** Số tiền đã hoàn về ví học viên khi hủy (0 nếu không hoàn). */
+    private BigDecimal refundedAmount;
 
     public static AppointmentResponse from(PtAppointment a) {
+        return from(a, null);
+    }
+
+    public static AppointmentResponse from(PtAppointment a, BigDecimal refundedAmount) {
         if (a == null) {
             return null;
         }
@@ -54,6 +61,7 @@ public class AppointmentResponse {
                 .venueMapsUrl(a.getVenueMapsUrl())
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
+                .refundedAmount(refundedAmount != null ? refundedAmount : BigDecimal.ZERO)
                 .build();
     }
 }

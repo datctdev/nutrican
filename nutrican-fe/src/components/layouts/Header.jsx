@@ -31,6 +31,8 @@ export default function Header() {
     const [loadingNotifications, setLoadingNotifications] = useState(false);
     const { unreadCount, notifications, markAsRead, markAllAsRead, clearNotifications } = useNotificationStore();
     const [pendingHiresCount, setPendingHiresCount] = useState(0);
+    /** Fail-open: keep «Lịch hẹn» until ACTIVE offline fetch succeeds with zero. */
+    const [showAppointmentsNav, setShowAppointmentsNav] = useState(true);
 
     useEffect(() => {
         clearNotifications();
@@ -86,6 +88,43 @@ export default function Header() {
         };
     }, [isAuthenticated, user]);
 
+    useEffect(() => {
+        if (!isAuthenticated || !user?.role?.startsWith('PT')) {
+            setShowAppointmentsNav(true);
+            return undefined;
+        }
+        let cancelled = false;
+        const detectOfflineClients = async () => {
+            try {
+                let hasOffline = false;
+                let page = 0;
+                let last = false;
+                while (!last && page < 30 && !hasOffline) {
+                    const res = await workspaceService.getClients({ page, size: 100, status: 'ACTIVE' });
+                    const data = res.data?.data;
+                    const list = data?.content || [];
+                    hasOffline = list.some((c) => c.selectedTrainingMode === 'OFFLINE' && c.mappingId);
+                    last = data?.last != null ? Boolean(data.last) : list.length < 100;
+                    page += 1;
+                }
+                if (!cancelled) setShowAppointmentsNav(hasOffline);
+            } catch {
+                if (!cancelled) setShowAppointmentsNav(true);
+            }
+        };
+        detectOfflineClients();
+        const onRefresh = () => detectOfflineClients();
+        window.addEventListener('pt_client_alert', onRefresh);
+        window.addEventListener('realtime_update', onRefresh);
+        window.addEventListener('focus', onRefresh);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('pt_client_alert', onRefresh);
+            window.removeEventListener('realtime_update', onRefresh);
+            window.removeEventListener('focus', onRefresh);
+        };
+    }, [isAuthenticated, user]);
+
     const handleLogout = () => {
         logout();
         toast.success('Đăng xuất thành công', { description: 'Hẹn gặp lại bạn!' });
@@ -107,6 +146,10 @@ export default function Header() {
         const currentMode = activeRole || role;
         const isPtMode = currentMode?.startsWith('PT');
         const link = n.linkType;
+        if (n.type === 'PT_CONDUCT_REPORT') {
+            if (role === 'ADMIN') return '/admin/finance?tab=pt-reports';
+            return isPtMode ? '/pt/clients' : '/coaching?tab=contract';
+        }
         switch (link) {
             case 'DIET_LOG':
                 return isPtMode ? '/pt/reviews' : '/diet';
@@ -159,6 +202,24 @@ export default function Header() {
         return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     };
 
+    const buildPtNav = () => {
+        const items = [
+            { label: 'Bảng điều khiển', href: '/pt' },
+            { label: 'Học viên của tôi', href: '/pt/clients' },
+            { label: 'Lịch hẹn', href: '/pt/appointments' },
+            { label: 'Tin nhắn', href: '/pt/chat' },
+            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
+            { label: 'Thống kê đánh giá', href: '/pt/ratings' },
+            { label: 'Portfolio', href: '/pt/portfolio' },
+        ];
+        // Fail-open: only hide after successful ACTIVE-client fetch with zero offline mappings.
+        // Never gate on trainingMode alone (BOTH / ONLINE-with-offline-client).
+        if (!showAppointmentsNav) {
+            return items.filter((item) => item.href !== '/pt/appointments');
+        }
+        return items;
+    };
+
     const navItems = {
         CUSTOMER: [
             { label: 'Nhật ký ăn uống', href: '/diet' },
@@ -166,24 +227,8 @@ export default function Header() {
             { label: 'Tìm PT', href: '/marketplace' },
             { label: "Coaching Của Tôi", href: '/coaching' },
         ],
-        PT_CERTIFIED: [
-            { label: 'Bảng điều khiển', href: '/pt' },
-            { label: 'Học viên của tôi', href: '/pt/clients' },
-            { label: 'Lịch hẹn', href: '/pt/appointments' },
-            { label: 'Tin nhắn', href: '/pt/chat' },
-            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
-            { label: 'Thống kê đánh giá', href: '/pt/ratings' },
-            { label: 'Portfolio', href: '/pt/portfolio' },
-        ],
-        PT_FREELANCE: [
-            { label: 'Bảng điều khiển', href: '/pt' },
-            { label: 'Học viên của tôi', href: '/pt/clients' },
-            { label: 'Lịch hẹn', href: '/pt/appointments' },
-            { label: 'Tin nhắn', href: '/pt/chat' },
-            { label: 'Duyệt bữa ăn', href: '/pt/reviews' },
-            { label: 'Thống kê đánh giá', href: '/pt/ratings' },
-            { label: 'Portfolio', href: '/pt/portfolio' },
-        ],
+        PT_CERTIFIED: buildPtNav(),
+        PT_FREELANCE: buildPtNav(),
         ADMIN: [
             { label: 'Bảng điều khiển', href: '/admin' },
             { label: 'Duyệt PT', href: '/admin/pts' },

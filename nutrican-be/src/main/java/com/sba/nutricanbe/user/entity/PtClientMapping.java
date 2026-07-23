@@ -4,6 +4,8 @@ import com.sba.nutricanbe.common.entity.BaseEntity;
 
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.CoachingEndRequestedBy;
+import com.sba.nutricanbe.user.enums.CoachingEvaluation;
+import com.sba.nutricanbe.user.enums.CoachingHealthStatus;
 import com.sba.nutricanbe.user.enums.TrainingMode;
 import jakarta.persistence.*;
 import lombok.*;
@@ -100,5 +102,20 @@ public class PtClientMapping extends BaseEntity {
 
     @Column(name = "per_session_amount", precision = 15, scale = 2)
     private BigDecimal perSessionAmount;
+
+    /** PT-confirmed coaching health badge; null = not yet confirmed (show suggested). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "coaching_status", length = 20)
+    private CoachingHealthStatus coachingStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "coaching_evaluation", length = 20)
+    private CoachingEvaluation coachingEvaluation;
+
+    @Column(name = "coaching_eval_note", length = 500)
+    private String coachingEvalNote;
+
+    @Column(name = "coaching_eval_updated_at")
+    private LocalDateTime coachingEvalUpdatedAt;
 }
 

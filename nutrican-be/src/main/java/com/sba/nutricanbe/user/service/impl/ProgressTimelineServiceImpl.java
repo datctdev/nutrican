@@ -176,7 +176,8 @@ public class ProgressTimelineServiceImpl implements ProgressTimelineService {
     }
 
     private void notifyPtRegression(UUID userId, String message) {
-        mappingRepository.findFirstByClient_IdAndStatus(userId, ClientMappingStatus.ACTIVE)
+        mappingRepository.findFirstByClient_IdAndStatusIn(
+                        userId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))
                 .ifPresent(mapping -> {
                     Map<String, Object> payload = new HashMap<>();
                     payload.put("clientId", userId.toString());

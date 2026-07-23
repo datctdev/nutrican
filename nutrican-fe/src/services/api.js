@@ -37,7 +37,16 @@ api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
-        const skipEndpoints = ['/auth/login', '/auth/refresh', '/auth/register', '/auth/google'];
+        const skipEndpoints = [
+            '/auth/login',
+            '/auth/refresh',
+            '/auth/register',
+            '/auth/google',
+            '/auth/verify-email',
+            '/auth/resend-verification',
+            '/auth/forgot-password',
+            '/auth/reset-password',
+        ];
         const isAuthEndpoint = skipEndpoints.some(endpoint => originalRequest.url?.includes(endpoint));
 
         if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {

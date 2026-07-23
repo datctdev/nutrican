@@ -41,6 +41,10 @@ public class User extends BaseEntity {
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
 
+    /** When status=SUSPENDED: null = indefinite; otherwise auto-lift after this instant (VN clock). */
+    @Column(name = "suspended_until")
+    private java.time.LocalDateTime suspendedUntil;
+
     @Column(name = "full_name", length = 255)
     private String fullName;
 
@@ -105,6 +109,10 @@ public class User extends BaseEntity {
 
     @Column(name = "allergy_notes", columnDefinition = "TEXT")
     private String allergyNotes;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "allergic_food_codes", columnDefinition = "jsonb")
+    private List<String> allergicFoodCodes;
 
 
     @JdbcTypeCode(SqlTypes.JSON)

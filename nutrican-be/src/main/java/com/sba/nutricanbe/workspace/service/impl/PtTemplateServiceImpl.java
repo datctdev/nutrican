@@ -4,11 +4,16 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
+import com.sba.nutricanbe.common.util.CoachingWeeks;
 import com.sba.nutricanbe.diet.entity.MealPlan;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
+import com.sba.nutricanbe.diet.enums.MealPlanWeekBasis;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanRepository;
+import com.sba.nutricanbe.user.entity.PtClientMapping;
+import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.workspace.dto.ApplyTemplateRequest;
 import com.sba.nutricanbe.workspace.dto.CreateTemplateRequest;
 import com.sba.nutricanbe.workspace.dto.TemplateResponse;
@@ -19,12 +24,14 @@ import com.sba.nutricanbe.workspace.repository.MealPlanTemplateRepository;
 import com.sba.nutricanbe.workspace.service.PtTemplateService;
 import com.sba.nutricanbe.workspace.service.support.PtWorkspaceAccessGuard;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -35,6 +42,7 @@ public class PtTemplateServiceImpl implements PtTemplateService {
     private final MealPlanTemplateItemRepository mealPlanTemplateItemRepository;
     private final MealPlanRepository mealPlanRepository;
     private final MealPlanItemRepository mealPlanItemRepository;
+    private final PtClientMappingRepository mappingRepository;
     private final PtWorkspaceAccessGuard accessGuard;
 
     @Override
@@ -94,6 +102,7 @@ public class PtTemplateServiceImpl implements PtTemplateService {
             throw new UnauthorizedException("You can only apply your own meal-plan templates");
         }
         LocalDate weekStart = LocalDate.parse(request.getWeekStart());
+        MealPlanWeekBasis weekBasis = resolveWeekBasis(clientId, weekStart);
 
         List<MealPlanTemplateItem> templateItems =
                 mealPlanTemplateItemRepository.findByTemplateIdOrderByDayOffsetAscMealTypeAsc(templateId);
@@ -106,11 +115,13 @@ public class PtTemplateServiceImpl implements PtTemplateService {
                             .clientId(clientId)
                             .ptId(ptId)
                             .weekStart(weekStart)
+                            .weekBasis(weekBasis)
                             .build();
                     return mealPlanRepository.save(newPlan);
                 });
 
         plan.setPtId(ptId);
+        plan.setWeekBasis(weekBasis);
         plan = mealPlanRepository.save(plan);
 
         List<MealPlanItem> existingItems = mealPlanItemRepository
@@ -137,5 +148,20 @@ public class PtTemplateServiceImpl implements PtTemplateService {
         }
 
         return ApiResponse.success(null, "Template applied successfully");
+    }
+
+    /** Same dual-write rule as MealPlanAuthoringServiceImpl: coaching boundary → COACHING. */
+    private MealPlanWeekBasis resolveWeekBasis(UUID clientId, LocalDate weekStart) {
+        LocalDateTime startedAt = mappingRepository.findByClient_Id(clientId, PageRequest.of(0, 20)).stream()
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                        || m.getStatus() == ClientMappingStatus.END_REQUESTED)
+                .map(PtClientMapping::getCoachingStartedAt)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        if (startedAt != null && CoachingWeeks.isBoundary(startedAt.toLocalDate(), weekStart)) {
+            return MealPlanWeekBasis.COACHING;
+        }
+        return MealPlanWeekBasis.MONDAY;
     }
 }

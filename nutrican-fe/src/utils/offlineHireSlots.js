@@ -99,12 +99,14 @@ export function generateOfflineSlots(availability, rateUnit, daysAhead = 14, occ
   return slots.sort((a, b) => a.start - b.start);
 }
 
-export function generateWeeklySlots(availability, rateUnit, weekStart, occupiedSlots = []) {
+export function generateWeeklySlots(availability, rateUnit, weekStart, occupiedSlots = [], nowOverride = null) {
   if (!availability?.length) return [];
 
   const duration = sessionMinutesFromRateUnit(rateUnit);
   const slots = [];
-  const now = new Date();
+  const now = nowOverride instanceof Date && !Number.isNaN(nowOverride.getTime())
+    ? nowOverride
+    : new Date();
   const start = getWeekStart(weekStart);
 
   for (let d = 0; d < 7; d += 1) {

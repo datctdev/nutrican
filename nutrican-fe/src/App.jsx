@@ -8,6 +8,8 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import SetPasswordPage from './pages/auth/SetPasswordPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import CheckEmailPage from './pages/auth/CheckEmailPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import LandingPage from './pages/LandingPage';
 import MarketplacePage from './pages/customer/MarketplacePage';
 import PtDetailPage from './pages/customer/PtDetailPage';
@@ -45,6 +47,8 @@ function App() {
                 { path: '/', element: <LandingPage /> },
                 { path: '/login', element: <LoginPage /> },
                 { path: '/register', element: <RegisterPage /> },
+                { path: '/check-email', element: <CheckEmailPage /> },
+                { path: '/verify-email', element: <VerifyEmailPage /> },
                 { path: '/forgot-password', element: <ForgotPasswordPage /> },
                 { path: '/reset-password', element: <ResetPasswordPage /> },
                 {

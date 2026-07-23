@@ -16,6 +16,7 @@ import com.sba.nutricanbe.workspace.service.PtDietLogReviewService;
 import com.sba.nutricanbe.workspace.service.PtProgressService;
 import com.sba.nutricanbe.workspace.service.PtReviewService;
 import com.sba.nutricanbe.workspace.service.PtTemplateService;
+import com.sba.nutricanbe.workspace.service.support.PtWorkspaceAccessGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -42,6 +43,7 @@ public class PtWorkspaceController {
     private final ClientGoalService clientGoalService;
     private final com.sba.nutricanbe.user.service.BodyMetricService bodyMetricService;
     private final com.sba.nutricanbe.user.service.CoachingLifecycleService coachingLifecycleService;
+    private final PtWorkspaceAccessGuard ptWorkspaceAccessGuard;
 
     @GetMapping("/clients")
     public ResponseEntity<ApiResponse<PageResponse<ClientStatusDto>>> getClients(
@@ -118,6 +120,7 @@ public class PtWorkspaceController {
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user,
             @RequestBody java.util.Map<String, String> body) {
+        ptWorkspaceAccessGuard.requireActiveOrEndRequested(user.getId(), clientId);
         return ResponseEntity.ok(ApiResponse.success(
                 clientGoalService.addManualMilestone(clientId, body.get("title"), body.get("note")),
                 "Milestone added"));
@@ -147,6 +150,22 @@ public class PtWorkspaceController {
             @AuthenticationPrincipal User user,
             @RequestBody com.sba.nutricanbe.user.dto.MacroTargetRequest request) {
         return ResponseEntity.ok(ptClientService.setClientMacroTarget(user.getId(), clientId, request));
+    }
+
+    @PutMapping("/clients/{clientId}/goals")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.user.dto.ClientGoalDto>> setClientGoals(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestBody com.sba.nutricanbe.user.dto.ClientGoalRequest request) {
+        return ResponseEntity.ok(ptClientService.setClientGoals(user.getId(), clientId, request));
+    }
+
+    @PutMapping("/clients/{clientId}/coaching-evaluation")
+    public ResponseEntity<ApiResponse<ClientStatusDto>> setCoachingEvaluation(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestBody CoachingEvaluationRequest request) {
+        return ResponseEntity.ok(ptClientService.setCoachingEvaluation(user.getId(), clientId, request));
     }
 
     @PutMapping("/meal-plan-suggestions/{id}")
@@ -220,7 +239,9 @@ public class PtWorkspaceController {
     public ResponseEntity<ApiResponse<PtClientProfileDto>> createClient(
             @AuthenticationPrincipal User user,
             @RequestBody CreateClientRequest request) {
-        return ResponseEntity.ok(ptClientService.createClient(user.getId(), request));
+        // Hire/marketplace only — direct create bypasses escrow & onboarding.
+        throw new com.sba.nutricanbe.common.exception.BadRequestException(
+                "Không thể thêm học viên trực tiếp. Học viên chỉ vào qua luồng thuê PT / marketplace.");
     }
 
     @GetMapping("/clients/{clientId}/chat-context")

@@ -70,14 +70,6 @@ export default function LoginPage() {
                 <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" style={{ animationDuration: '8s' }} />
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
-                {/* Logo & Header */}
-                <div className="relative z-10 flex items-center gap-3">
-                    <Link to="/" className="flex items-center gap-3 group">
-                        <img src={logo} alt="Nutrican Logo" className="w-10 h-10 rounded-xl shadow-lg object-cover group-hover:scale-105 transition-transform duration-300 border border-white/10" />
-                        <span className="font-black text-2xl tracking-tight text-white">Nutrican<span className="text-blue-500">.</span></span>
-                    </Link>
-                </div>
-
                 {/* Khối Visual giữa trang (Floating AI Showcase Cards) */}
                 <div className="relative z-10 my-auto max-w-lg space-y-8 py-12">
                     <div className="space-y-4">

@@ -26,8 +26,11 @@ import com.sba.nutricanbe.diet.service.DayTimelineService;
 import com.sba.nutricanbe.diet.service.DietLogService;
 import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.user.entity.MacroTarget;
+import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
+import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.ProgressTimelineService;
 import com.sba.nutricanbe.user.service.UserQueryService;
@@ -49,6 +52,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -79,6 +83,7 @@ public class PtProgressServiceImpl implements PtProgressService {
     private final DayTimelineService dayTimelineService;
     private final PtWorkspaceAccessGuard accessGuard;
     private final MealPlanSuggestionMapper suggestionMapper;
+    private final PtClientMappingRepository mappingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -141,9 +146,12 @@ public class PtProgressServiceImpl implements PtProgressService {
         User client = userRepository.findById(clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", clientId));
 
+        LocalDateTime coachingStartedAt = findCoachingStartedAt(clientId);
+
         ProgressDataDto response = ProgressDataDto.builder()
                 .clientId(clientId)
                 .clientName(client.getFullName())
+                .coachingStartedAt(coachingStartedAt)
                 .calorieHistory(calorieData)
                 .bodyMetrics(metricData)
                 .macroSummary(macroSummary)
@@ -219,48 +227,15 @@ public class PtProgressServiceImpl implements PtProgressService {
         }
         response.setSkipReasons(skips);
 
-        List<MealPlanLateTickItemDto> lateTicks = new ArrayList<>();
-        if (selectedPlan != null) {
-            mealPlanItemRepository.findByMealPlanIdOrderByPlanDateAscMealTypeAsc(selectedPlan.getId())
-                    .stream()
-                    .filter(i -> i.getLateTickReason() != null && !i.getLateTickReason().isBlank())
-                    .filter(i -> !i.getPlanDate().isBefore(startDate) && !i.getPlanDate().isAfter(endDate))
-                    .forEach(i -> lateTicks.add(MealPlanLateTickItemDto.builder()
-                            .itemId(i.getId())
-                            .planDate(i.getPlanDate())
-                            .mealType(i.getMealType() != null ? i.getMealType().name() : null)
-                            .mealPeriod(i.getMealPeriod() != null ? i.getMealPeriod().name() : null)
-                            .foodLabel(i.getFreeText() != null ? i.getFreeText() : i.getFoodCode())
-                            .lateTickReason(i.getLateTickReason())
-                            .source(i.getSourceType() != null ? i.getSourceType().name() : "PT_ORIGINAL")
-                            .build()));
-        }
-        logs.stream()
-                .filter(log -> log.getLateTickReason() != null && !log.getLateTickReason().isBlank())
-                .forEach(log -> lateTicks.add(MealPlanLateTickItemDto.builder()
-                        .itemId(log.getId())
-                        .planDate(log.getLogDate())
-                        .mealType(log.getMealType() != null ? log.getMealType().name() : null)
-                        .mealPeriod(log.getMealPeriod() != null ? log.getMealPeriod().name() : null)
-                        .foodLabel(log.getFoodDescription())
-                        .lateTickReason(log.getLateTickReason())
-                        .source("DIET_LOG")
-                        .build()));
-        response.setLateTickReasons(lateTicks);
+        // Progress UI no longer shows late ticks / weekly summaries (kept on client list).
+        // Leave empty lists so older FE clients don't break on missing keys.
+        response.setLateTickReasons(List.of());
+        response.setWeeklySummaries(List.of());
 
         List<MealPlanSuggestionDto> pending = mealPlanSuggestionRepository
                 .findByCustomerIdAndStatus(clientId, MealPlanSuggestionStatus.PENDING)
                 .stream().map(suggestionMapper::toDto).toList();
         response.setPendingSuggestions(pending);
-
-        response.setWeeklySummaries(weeklySummaryRepository.findByClientIdOrderByWeekStartDateDesc(clientId)
-                .stream().limit(8).map(ws -> WeeklySummaryDto.builder()
-                        .id(ws.getId())
-                        .weekStartDate(ws.getWeekStartDate())
-                        .summaryText(ws.getSummaryText())
-                        .adherenceRate(ws.getAdherenceRate())
-                        .nextPlanNote(ws.getNextPlanNote())
-                        .build()).toList());
 
         if (logs.isEmpty()) {
             response.setPostMealAggregate(List.of());
@@ -316,8 +291,15 @@ public class PtProgressServiceImpl implements PtProgressService {
                 ? newestPlanByWeek.get(requestedWeekStart)
                 : null;
         if (selectedPlan == null) {
-            LocalDate currentWeekStart = today.with(DayOfWeek.MONDAY);
-            selectedPlan = newestPlanByWeek.get(currentWeekStart);
+            LocalDateTime startedAt = findCoachingStartedAt(clientId);
+            LocalDate coachingWeek = com.sba.nutricanbe.common.util.CoachingWeeks.currentWeekStart(startedAt, today);
+            if (coachingWeek != null) {
+                selectedPlan = newestPlanByWeek.get(coachingWeek);
+            }
+            if (selectedPlan == null) {
+                LocalDate currentWeekStart = today.with(DayOfWeek.MONDAY);
+                selectedPlan = newestPlanByWeek.get(currentWeekStart);
+            }
         }
         if (selectedPlan == null) {
             selectedPlan = newestPlanByWeek.values().stream()
@@ -443,6 +425,16 @@ public class PtProgressServiceImpl implements PtProgressService {
         return BigDecimal.valueOf(numerator)
                 .multiply(BigDecimal.valueOf(100))
                 .divide(BigDecimal.valueOf(denominator), 1, RoundingMode.HALF_UP);
+    }
+
+    private LocalDateTime findCoachingStartedAt(UUID clientId) {
+        return mappingRepository.findByClient_Id(clientId, PageRequest.of(0, 20)).stream()
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                        || m.getStatus() == ClientMappingStatus.END_REQUESTED)
+                .map(PtClientMapping::getCoachingStartedAt)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private record MealPlanProgressContext(

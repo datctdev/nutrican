@@ -63,7 +63,8 @@ public class DietLogFeedbackServiceImpl implements DietLogFeedbackService {
                 .filter(f -> f.getEnergyRating() != null && f.getEnergyRating() == 1)
                 .count();
         if (lowEnergy >= 3) {
-            mappingRepository.findFirstByClient_IdAndStatus(customerId, ClientMappingStatus.ACTIVE)
+            mappingRepository.findFirstByClient_IdAndStatusIn(
+                            customerId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))
                     .ifPresent(m -> {
                         Map<String, Object> payload = new HashMap<>();
                         payload.put("clientId", customerId.toString());

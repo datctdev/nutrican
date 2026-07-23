@@ -37,16 +37,29 @@ public class OfflinePackageAppointmentService {
             return;
         }
 
-        long existing = appointmentRepository.countByMappingId(mapping.getId());
-        if (existing >= sessions.size()) {
+        List<PtMappingSession> liveSessions = sessions.stream()
+                .filter(s -> s.getStatus() != com.sba.nutricanbe.user.enums.MappingSessionStatus.CANCELLED)
+                .toList();
+        if (liveSessions.isEmpty()) {
+            slotHoldService.convertByMapping(mapping.getId());
+            return;
+        }
+
+        List<PtAppointment> activeAppts = appointmentRepository.findByMappingId(mapping.getId()).stream()
+                .filter(a -> a.getStatus() != AppointmentStatus.CANCELLED
+                        && a.getStatus() != AppointmentStatus.EXPIRED)
+                .toList();
+        if (activeAppts.size() >= liveSessions.size()) {
             slotHoldService.convertByMapping(mapping.getId());
             return;
         }
 
         int sequence = 1;
-        for (PtMappingSession session : sessions) {
-            if (appointmentRepository.existsByMappingIdAndStartTime(
-                    mapping.getId(), session.getStartTime())) {
+        for (PtMappingSession session : liveSessions) {
+            boolean alreadyLinked = activeAppts.stream().anyMatch(a ->
+                    session.getId().equals(a.getMappingSessionId())
+                            || (a.getStartTime() != null && a.getStartTime().equals(session.getStartTime())));
+            if (alreadyLinked) {
                 sequence++;
                 continue;
             }
@@ -62,9 +75,9 @@ public class OfflinePackageAppointmentService {
                 status = AppointmentStatus.PENDING;
             }
 
-            String note = sessions.size() == 1
+            String note = liveSessions.size() == 1
                     ? "Buổi tập đầu tiên"
-                    : "Buổi offline #" + sequence + " / " + sessions.size();
+                    : "Buổi offline #" + sequence + " / " + liveSessions.size();
 
             appointmentRepository.save(PtAppointment.builder()
                     .clientId(mapping.getClient().getId())

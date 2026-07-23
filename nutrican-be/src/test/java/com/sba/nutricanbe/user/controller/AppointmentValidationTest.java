@@ -1,18 +1,18 @@
 package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.payment.service.CoachingWalletService;
+import com.sba.nutricanbe.user.dto.AppointmentResponse;
 import com.sba.nutricanbe.user.dto.BookAppointmentRequest;
 import com.sba.nutricanbe.user.entity.PtAppointment;
-import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.AppointmentCancelType;
 import com.sba.nutricanbe.user.enums.AppointmentStatus;
-import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.PtAppointmentRepository;
-import com.sba.nutricanbe.user.repository.PtAvailabilityWindowRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
-import com.sba.nutricanbe.user.repository.PtSlotHoldRepository;
-import com.sba.nutricanbe.user.repository.RefundRequestRepository;
+import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
+import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.service.AppointmentSlotHelper;
+import com.sba.nutricanbe.user.service.OfflinePackageAppointmentService;
 import com.sba.nutricanbe.user.service.impl.AppointmentServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,14 +22,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,65 +35,25 @@ class AppointmentValidationTest {
 
     @Mock private PtAppointmentRepository appointmentRepository;
     @Mock private PtClientMappingRepository mappingRepository;
-    @Mock private RefundRequestRepository refundRepository;
-    @Mock private PtAvailabilityWindowRepository availabilityRepository;
-    @Mock private PtSlotHoldRepository slotHoldRepository;
+    @Mock private PtMappingSessionRepository mappingSessionRepository;
+    @Mock private CoachingWalletService walletService;
+    @Mock private AppointmentSlotHelper appointmentSlotHelper;
+    @Mock private PtProfileRepository ptProfileRepository;
+    @Mock private OfflinePackageAppointmentService offlinePackageAppointmentService;
 
     private AppointmentServiceImpl appointmentService;
 
     @BeforeEach
     void setUp() {
-        AppointmentSlotHelper slotHelper = new AppointmentSlotHelper(
-                appointmentRepository, availabilityRepository, slotHoldRepository);
         appointmentService = new AppointmentServiceImpl(
-                appointmentRepository, mappingRepository, refundRepository, slotHelper);
+                appointmentRepository, mappingRepository, mappingSessionRepository, walletService,
+                appointmentSlotHelper, ptProfileRepository, offlinePackageAppointmentService);
     }
 
     @Test
-    void book_rejectsSlotShorterThan30Minutes() {
-        UUID ptId = UUID.randomUUID();
-        UUID customerId = UUID.randomUUID();
-        PtClientMapping mapping = PtClientMapping.builder()
-                .status(ClientMappingStatus.ACTIVE)
-                .build();
-        ReflectionTestUtils.setField(mapping, "id", UUID.randomUUID());
-        when(mappingRepository.findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, customerId))
-                .thenReturn(Optional.of(mapping));
-
-        BookAppointmentRequest request = new BookAppointmentRequest();
-        LocalDateTime start = LocalDateTime.now().plusDays(1);
-        request.setStartTime(start);
-        request.setEndTime(start.plusMinutes(20));
-
+    void book_rejectsBecauseFreeBookingDisabled() {
         assertThrows(BadRequestException.class,
-                () -> appointmentService.book(customerId, ptId, request));
-    }
-
-    @Test
-    void book_rejectsOverlappingPtSlot() {
-        UUID ptId = UUID.randomUUID();
-        UUID customerId = UUID.randomUUID();
-        PtClientMapping mapping = PtClientMapping.builder()
-                .status(ClientMappingStatus.ACTIVE)
-                .build();
-        when(mappingRepository.findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, customerId))
-                .thenReturn(Optional.of(mapping));
-
-        LocalDateTime start = LocalDateTime.now().plusDays(1).withHour(10).withMinute(0);
-        LocalDateTime end = start.plusMinutes(60);
-        BookAppointmentRequest request = new BookAppointmentRequest();
-        request.setStartTime(start);
-        request.setEndTime(end);
-
-        PtAppointment existing = PtAppointment.builder().build();
-        ReflectionTestUtils.setField(existing, "id", UUID.randomUUID());
-        when(appointmentRepository.findOverlapping(
-                eq(ptId), eq(start), eq(end),
-                eq(List.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED))))
-                .thenReturn(List.of(existing));
-
-        assertThrows(BadRequestException.class,
-                () -> appointmentService.book(customerId, ptId, request));
+                () -> appointmentService.book(UUID.randomUUID(), UUID.randomUUID(), new BookAppointmentRequest()));
     }
 
     @Test
@@ -112,7 +70,7 @@ class AppointmentValidationTest {
         when(appointmentRepository.findById(apptId)).thenReturn(Optional.of(appt));
         when(appointmentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PtAppointment result = appointmentService.cancelByCustomer(customerId, apptId, null);
+        AppointmentResponse result = appointmentService.cancelByCustomer(customerId, apptId, null);
         assertEquals(AppointmentCancelType.NO_FEE, result.getCancelType());
         assertEquals(AppointmentStatus.CANCELLED, result.getStatus());
     }
@@ -131,7 +89,7 @@ class AppointmentValidationTest {
         when(appointmentRepository.findById(apptId)).thenReturn(Optional.of(appt));
         when(appointmentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        PtAppointment result = appointmentService.cancelByCustomer(customerId, apptId, null);
+        AppointmentResponse result = appointmentService.cancelByCustomer(customerId, apptId, null);
         assertEquals(AppointmentCancelType.LATE, result.getCancelType());
     }
 
