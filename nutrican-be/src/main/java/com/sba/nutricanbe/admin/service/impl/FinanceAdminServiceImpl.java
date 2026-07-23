@@ -2,7 +2,6 @@ package com.sba.nutricanbe.admin.service.impl;
 
 import com.sba.nutricanbe.admin.dto.FinanceOverviewDto;
 import com.sba.nutricanbe.admin.service.FinanceAdminService;
-import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.service.SystemSettingService;
 import com.sba.nutricanbe.payment.dto.WalletResponse;
@@ -35,12 +34,12 @@ public class FinanceAdminServiceImpl implements FinanceAdminService {
 
     @Override
     @Transactional
-    public ApiResponse<FinanceOverviewDto> getOverview(LocalDateTime from, LocalDateTime to) {
+    public FinanceOverviewDto getOverview(LocalDateTime from, LocalDateTime to) {
         // Not readOnly: getSystemWallet may create missing system wallets.
         WalletResponse escrow = walletService.getSystemWallet(WalletType.ESCROW);
         WalletResponse platform = walletService.getSystemWallet(WalletType.PLATFORM);
 
-        FinanceOverviewDto dto = FinanceOverviewDto.builder()
+        return FinanceOverviewDto.builder()
                 .escrowLockedBalance(escrow.getLockedBalance())
                 .platformAvailableBalance(platform.getAvailableBalance())
                 .totalCommission(nullToZero(transactionRepository.sumSuccessByTypeInRange(
@@ -57,13 +56,11 @@ public class FinanceAdminServiceImpl implements FinanceAdminService {
                 .pendingSessionDisputeCount(mappingSessionConfirmService.countPendingDisputes())
                 .platformFeeRate(systemSettingService.getPlatformFeeRate())
                 .build();
-
-        return ApiResponse.success(dto);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public ApiResponse<PageResponse<WalletTransactionResponse>> getTransactions(
+    public PageResponse<WalletTransactionResponse> getTransactions(
             WalletTransactionType type,
             LocalDateTime from,
             LocalDateTime to,
@@ -77,7 +74,7 @@ public class FinanceAdminServiceImpl implements FinanceAdminService {
                         PageRequest.of(safePage, safeSize))
                 .map(WalletTransactionResponse::fromAdmin);
 
-        return ApiResponse.success(PageResponse.from(result));
+        return PageResponse.from(result);
     }
 
     private static BigDecimal nullToZero(BigDecimal value) {
