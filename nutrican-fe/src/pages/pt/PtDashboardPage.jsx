@@ -1,11 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import {
-    Users, Clock, AlertTriangle, Wallet, Calendar, ArrowUpRight,
-    TrendingUp, MessageSquare, CheckCircle2, ShieldAlert, Sparkles,
-    ChevronRight, Activity, MapPin, Wifi, Loader2
+    Activity,
+    AlertTriangle,
+    ArrowUpRight,
+    Calendar,
+    CheckCircle2,
+    ChevronRight,
+    Clock,
+    Loader2,
+    MapPin,
+    MessageSquare,
+    Percent,
+    Sparkles,
+    TrendingUp,
+    Users,
+    Wallet,
 } from 'lucide-react';
 import { workspaceService } from '../../services/workspaceService';
 import { userService } from '../../services/userService';
@@ -19,9 +31,9 @@ import { toast } from 'sonner';
 export default function PtDashboardPage() {
     const { user } = useAuthStore();
     const navigate = useNavigate();
-
-    // --- STATES ---
+    const [searchParams] = useSearchParams();
     const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [maxClients, setMaxClients] = useState(10);
     const [savingMax, setSavingMax] = useState(false);
     const [pendingHiresCount, setPendingHiresCount] = useState(0);
@@ -29,7 +41,10 @@ export default function PtDashboardPage() {
     const [upcomingAppts, setUpcomingAppts] = useState([]);
     const [wallet, setWallet] = useState(null);
     const [withdrawOpen, setWithdrawOpen] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [platformFeeRate, setPlatformFeeRate] = useState(null);
+    const [highlightCommission, setHighlightCommission] = useState(false);
+    const commissionCardRef = useRef(null);
+    const focusCommission = searchParams.get('focus') === 'commission';
 
     // --- DATA FETCHING ---
     const fetchWallet = useCallback(async () => {
@@ -38,6 +53,16 @@ export default function PtDashboardPage() {
             setWallet(res.data?.data || null);
         } catch {
             setWallet(null);
+        }
+    }, []);
+
+    const fetchPlatformFeeRate = useCallback(async () => {
+        try {
+            const res = await userService.getPlatformFeeRate();
+            const rate = res.data?.data;
+            setPlatformFeeRate(rate == null ? null : Number(rate));
+        } catch {
+            setPlatformFeeRate(null);
         }
     }, []);
 
@@ -65,7 +90,8 @@ export default function PtDashboardPage() {
         const init = async () => {
             setLoading(true);
             await fetchData();
-            await fetchWallet();
+            fetchWallet();
+            fetchPlatformFeeRate();
             try {
                 const res = await userService.getProfile();
                 const max = res.data?.data?.maxClients || res.data?.data?.ptProfile?.maxClients;
@@ -82,8 +108,34 @@ export default function PtDashboardPage() {
             fetchWallet();
         };
         window.addEventListener('realtime_update', handleRealtimeUpdate);
-        return () => window.removeEventListener('realtime_update', handleRealtimeUpdate);
-    }, [fetchData, fetchWallet]);
+        const handlePlatformFeeUpdated = (event) => {
+            const rate = event.detail?.newRate;
+            if (rate != null && !Number.isNaN(Number(rate))) {
+                setPlatformFeeRate(Number(rate));
+            } else {
+                fetchPlatformFeeRate();
+            }
+        };
+        window.addEventListener('platform_fee_updated', handlePlatformFeeUpdated);
+
+        return () => {
+            window.removeEventListener('realtime_update', handleRealtimeUpdate);
+            window.removeEventListener('platform_fee_updated', handlePlatformFeeUpdated);
+        };
+    }, [fetchData, fetchPlatformFeeRate, fetchWallet]);
+
+    useEffect(() => {
+        if (!focusCommission) return undefined;
+        setHighlightCommission(true);
+        const scrollTimer = window.setTimeout(() => {
+            commissionCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
+        const highlightTimer = window.setTimeout(() => setHighlightCommission(false), 5000);
+        return () => {
+            window.clearTimeout(scrollTimer);
+            window.clearTimeout(highlightTimer);
+        };
+    }, [focusCommission]);
 
     const handleSaveMaxClients = async () => {
         const value = Number(maxClients);
@@ -124,6 +176,15 @@ export default function PtDashboardPage() {
             color: 'text-amber-600',
             bg: 'bg-amber-50 border-amber-100',
             onClick: () => navigate('/pt/reviews')
+        },
+        {
+            id: 'commission',
+            label: 'Phí hoa hồng',
+            value: platformFeeRate == null ? '--' : `${platformFeeRate.toLocaleString('vi-VN')}%`,
+            subText: 'Mức do admin thiết lập',
+            icon: Percent,
+            color: 'text-fuchsia-600',
+            bg: 'bg-fuchsia-50 border-fuchsia-100',
         },
         {
             label: 'Lịch tập sắp tới',
@@ -211,12 +272,20 @@ export default function PtDashboardPage() {
             )}
 
             {/* 3. KPI OVERVIEW CARDS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
                 {kpiCards.map((stat, idx) => (
                     <Card
-                        key={idx}
+                        key={stat.id || idx}
+                        id={stat.id === 'commission' ? 'platform-fee-card' : undefined}
+                        ref={stat.id === 'commission' ? commissionCardRef : undefined}
                         onClick={stat.onClick}
-                        className="bg-white border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-200 rounded-3xl cursor-pointer group"
+                        className={`bg-white border-slate-200/80 shadow-sm transition-all duration-500 rounded-3xl group ${
+                            stat.onClick ? 'cursor-pointer hover:shadow-md' : ''
+                        } ${
+                            stat.id === 'commission' && highlightCommission
+                                ? 'border-fuchsia-400 ring-4 ring-fuchsia-200 shadow-lg shadow-fuchsia-100 scale-[1.02]'
+                                : ''
+                        }`}
                     >
                         <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
                             <div className="flex justify-between items-start">

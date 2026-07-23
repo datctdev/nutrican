@@ -1,12 +1,9 @@
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import useWebSocket from '../../hooks/useWebSocket';
 
 export default function PtProtectedRoute({ children }) {
     const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
     const user = useAuthStore((state) => state.user);
-
-    useWebSocket();
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;

@@ -21,7 +21,6 @@ import {
     ShieldCheck, HelpCircle, AlertCircle
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
-import useWebSocket from '../../hooks/useWebSocket';
 import { ACTIVITY_LEVEL_OPTIONS, ActivityLevelInfoTooltip } from './components/activityLevelOptions';
 import AllergySelector from './components/AllergySelector';
 
@@ -112,8 +111,6 @@ export default function ProfilePage() {
     const [endCoachingLoading, setEndCoachingLoading] = useState(false);
     const [cancelApptId, setCancelApptId] = useState(null);
     const [cancellingAppt, setCancellingAppt] = useState(false);
-
-    useWebSocket();
 
     useEffect(() => { fetchAll(); }, []);
 

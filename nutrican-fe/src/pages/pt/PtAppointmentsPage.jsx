@@ -12,7 +12,6 @@ import Modal from '../../components/common/Modal';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import CoachingTimetable, { mergeTimetableSources } from '../../components/coaching/CoachingTimetable';
 import PtWeeklyCalendarPicker from '../../components/pt/PtWeeklyCalendarPicker';
-import useWebSocket from '../../hooks/useWebSocket';
 import { nowInVn } from '../customer/components/dietUtils';
 import { addWeeks, getWeekStart, sessionMinutesFromRateUnit as slotMinutes, slotsOverlap, isSlotOccupied, toLocalDateTimeIso } from '../../utils/offlineHireSlots';
 
@@ -200,8 +199,6 @@ export default function PtAppointmentsPage() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [manualTime, setManualTime] = useState(false);
   const [pickedSlots, setPickedSlots] = useState([]);
-
-  useWebSocket();
 
   const offlineClients = useMemo(
     () => (clients || []).filter((c) => c.selectedTrainingMode === 'OFFLINE' && c.mappingId),
