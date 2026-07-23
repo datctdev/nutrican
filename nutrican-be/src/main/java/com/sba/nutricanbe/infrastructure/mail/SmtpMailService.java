@@ -25,6 +25,7 @@ public class SmtpMailService implements MailService {
     private String fromEmail;
 
     private static final String RESET_TEMPLATE = "password-reset-email";
+    private static final String VERIFY_TEMPLATE = "email-verification";
     private static final int TOKEN_EXPIRY_MINUTES = 15;
 
     @Override
@@ -50,6 +51,32 @@ public class SmtpMailService implements MailService {
             log.info("Password reset email sent to: {}", maskEmail(toEmail));
         } catch (Exception e) {
             log.error("Failed to send password reset email to {}: {}", maskEmail(toEmail), e.getMessage());
+        }
+    }
+
+    @Override
+    public void sendEmailVerificationEmail(String toEmail, String verificationToken, int expiresInHours) {
+        try {
+            Context context = new Context();
+            String verifyLink = frontendUrl + "/verify-email?token=" + verificationToken;
+            context.setVariable("verifyLink", verifyLink);
+            context.setVariable("expiresIn", expiresInHours);
+            context.setVariable("fullName", "");
+            context.setVariable("frontendUrl", frontendUrl);
+
+            String htmlContent = templateEngine.process(VERIFY_TEMPLATE, context);
+
+            var mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject("Xac nhan email NutriCan PT");
+            helper.setText(htmlContent, true);
+
+            mailSender.send(mimeMessage);
+            log.info("Email verification sent to: {}", maskEmail(toEmail));
+        } catch (Exception e) {
+            log.error("Failed to send verification email to {}: {}", maskEmail(toEmail), e.getMessage());
         }
     }
 

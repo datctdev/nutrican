@@ -60,12 +60,11 @@ public class FinanceAdminServiceImpl implements FinanceAdminService {
     @Transactional(readOnly = true)
     public PageResponse<WalletTransactionResponse> getTransactions(
             WalletTransactionType type, LocalDateTime from, LocalDateTime to, int page, int size) {
-        if (page < 0 || size < 1 || size > 100) {
-            size = 20;
-            page = Math.max(page, 0);
-        }
+        int safePage = Math.max(page, 0);
+        int safeSize = (size < 1 || size > 100) ? 20 : size;
         var result = transactionRepository
-                .findAll(WalletTransactionRepository.adminLedgerSpec(type, from, to), PageRequest.of(page, size))
+                .findAll(WalletTransactionRepository.adminLedgerSpec(type, from, to),
+                        PageRequest.of(safePage, safeSize))
                 .map(WalletTransactionResponse::fromAdmin);
         return PageResponse.from(result);
     }
