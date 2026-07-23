@@ -77,6 +77,10 @@ export default function ReviewDietLogPage({ clientPage = false }) {
     const [loading, setLoading] = useState(true);
     const [reviewedLoading, setReviewedLoading] = useState(false);
     const [actionLoading, setActionLoading] = useState(null);
+    const [pendingPage, setPendingPage] = useState(0);
+    const [pendingLast, setPendingLast] = useState(true);
+    const [pendingTotal, setPendingTotal] = useState(0);
+    const [loadingMorePending, setLoadingMorePending] = useState(false);
 
     const [adjustingLog, setAdjustingLog] = useState(null);
     const [adjustForm, setAdjustForm] = useState({
@@ -130,30 +134,55 @@ export default function ReviewDietLogPage({ clientPage = false }) {
 
     const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'HV';
 
-    const fetchPendingLogs = useCallback(async () => {
+    const fetchPendingLogs = useCallback(async ({ append = false, page = 0 } = {}) => {
         try {
-            setLoading(true);
+            if (append) {
+                setLoadingMorePending(true);
+            } else {
+                setLoading(true);
+            }
             if (clientPage && !selectedClientId) {
                 setPendingLogs([]);
+                setPendingLast(true);
+                setPendingTotal(0);
+                setPendingPage(0);
                 return;
             }
+            const size = clientPage ? 50 : 20;
             const response = clientPage
                 ? await dietService.getClientLogsForPt(selectedClientId, {
-                    size: 50,
+                    page,
+                    size,
                     reviewStatus: 'PENDING',
                 })
                 : await workspaceService.getPendingLogs({
-                    size: 20,
+                    page,
+                    size,
                     clientId: selectedClientId || undefined,
                 });
-            setPendingLogs(response.data.data.content || []);
+            const data = response.data.data || {};
+            const content = data.content || [];
+            setPendingLogs((prev) => {
+                if (!append) return content;
+                const seen = new Set(prev.map((l) => l.id));
+                return [...prev, ...content.filter((l) => l?.id != null && !seen.has(l.id))];
+            });
+            setPendingPage(page);
+            setPendingLast(Boolean(data.last ?? content.length < size));
+            setPendingTotal(Number(data.totalElements ?? content.length));
         } catch (err) {
             console.error(err);
             toast.error('Không thể tải danh sách bữa ăn');
         } finally {
             setLoading(false);
+            setLoadingMorePending(false);
         }
     }, [clientPage, selectedClientId]);
+
+    const loadMorePending = useCallback(() => {
+        if (loadingMorePending || pendingLast || isReviewedList) return;
+        fetchPendingLogs({ append: true, page: pendingPage + 1 });
+    }, [fetchPendingLogs, loadingMorePending, pendingLast, isReviewedList, pendingPage]);
 
     const fetchReviewedLogs = useCallback(async () => {
         if (!clientPage || !selectedClientId) {
@@ -361,7 +390,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                             <>
                                 Hộp thư chung — chỉ log học viên ACTIVE của bạn.
                                 {selectedClientId ? ' Đang lọc theo học viên này.' : ''}{' '}
-                                <strong className="text-blue-600">{pendingLogs.length}</strong> bữa đang chờ.
+                                <strong className="text-blue-600">{pendingTotal || pendingLogs.length}</strong> bữa đang chờ.
                             </>
                         )}
                     </p>
@@ -428,7 +457,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                             <span className="mt-0.5 block text-xs font-medium opacity-70">Các bữa ăn cần PT kiểm tra</span>
                         </span>
                         <span className={`rounded-full px-3 py-1 text-sm font-black ${activeList === 'PENDING' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                            {pendingLogs.length}
+                            {pendingTotal || pendingLogs.length}
                         </span>
                     </button>
 
@@ -848,6 +877,19 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                         </Card>
                         );
                     })}
+                    {!isReviewedList && !pendingLast && (
+                        <div className="flex justify-center pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={loadingMorePending}
+                                onClick={loadMorePending}
+                                className="rounded-xl border-slate-200 text-slate-700 font-bold h-11 px-6"
+                            >
+                                {loadingMorePending ? 'Đang tải…' : `Tải thêm (${pendingLogs.length}/${pendingTotal || '…'})`}
+                            </Button>
+                        </div>
+                    )}
                 </div>
             )}
 

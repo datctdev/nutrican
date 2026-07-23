@@ -46,4 +46,8 @@ public class ClientStatusDto {
     /** Ngày bắt đầu coaching (neo tuần 7 ngày). */
     private java.time.LocalDateTime coachingStartedAt;
     private UUID mappingId;
+    /** Escrow còn lại (VND) — offline. */
+    private java.math.BigDecimal remainingEscrow;
+    /** Số buổi còn «trống» trong escrow (chưa gán SCHEDULED/AWAITING/DISPUTED). */
+    private Integer escrowFreeSessions;
 }

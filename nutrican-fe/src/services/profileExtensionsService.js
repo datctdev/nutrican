@@ -28,7 +28,8 @@ export const profileExtensionsService = {
   disputeSession: (sessionId, data) => api.post(`/profile/sessions/${sessionId}/dispute`, data),
   getSessionDisputes: (params = {}) => api.get('/profile/session-disputes', { params }),
   replySessionDispute: (id, data) => api.post(`/profile/session-disputes/${id}/messages`, data),
-  reportPt: (mappingId, data) => api.post(`/profile/mappings/${mappingId}/report-pt`, data),
+  reportPt: (mappingId, formData) => api.post(`/profile/mappings/${mappingId}/report-pt`, formData),
+  getMyPtReports: () => api.get('/profile/pt-reports'),
   setMaxClients: (maxClients) => api.put('/profile/pt/max-clients', { maxClients }),
 };
 

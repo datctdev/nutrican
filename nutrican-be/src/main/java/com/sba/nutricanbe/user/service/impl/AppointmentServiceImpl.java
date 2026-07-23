@@ -2,6 +2,7 @@ package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.dto.AddMappingSessionRequest;
 import com.sba.nutricanbe.user.dto.AppointmentActionRequest;
@@ -92,7 +93,7 @@ public class AppointmentServiceImpl implements AppointmentService {
             if (appt.getStatus() != AppointmentStatus.PENDING && appt.getStatus() != AppointmentStatus.CONFIRMED) {
                 throw new BadRequestException("Không thể hủy lịch hẹn ở trạng thái hiện tại");
             }
-            if (appt.getStartTime() != null && !appt.getStartTime().isAfter(LocalDateTime.now())) {
+            if (appt.getStartTime() != null && !appt.getStartTime().isAfter(DietDates.nowVn())) {
                 throw new BadRequestException("Không thể hủy buổi đã bắt đầu hoặc đã qua giờ");
             }
             Optional<PtMappingSession> linked = resolveLinkedSession(appt);
@@ -123,7 +124,7 @@ public class AppointmentServiceImpl implements AppointmentService {
         if (appt.getStatus() != AppointmentStatus.PENDING && appt.getStatus() != AppointmentStatus.CONFIRMED) {
             throw new BadRequestException("Không thể hủy lịch hẹn ở trạng thái hiện tại");
         }
-        if (appt.getStartTime() == null || !appt.getStartTime().isAfter(LocalDateTime.now())) {
+        if (appt.getStartTime() == null || !appt.getStartTime().isAfter(DietDates.nowVn())) {
             throw new BadRequestException("Không thể hủy buổi đã bắt đầu hoặc đã qua giờ");
         }
 
@@ -133,7 +134,7 @@ public class AppointmentServiceImpl implements AppointmentService {
                     "Buổi này không còn ở trạng thái chờ dạy — không thể hủy / hoàn tiền");
         }
 
-        long hoursUntil = Duration.between(LocalDateTime.now(), appt.getStartTime()).toHours();
+        long hoursUntil = Duration.between(DietDates.nowVn(), appt.getStartTime()).toHours();
         boolean noFee = hoursUntil >= CUSTOMER_NO_FEE_CANCEL_HOURS;
         appt.setStatus(AppointmentStatus.CANCELLED);
         appt.setCancelledBy("CUSTOMER");
@@ -222,7 +223,7 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     private void expireStale() {
-        LocalDateTime cutoff = LocalDateTime.now().minusHours(PENDING_EXPIRY_HOURS);
+        LocalDateTime cutoff = DietDates.nowVn().minusHours(PENDING_EXPIRY_HOURS);
         List<PtAppointment> stale = appointmentRepository
                 .findByStatusAndCreatedAtBefore(AppointmentStatus.PENDING, cutoff);
         if (stale.isEmpty()) {
@@ -246,7 +247,7 @@ public class AppointmentServiceImpl implements AppointmentService {
         if (appt.getStatus() != AppointmentStatus.PENDING && appt.getStatus() != AppointmentStatus.CONFIRMED) {
             throw new BadRequestException("Không thể đổi lịch buổi ở trạng thái hiện tại");
         }
-        if (appt.getStartTime() != null && !appt.getStartTime().isAfter(LocalDateTime.now())) {
+        if (appt.getStartTime() != null && !appt.getStartTime().isAfter(DietDates.nowVn())) {
             throw new BadRequestException("Không thể đổi lịch buổi đã bắt đầu hoặc đã qua giờ");
         }
 
@@ -264,8 +265,14 @@ public class AppointmentServiceImpl implements AppointmentService {
         if (!mapping.getPt().getId().equals(ptId)) {
             throw new BadRequestException("Bạn không quản lý học viên của lịch này");
         }
+        if (mapping.getStatus() != ClientMappingStatus.ACTIVE) {
+            throw new BadRequestException("Chỉ đổi lịch khi quan hệ coaching đang ACTIVE");
+        }
 
         LocalDateTime start = request.getStartTime();
+        if (!start.isAfter(DietDates.nowVn())) {
+            throw new BadRequestException("Thời gian mới phải bắt đầu trong tương lai");
+        }
         LocalDateTime end = request.getEndTime() != null
                 ? request.getEndTime()
                 : appointmentSlotHelper.computeSessionEnd(start, mapping.getAgreedRateUnit());
@@ -327,7 +334,7 @@ public class AppointmentServiceImpl implements AppointmentService {
                 ? request.getEndTime()
                 : appointmentSlotHelper.computeSessionEnd(start, mapping.getAgreedRateUnit());
         appointmentSlotHelper.validateSlot(start, end);
-        if (!start.isAfter(LocalDateTime.now())) {
+        if (!start.isAfter(DietDates.nowVn())) {
             throw new BadRequestException("Buổi mới phải bắt đầu trong tương lai");
         }
         appointmentSlotHelper.assertNoOverlap(ptId, start, end, null);

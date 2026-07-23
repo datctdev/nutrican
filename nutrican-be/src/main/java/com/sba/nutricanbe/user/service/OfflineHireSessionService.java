@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.user.service;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.user.dto.PtAvailabilityWindowResponse;
 import com.sba.nutricanbe.user.entity.PtMappingSession;
 import com.sba.nutricanbe.user.entity.PtVenue;
@@ -48,7 +49,7 @@ public class OfflineHireSessionService {
             if (start == null) {
                 throw new BadRequestException("Invalid session time");
             }
-            if (start.isBefore(LocalDateTime.now())) {
+            if (start.isBefore(DietDates.nowVn())) {
                 throw new BadRequestException("All sessions must be in the future");
             }
             LocalDateTime end = appointmentSlotHelper.computeSessionEnd(start, rateUnit);

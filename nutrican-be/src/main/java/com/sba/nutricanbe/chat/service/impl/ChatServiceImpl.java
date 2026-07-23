@@ -239,6 +239,7 @@ public class ChatServiceImpl implements ChatService {
                 .venueName(mapping.getVenueName())
                 .periodEndsAt(mapping.getPeriodEndsAt())
                 .ptProfileId(ptProfileId)
+                .coachingStartedAt(mapping.getCoachingStartedAt())
                 .build();
     }
 

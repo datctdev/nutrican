@@ -75,25 +75,7 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
             return ApiResponse.success(PageResponse.from(Page.empty(pageable)));
         }
 
-        Page<DietLog> logPage = dietLogRepository.findByCustomerIdInAndReviewStatus(
-                clientIds, DietLogReviewStatus.PENDING, pageable);
-
-        List<DietLogReviewResponse> filteredResponses = logPage.getContent().stream()
-                .filter(log -> log.getMacrosJson() != null && log.getMacrosJson().calories() != null)
-                .map(this::toReviewResponse)
-                .toList();
-
-        // Giữ total/pages từ DB page (không lấy size page đã lọc — tránh totalElements = content.size())
-        PageResponse<DietLogReviewResponse> customPageResponse = PageResponse.<DietLogReviewResponse>builder()
-                .content(filteredResponses)
-                .page(logPage.getNumber())
-                .size(logPage.getSize())
-                .totalElements(logPage.getTotalElements())
-                .totalPages(logPage.getTotalPages())
-                .last(logPage.isLast())
-                .build();
-
-        return ApiResponse.success(customPageResponse);
+        return ApiResponse.success(pagePendingWithCalories(clientIds, page, size));
     }
 
     @Override
@@ -105,15 +87,16 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
             throw new ForbiddenException("Bạn chỉ xem được nhật ký của học viên đang được bạn huấn luyện");
         }
 
+        if (reviewStatus == DietLogReviewStatus.PENDING) {
+            return ApiResponse.success(pagePendingWithCalories(List.of(clientId), page, size));
+        }
+
         Pageable pageable = PageRequest.of(page, size, Sort.by("ptReviewedAt").descending()
                 .and(Sort.by("createdAt").descending()));
         Page<DietLog> rawPage = dietLogRepository
                 .findByCustomerIdInAndReviewStatus(List.of(clientId), reviewStatus, pageable);
 
-        // Cùng rule inbox: PENDING chỉ hiện khi đã có calo (đủ để PT duyệt)
         List<DietLogReviewResponse> content = rawPage.getContent().stream()
-                .filter(log -> reviewStatus != DietLogReviewStatus.PENDING
-                        || (log.getMacrosJson() != null && log.getMacrosJson().calories() != null))
                 .map(this::toReviewResponse)
                 .toList();
 
@@ -129,6 +112,31 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
         return ApiResponse.success(response);
     }
 
+    /**
+     * PENDING chỉ hiện khi có calo — paginate ở DB (jsonb), mỗi page đủ size trừ trang cuối.
+     */
+    private PageResponse<DietLogReviewResponse> pagePendingWithCalories(
+            List<UUID> clientIds, int page, int size) {
+        int safeSize = Math.max(size, 1);
+        int safePage = Math.max(page, 0);
+        // Native query đã ORDER BY created_at DESC — Pageable unsorted tránh double-sort lỗi.
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+        Page<DietLog> logPage = dietLogRepository.findPendingWithCaloriesByCustomerIds(
+                clientIds, DietLogReviewStatus.PENDING.name(), pageable);
+        List<DietLogReviewResponse> content = logPage.getContent().stream()
+                .map(this::toReviewResponse)
+                .toList();
+        return PageResponse.<DietLogReviewResponse>builder()
+                .content(content)
+                .page(logPage.getNumber())
+                .size(logPage.getSize())
+                .totalElements(logPage.getTotalElements())
+                .totalPages(logPage.getTotalPages())
+                .first(logPage.isFirst())
+                .last(logPage.isLast())
+                .build();
+    }
+
     @Override
     @Transactional
     public ApiResponse<DietLogReviewResponse> reviewLog(UUID logId, UUID ptId, ReviewActionRequest request) {
@@ -141,6 +149,10 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
         if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(
                 ptId, dietLog.getCustomerId(), ClientMappingStatus.ACTIVE)) {
             throw new ForbiddenException("Bạn chỉ duyệt được bữa ăn của học viên đang được bạn huấn luyện");
+        }
+
+        if (dietLog.getReviewStatus() != DietLogReviewStatus.PENDING) {
+            throw new BadRequestException("Chỉ duyệt bữa đang chờ xử lý");
         }
 
         dietLog.setPtReviewerId(ptId);

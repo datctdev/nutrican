@@ -7,11 +7,70 @@ import { dietService } from '../../services/dietService';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 import ProgressTimelineCard from '../customer/components/ProgressTimelineCard';
+import { ACTIVITY_LEVEL_OPTIONS } from '../customer/components/activityLevelOptions';
 import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlanSuggestionReviewList';
 import MealPlanWeekPicker from '../customer/components/MealPlanWeekPicker';
 import { toast } from 'sonner';
 import { ArrowLeft, TrendingUp, Utensils, Camera, Loader2 } from 'lucide-react';
 import { validateInbodyFile } from '../../utils/inbodyUpload';
+
+function normalizeGender(value) {
+  if (!value) return '';
+  const g = String(value).trim().toUpperCase();
+  if (g === 'MALE' || g === 'FEMALE') return g;
+  if (g === 'M') return 'MALE';
+  if (g === 'F') return 'FEMALE';
+  return '';
+}
+
+function genderLabel(value) {
+  const g = normalizeGender(value);
+  if (g === 'MALE') return 'Nam';
+  if (g === 'FEMALE') return 'Nữ';
+  return '—';
+}
+
+function activityLevelLabel(value) {
+  const opt = ACTIVITY_LEVEL_OPTIONS.find((o) => o.value === value);
+  return opt?.shortLabel || opt?.label || '—';
+}
+
+function validateProfileForm(form) {
+  if (form.heightCm !== '' && form.heightCm != null) {
+    const h = Number(form.heightCm);
+    if (!Number.isFinite(h) || h < 100 || h > 250) return 'Chiều cao phải từ 100–250 cm';
+  }
+  if (form.weight !== '' && form.weight != null) {
+    const w = Number(form.weight);
+    if (!Number.isFinite(w) || w < 20 || w > 300) return 'Cân nặng phải từ 20–300 kg';
+  }
+  if (form.bodyFatPercent !== '' && form.bodyFatPercent != null) {
+    const bf = Number(form.bodyFatPercent);
+    if (!Number.isFinite(bf) || bf < 3 || bf > 60) return 'Tỷ lệ mỡ phải từ 3–60%';
+  }
+  if (form.phoneNumber && String(form.phoneNumber).length > 20) return 'Số điện thoại tối đa 20 ký tự';
+  if (form.specialNotes && String(form.specialNotes).length > 1000) return 'Ghi chú tối đa 1000 ký tự';
+  if (form.gender && !normalizeGender(form.gender)) return 'Giới tính chỉ nhận Nam hoặc Nữ';
+  return null;
+}
+
+function validateGoalsForm(form) {
+  if (form.targetWeight !== '' && form.targetWeight != null) {
+    const w = Number(form.targetWeight);
+    if (!Number.isFinite(w) || w < 20 || w > 300) return 'Cân mục tiêu phải từ 20–300 kg';
+  }
+  if (form.baselineWeight !== '' && form.baselineWeight != null) {
+    const w = Number(form.baselineWeight);
+    if (!Number.isFinite(w) || w < 20 || w > 300) return 'Cân bắt đầu phải từ 20–300 kg';
+  }
+  if (form.targetDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = new Date(`${form.targetDate}T00:00:00`);
+    if (d < today) return 'Ngày dự kiến đạt không được trước hôm nay';
+  }
+  return null;
+}
 
 function AdherenceDonut({ percent }) {
   const hasValue = percent !== null && percent !== undefined && Number.isFinite(Number(percent));
@@ -92,6 +151,14 @@ export default function ClientProgressPage() {
 
   const [isEditingMacros, setIsEditingMacros] = useState(false);
   const [savingMacros, setSavingMacros] = useState(false);
+  const [isEditingGoals, setIsEditingGoals] = useState(false);
+  const [savingGoals, setSavingGoals] = useState(false);
+  const [goalForm, setGoalForm] = useState({
+    nutritionGoal: 'MAINTAIN',
+    targetWeight: '',
+    baselineWeight: '',
+    targetDate: '',
+  });
   const [selectedMealPlanWeek, setSelectedMealPlanWeek] = useState('');
   const [loadingMealPlanWeek, setLoadingMealPlanWeek] = useState(false);
   const [macroForm, setMacroForm] = useState({
@@ -110,6 +177,13 @@ export default function ClientProgressPage() {
     if (progressData?.mealPlanAdherence?.weekStart) {
       setSelectedMealPlanWeek(progressData.mealPlanAdherence.weekStart);
     }
+    const g = progressData?.goals;
+    setGoalForm({
+      nutritionGoal: g?.nutritionGoal || 'MAINTAIN',
+      targetWeight: g?.targetWeight ?? '',
+      baselineWeight: g?.baselineWeight ?? '',
+      targetDate: g?.targetDate || '',
+    });
     return progressData;
   }, [clientId]);
 
@@ -117,8 +191,13 @@ export default function ClientProgressPage() {
     try {
       const res = await workspaceService.getClientProfile(clientId);
       const profileData = res.data.data;
-      setProfile(profileData);
-      setEditForm(profileData);
+      const normalized = {
+        ...profileData,
+        gender: normalizeGender(profileData.gender) || profileData.gender || '',
+        activityLevel: profileData.activityLevel || 'MODERATE',
+      };
+      setProfile(normalized);
+      setEditForm(normalized);
       setMacroForm({
         nutritionGoal: profileData.nutritionGoal || 'MAINTAIN',
         dailyCalories: profileData.tdee || '',
@@ -171,22 +250,37 @@ export default function ClientProgressPage() {
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
+    const errMsg = validateProfileForm(editForm || {});
+    if (errMsg) {
+      toast.error(errMsg);
+      return;
+    }
     setSavingProfile(true);
     try {
       const payload = {
-        ...editForm,
-        heightCm: editForm.heightCm ? Number(editForm.heightCm) : null,
-        weight: editForm.weight ? Number(editForm.weight) : null,
-        bodyFatPercent: editForm.bodyFatPercent ? Number(editForm.bodyFatPercent) : null,
-        tdee: editForm.tdee ? Number(editForm.tdee) : null,
+        fullName: editForm.fullName || null,
+        phoneNumber: editForm.phoneNumber || null,
+        heightCm: editForm.heightCm !== '' && editForm.heightCm != null ? Number(editForm.heightCm) : null,
+        weight: editForm.weight !== '' && editForm.weight != null ? Number(editForm.weight) : null,
+        bodyFatPercent: editForm.bodyFatPercent !== '' && editForm.bodyFatPercent != null
+          ? Number(editForm.bodyFatPercent) : null,
         dateOfBirth: editForm.dateOfBirth || null,
+        gender: normalizeGender(editForm.gender) || null,
+        activityLevel: editForm.activityLevel || null,
+        dietPreference: editForm.dietPreference || null,
+        allergicFoodCodes: editForm.allergicFoodCodes || [],
+        specialNotes: editForm.specialNotes ?? null,
+        allergyNotes: editForm.allergyNotes ?? null,
       };
       const res = await workspaceService.updateClientProfile(clientId, payload);
-      const updatedData = res.data.data;
+      const updatedData = {
+        ...res.data.data,
+        gender: normalizeGender(res.data.data?.gender) || res.data.data?.gender || '',
+      };
       setProfile(updatedData);
       setEditForm(updatedData);
       setIsEditing(false);
-      toast.success('Cập nhật hồ sơ sức khỏe thành công!');
+      toast.success('Cập nhật hồ sơ học viên thành công!');
       await loadProgress(selectedMealPlanWeek || undefined);
       if (updatedData.allergicFoodCodes && updatedData.allergicFoodCodes.length > 0) {
         dietService.getFoodsByCodes(updatedData.allergicFoodCodes)
@@ -200,6 +294,32 @@ export default function ClientProgressPage() {
       toast.error(err.response?.data?.message || 'Không thể cập nhật hồ sơ.');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleUpdateGoals = async (e) => {
+    e.preventDefault();
+    const errMsg = validateGoalsForm(goalForm);
+    if (errMsg) {
+      toast.error(errMsg);
+      return;
+    }
+    setSavingGoals(true);
+    try {
+      await workspaceService.setClientGoals(clientId, {
+        nutritionGoal: goalForm.nutritionGoal || null,
+        targetWeight: goalForm.targetWeight !== '' ? Number(goalForm.targetWeight) : null,
+        baselineWeight: goalForm.baselineWeight !== '' ? Number(goalForm.baselineWeight) : null,
+        targetDate: goalForm.targetDate || null,
+      });
+      toast.success('Đã lưu mục tiêu cân nặng');
+      setIsEditingGoals(false);
+      await loadProgress(selectedMealPlanWeek || undefined);
+      await loadProfile();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể lưu mục tiêu cân');
+    } finally {
+      setSavingGoals(false);
     }
   };
 
@@ -224,7 +344,7 @@ export default function ClientProgressPage() {
           weight: inbodyData.weight || prev.weight,
           bodyFatPercent: inbodyData.bodyFatPercent ?? inbodyData.body_fat_percent ?? prev.bodyFatPercent,
           heightCm: inbodyData.height || prev.heightCm,
-          gender: inbodyData.gender || prev.gender,
+          gender: normalizeGender(inbodyData.gender) || prev.gender,
         }));
         toast.success('Phân tích ảnh InBody thành công! Các số đo đã tự động điền.');
       } else {
@@ -335,6 +455,7 @@ export default function ClientProgressPage() {
             weeks={data.mealPlanWeeks}
             value={selectedMealPlanWeek}
             loading={loadingMealPlanWeek}
+            coachingStartedAt={data.coachingStartedAt}
             onChange={async (weekStart) => {
               setSelectedMealPlanWeek(weekStart);
               setLoadingMealPlanWeek(true);
@@ -431,12 +552,12 @@ export default function ClientProgressPage() {
             <Card className="bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden">
               <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                 <div>
-                  <h3 className="font-extrabold text-slate-800">Hồ sơ sức khỏe & Mục tiêu</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Thông tin nhân trắc học và các lưu ý ăn uống của học viên.</p>
+                  <h3 className="font-extrabold text-slate-800">Hồ sơ học viên</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Nhân trắc, giới tính, mức vận động và lưu ý ăn uống.</p>
                 </div>
                 {!isEditing && (
                   <Button size="sm" onClick={() => setIsEditing(true)} className="rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white">
-                    Chỉnh sửa hồ sơ
+                    Chỉnh sửa
                   </Button>
                 )}
               </div>
@@ -478,14 +599,31 @@ export default function ClientProgressPage() {
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Giới tính</label>
                         <select
-                          value={editForm.gender || 'male'}
+                          value={normalizeGender(editForm.gender) || ''}
                           onChange={(e) => setEditForm({...editForm, gender: e.target.value})}
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                         >
-                          <option value="male">Nam</option>
-                          <option value="female">Nữ</option>
+                          <option value="">— Chọn —</option>
+                          <option value="MALE">Nam</option>
+                          <option value="FEMALE">Nữ</option>
                         </select>
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mức vận động</label>
+                      <select
+                        value={editForm.activityLevel || 'MODERATE'}
+                        onChange={(e) => setEditForm({...editForm, activityLevel: e.target.value})}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                      >
+                        {ACTIVITY_LEVEL_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {ACTIVITY_LEVEL_OPTIONS.find((o) => o.value === (editForm.activityLevel || 'MODERATE'))?.desc}
+                      </p>
                     </div>
 
                     <div className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-100">
@@ -517,6 +655,8 @@ export default function ClientProgressPage() {
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chiều cao (cm)</label>
                         <input
                           type="number"
+                          min={100}
+                          max={250}
                           value={editForm.heightCm || ''}
                           onChange={(e) => setEditForm({...editForm, heightCm: e.target.value})}
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
@@ -527,6 +667,8 @@ export default function ClientProgressPage() {
                         <input
                           type="number"
                           step="0.1"
+                          min={20}
+                          max={300}
                           value={editForm.weight || ''}
                           onChange={(e) => setEditForm({...editForm, weight: e.target.value})}
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
@@ -537,6 +679,8 @@ export default function ClientProgressPage() {
                         <input
                           type="number"
                           step="0.1"
+                          min={3}
+                          max={60}
                           value={editForm.bodyFatPercent || ''}
                           onChange={(e) => setEditForm({...editForm, bodyFatPercent: e.target.value})}
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
@@ -546,13 +690,10 @@ export default function ClientProgressPage() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mục tiêu Calo / TDEE</label>
-                        <input
-                          type="number"
-                          value={editForm.tdee || ''}
-                          onChange={(e) => setEditForm({...editForm, tdee: e.target.value})}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                        />
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Calo hiện tại (chỉ đọc)</label>
+                        <div className="w-full rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                          {profile.tdee ? `${profile.tdee} kcal/ngày` : '— (chỉnh ở Macro)'}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chế độ ăn</label>
@@ -579,11 +720,11 @@ export default function ClientProgressPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lưu ý đặc biệt (v.d. không ăn cay, dị ứng khác)</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ghi chú dinh dưỡng / lưu ý của PT</label>
                         <input
                           type="text"
                           value={editForm.specialNotes || ''}
-                          placeholder="v.d. Không ăn cay, dị ứng hải sản nhẹ"
+                          placeholder="vd. Không ăn cay, hạn chế sữa"
                           onChange={(e) => setEditForm({...editForm, specialNotes: e.target.value})}
                           className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                         />
@@ -593,7 +734,7 @@ export default function ClientProgressPage() {
                     <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
                       <Button type="button" variant="outline" onClick={() => { setIsEditing(false); setEditForm(profile); }}>Hủy</Button>
                       <Button type="submit" disabled={savingProfile} className="bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl px-5">
-                        {savingProfile ? 'Đang lưu...' : 'Lưu lại'}
+                        {savingProfile ? 'Đang lưu...' : 'Lưu hồ sơ'}
                       </Button>
                     </div>
                   </form>
@@ -604,11 +745,12 @@ export default function ClientProgressPage() {
                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Thông tin cá nhân</h4>
                         <div className="mt-2 grid grid-cols-2 gap-3 text-sm font-semibold text-slate-700">
                           <div><span className="text-slate-450 font-normal">Họ tên:</span> {profile.fullName}</div>
-                          <div><span className="text-slate-450 font-normal">Giới tính:</span> {profile.gender === 'male' ? 'Nam' : 'Nữ'}</div>
+                          <div><span className="text-slate-450 font-normal">Giới tính:</span> {genderLabel(profile.gender)}</div>
                           <div><span className="text-slate-450 font-normal">Chiều cao:</span> {profile.heightCm ? `${profile.heightCm} cm` : '—'}</div>
                           <div><span className="text-slate-450 font-normal">Cân nặng:</span> {profile.weight ? `${profile.weight} kg` : '—'}</div>
                           <div><span className="text-slate-450 font-normal">Tỷ lệ mỡ:</span> {profile.bodyFatPercent ? `${profile.bodyFatPercent}%` : '—'}</div>
                           <div><span className="text-slate-450 font-normal">Ngày sinh:</span> {profile.dateOfBirth || '—'}</div>
+                          <div className="col-span-2"><span className="text-slate-450 font-normal">Mức vận động:</span> {activityLevelLabel(profile.activityLevel)}</div>
                         </div>
                       </div>
                       <div>
@@ -622,14 +764,14 @@ export default function ClientProgressPage() {
 
                     <div className="space-y-4">
                       <div>
-                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Mục tiêu & Chế độ ăn</h4>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Chế độ ăn & calo</h4>
                         <div className="mt-2 grid grid-cols-2 gap-3 text-sm font-semibold text-slate-700">
-                          <div><span className="text-slate-450 font-normal">TDEE / Calo:</span> {profile.tdee ? `${profile.tdee} kcal` : '—'}</div>
+                          <div><span className="text-slate-450 font-normal">Calo hiện tại:</span> {profile.tdee ? `${profile.tdee} kcal` : '—'}</div>
                           <div><span className="text-slate-450 font-normal">Chế độ ăn:</span> {profile.dietPreference === 'NORMAL' ? 'Bình thường' : profile.dietPreference || '—'}</div>
                         </div>
                       </div>
                       <div>
-                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Lưu ý đặc biệt & Dị ứng</h4>
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Lưu ý & Dị ứng</h4>
                         <div className="mt-2 text-sm font-semibold space-y-2">
                           <div className="flex flex-wrap gap-1.5">
                             <span className="text-slate-450 font-normal mr-1">Dị ứng:</span>
@@ -644,13 +786,13 @@ export default function ClientProgressPage() {
                             )}
                           </div>
                           <div>
-                            <span className="text-slate-450 font-normal">Lưu ý:</span>{' '}
+                            <span className="text-slate-450 font-normal">Ghi chú:</span>{' '}
                             {profile.specialNotes ? (
                               <span className="text-amber-800 bg-amber-50 border border-amber-100 px-2 py-1 rounded-lg text-xs font-bold inline-block mt-1">
                                 {profile.specialNotes}
                               </span>
                             ) : (
-                              <span className="text-slate-450 italic">Không có lưu ý đặc biệt</span>
+                              <span className="text-slate-450 italic">Không có ghi chú</span>
                             )}
                           </div>
                         </div>
@@ -667,12 +809,12 @@ export default function ClientProgressPage() {
             <Card className="bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden mt-6">
               <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                 <div>
-                  <h3 className="font-extrabold text-slate-800">Thiết lập Mục tiêu Dinh dưỡng & Macro</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Xác định giai đoạn tập luyện và phân bổ năng lượng hàng ngày.</p>
+                  <h3 className="font-extrabold text-slate-800">Macro & mục tiêu dinh dưỡng</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Giai đoạn tập luyện và phân bổ calo / protein / carb / fat (nguồn chỉnh calo duy nhất).</p>
                 </div>
                 {!isEditingMacros && (
                   <Button size="sm" onClick={() => setIsEditingMacros(true)} className="rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 text-white">
-                    Cấu hình Mục tiêu & Macro
+                    Cấu hình
                   </Button>
                 )}
               </div>
@@ -777,7 +919,7 @@ export default function ClientProgressPage() {
                         fat: profile.fat || '',
                       }); }}>Hủy</Button>
                       <Button type="submit" disabled={savingMacros || !macroOk} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl px-5">
-                        {savingMacros ? 'Đang lưu...' : 'Lưu chốt mục tiêu'}
+                        {savingMacros ? 'Đang lưu...' : 'Lưu macro'}
                       </Button>
                     </div>
                   </form>
@@ -819,11 +961,6 @@ export default function ClientProgressPage() {
                             <span className="text-slate-500 italic text-sm">Chưa thiết lập mục tiêu</span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-400 mt-2 font-medium">
-                          {profile.nutritionGoal === 'WEIGHT_LOSS' && 'PT khuyến nghị thâm hụt năng lượng lành mạnh kết hợp protein cao để bảo vệ khối cơ.'}
-                          {profile.nutritionGoal === 'WEIGHT_GAIN' && 'PT khuyến nghị thặng dư năng lượng nhẹ kèm lượng tinh bột cao để tối ưu hóa năng lượng buổi tập.'}
-                          {profile.nutritionGoal === 'MAINTAIN' && 'PT khuyến nghị giữ mức Calo thăng bằng theo TDEE gợi ý để duy trì vóc dáng lý tưởng.'}
-                        </p>
                       </div>
                     </div>
 
@@ -859,18 +996,138 @@ export default function ClientProgressPage() {
             </Card>
           )}
 
+          <Card className="bg-white border-slate-200 shadow-sm rounded-3xl overflow-hidden mt-6">
+            <div className="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+              <div>
+                <h3 className="font-extrabold text-slate-800">Mục tiêu cân nặng</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Cân bắt đầu, cân mục tiêu và ngày dự kiến đạt.</p>
+              </div>
+              {!isEditingGoals && (
+                <Button size="sm" onClick={() => setIsEditingGoals(true)} className="rounded-xl font-bold bg-violet-600 hover:bg-violet-700 text-white">
+                  Chỉnh mục tiêu
+                </Button>
+              )}
+            </div>
+            <CardContent className="p-6">
+              {isEditingGoals ? (
+                <form onSubmit={handleUpdateGoals} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cân bắt đầu (kg)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={20}
+                        max={300}
+                        value={goalForm.baselineWeight}
+                        onChange={(e) => setGoalForm({ ...goalForm, baselineWeight: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cân mục tiêu (kg)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min={20}
+                        max={300}
+                        value={goalForm.targetWeight}
+                        onChange={(e) => setGoalForm({ ...goalForm, targetWeight: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ngày dự kiến đạt</label>
+                      <input
+                        type="date"
+                        value={goalForm.targetDate}
+                        onChange={(e) => setGoalForm({ ...goalForm, targetDate: e.target.value })}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Giai đoạn (đồng bộ macro)</label>
+                    <select
+                      value={goalForm.nutritionGoal}
+                      onChange={(e) => setGoalForm({ ...goalForm, nutritionGoal: e.target.value })}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-500"
+                    >
+                      <option value="WEIGHT_LOSS">Giảm mỡ</option>
+                      <option value="WEIGHT_GAIN">Tăng cơ</option>
+                      <option value="MAINTAIN">Giữ cân</option>
+                      <option value="PREGNANT">Thai kỳ</option>
+                      <option value="RECOVERY">Phục hồi</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditingGoals(false);
+                        const g = data?.goals;
+                        setGoalForm({
+                          nutritionGoal: g?.nutritionGoal || 'MAINTAIN',
+                          targetWeight: g?.targetWeight ?? '',
+                          baselineWeight: g?.baselineWeight ?? '',
+                          targetDate: g?.targetDate || '',
+                        });
+                      }}
+                    >
+                      Hủy
+                    </Button>
+                    <Button type="submit" disabled={savingGoals} className="bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl px-5">
+                      {savingGoals ? 'Đang lưu...' : 'Lưu mục tiêu'}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-bold mb-1">Cân bắt đầu</span>
+                    <span className="font-semibold text-slate-800">
+                      {data?.goals?.baselineWeight != null ? `${data.goals.baselineWeight} kg` : '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-bold mb-1">Cân mục tiêu</span>
+                    <span className="font-semibold text-violet-700">
+                      {data?.goals?.targetWeight != null ? `${data.goals.targetWeight} kg` : '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-bold mb-1">Ngày dự kiến</span>
+                    <span className="font-semibold text-slate-800">
+                      {data?.projectedCompletion || data?.goals?.targetDate || '—'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-xs uppercase font-bold mb-1">Giai đoạn</span>
+                    <span className="font-semibold text-slate-800">{data?.goals?.nutritionGoal || profile?.nutritionGoal || '—'}</span>
+                  </div>
+                  {!data?.goals?.targetWeight && !data?.goals?.baselineWeight && (
+                    <p className="col-span-full text-xs text-slate-400 italic">Chưa đặt mục tiêu cân — bấm «Chỉnh mục tiêu» để thêm.</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <ProgressTimelineCard
             goals={data?.goals}
             milestones={data?.milestones}
             regressionAlert={data?.regressionAlert}
             projectedCompletion={data?.projectedCompletion}
             bodyMetrics={weights}
+            allowSelfMetricsFallback={false}
           />
 
           {data?.calorieHistory?.length > 0 && (
             <Card>
               <CardContent className="p-5">
-                <p className="text-sm font-bold text-slate-600 mb-3">Calories vs target (7 ngày)</p>
+                <p className="text-sm font-bold text-slate-600 mb-1">Calories vs target</p>
+                <p className="text-xs text-slate-400 mb-3">7 ngày gần nhất trên lịch (không phải tuần coaching)</p>
                 <CalorieLineChart history={data.calorieHistory} />
                 <div className="flex gap-4 mt-2 text-xs text-slate-500">
                   <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-violet-500" /> Thực tế</span>

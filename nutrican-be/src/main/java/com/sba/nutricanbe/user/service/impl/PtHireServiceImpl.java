@@ -22,6 +22,7 @@ import com.sba.nutricanbe.user.service.OfflineHireSessionService;
 import com.sba.nutricanbe.user.service.PtHireService;
 import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
 import com.sba.nutricanbe.user.service.SlotHoldService;
+import com.sba.nutricanbe.user.service.UserAccountStatusHelper;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +51,7 @@ public class PtHireServiceImpl implements PtHireService {
     private final PtMappingSessionRepository mappingSessionRepository;
     private final SlotHoldService slotHoldService;
     private final WebSocketSessionService webSocketSessionService;
+    private final UserAccountStatusHelper userAccountStatusHelper;
 
     @Value("${app.payment.accepted-request-hours:24}")
     private long acceptedRequestHours;
@@ -62,6 +64,10 @@ public class PtHireServiceImpl implements PtHireService {
                 .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
         if (pt.getRole() != UserRole.PT_CERTIFIED && pt.getRole() != UserRole.PT_FREELANCE) {
             throw new BadRequestException("User is not a PT");
+        }
+        userAccountStatusHelper.ensureActiveOrLiftExpired(pt);
+        if (UserAccountStatusHelper.isCurrentlySuspended(pt)) {
+            throw new BadRequestException("PT đang bị khóa tài khoản — không thể thuê");
         }
 
         PtProfile profile = ptProfileRepository.findByUserId(ptId)

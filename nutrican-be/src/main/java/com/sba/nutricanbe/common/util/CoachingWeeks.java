@@ -36,6 +36,25 @@ public final class CoachingWeeks {
         return new Window(true, weekIndex, weekStart, weekEnd);
     }
 
+    /** Current coaching week start, or null if unavailable. */
+    public static LocalDate currentWeekStart(LocalDateTime startedAt, LocalDate todayVn) {
+        Window w = from(startedAt, todayVn);
+        return w.available() ? w.weekStart() : null;
+    }
+
+    public static LocalDate currentWeekStart(LocalDate startedAt, LocalDate todayVn) {
+        Window w = from(startedAt, todayVn);
+        return w.available() ? w.weekStart() : null;
+    }
+
+    /** True when date is start + 7*i. */
+    public static boolean isBoundary(LocalDate startedAt, LocalDate weekStartDate) {
+        if (startedAt == null || weekStartDate == null || weekStartDate.isBefore(startedAt)) {
+            return false;
+        }
+        return ChronoUnit.DAYS.between(startedAt, weekStartDate) % 7 == 0;
+    }
+
     /**
      * Whether a weekly summary for {@code weekStartDate} may be submitted.
      * Requires coaching available, {@code weekStartDate} on a valid boundary

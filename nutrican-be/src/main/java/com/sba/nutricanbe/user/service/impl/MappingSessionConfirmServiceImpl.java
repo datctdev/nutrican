@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.dto.MappingSessionResponse;
 import com.sba.nutricanbe.user.dto.SessionDisputeMessageRequest;
@@ -74,8 +75,11 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
         if (session.getStatus() != MappingSessionStatus.SCHEDULED) {
             throw new BadRequestException("Session cannot be marked done in status " + session.getStatus());
         }
+        LocalDateTime now = DietDates.nowVn();
+        if (session.getStartTime() != null && session.getStartTime().isAfter(now)) {
+            throw new BadRequestException("Chỉ xác nhận đã dạy khi buổi đã bắt đầu");
+        }
 
-        LocalDateTime now = LocalDateTime.now();
         session.setStatus(MappingSessionStatus.AWAITING_CONFIRM);
         session.setPtMarkedDoneAt(now);
         session.setConfirmDeadlineAt(now.plusHours(confirmTimeoutHours));

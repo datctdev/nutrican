@@ -149,6 +149,14 @@ public class PtWorkspaceController {
         return ResponseEntity.ok(ptClientService.setClientMacroTarget(user.getId(), clientId, request));
     }
 
+    @PutMapping("/clients/{clientId}/goals")
+    public ResponseEntity<ApiResponse<com.sba.nutricanbe.user.dto.ClientGoalDto>> setClientGoals(
+            @PathVariable UUID clientId,
+            @AuthenticationPrincipal User user,
+            @RequestBody com.sba.nutricanbe.user.dto.ClientGoalRequest request) {
+        return ResponseEntity.ok(ptClientService.setClientGoals(user.getId(), clientId, request));
+    }
+
     @PutMapping("/clients/{clientId}/coaching-evaluation")
     public ResponseEntity<ApiResponse<ClientStatusDto>> setCoachingEvaluation(
             @PathVariable UUID clientId,
@@ -228,7 +236,9 @@ public class PtWorkspaceController {
     public ResponseEntity<ApiResponse<PtClientProfileDto>> createClient(
             @AuthenticationPrincipal User user,
             @RequestBody CreateClientRequest request) {
-        return ResponseEntity.ok(ptClientService.createClient(user.getId(), request));
+        // Hire/marketplace only — direct create bypasses escrow & onboarding.
+        throw new com.sba.nutricanbe.common.exception.BadRequestException(
+                "Không thể thêm học viên trực tiếp. Học viên chỉ vào qua luồng thuê PT / marketplace.");
     }
 
     @GetMapping("/clients/{clientId}/chat-context")

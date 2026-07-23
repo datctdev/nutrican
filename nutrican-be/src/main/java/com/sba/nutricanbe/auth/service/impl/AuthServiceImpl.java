@@ -19,6 +19,7 @@ import com.sba.nutricanbe.common.exception.TooManyRequestsException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
 import com.sba.nutricanbe.auth.repository.PasswordResetTokenRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.user.service.UserAccountStatusHelper;
 import com.sba.nutricanbe.infrastructure.mail.MailService;
 import com.sba.nutricanbe.common.util.JwtUtil;
 import jakarta.servlet.http.Cookie;
@@ -58,6 +59,7 @@ public class AuthServiceImpl implements AuthService {
     private final com.sba.nutricanbe.auth.service.GoogleIdTokenService googleIdTokenService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final MailService emailService;
+    private final UserAccountStatusHelper userAccountStatusHelper;
 
     @Value("${app.security.jwt.expiration}")
     private Long jwtExpirationMs;
@@ -101,10 +103,9 @@ public class AuthServiceImpl implements AuthService {
             throw new UnauthorizedException("Invalid email or password");
         }
 
-        if (user.getStatus() == UserStatus.SUSPENDED) {
-            auditLog.warn("AUTH_FAILED: email={}, userId={}, reason=ACCOUNT_SUSPENDED",
-                    request.getEmail(), user.getId());
-            throw new BadRequestException("Account is suspended");
+        if (user.getStatus() == UserStatus.SUSPENDED
+                || user.getSuspendedUntil() != null) {
+            userAccountStatusHelper.assertNotSuspendedOrThrow(user);
         }
 
         if (user.getPasswordSetRequired() != null && user.getPasswordSetRequired()) {
@@ -154,6 +155,8 @@ public class AuthServiceImpl implements AuthService {
                             jwtUtil.getTokenId(rawRefreshToken));
                     return new UnauthorizedException("User not found");
                 });
+
+        userAccountStatusHelper.assertNotSuspendedOrThrow(user);
 
         auditLog.info("TOKEN_REFRESHED: userId={}", user.getId());
         return ApiResponse.success(buildAuthResponse(user, rawRefreshToken, response), "Token refreshed");
@@ -205,10 +208,13 @@ public class AuthServiceImpl implements AuthService {
         User user;
         if (byGoogleId.isPresent()) {
             user = byGoogleId.get();
+            userAccountStatusHelper.assertNotSuspendedOrThrow(user);
         } else {
             Optional<User> byEmail = userRepository.findByEmail(email);
             if (byEmail.isPresent()) {
                 User existing = byEmail.get();
+                // Must check before overwriting status (e.g. PENDING_PASSWORD would clear SUSPENDED)
+                userAccountStatusHelper.assertNotSuspendedOrThrow(existing);
                 existing.setGoogleId(googleId);
                 existing.setGooglePictureUrl(picture);
                 existing.setPasswordSetRequired(true);

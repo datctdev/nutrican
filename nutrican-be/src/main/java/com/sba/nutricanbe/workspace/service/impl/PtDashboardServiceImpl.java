@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.workspace.service.impl;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.common.util.CoachingWeeks;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.RblDatasetFilter;
 import com.sba.nutricanbe.common.util.RblMetricsUtil;
@@ -53,8 +54,8 @@ public class PtDashboardServiceImpl implements PtDashboardService {
                 .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
                 .map(m -> m.getClient().getId()).toList();
         long pendingCount = clientIds.isEmpty() ? 0
-                : dietLogRepository.findByCustomerIdInAndReviewStatus(
-                        clientIds, DietLogReviewStatus.PENDING, PageRequest.of(0, 1)).getTotalElements();
+                : dietLogRepository.findPendingWithCaloriesByCustomerIds(
+                        clientIds, DietLogReviewStatus.PENDING.name(), PageRequest.of(0, 1)).getTotalElements();
 
         PtStatsDto stats = PtStatsDto.builder()
                 .totalClients((int) allClients.getTotalElements())
@@ -81,6 +82,10 @@ public class PtDashboardServiceImpl implements PtDashboardService {
 
         for (PtClientMapping mapping : activeMappings) {
             User client = mapping.getClient();
+            LocalDate currentWeekStart = CoachingWeeks.currentWeekStart(mapping.getCoachingStartedAt(), today);
+            if (currentWeekStart == null) {
+                currentWeekStart = thisMonday;
+            }
 
             List<MealPlan> plans = mealPlanRepository.findByClientIdOrderByWeekStartDesc(client.getId());
             if (plans.isEmpty()) {
@@ -93,7 +98,7 @@ public class PtDashboardServiceImpl implements PtDashboardService {
                         .build());
             } else {
                 MealPlan latestPlan = plans.get(0);
-                if (latestPlan.getWeekStart().isBefore(thisMonday)) {
+                if (latestPlan.getWeekStart().isBefore(currentWeekStart)) {
                     alerts.add(PtClientAlertDto.builder()
                             .clientId(client.getId())
                             .clientName(client.getFullName())

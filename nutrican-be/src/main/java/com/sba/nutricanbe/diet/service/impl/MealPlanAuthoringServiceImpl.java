@@ -2,6 +2,7 @@ package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.CoachingWeeks;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.MealPeriods;
@@ -15,6 +16,7 @@ import com.sba.nutricanbe.diet.dto.response.PlanDietPrefWarning;
 import com.sba.nutricanbe.diet.entity.MealPlan;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
+import com.sba.nutricanbe.diet.enums.MealPlanWeekBasis;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.diet.repository.MealPlanItemRepository;
@@ -25,6 +27,7 @@ import com.sba.nutricanbe.diet.service.FoodCatalogService;
 import com.sba.nutricanbe.diet.service.MealPlanAuthoringService;
 import com.sba.nutricanbe.diet.service.support.MealPlanDetailAssembler;
 import com.sba.nutricanbe.user.entity.MacroTarget;
+import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
@@ -34,7 +37,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,10 +75,12 @@ public class MealPlanAuthoringServiceImpl implements MealPlanAuthoringService {
             throw new BadRequestException("clientId is required");
         }
         assertActiveClient(ptId, request.getClientId());
+        WeekAnchor anchor = resolveWeekAnchor(request.getClientId(), request.getWeekStart());
         MealPlan plan = mealPlanRepository.save(MealPlan.builder()
                 .clientId(request.getClientId())
                 .ptId(ptId)
-                .weekStart(request.getWeekStart() != null ? request.getWeekStart() : DietDates.todayVn())
+                .weekStart(anchor.weekStart())
+                .weekBasis(anchor.basis())
                 .notes(request.getNotes())
                 .build());
         return finalizeSave(plan, request.getClientId(), request.getItems());
@@ -83,6 +90,7 @@ public class MealPlanAuthoringServiceImpl implements MealPlanAuthoringService {
     @Transactional
     public MealPlanSaveResult updatePlan(UUID ptId, UUID clientId, MealPlanRequest request) {
         assertActiveClient(ptId, clientId);
+        WeekAnchor anchor = resolveWeekAnchor(clientId, request.getWeekStart());
         MealPlan plan = (request.getWeekStart() != null
                 ? mealPlanRepository.findFirstByClientIdAndWeekStartOrderByCreatedAtDesc(
                         clientId, request.getWeekStart())
@@ -90,7 +98,8 @@ public class MealPlanAuthoringServiceImpl implements MealPlanAuthoringService {
                 .orElseGet(() -> mealPlanRepository.save(MealPlan.builder()
                         .clientId(clientId)
                         .ptId(ptId)
-                        .weekStart(request.getWeekStart() != null ? request.getWeekStart() : DietDates.todayVn())
+                        .weekStart(anchor.weekStart())
+                        .weekBasis(anchor.basis())
                         .build()));
         if (!plan.getPtId().equals(ptId)) {
             throw new BadRequestException("You can only update meal plans that you created");
@@ -100,9 +109,45 @@ public class MealPlanAuthoringServiceImpl implements MealPlanAuthoringService {
         }
         if (request.getWeekStart() != null) {
             plan.setWeekStart(request.getWeekStart());
+            plan.setWeekBasis(anchor.basis());
+        } else if (plan.getWeekBasis() == null) {
+            plan.setWeekBasis(MealPlanWeekBasis.MONDAY);
         }
         plan = mealPlanRepository.save(plan);
         return finalizeUpdate(plan, clientId, request.getItems());
+    }
+
+    private record WeekAnchor(LocalDate weekStart, MealPlanWeekBasis basis) {}
+
+    /**
+     * Dual-write: coached clients prefer coaching boundaries; otherwise Monday calendar.
+     * Legacy Monday weekStarts still accepted (basis=MONDAY) so old FE keeps working.
+     */
+    private WeekAnchor resolveWeekAnchor(UUID clientId, LocalDate requested) {
+        LocalDate today = DietDates.todayVn();
+        LocalDateTime startedAt = mappingRepository
+                .findByClient_Id(clientId, org.springframework.data.domain.PageRequest.of(0, 20))
+                .stream()
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                        || m.getStatus() == ClientMappingStatus.END_REQUESTED)
+                .map(PtClientMapping::getCoachingStartedAt)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+
+        if (startedAt != null) {
+            LocalDate coachingCurrent = CoachingWeeks.currentWeekStart(startedAt, today);
+            if (requested == null) {
+                return new WeekAnchor(
+                        coachingCurrent != null ? coachingCurrent : today.with(DayOfWeek.MONDAY),
+                        MealPlanWeekBasis.COACHING);
+            }
+            if (CoachingWeeks.isBoundary(startedAt.toLocalDate(), requested)) {
+                return new WeekAnchor(requested, MealPlanWeekBasis.COACHING);
+            }
+        }
+        LocalDate mondayFallback = requested != null ? requested : today.with(DayOfWeek.MONDAY);
+        return new WeekAnchor(mondayFallback, MealPlanWeekBasis.MONDAY);
     }
 
     @Override

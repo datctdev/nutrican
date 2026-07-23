@@ -42,6 +42,31 @@ public interface DietLogRepository extends JpaRepository<DietLog, UUID> {
             @Param("reviewStatus") com.sba.nutricanbe.diet.enums.DietLogReviewStatus reviewStatus,
             Pageable pageable);
 
+    /** PENDING có calo — paginate ở DB (PostgreSQL jsonb), không load hết vào RAM. */
+    @Query(
+            value = """
+                    SELECT * FROM diet_logs d
+                    WHERE d.customer_id IN (:customerIds)
+                      AND d.review_status = :reviewStatus
+                      AND d.macros_json IS NOT NULL
+                      AND (d.macros_json->>'calories') IS NOT NULL
+                      AND (d.macros_json->>'calories') <> 'null'
+                    ORDER BY d.created_at DESC
+                    """,
+            countQuery = """
+                    SELECT count(*) FROM diet_logs d
+                    WHERE d.customer_id IN (:customerIds)
+                      AND d.review_status = :reviewStatus
+                      AND d.macros_json IS NOT NULL
+                      AND (d.macros_json->>'calories') IS NOT NULL
+                      AND (d.macros_json->>'calories') <> 'null'
+                    """,
+            nativeQuery = true)
+    Page<DietLog> findPendingWithCaloriesByCustomerIds(
+            @Param("customerIds") List<UUID> customerIds,
+            @Param("reviewStatus") String reviewStatus,
+            Pageable pageable);
+
     @Query("SELECT d FROM DietLog d WHERE d.customerId IN :customerIds AND d.status = :status")
     Page<DietLog> findByCustomerIdInAndStatus(
             @Param("customerIds") List<UUID> customerIds,

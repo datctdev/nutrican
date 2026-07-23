@@ -299,13 +299,9 @@ public class DietLogServiceImpl implements DietLogService {
 
         boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt());
         boolean hasActivePt = dietLogHelper.hasActivePt(userId);
-        boolean macrosChanged = request.getCalories() != null
-                || request.getProtein() != null
-                || request.getCarb() != null
-                || request.getFat() != null;
 
-        // HV có PT: gửi PT hoặc sửa macro → luôn PENDING (không bypass bằng bỏ tick)
-        if (hasActivePt && (sendToPt || macrosChanged)) {
+        // HV có PT ACTIVE: mọi update đều PENDING (không bypass bằng chỉ sửa mô tả / bỏ tick)
+        if (hasActivePt) {
             var reviewStatus = dietLogHelper.resolveReviewStatus(userId, true);
             dietLog.setStatus(DietLogStatus.LOGGED);
             dietLog.setReviewStatus(reviewStatus);

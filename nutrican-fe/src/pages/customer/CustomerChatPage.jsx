@@ -12,6 +12,17 @@ import useWebSocket from '../../hooks/useWebSocket';
 import ImageLightbox from '../../components/common/ImageLightbox';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
+const MSG_PAGE_SIZE = 30;
+
+function mergeUniqueById(existing, incoming, mode = 'append') {
+    const map = new Map();
+    const ordered = mode === 'prepend' ? [...incoming, ...existing] : [...existing, ...incoming];
+    ordered.forEach((m) => {
+        if (m?.id != null) map.set(String(m.id), m);
+        else map.set(`tmp-${m.createdAt}-${m.content}`, m);
+    });
+    return Array.from(map.values()).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
 
 export default function CustomerChatPage() {
     const { user } = useAuthStore();
@@ -29,8 +40,13 @@ export default function CustomerChatPage() {
     const [sending, setSending] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
+    const [msgPage, setMsgPage] = useState(0);
+    const [msgLast, setMsgLast] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
 
     const messagesEndRef = useRef(null);
+    const messagesContainerRef = useRef(null);
+    const stickToBottomRef = useRef(true);
     const imageInputRef = useRef(null);
 
     const loadThreads = useCallback(async () => {
@@ -77,9 +93,13 @@ export default function CustomerChatPage() {
         const loadMessages = async () => {
             try {
                 setLoadingMessages(true);
-                const res = await chatService.getMessages(activeMappingId, { page: 0, size: 50 });
-                const msgs = res.data.data.content || [];
-                setMessages(msgs.reverse());
+                stickToBottomRef.current = true;
+                setMsgPage(0);
+                const res = await chatService.getMessages(activeMappingId, { page: 0, size: MSG_PAGE_SIZE });
+                const pageData = res.data.data || {};
+                const msgs = [...(pageData.content || [])].reverse();
+                setMessages(msgs);
+                setMsgLast(Boolean(pageData.last ?? true));
                 await chatService.markRead(activeMappingId);
             } catch (err) {
                 console.error("Fetch messages error:", err);
@@ -91,6 +111,41 @@ export default function CustomerChatPage() {
         loadMessages();
     }, [activeMappingId]);
 
+    const loadOlderMessages = useCallback(async () => {
+        if (!activeMappingId || isLoadingMore || msgLast) return;
+        const container = messagesContainerRef.current;
+        const prevHeight = container?.scrollHeight || 0;
+        const prevTop = container?.scrollTop || 0;
+        const nextPage = msgPage + 1;
+        setIsLoadingMore(true);
+        stickToBottomRef.current = false;
+        try {
+            const res = await chatService.getMessages(activeMappingId, { page: nextPage, size: MSG_PAGE_SIZE });
+            const pageData = res.data.data || {};
+            const older = [...(pageData.content || [])].reverse();
+            setMessages((prev) => mergeUniqueById(prev, older, 'prepend'));
+            setMsgPage(nextPage);
+            setMsgLast(Boolean(pageData.last ?? true));
+            requestAnimationFrame(() => {
+                if (container) {
+                    container.scrollTop = container.scrollHeight - prevHeight + prevTop;
+                }
+            });
+        } catch {
+            toast.error('Không tải thêm được tin cũ');
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [activeMappingId, isLoadingMore, msgLast, msgPage]);
+
+    const handleMessagesScroll = (e) => {
+        const el = e.currentTarget;
+        stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        if (el.scrollTop < 48) {
+            loadOlderMessages();
+        }
+    };
+
     useEffect(() => {
         const handleNewMessage = (e) => {
             const newMsg = e.detail;
@@ -98,10 +153,8 @@ export default function CustomerChatPage() {
                 newMsg.createdAt = new Date().toISOString();
             }
             if (newMsg.mappingId === activeMappingId) {
-                setMessages(prev => {
-                    if (prev.some(m => m.id === newMsg.id)) return prev;
-                    return [...prev, newMsg];
-                });
+                stickToBottomRef.current = true;
+                setMessages(prev => mergeUniqueById(prev, [newMsg], 'append'));
                 chatService.markRead(activeMappingId).catch(console.error);
             }
             loadThreads();
@@ -112,6 +165,7 @@ export default function CustomerChatPage() {
     }, [activeMappingId, loadThreads]);
 
     const scrollToBottom = () => {
+        if (!stickToBottomRef.current) return;
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
@@ -343,7 +397,23 @@ export default function CustomerChatPage() {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-4">
+                        <div
+                            ref={messagesContainerRef}
+                            onScroll={handleMessagesScroll}
+                            className="flex-1 overflow-y-auto p-6 bg-slate-50/50 space-y-4"
+                        >
+                            {isLoadingMore && (
+                                <p className="text-center text-xs text-slate-400 font-medium">Đang tải tin cũ…</p>
+                            )}
+                            {!msgLast && !isLoadingMore && messages.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={loadOlderMessages}
+                                    className="w-full text-center text-xs font-semibold text-primary hover:underline py-1"
+                                >
+                                    Tải thêm tin nhắn cũ
+                                </button>
+                            )}
                             {loadingMessages ? (
                                 <div className="flex flex-col gap-4">
                                     <Skeleton className="h-16 w-2/3 rounded-2xl rounded-tl-none self-start bg-slate-200" />

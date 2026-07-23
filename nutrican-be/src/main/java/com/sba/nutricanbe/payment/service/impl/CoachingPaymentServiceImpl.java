@@ -2,6 +2,7 @@ package com.sba.nutricanbe.payment.service.impl;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.payment.config.VNPayConfig;
 import com.sba.nutricanbe.payment.dto.CoachingPaymentResult;
 import com.sba.nutricanbe.payment.dto.CreateCoachingPaymentResponse;
@@ -69,7 +70,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
             throw new BadRequestException("The coaching price exceeds VNPay's supported amount");
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DietDates.nowVn();
         LocalDateTime attemptExpiresAt = now.plusMinutes(30);
         cancelPendingHirePayment(mappingId);
         Payment payment = paymentRepository.save(Payment.builder()
@@ -102,7 +103,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", mappingId));
         validatePayable(mapping, customerId);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DietDates.nowVn();
         cancelPendingHirePayment(mappingId);
         Payment payment = paymentRepository.save(Payment.builder()
                 .mappingId(mapping.getId())
@@ -208,7 +209,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
                 throw new BadRequestException("Extra sessions require ACTIVE coaching");
             }
             payment.setStatus(CoachingPaymentStatus.SUCCESS);
-            payment.setPaidAt(LocalDateTime.now());
+            payment.setPaidAt(DietDates.nowVn());
             paymentRepository.save(payment);
             extraSessionService.fulfillFromPayment(payment, mapping);
             notifyPaymentSuccessAfterCommit(mapping, payment);
@@ -224,12 +225,12 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         }
 
         payment.setStatus(CoachingPaymentStatus.SUCCESS);
-        payment.setPaidAt(LocalDateTime.now());
+        payment.setPaidAt(DietDates.nowVn());
         paymentRepository.save(payment);
         walletService.holdSuccessfulPayment(payment);
 
         mapping.setStatus(ClientMappingStatus.ACTIVE);
-        mapping.setCoachingStartedAt(LocalDateTime.now());
+        mapping.setCoachingStartedAt(DietDates.nowVn());
         mapping.setPaymentDueAt(null);
         applyOnlinePeriodEnd(mapping, mapping.getCoachingStartedAt());
         mappingRepository.save(mapping);
@@ -273,7 +274,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         }
         return payment.getExpiresAt()
                 .plusMinutes(PAYMENT_ATTEMPT_GRACE_MINUTES)
-                .isBefore(LocalDateTime.now());
+                .isBefore(DietDates.nowVn());
     }
 
     private String failureMessage(String responseCode) {
@@ -358,7 +359,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
             throw new BadRequestException("The coaching request is not awaiting payment");
         }
         if (mapping.getPaymentDueAt() != null
-                && mapping.getPaymentDueAt().isBefore(LocalDateTime.now())) {
+                && mapping.getPaymentDueAt().isBefore(DietDates.nowVn())) {
             throw new BadRequestException("The payment window for this coaching request has expired");
         }
         if (mapping.getAgreedAmount() == null || mapping.getAgreedAmount().signum() <= 0) {

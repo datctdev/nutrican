@@ -10,6 +10,7 @@ import com.sba.nutricanbe.workspace.dto.RegressionAlertDto;
 import com.sba.nutricanbe.workspace.dto.WeeklyAdherenceDto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,6 +21,8 @@ import java.util.UUID;
 public class ProgressDataDto {
     private UUID clientId;
     private String clientName;
+    /** When set, meal-plan weeks use coaching boundaries (start + 7*i). */
+    private LocalDateTime coachingStartedAt;
     private List<DailyCalorieData> calorieHistory;
     private List<BodyMetricData> bodyMetrics;
     private MacroSummary macroSummary;

@@ -4,6 +4,8 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
+import com.sba.nutricanbe.user.dto.ClientGoalDto;
+import com.sba.nutricanbe.user.dto.ClientGoalRequest;
 import com.sba.nutricanbe.workspace.dto.ClientStatusDto;
 import com.sba.nutricanbe.workspace.dto.CoachingEvaluationRequest;
 import com.sba.nutricanbe.workspace.dto.CreateClientRequest;
@@ -24,6 +26,8 @@ public interface PtClientService {
     ApiResponse<PtClientProfileDto> createClient(UUID ptId, CreateClientRequest request);
 
     ApiResponse<MacroTargetResponse> setClientMacroTarget(UUID ptId, UUID clientId, MacroTargetRequest request);
+
+    ApiResponse<ClientGoalDto> setClientGoals(UUID ptId, UUID clientId, ClientGoalRequest request);
 
     ApiResponse<ClientStatusDto> setCoachingEvaluation(UUID ptId, UUID clientId, CoachingEvaluationRequest request);
 }

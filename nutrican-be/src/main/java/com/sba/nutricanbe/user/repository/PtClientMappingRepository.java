@@ -26,6 +26,8 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
 
     Page<PtClientMapping> findByPt_IdAndStatusIn(UUID ptId, List<ClientMappingStatus> statuses, Pageable pageable);
 
+    List<PtClientMapping> findAllByPt_IdAndStatusIn(UUID ptId, List<ClientMappingStatus> statuses);
+
     Page<PtClientMapping> findByClient_Id(UUID clientId, Pageable pageable);
 
     Optional<PtClientMapping> findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(

@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, MapPin, Clock, User, FileText, Bell } from '
 import { Button } from '../ui/button';
 import Modal from '../common/Modal';
 import { addWeeks, formatWeekRange, getWeekStart } from '../../utils/offlineHireSlots';
+import { nowInVn } from '../../pages/customer/components/dietUtils';
 
 const DAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const HOUR_START = 6;
@@ -88,7 +89,7 @@ function canCancelMergedItem(sessionStatus, appointmentStatus) {
 }
 
 /** Hủy chỉ khi buổi chưa bắt đầu và còn SCHEDULED/PENDING. */
-export function canCancelAppointment(item, now = new Date()) {
+export function canCancelAppointment(item, now = nowInVn()) {
   if (!item || !item.start) return false;
   if (item.start.getTime() <= now.getTime()) return false;
   if (item.sessionId) {
@@ -98,7 +99,7 @@ export function canCancelAppointment(item, now = new Date()) {
 }
 
 /** Đổi lịch: chưa tới giờ + session SCHEDULED (hoặc appointment PENDING). */
-export function canRescheduleAppointment(item, now = new Date()) {
+export function canRescheduleAppointment(item, now = nowInVn()) {
   if (!item || !item.start) return false;
   if (item.start.getTime() <= now.getTime()) return false;
   if (item.sessionId) {
@@ -108,7 +109,7 @@ export function canRescheduleAppointment(item, now = new Date()) {
 }
 
 /** Enable «Đã dạy xong» when session has started (during or after). */
-export function canMarkSessionDone(item, now = new Date()) {
+export function canMarkSessionDone(item, now = nowInVn()) {
   if (!item || item.status !== 'SCHEDULED' || !item.sessionId || !item.start) return false;
   return now.getTime() >= item.start.getTime();
 }
@@ -202,12 +203,12 @@ export default function CoachingTimetable({
   onReschedule,
   actingId,
 }) {
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(nowInVn()));
   const [selected, setSelected] = useState(null);
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState(() => nowInVn());
 
   useEffect(() => {
-    const tick = () => setNow(new Date());
+    const tick = () => setNow(nowInVn());
     const onVisible = () => {
       if (document.visibilityState === 'visible') tick();
     };
@@ -311,7 +312,7 @@ export default function CoachingTimetable({
           type="button"
           variant="outline"
           size="sm"
-          disabled={weekStart.getTime() <= getWeekStart(new Date()).getTime() - 8 * 7 * 24 * 3600 * 1000}
+          disabled={weekStart.getTime() <= getWeekStart(nowInVn()).getTime() - 8 * 7 * 24 * 3600 * 1000}
           onClick={() => setWeekStart(addWeeks(weekStart, -1))}
           className="rounded-xl"
         >
@@ -581,7 +582,9 @@ export default function CoachingTimetable({
                 >
                   {cancellingId === (selected.appointmentId || selected.id)
                     ? 'Đang hủy...'
-                    : 'Hủy buổi & hoàn tiền'}
+                    : role === 'pt'
+                      ? 'Hủy buổi & hoàn tiền HV'
+                      : 'Hủy buổi'}
                 </Button>
               )}
             </div>
