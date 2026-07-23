@@ -1,3 +1,4 @@
+// src/pages/pt/PtPortfolioEditor.jsx
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -6,7 +7,7 @@ import {
     Link as LinkIcon, Image as ImageIcon, Lock, ShieldCheck, FileEdit,
     AlertCircle, CheckCircle2, GraduationCap, Target, Clock,
     UserCircle, Quote, Send, Briefcase, Award, FileUp, UploadCloud,
-    Monitor, Globe, Dumbbell, Calendar, Phone, Banknote, ExternalLink
+    Monitor, Globe, Dumbbell, Phone, Banknote, ExternalLink, Users
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { userService } from '../../services/userService';
@@ -18,9 +19,17 @@ const getPermanentUrl = (url) => {
     return url.split('?')[0];
 };
 
+const formatRequestDate = (dateVal) => {
+    if (!dateVal) return new Date().toLocaleDateString('vi-VN');
+    const timestamp = new Date(dateVal).getTime();
+    if (isNaN(timestamp) || timestamp === 0) return new Date().toLocaleDateString('vi-VN');
+    return new Date(dateVal).toLocaleDateString('vi-VN');
+};
+
 const GOAL_OPTIONS_KYC = [
     { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
     { value: 'WEIGHT_GAIN', label: 'Tăng cân' },
+    { value: 'MUSCLE_GAIN', label: 'Tăng cơ' },
     { value: 'MAINTAIN', label: 'Duy trì' },
     { value: 'PREGNANT', label: 'Mang thai' },
     { value: 'RECOVERY', label: 'Phục hồi' },
@@ -81,7 +90,7 @@ function CertCardModal({ cert, index, onChange, onRemove, onImageUpload, disable
                     <button
                         type="button"
                         onClick={() => onRemove(index)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
@@ -117,7 +126,7 @@ function CertCardModal({ cert, index, onChange, onRemove, onImageUpload, disable
                         max={new Date().toISOString().slice(0, 7)}
                         onChange={(e) => onChange(index, 'issueDate', e.target.value)}
                         disabled={disabled}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm disabled:bg-slate-50"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm disabled:bg-slate-50 cursor-pointer"
                     />
                 </div>
                 <div>
@@ -133,7 +142,7 @@ function CertCardModal({ cert, index, onChange, onRemove, onImageUpload, disable
                             min={cert.issueDate}
                             onChange={(e) => onChange(index, 'expiryDate', e.target.value)}
                             disabled={disabled}
-                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm disabled:bg-slate-50"
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm disabled:bg-slate-50 cursor-pointer"
                         />
                     )}
                     {!disabled && (
@@ -145,7 +154,7 @@ function CertCardModal({ cert, index, onChange, onRemove, onImageUpload, disable
                                     onChange(index, 'neverExpires', e.target.checked);
                                     if (e.target.checked) onChange(index, 'expiryDate', '');
                                 }}
-                                className="rounded"
+                                className="rounded cursor-pointer"
                             />
                             <span className="text-[11px] font-medium text-slate-500">Không có ngày hết hạn</span>
                         </label>
@@ -184,7 +193,7 @@ function CertCardModal({ cert, index, onChange, onRemove, onImageUpload, disable
                             </a>
                         </div>
                         {!disabled && (
-                            <Button type="button" size="sm" variant="outline" onClick={() => imageRef.current?.click()} disabled={cert.isUploading} className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs">
+                            <Button type="button" size="sm" variant="outline" onClick={() => imageRef.current?.click()} disabled={cert.isUploading} className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs cursor-pointer">
                                 Đổi ảnh
                             </Button>
                         )}
@@ -229,6 +238,8 @@ export default function PtPortfolioEditor() {
     const cvInputRef = useRef(null);
     const [certList, setCertList] = useState([]);
 
+    const [showApprovedBanner, setShowApprovedBanner] = useState(true);
+
     const [updateForm, setUpdateForm] = useState({
         bio: '',
         trainingPhilosophy: '',
@@ -250,6 +261,7 @@ export default function PtPortfolioEditor() {
 
     const isPending = latestRequest?.status === 'PENDING';
     const isRejected = latestRequest?.status === 'REJECTED';
+    const isApproved = latestRequest?.status === 'APPROVED' || latestRequest?.status === 'COMPLETED';
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -259,17 +271,20 @@ export default function PtPortfolioEditor() {
                 const ptProfile = data?.ptProfile;
 
                 if (data && ptProfile) {
+                    const displayRate = ptProfile.hourlyRate || ptProfile.offlineRate || ptProfile.onlineRate || '';
+                    const displayUnit = ptProfile.rateUnit || ptProfile.offlineRateUnit || ptProfile.onlineRateUnit || 'SESSION_60';
+
                     setLockedProfile({
                         fullName: data.fullName,
-                        gender: data.gender,
+                        gender: data.gender || ptProfile.gender,
                         bio: ptProfile.bio,
                         trainingPhilosophy: ptProfile.trainingPhilosophy,
                         experienceStartDate: ptProfile.experienceStartDate,
                         trainingMode: ptProfile.trainingMode,
                         location: ptProfile.location,
                         contactPhone: ptProfile.contactPhone,
-                        hourlyRate: ptProfile.hourlyRate,
-                        rateUnit: ptProfile.rateUnit,
+                        hourlyRate: displayRate,
+                        rateUnit: displayUnit,
                         specializations: ptProfile.specializations || [],
                         preferredGoals: ptProfile.preferredGoals || [],
                         preferredDietTypes: ptProfile.preferredDietTypes || [],
@@ -277,6 +292,9 @@ export default function PtPortfolioEditor() {
                         instagramUrl: ptProfile.instagramUrl,
                         linkedinUrl: ptProfile.linkedinUrl,
                         cvUrl: ptProfile.cvUrl,
+                        tier: ptProfile.tier,
+                        preferredTrack: ptProfile.preferredTrack,
+                        maxClients: ptProfile.maxClients || 10,
                     });
 
                     setPortfolioData(ptProfile.portfolioShowcase || { coverPhotoUrl: '', transformations: [] });
@@ -284,13 +302,13 @@ export default function PtPortfolioEditor() {
                     setUpdateForm({
                         bio: ptProfile.bio || '',
                         trainingPhilosophy: ptProfile.trainingPhilosophy || '',
-                        gender: data.gender || '',
+                        gender: data.gender || ptProfile.gender || '',
                         contactPhone: ptProfile.contactPhone || '',
                         experienceStartDate: ptProfile.experienceStartDate || '',
                         trainingMode: ptProfile.trainingMode || 'ONLINE',
                         location: ptProfile.location || '',
-                        hourlyRate: ptProfile.hourlyRate || '',
-                        rateUnit: ptProfile.rateUnit || 'SESSION_60',
+                        hourlyRate: displayRate,
+                        rateUnit: displayUnit,
                         specializations: ptProfile.specializations || [],
                         preferredGoals: ptProfile.preferredGoals || [],
                         preferredDietTypes: ptProfile.preferredDietTypes || [],
@@ -406,7 +424,14 @@ export default function PtPortfolioEditor() {
             };
             const res = await userService.submitPtUpdateRequest(payload);
             toast.success('Đã gửi yêu cầu thay đổi hồ sơ!');
-            setLatestRequest(res.data.data);
+
+            const newRequestData = res.data?.data || {};
+            setLatestRequest({
+                ...newRequestData,
+                createdAt: newRequestData.createdAt || new Date().toISOString(),
+                status: newRequestData.status || 'PENDING'
+            });
+
             setUpdateModalOpen(false);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Lỗi khi gửi yêu cầu');
@@ -415,16 +440,16 @@ export default function PtPortfolioEditor() {
         }
     };
 
-    const handleSavePortfolio = async () => {
+    const handleSaveCaseStudies = async () => {
         try {
             setLoading(true);
             const response = await userService.updatePtProfile({ portfolioShowcase: portfolioData });
             if (response.data) {
-                toast.success('Đã lưu ảnh bìa và Case Study!');
+                toast.success('Đã lưu danh sách Case Study công khai!');
                 setUser({ ...user, ptProfile: response.data.data });
             }
         } catch (error) {
-            toast.error('Có lỗi xảy ra khi lưu Portfolio');
+            toast.error('Có lỗi xảy ra khi lưu Case Study');
         } finally {
             setLoading(false);
         }
@@ -464,13 +489,19 @@ export default function PtPortfolioEditor() {
             const imageUrl = getPermanentUrl(res.data.data);
 
             if (type === 'cover') {
+                const updatedShowcase = { ...portfolioData, coverPhotoUrl: imageUrl };
                 updateShowcaseField('coverPhotoUrl', imageUrl);
+                const response = await userService.updatePtProfile({ portfolioShowcase: updatedShowcase });
+                if (response.data) {
+                    setUser({ ...user, ptProfile: response.data.data });
+                }
+                toast.success('Đã cập nhật ảnh bìa mới thành công!');
             } else {
                 updateTransformation(idOrField, field, imageUrl);
+                toast.success('Tải ảnh lên thành công!');
             }
-            toast.success('Tải ảnh lên thành công!');
         } catch (error) {
-            toast.error('Không thể tải ảnh lên');
+            toast.error('Không thể tải hoặc lưu ảnh lên');
         } finally {
             setUploadingImage(null);
         }
@@ -486,6 +517,7 @@ export default function PtPortfolioEditor() {
     return (
         <div className="max-w-[1600px] mx-auto pb-12 animate-fade-in mt-6 px-4">
 
+            {/* STICKY BAR */}
             <div className="sticky top-[64px] z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200 py-4 mb-8 -mx-4 px-4 sm:mx-0 sm:px-0 sm:rounded-b-3xl sm:border-x sm:border-slate-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 shadow-sm">
                 <div className="flex items-center gap-3 pl-2">
                     <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
@@ -500,37 +532,97 @@ export default function PtPortfolioEditor() {
                     <Button
                         onClick={() => setUpdateModalOpen(true)}
                         variant="outline"
-                        className={`rounded-xl font-bold h-12 px-6 ${
-                            isPending ? 'border-amber-200 text-amber-700 hover:bg-amber-50' :
-                                isRejected ? 'border-red-200 text-red-700 hover:bg-red-50' :
+                        className={`rounded-xl font-extrabold h-12 px-6 shadow-xs cursor-pointer ${
+                            isPending ? 'border-amber-300 text-amber-800 bg-amber-50/50 hover:bg-amber-100' :
+                                isRejected ? 'border-red-300 text-red-700 bg-red-50/50 hover:bg-red-100 animate-pulse' :
                                     'border-blue-200 text-blue-700 hover:bg-blue-50'
                         }`}
                     >
-                        {isPending ? <Clock className="w-4 h-4 mr-2" /> : isRejected ? <AlertCircle className="w-4 h-4 mr-2" /> : <FileEdit className="w-4 h-4 mr-2" />}
-                        {isPending ? 'Đang chờ duyệt...' : isRejected ? 'Cập nhật bị từ chối' : 'Cập nhật Hồ sơ'}
-                    </Button>
-                    <Button
-                        onClick={handleSavePortfolio}
-                        disabled={loading}
-                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg shadow-blue-500/30 h-12 px-8 font-bold transition-all hover:-translate-y-0.5"
-                    >
-                        <Save className="w-5 h-5 mr-2" />
-                        {loading ? 'Đang lưu...' : 'Lưu Portfolio'}
+                        {isPending ? <Clock className="w-4 h-4 mr-2 text-amber-600" /> : isRejected ? <AlertCircle className="w-4 h-4 mr-2 text-red-600" /> : <FileEdit className="w-4 h-4 mr-2" />}
+                        {isPending ? 'Đang chờ duyệt hồ sơ...' : isRejected ? '⚠️ Cập nhật bị từ chối - Sửa ngay' : 'Cập nhật Hồ sơ chuyên môn'}
                     </Button>
                 </div>
             </div>
 
+            {/* --- STATUS BANNER ĐÃ XÓA NÚT DƯ THỪA & SỬA LỖI 1/1/1970 --- */}
+            {isPending && (
+                <div className="bg-amber-50 border-2 border-amber-200 rounded-[2rem] p-6 mb-8 flex items-center gap-4 shadow-sm animate-fade-in">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 shadow-inner">
+                        <Clock className="w-6 h-6 animate-pulse" />
+                    </div>
+                    <div>
+                        <h4 className="font-black text-amber-950 text-base sm:text-lg">Hồ sơ chuyên môn đang trong quá trình kiểm duyệt</h4>
+                        <p className="text-xs sm:text-sm font-semibold text-amber-900 mt-0.5 leading-relaxed">
+                            Yêu cầu cập nhật bạn gửi vào ngày <span className="underline font-black">{formatRequestDate(latestRequest?.createdAt)}</span> đang được Admin kiểm tra. Các thay đổi sẽ được áp dụng công khai ngay sau khi phê duyệt.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {isRejected && (
+                <div className="bg-red-50 border-2 border-red-300 rounded-[2rem] p-6 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md animate-fade-in">
+                    <div className="flex items-start sm:items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-700 flex items-center justify-center shrink-0 shadow-inner">
+                            <AlertCircle className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h4 className="font-black text-red-950 text-base sm:text-lg">Yêu cầu cập nhật hồ sơ vừa rồi bị từ chối</h4>
+                            <p className="text-xs sm:text-sm font-semibold text-red-900 mt-0.5 leading-relaxed">
+                                Lý do từ Admin: <strong className="underline bg-white px-2 py-0.5 rounded-md text-red-700 border border-red-200">{latestRequest.adminNote || 'Chưa đạt yêu cầu kiểm duyệt'}</strong>. Vui lòng chỉnh sửa lại thông tin bên dưới và gửi yêu cầu mới.
+                            </p>
+                        </div>
+                    </div>
+                    <Button onClick={() => setUpdateModalOpen(true)} className="bg-red-600 hover:bg-red-700 text-white font-black text-xs sm:text-sm shrink-0 h-12 px-6 shadow-lg shadow-red-500/20 cursor-pointer transition-all hover:scale-105">
+                        Sửa & Gửi lại ngay
+                    </Button>
+                </div>
+            )}
+
+            {isApproved && showApprovedBanner && (
+                <div className="bg-emerald-50 border-2 border-emerald-200 rounded-[2rem] p-6 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+                    <div className="flex items-start sm:items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 shadow-inner">
+                            <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h4 className="font-black text-emerald-950 text-base sm:text-lg">🎉 Chúc mừng! Yêu cầu cập nhật hồ sơ đã được PHÊ DUYỆT</h4>
+                            <p className="text-xs sm:text-sm font-semibold text-emerald-900 mt-0.5 leading-relaxed">
+                                Các thay đổi hồ sơ bạn gửi vào ngày <span className="font-black">{formatRequestDate(latestRequest?.createdAt)}</span> đã được Admin kiểm duyệt thành công và đang được hiển thị công khai trên Marketplace!
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setShowApprovedBanner(false)}
+                        className="text-emerald-800 hover:bg-emerald-200/60 bg-white border border-emerald-200 px-4 py-2.5 rounded-xl font-extrabold text-xs transition-colors shrink-0 cursor-pointer shadow-xs self-end sm:self-center"
+                        title="Đóng thông báo"
+                    >
+                        ✕ Đóng thông báo
+                    </button>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
 
+                {/* CỘT TRÁI - THÔNG TIN KHOÁ/ĐÃ DUYỆT */}
+                {/* CỘT TRÁI - THÔNG TIN KHOÁ/ĐÃ DUYỆT (ĐÃ NÂNG CẤP HIỂN THỊ ĐẦY ĐỦ GIÁ & CHỨNG CHỈ) */}
                 <div className="xl:col-span-4 space-y-6">
                     <Card className="rounded-[2rem] border-slate-200 shadow-sm bg-slate-50/50 relative overflow-hidden">
 
-                        <div className="absolute top-4 right-4 bg-slate-200/50 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-slate-200 z-10">
-                            <Lock className="w-3.5 h-3.5 text-slate-500" />
-                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">Khóa / Đã duyệt</span>
+                        {/* Huy hiệu góc thẻ động */}
+                        <div className={`absolute top-4 right-4 backdrop-blur-sm px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 border z-10 shadow-2xs ${
+                            isPending ? 'bg-amber-100/90 text-amber-900 border-amber-300' :
+                                isRejected ? 'bg-red-100/90 text-red-900 border-red-300 animate-pulse' :
+                                    'bg-slate-200/70 text-slate-700 border-slate-300'
+                        }`}>
+                            {isPending ? <Clock className="w-3.5 h-3.5 text-amber-600" /> :
+                                isRejected ? <AlertCircle className="w-3.5 h-3.5 text-red-600" /> :
+                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />}
+                            <span className="text-[10px] font-black uppercase tracking-wider">
+                                {isPending ? 'Đang chờ Admin duyệt' : isRejected ? 'Cập nhật bị từ chối' : 'Khóa / Đã duyệt công khai'}
+                            </span>
                         </div>
 
-                        <CardContent className="p-6 pt-12 space-y-6">
+                        <CardContent className="p-6 pt-14 space-y-6">
 
                             <div className="space-y-4">
                                 <div>
@@ -557,9 +649,21 @@ export default function PtPortfolioEditor() {
                                 </h4>
                                 <div className="grid grid-cols-2 gap-4 text-sm bg-white p-4 rounded-xl border border-slate-200 opacity-90">
                                     <div>
+                                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Phân hạng PT</p>
+                                        <p className="font-bold text-blue-600 mt-0.5">
+                                            {lockedProfile?.tier === 'TIER_1' || lockedProfile?.preferredTrack === 'CERTIFIED' ? 'PT Chuyên Nghiệp' : 'PT Tự Do'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Số học viên tối đa</p>
+                                        <p className="font-bold text-slate-800 mt-0.5 flex items-center gap-1">
+                                            <Users className="w-3.5 h-3.5 text-emerald-600"/> {lockedProfile?.maxClients || 10} người
+                                        </p>
+                                    </div>
+                                    <div>
                                         <p className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Giới tính</p>
                                         <p className="font-bold text-slate-800 mt-0.5">
-                                            {lockedProfile?.gender === 'MALE' ? 'Nam' : lockedProfile?.gender === 'FEMALE' ? 'Nữ' : 'Khác'}
+                                            {lockedProfile?.gender === 'MALE' ? 'Nam' : lockedProfile?.gender === 'FEMALE' ? 'Nữ' : lockedProfile?.gender || '—'}
                                         </p>
                                     </div>
                                     <div>
@@ -597,6 +701,7 @@ export default function PtPortfolioEditor() {
                                 </div>
                             </div>
 
+                            {/* --- NÂNG CẤP HIỂN THỊ HÌNH THỨC & PHÍ DỊCH VỤ THÔNG MINH --- */}
                             <div className="space-y-4 border-t border-slate-200 pt-4">
                                 <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                                     <Banknote className="w-3.5 h-3.5"/> Hoạt động & Phí dịch vụ
@@ -613,10 +718,14 @@ export default function PtPortfolioEditor() {
                                         <p className="font-bold text-slate-800 mt-0.5">{lockedProfile?.location || 'Toàn quốc'}</p>
                                     </div>
                                     <div className="col-span-2">
-                                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Mức phí</p>
+                                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-wider">Mức phí dịch vụ</p>
                                         <p className="font-bold text-emerald-600 mt-0.5 text-base">
-                                            {lockedProfile?.hourlyRate ? parseInt(lockedProfile.hourlyRate).toLocaleString('vi-VN') + ' VNĐ' : 'Liên hệ'}{' '}
-                                            <span className="text-xs text-slate-500 font-medium">/ {RATE_UNIT_OPTIONS.find(r => r.value === lockedProfile?.rateUnit)?.label?.toLowerCase() || 'buổi'}</span>
+                                            {(() => {
+                                                const rate = lockedProfile?.offlineRate || lockedProfile?.onlineRate || lockedProfile?.hourlyRate;
+                                                const unit = lockedProfile?.offlineRateUnit || lockedProfile?.onlineRateUnit || lockedProfile?.rateUnit;
+                                                const unitLabel = RATE_UNIT_OPTIONS.find(r => r.value === unit)?.label?.toLowerCase() || 'buổi';
+                                                return rate ? `${Number(rate).toLocaleString('vi-VN')} VNĐ / ${unitLabel}` : 'Chưa cập nhật phí';
+                                            })()}
                                         </p>
                                     </div>
                                 </div>
@@ -665,42 +774,40 @@ export default function PtPortfolioEditor() {
                                 )}
                             </div>
 
+                            {/* --- NÂNG CẤP HIỂN THỊ CHI TIẾT NGÀY CẤP & NGÀY HẾT HẠN CHỨNG CHỈ --- */}
                             {lockedProfile?.certifications?.length > 0 && (
                                 <div className="border-t border-slate-200 pt-4">
                                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                                        <GraduationCap className="w-3.5 h-3.5"/> Chứng chỉ chuyên môn
+                                        <GraduationCap className="w-3.5 h-3.5"/> Chứng chỉ chuyên môn ({lockedProfile.certifications.length})
                                     </h4>
-                                    <div className="space-y-2">
+                                    <div className="space-y-2.5">
                                         {lockedProfile.certifications.map((cert, i) => (
-                                            <div key={i} className="bg-white border border-slate-200 p-3 rounded-xl flex items-center justify-between opacity-80">
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-800 line-clamp-1">{cert.name}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase">{cert.issuingOrganization}</p>
+                                            <div key={i} className="bg-white border border-slate-200 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-black text-slate-800 truncate">{cert.name}</p>
+                                                    <p className="text-xs font-bold text-slate-500 mt-0.5">{cert.issuingOrganization}</p>
+                                                    <p className="text-[10px] font-extrabold text-slate-400 mt-1 uppercase tracking-wider">
+                                                        Cấp: {cert.issueDate || '—'} {cert.neverExpires ? '· Vô thời hạn ∞' : cert.expiryDate ? `đến ${cert.expiryDate}` : ''}
+                                                    </p>
                                                 </div>
-                                                <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {cert.certificateImageUrl && (
+                                                        <a href={getPermanentUrl(cert.certificateImageUrl)} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors shadow-2xs" title="Xem ảnh chứng chỉ">
+                                                            <ExternalLink className="w-3.5 h-3.5" />
+                                                        </a>
+                                                    )}
+                                                    <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             )}
-
-                            <div className="pt-2">
-                                <Button
-                                    onClick={() => setUpdateModalOpen(true)}
-                                    className={`w-full text-white rounded-xl h-11 font-bold shadow-sm ${
-                                        isPending ? 'bg-amber-500 hover:bg-amber-600' :
-                                            isRejected ? 'bg-red-500 hover:bg-red-600' :
-                                                'bg-slate-800 hover:bg-slate-900'
-                                    }`}
-                                >
-                                    {isPending ? <Clock className="w-4 h-4 mr-2" /> : isRejected ? <AlertCircle className="w-4 h-4 mr-2" /> : <FileEdit className="w-4 h-4 mr-2" />}
-                                    {isPending ? 'Xem Yêu cầu đang chờ duyệt' : isRejected ? 'Xem lý do bị từ chối' : 'Gửi Yêu Cầu Thay Đổi Hồ Sơ'}
-                                </Button>
-                            </div>
                         </CardContent>
                     </Card>
                 </div>
 
+                {/* CỘT PHẢI - QUẢN LÝ PORTFOLIO & CASE STUDY */}
                 <div className="xl:col-span-8 space-y-6">
 
                     <Card className="rounded-[2rem] border-slate-200 shadow-sm overflow-hidden group">
@@ -746,95 +853,89 @@ export default function PtPortfolioEditor() {
                                     <p className="text-xs text-slate-500 mt-1 font-medium">Thêm/sửa Case Study rồi bấm Lưu để lưu lên hồ sơ công khai.</p>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    <Button onClick={addTransformation} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl font-bold h-11">
+                                    <Button onClick={addTransformation} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 rounded-xl font-bold h-11 shadow-sm">
                                         <Plus className="w-5 h-5 mr-1" /> Thêm Case Study
-                                    </Button>
-                                    <Button
-                                        onClick={handleSavePortfolio}
-                                        disabled={loading}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-11 px-5 shadow-md shadow-blue-500/20"
-                                    >
-                                        <Save className="w-4 h-4 mr-2" />
-                                        {loading ? 'Đang lưu...' : 'Lưu Case Study'}
                                     </Button>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-10">
                                 {portfolioData.transformations?.length ? portfolioData.transformations.map((item) => (
-                                    <div key={item.id} className="border border-slate-200 rounded-[2rem] relative shadow-sm overflow-hidden flex flex-col md:flex-row">
+                                    <div key={item.id} className="border border-slate-200 rounded-[2rem] relative shadow-sm overflow-hidden flex flex-col bg-white">
 
                                         <button
                                             onClick={() => removeTransformation(item.id)}
-                                            className="absolute top-4 right-4 z-20 text-red-500 bg-white hover:bg-red-500 hover:text-white p-2.5 rounded-xl transition-all shadow-sm border border-slate-100"
+                                            className="absolute top-4 right-4 z-20 text-red-500 bg-white/90 hover:bg-red-500 hover:text-white p-2.5 rounded-xl transition-all shadow-md border border-slate-100 backdrop-blur-sm cursor-pointer"
+                                            title="Xóa Case Study"
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </button>
 
-                                        <div className="relative w-full md:w-5/12 flex shrink-0 bg-slate-100 overflow-hidden min-h-[250px]">
-                                            <div className="w-1/2 relative border-r-2 border-white group/img">
+                                        <div className="relative w-full h-[280px] sm:h-[360px] flex shrink-0 bg-slate-100 overflow-hidden border-b border-slate-100">
+                                            <div className="w-1/2 h-full relative border-r-2 border-white group/img">
                                                 {item.beforeUrl ? (
                                                     <>
-                                                        <img src={getPermanentUrl(item.beforeUrl)} className="absolute inset-0 w-full h-full object-cover" />
+                                                        <img src={getPermanentUrl(item.beforeUrl)} alt="Before" className="absolute inset-0 w-full h-full object-cover object-center" />
                                                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity">
-                                                            <label className="cursor-pointer bg-white p-3 rounded-full shadow-lg">
-                                                                <Camera className="w-5 h-5"/>
+                                                            <label className="cursor-pointer bg-white p-3 rounded-full shadow-lg hover:scale-110 transition-transform">
+                                                                <Camera className="w-5 h-5 text-slate-700"/>
                                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload('transform', item.id, 'beforeUrl', e.target.files[0])}/>
                                                             </label>
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full text-slate-400 hover:bg-slate-200">
+                                                    <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full text-slate-400 hover:bg-slate-200/60 transition-colors">
                                                         <ImagePlus className="w-8 h-8 mb-2" />
                                                         <span className="text-[10px] font-bold uppercase tracking-wide">Before</span>
                                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload('transform', item.id, 'beforeUrl', e.target.files[0])} />
                                                     </label>
                                                 )}
-                                                {item.beforeUrl && <div className="absolute bottom-3 left-3 bg-slate-900/80 text-white text-[10px] font-black px-2 py-1 rounded">BEFORE</div>}
+                                                {item.beforeUrl && <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-md uppercase tracking-wider shadow">BEFORE</div>}
                                             </div>
 
-                                            <div className="w-1/2 relative group/img">
+                                            <div className="w-1/2 h-full relative group/img">
                                                 {item.afterUrl ? (
                                                     <>
-                                                        <img src={getPermanentUrl(item.afterUrl)} className="absolute inset-0 w-full h-full object-cover" />
+                                                        <img src={getPermanentUrl(item.afterUrl)} alt="After" className="absolute inset-0 w-full h-full object-cover object-center" />
                                                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity">
-                                                            <label className="cursor-pointer bg-white p-3 rounded-full shadow-lg">
-                                                                <Camera className="w-5 h-5"/>
+                                                            <label className="cursor-pointer bg-white p-3 rounded-full shadow-lg hover:scale-110 transition-transform">
+                                                                <Camera className="w-5 h-5 text-slate-700"/>
                                                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload('transform', item.id, 'afterUrl', e.target.files[0])}/>
                                                             </label>
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full text-slate-400 hover:bg-slate-200">
+                                                    <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full text-slate-400 hover:bg-slate-200/60 transition-colors">
                                                         <ImagePlus className="w-8 h-8 mb-2" />
                                                         <span className="text-[10px] font-bold uppercase tracking-wide">After</span>
                                                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload('transform', item.id, 'afterUrl', e.target.files[0])} />
                                                     </label>
                                                 )}
-                                                {item.afterUrl && <div className="absolute bottom-3 right-3 bg-emerald-500/90 text-white text-[10px] font-black px-2 py-1 rounded">AFTER</div>}
+                                                {item.afterUrl && <div className="absolute bottom-3 right-3 bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-md uppercase tracking-wider shadow">AFTER</div>}
                                             </div>
                                         </div>
 
-                                        <div className="p-8 flex-1 flex flex-col gap-6 bg-slate-50/50">
+                                        <div className="p-6 sm:p-8 flex flex-col gap-4 bg-slate-50/40">
                                             <input
                                                 type="text"
                                                 value={item.title}
                                                 onChange={e => updateTransformation(item.id, 'title', e.target.value)}
-                                                className="w-full px-5 py-3.5 rounded-xl border border-slate-200 focus:border-blue-500 font-bold text-base bg-white shadow-sm"
-                                                placeholder="Tiêu đề thành tựu..."
+                                                className="w-full px-5 py-3.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 font-bold text-lg bg-white shadow-xs outline-none transition-all"
+                                                placeholder="Tiêu đề thành tựu (Ví dụ: Giảm 15kg mỡ thừa trong 3 tháng)..."
                                             />
                                             <textarea
                                                 value={item.story}
                                                 onChange={e => updateTransformation(item.id, 'story', e.target.value)}
-                                                className="w-full px-5 py-4 rounded-xl border border-slate-200 focus:border-blue-500 font-medium text-sm bg-white flex-1 min-h-[120px] resize-none shadow-sm"
-                                                placeholder="Câu chuyện chi tiết..."
+                                                className="w-full px-5 py-4 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 font-medium text-sm bg-white min-h-[130px] resize-none shadow-xs outline-none transition-all leading-relaxed"
+                                                placeholder="Chia sẻ câu chuyện chi tiết về quá trình tập luyện, chế độ dinh dưỡng và sự thay đổi ngoạn mục của học viên..."
                                             />
                                         </div>
                                     </div>
                                 )) : (
-                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-14 text-center text-slate-400">
-                                        <p className="font-bold text-sm">Chưa có Case Study nào</p>
-                                        <p className="text-xs mt-1">Bấm &quot;Thêm Case Study&quot; để bắt đầu.</p>
+                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 py-16 text-center text-slate-400">
+                                        <Award className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                                        <p className="font-bold text-base text-slate-600">Chưa có Case Study nào</p>
+                                        <p className="text-xs mt-1">Bấm nút &quot;+ Thêm Case Study&quot; ở trên để bắt đầu thêm thành tựu học viên.</p>
                                     </div>
                                 )}
                             </div>
@@ -842,9 +943,9 @@ export default function PtPortfolioEditor() {
                             {(portfolioData.transformations?.length > 0) && (
                                 <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
                                     <Button
-                                        onClick={handleSavePortfolio}
+                                        onClick={handleSaveCaseStudies}
                                         disabled={loading}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-12 px-8 shadow-lg shadow-blue-500/25"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-12 px-8 shadow-lg shadow-blue-500/25 transition-all hover:-translate-y-0.5 cursor-pointer"
                                     >
                                         <Save className="w-5 h-5 mr-2" />
                                         {loading ? 'Đang lưu...' : 'Lưu Case Study'}
@@ -882,7 +983,7 @@ export default function PtPortfolioEditor() {
                                     <div>
                                         <h4 className="font-bold text-amber-900">Đang chờ Admin phê duyệt</h4>
                                         <p className="text-sm font-medium text-amber-800 mt-1 leading-relaxed">
-                                            Bạn đã gửi yêu cầu vào ngày {new Date(latestRequest.createdAt).toLocaleDateString('vi-VN')}. Không thể thay đổi khi đang chờ duyệt.
+                                            Bạn đã gửi yêu cầu vào ngày {formatRequestDate(latestRequest?.createdAt)}. Không thể thay đổi khi đang chờ duyệt.
                                         </p>
                                     </div>
                                 </div>
@@ -927,7 +1028,7 @@ export default function PtPortfolioEditor() {
                                             <select
                                                 value={activeForm.gender}
                                                 onChange={(e) => setUpdateForm({ ...updateForm, gender: e.target.value })}
-                                                className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-white disabled:bg-slate-50"
+                                                className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-white disabled:bg-slate-50 cursor-pointer"
                                             >
                                                 <option value="">Chọn giới tính</option>
                                                 <option value="MALE">Nam</option>
@@ -957,7 +1058,7 @@ export default function PtPortfolioEditor() {
                                             value={activeForm.experienceStartDate?.slice(0, 7)}
                                             max={new Date().toISOString().slice(0, 7)}
                                             onChange={(e) => setUpdateForm({ ...updateForm, experienceStartDate: e.target.value })}
-                                            className="w-full md:w-1/2 p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm disabled:bg-slate-50"
+                                            className="w-full md:w-1/2 p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm disabled:bg-slate-50 cursor-pointer"
                                         />
                                     </div>
 
@@ -970,7 +1071,7 @@ export default function PtPortfolioEditor() {
                                                     type="button"
                                                     disabled={isPending}
                                                     onClick={() => toggleArrayItem('specializations', spec)}
-                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${activeForm.specializations?.includes(spec) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200'}`}
+                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${activeForm.specializations?.includes(spec) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200'}`}
                                                 >
                                                     {spec}
                                                 </button>
@@ -987,7 +1088,7 @@ export default function PtPortfolioEditor() {
                                                     type="button"
                                                     disabled={isPending}
                                                     onClick={() => toggleArrayItem('preferredGoals', opt.value)}
-                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${activeForm.preferredGoals?.includes(opt.value) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}`}
+                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${activeForm.preferredGoals?.includes(opt.value) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'}`}
                                                 >
                                                     {opt.label}
                                                 </button>
@@ -1004,7 +1105,7 @@ export default function PtPortfolioEditor() {
                                                     type="button"
                                                     disabled={isPending}
                                                     onClick={() => toggleArrayItem('preferredDietTypes', opt.value)}
-                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${activeForm.preferredDietTypes?.includes(opt.value) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}
+                                                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border cursor-pointer ${activeForm.preferredDietTypes?.includes(opt.value) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'}`}
                                                 >
                                                     {opt.label}
                                                 </button>
@@ -1018,7 +1119,7 @@ export default function PtPortfolioEditor() {
                                             <select
                                                 value={activeForm.trainingMode}
                                                 onChange={(e) => setUpdateForm({ ...updateForm, trainingMode: e.target.value })}
-                                                className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-white disabled:bg-slate-50"
+                                                className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-white disabled:bg-slate-50 cursor-pointer"
                                             >
                                                 {TRAINING_MODE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                             </select>
@@ -1049,7 +1150,7 @@ export default function PtPortfolioEditor() {
                                             <select
                                                 value={activeForm.rateUnit}
                                                 onChange={(e) => setUpdateForm({ ...updateForm, rateUnit: e.target.value })}
-                                                className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-white disabled:bg-slate-50"
+                                                className="w-full p-3 rounded-xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-white disabled:bg-slate-50 cursor-pointer"
                                             >
                                                 {RATE_UNIT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                             </select>
@@ -1074,7 +1175,7 @@ export default function PtPortfolioEditor() {
                                         <button
                                             type="button"
                                             onClick={() => setCertList(p => [...p, newEmptyCert()])}
-                                            className="w-full flex justify-center py-3 border-2 border-dashed border-amber-300 rounded-xl text-amber-600 hover:bg-amber-50 text-sm font-bold transition-colors"
+                                            className="w-full flex justify-center py-3 border-2 border-dashed border-amber-300 rounded-xl text-amber-600 hover:bg-amber-50 text-sm font-bold transition-colors cursor-pointer"
                                         >
                                             <Plus className="w-4 h-4 mr-2"/> Thêm chứng chỉ khác
                                         </button>
@@ -1148,7 +1249,7 @@ export default function PtPortfolioEditor() {
                             <Button
                                 variant="ghost"
                                 onClick={() => setUpdateModalOpen(false)}
-                                className="flex-1 rounded-xl font-bold text-slate-600 hover:bg-slate-200 h-12"
+                                className="flex-1 rounded-xl font-bold text-slate-600 hover:bg-slate-200 h-12 cursor-pointer"
                             >
                                 Đóng
                             </Button>
@@ -1156,7 +1257,7 @@ export default function PtPortfolioEditor() {
                                 <Button
                                     onClick={handleSendUpdateRequest}
                                     disabled={sendingRequest}
-                                    className="flex-1 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 h-12 transition-all hover:-translate-y-0.5"
+                                    className="flex-1 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 h-12 transition-all hover:-translate-y-0.5 cursor-pointer"
                                 >
                                     <Send className="w-4 h-4 mr-2" />
                                     {sendingRequest ? 'Đang gửi...' : isRejected ? 'Gửi Lại Yêu Cầu' : 'Gửi Yêu Cầu Duyệt'}
