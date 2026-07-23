@@ -96,6 +96,14 @@ const handleWebSocketMessage = (message) => {
             }
             break;
 
+        case 'CHAT_MESSAGE_UPDATED':
+            window.dispatchEvent(new CustomEvent('realtime_chat_message_updated', { detail: data }));
+            break;
+
+        case 'CHAT_MESSAGE_DELETED':
+            window.dispatchEvent(new CustomEvent('realtime_chat_message_deleted', { detail: data }));
+            break;
+
         case 'REFUND_UPDATE': {
             const status = data?.status || '';
             const isApproved = status === 'APPROVED' || status === 'AUTO_APPROVED';

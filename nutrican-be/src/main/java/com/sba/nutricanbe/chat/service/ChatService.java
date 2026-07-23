@@ -3,6 +3,7 @@ package com.sba.nutricanbe.chat.service;
 import com.sba.nutricanbe.chat.dto.ChatMessageRequest;
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
+import com.sba.nutricanbe.chat.dto.UpdateChatMessageRequest;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +22,11 @@ public interface ChatService {
 
     ChatMessageResponse sendAttachmentMessage(UUID senderId, UUID mappingId, String content, MultipartFile file,
             String contextType, UUID contextRefId);
+
+    ChatMessageResponse updateMessage(
+            UUID userId, UUID mappingId, UUID messageId, UpdateChatMessageRequest request);
+
+    void deleteMessage(UUID userId, UUID mappingId, UUID messageId);
 
     ApiResponse<Void> markRead(UUID userId, UUID mappingId);
 }

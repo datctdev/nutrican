@@ -31,4 +31,5 @@ public class ChatMessageResponse {
     private String attachmentUrl;
     private LocalDateTime readAt;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

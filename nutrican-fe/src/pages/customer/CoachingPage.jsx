@@ -29,6 +29,7 @@ import { preferMealPlanWeekStartIso } from '../../utils/coachingWeeks';
 import CoachingTimetable, { mergeTimetableSources } from '../../components/coaching/CoachingTimetable';
 import SessionConfirmPanel from '../../components/coaching/SessionConfirmPanel';
 import SessionDisputeThread from '../../components/coaching/SessionDisputeThread';
+import ChatMessageActions from '../../components/chat/ChatMessageActions';
 import { formatVnd } from '../../utils/currency';
 import { toast } from 'sonner';
 import {
@@ -366,6 +367,39 @@ export default function CoachingPage() {
     window.addEventListener('realtime_chat_message', handleNewMessage);
     return () => window.removeEventListener('realtime_chat_message', handleNewMessage);
   }, [activeMappingId, activeTab, loadChatThreads]);
+
+  const applyUpdatedMessage = useCallback((updated) => {
+    if (!updated?.id) return;
+    setMessages((prev) => prev.map((message) =>
+      message.id === updated.id ? { ...message, ...updated } : message
+    ));
+  }, []);
+
+  const removeMessage = useCallback((messageId) => {
+    setMessages((prev) => prev.filter((message) => message.id !== messageId));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'chat') return;
+    const handleUpdated = (event) => {
+      if (event.detail?.mappingId === activeMappingId) {
+        applyUpdatedMessage(event.detail);
+      }
+      loadChatThreads();
+    };
+    const handleDeleted = (event) => {
+      if (event.detail?.mappingId === activeMappingId) {
+        removeMessage(event.detail.messageId);
+      }
+      loadChatThreads();
+    };
+    window.addEventListener('realtime_chat_message_updated', handleUpdated);
+    window.addEventListener('realtime_chat_message_deleted', handleDeleted);
+    return () => {
+      window.removeEventListener('realtime_chat_message_updated', handleUpdated);
+      window.removeEventListener('realtime_chat_message_deleted', handleDeleted);
+    };
+  }, [activeMappingId, activeTab, applyUpdatedMessage, loadChatThreads, removeMessage]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1382,10 +1416,16 @@ export default function CoachingPage() {
                                   )}
                                   {msg.content && <p className="leading-relaxed">{msg.content}</p>}
                               </div>
-                              <span className="text-[9px] text-slate-400 mt-1 px-1.5 font-bold flex items-center gap-1">
-                                <Clock className="w-2.5 h-2.5" /> {formatTime(msg.createdAt)}
-                              </span>
-                            </div>
+                               <span className="text-[9px] text-slate-400 mt-1 px-1.5 font-bold flex items-center gap-1">
+                                 <Clock className="w-2.5 h-2.5" /> {formatTime(msg.createdAt)}
+                               </span>
+                               <ChatMessageActions
+                                 message={msg}
+                                 isMine={isMe}
+                                 onUpdated={applyUpdatedMessage}
+                                 onDeleted={removeMessage}
+                               />
+                             </div>
                           );
                         })
                       )}

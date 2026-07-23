@@ -33,4 +33,10 @@ export const chatService = {
         if (contextRefId) formData.append('contextRefId', contextRefId);
         return api.post(`/chat/threads/${mappingId}/attachments`, formData);
     },
+
+    updateMessage: (mappingId, messageId, content) =>
+        api.patch(`/chat/threads/${mappingId}/messages/${messageId}`, { content }),
+
+    deleteMessage: (mappingId, messageId) =>
+        api.delete(`/chat/threads/${mappingId}/messages/${messageId}`),
 };

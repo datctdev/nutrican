@@ -2,20 +2,25 @@ package com.sba.nutricanbe.chat.controller;
 
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
+import com.sba.nutricanbe.chat.dto.UpdateChatMessageRequest;
 import com.sba.nutricanbe.chat.service.ChatService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.user.entity.User;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -72,5 +77,25 @@ public class ChatController {
             @PathVariable UUID mappingId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(chatService.markRead(user.getId(), mappingId));
+    }
+
+    @PatchMapping("/threads/{mappingId}/messages/{messageId}")
+    public ResponseEntity<ApiResponse<ChatMessageResponse>> updateMessage(
+            @PathVariable UUID mappingId,
+            @PathVariable UUID messageId,
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody UpdateChatMessageRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                chatService.updateMessage(user.getId(), mappingId, messageId, request),
+                "Đã sửa tin nhắn"));
+    }
+
+    @DeleteMapping("/threads/{mappingId}/messages/{messageId}")
+    public ResponseEntity<ApiResponse<Void>> deleteMessage(
+            @PathVariable UUID mappingId,
+            @PathVariable UUID messageId,
+            @AuthenticationPrincipal User user) {
+        chatService.deleteMessage(user.getId(), mappingId, messageId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã xóa tin nhắn"));
     }
 }
