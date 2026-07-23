@@ -22,7 +22,6 @@ import com.sba.nutricanbe.user.dto.PtCalendarResponse;
 import com.sba.nutricanbe.user.service.PtCalendarService;
 import org.springframework.format.annotation.DateTimeFormat;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -37,44 +36,8 @@ public class MarketplaceController {
 
     @GetMapping("/pts")
     public ResponseEntity<ApiResponse<PageResponse<PtProfileResponse>>> searchPts(
-            @RequestParam(required = false) String specialization,
-            @RequestParam(required = false) Integer minExperience,
-            @RequestParam(required = false) Boolean verifiedOnly,
-            @RequestParam(required = false) String tier,
-            @RequestParam(required = false) String goalFilter,
-            @RequestParam(required = false) String dietFilter,
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String gender,
-            @RequestParam(required = false) String trainingMode,
-            @RequestParam(required = false) String location,
-            @RequestParam(required = false) BigDecimal maxRate,
-            @RequestParam(required = false) BigDecimal minRating,
-            @RequestParam(defaultValue = "tier") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @ModelAttribute PtSearchRequest request,
             @AuthenticationPrincipal User user) {
-
-        PtSearchRequest request = new PtSearchRequest();
-        request.setSpecialization(specialization);
-        request.setMinExperience(minExperience);
-        request.setVerifiedOnly(verifiedOnly);
-        request.setTier(tier);
-        request.setGoalFilter(goalFilter);
-        request.setDietFilter(dietFilter);
-        request.setSearch(search);
-        request.setSort(sort);
-        request.setGender(gender);
-        request.setTrainingMode(trainingMode);
-        request.setLocation(location);
-        request.setMaxRate(maxRate);
-        request.setMinRating(minRating);
-        request.setSortBy(sortBy);
-        request.setSortDir(sortDir);
-        request.setPage(page);
-        request.setSize(size);
-
         return ResponseEntity.ok(marketplaceService.searchPts(request, user));
     }
 

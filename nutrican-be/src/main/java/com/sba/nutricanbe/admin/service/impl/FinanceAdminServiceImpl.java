@@ -33,10 +33,12 @@ public class FinanceAdminServiceImpl implements FinanceAdminService {
     private final SystemSettingService systemSettingService;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public FinanceOverviewDto getOverview(LocalDateTime from, LocalDateTime to) {
+        // Not readOnly: getSystemWallet may create missing system wallets.
         WalletResponse escrow = walletService.getSystemWallet(WalletType.ESCROW);
         WalletResponse platform = walletService.getSystemWallet(WalletType.PLATFORM);
+
         return FinanceOverviewDto.builder()
                 .escrowLockedBalance(escrow.getLockedBalance())
                 .platformAvailableBalance(platform.getAvailableBalance())
@@ -59,13 +61,19 @@ public class FinanceAdminServiceImpl implements FinanceAdminService {
     @Override
     @Transactional(readOnly = true)
     public PageResponse<WalletTransactionResponse> getTransactions(
-            WalletTransactionType type, LocalDateTime from, LocalDateTime to, int page, int size) {
+            WalletTransactionType type,
+            LocalDateTime from,
+            LocalDateTime to,
+            int page,
+            int size) {
         int safePage = Math.max(page, 0);
         int safeSize = (size < 1 || size > 100) ? 20 : size;
+
         var result = transactionRepository
                 .findAll(WalletTransactionRepository.adminLedgerSpec(type, from, to),
                         PageRequest.of(safePage, safeSize))
                 .map(WalletTransactionResponse::fromAdmin);
+
         return PageResponse.from(result);
     }
 

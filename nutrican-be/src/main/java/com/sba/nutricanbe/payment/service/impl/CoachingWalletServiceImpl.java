@@ -701,7 +701,16 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         if (type == WalletType.USER) {
             throw new BadRequestException("USER is not a system wallet type");
         }
-        return WalletResponse.from(getOrCreateSystemWalletForUpdate(type));
+        // Read path: no pessimistic lock (FOR UPDATE breaks when caller is readOnly).
+        Wallet wallet = walletRepository.findFirstByOwnerIdIsNullAndWalletType(type)
+                .orElseGet(() -> walletRepository.saveAndFlush(Wallet.builder()
+                        .ownerId(null)
+                        .walletType(type)
+                        .currency("VND")
+                        .availableBalance(BigDecimal.ZERO)
+                        .lockedBalance(BigDecimal.ZERO)
+                        .build()));
+        return WalletResponse.from(wallet);
     }
 
     @Override

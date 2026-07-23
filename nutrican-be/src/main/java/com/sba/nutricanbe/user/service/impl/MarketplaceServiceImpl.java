@@ -183,9 +183,14 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 return false;
             }
         }
-        // 3. Lọc theo Địa điểm Tỉnh/Thành
+        // 3. Lọc theo Địa điểm Tỉnh/Thành (Xử lý thông minh chuẩn hóa từ khóa TP / Tỉnh)
         if (request.getLocation() != null && !request.getLocation().isBlank()) {
-            if (r.getLocation() == null || !r.getLocation().toLowerCase(Locale.ROOT).contains(request.getLocation().toLowerCase(Locale.ROOT))) {
+            if (r.getLocation() == null) return false;
+            String reqLoc = request.getLocation().toLowerCase(Locale.ROOT)
+                    .replace("thành phố ", "").replace("tp. ", "").replace("tp ", "").replace("tỉnh ", "").trim();
+            String ptLoc = r.getLocation().toLowerCase(Locale.ROOT)
+                    .replace("thành phố ", "").replace("tp. ", "").replace("tp ", "").replace("tỉnh ", "").trim();
+            if (!ptLoc.contains(reqLoc)) {
                 return false;
             }
         }

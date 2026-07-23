@@ -19,20 +19,21 @@ const TRAINING_MODE_LABEL = { ONLINE: 'Online', OFFLINE: 'Trực tiếp (Offline
 const GENDER_LABEL = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' };
 
 const GOAL_LABELS = {
-    'WEIGHT_LOSS': 'Giảm cân / Giảm mỡ',
-    'WEIGHT_GAIN': 'Tăng cân / Tăng cơ',
-    'MUSCLE_GAIN': 'Tăng cơ / Thể hình',
-    'MAINTAIN': 'Duy trì vóc dáng',
-    'PREGNANT': 'Dinh dưỡng thai kỳ',
-    'RECOVERY': 'Phục hồi thể chất'
+    'WEIGHT_LOSS': 'Giảm cân',
+    'WEIGHT_GAIN': 'Tăng cân',
+    'MUSCLE_GAIN': 'Tăng cơ',
+    'FAT_LOSS': 'Đốt mỡ',
+    'MAINTAIN': 'Duy trì',
+    'PREGNANT': 'Mang thai',
+    'RECOVERY': 'Phục hồi'
 };
 
 const DIET_LABELS = {
     'NORMAL': 'Ăn thường',
     'VEGETARIAN': 'Ăn chay',
     'VEGAN': 'Thuần chay',
-    'KETO': 'Chế độ Keto',
-    'EAT_CLEAN': 'Eat Clean'
+    'KETO': 'Keto',
+    'EAT_CLEAN': 'Eat clean'
 };
 
 const getPermanentUrl = (url) => url ? url.split('?')[0] : '';
@@ -55,16 +56,16 @@ export default function MarketplacePage() {
     const [loading, setLoading] = useState(true);
     const [historyLoading, setHistoryLoading] = useState(false);
 
-    // --- STATE TÌM KIẾM & BỘ LỌC CƠ BẢN ---
+    // --- STATE TÌM KIẾM CƠ BẢN ---
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
-    const [goalFilter, setGoalFilter] = useState('');
     const [sortMode, setSortMode] = useState('tier');
 
     // --- STATE BỘ LỌC NÂNG CAO (DRAWER) ---
     const [showFilterDrawer, setShowFilterDrawer] = useState(false);
     const [advFilters, setAdvFilters] = useState({
+        goalFilter: '',
         gender: '',
         trainingMode: '',
         location: '',
@@ -74,14 +75,13 @@ export default function MarketplacePage() {
         minRating: ''
     });
 
-    // Đếm số lượng bộ lọc nâng cao đang kích hoạt
     const activeFilterCount = useMemo(() => {
         return Object.values(advFilters).filter(v => v !== '' && v !== null && v !== 0).length;
     }, [advFilters]);
 
     useEffect(() => {
         fetchPts();
-    }, [page, goalFilter, sortMode]);
+    }, [page, sortMode]);
 
     useEffect(() => {
         if (isAuthenticated && user?.role === 'CUSTOMER') {
@@ -98,10 +98,9 @@ export default function MarketplacePage() {
                 verifiedOnly: true,
                 sort: sortMode
             };
-            if (goalFilter) params.goalFilter = goalFilter;
             if (searchTerm) params.search = searchTerm;
 
-            // Gắn các tham số lọc nâng cao gửi xuống Backend
+            if (customFilters.goalFilter) params.goalFilter = customFilters.goalFilter;
             if (customFilters.gender) params.gender = customFilters.gender;
             if (customFilters.trainingMode) params.trainingMode = customFilters.trainingMode;
             if (customFilters.location) params.location = customFilters.location;
@@ -147,6 +146,7 @@ export default function MarketplacePage() {
 
     const handleResetAdvFilters = () => {
         const resetState = {
+            goalFilter: '',
             gender: '',
             trainingMode: '',
             location: '',
@@ -156,6 +156,7 @@ export default function MarketplacePage() {
             minRating: ''
         };
         setAdvFilters(resetState);
+        setSortMode('tier');
         setPage(0);
         setShowFilterDrawer(false);
         fetchPts(search, resetState);
@@ -208,7 +209,7 @@ export default function MarketplacePage() {
                             </div>
                         </div>
 
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {coachingHistory.map((history) => (
                                 <Card key={history.mappingId} className="bg-white border-emerald-100 shadow-sm hover:shadow-md transition-shadow rounded-3xl overflow-hidden relative">
                                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-teal-400"></div>
@@ -251,8 +252,8 @@ export default function MarketplacePage() {
                     </div>
                 )}
 
-                {/* --- THANH CÔNG CỤ TÌM KIẾM & BỘ LỌC HIỆN ĐẠI --- */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-8 px-2 border-t border-slate-100 pt-8">
+                {/* --- THANH CÔNG CỤ TÌM KIẾM SIÊU GỌN (ĐÃ XÓA 2 PHẦN LỌC DƯ THỪA) --- */}
+                <div className="flex items-center justify-between gap-4 mb-8 px-2 border-t border-slate-100 pt-8">
                     <div>
                         <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
                             Huấn Luyện Viên Nổi Bật
@@ -261,46 +262,29 @@ export default function MarketplacePage() {
                         <p className="text-sm font-medium text-slate-500 mt-1">Khám phá và chọn lọc chuyên gia phù hợp tuyệt đối với tiêu chí của bạn.</p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2.5 items-center w-full md:w-auto justify-start md:justify-end">
-                        {/* Bộ lọc nhanh theo mục tiêu */}
-                        <div className="flex flex-wrap gap-1.5 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/80">
-                            {['', 'WEIGHT_LOSS', 'WEIGHT_GAIN', 'MUSCLE_GAIN', 'MAINTAIN'].map((g) => (
-                                <button key={g || 'all'} type="button" onClick={() => { setGoalFilter(g); setPage(0); }}
-                                        className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${goalFilter === g ? 'bg-white text-blue-600 shadow-sm scale-105' : 'text-slate-600 hover:text-slate-900'}`}>
-                                    {g === '' ? 'Tất cả' : g === 'WEIGHT_LOSS' ? 'Giảm cân' : g === 'WEIGHT_GAIN' ? 'Tăng cân' : g === 'MUSCLE_GAIN' ? 'Tăng cơ' : 'Duy trì'}
-                                </button>
-                            ))}
-                        </div>
-
-                        {/* NÚT MỞ BỘ LỌC NÂNG CAO (DRAWER) */}
+                    <div className="flex items-center shrink-0">
+                        {/* NÚT MỞ BỘ LỌC NÂNG CAO (DUY NHẤT & NỔI BẬT) */}
                         <Button
                             type="button"
                             onClick={() => setShowFilterDrawer(true)}
                             variant="outline"
-                            className={`h-11 px-4 rounded-xl font-black text-xs sm:text-sm border-2 transition-all cursor-pointer flex items-center gap-2 ${activeFilterCount > 0 ? 'border-blue-600 bg-blue-50/50 text-blue-700 shadow-sm' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                            className={`h-12 px-5 rounded-2xl font-black text-sm border-2 transition-all cursor-pointer flex items-center gap-2.5 shadow-sm hover:scale-105 ${activeFilterCount > 0 ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                         >
                             <SlidersHorizontal className="w-4 h-4 text-blue-600" />
-                            <span>Bộ lọc</span>
+                            <span>Bộ lọc tìm kiếm</span>
                             {activeFilterCount > 0 && (
-                                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-black">
+                                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-black">
                                     {activeFilterCount}
                                 </span>
                             )}
                         </Button>
-
-                        {/* Sắp xếp */}
-                        <select value={sortMode} onChange={(e) => { setSortMode(e.target.value); setPage(0); }}
-                                className="h-11 text-xs font-extrabold border-2 border-slate-200 rounded-xl px-3.5 bg-white text-slate-700 outline-none focus:border-blue-600 cursor-pointer transition-colors shadow-2xs">
-                            <option value="tier">⚡ Sắp xếp: Theo Hạng (Tier)</option>
-                            <option value="compatibility">🎯 Sắp xếp: Phù hợp nhất</option>
-                        </select>
                     </div>
                 </div>
 
-                {/* --- HIỂN THỊ DANH SÁCH THẺ PT (GRID CARDS) --- */}
+                {/* --- HIỂN THỊ DANH SÁCH THẺ PT (GRID CARDS 3 CỘT SIÊU THOÁNG) --- */}
                 {loading ? (
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <Skeleton key={i} className="h-[420px] w-full rounded-[2rem] bg-slate-200/80" />)}
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-[520px] w-full rounded-[2.5rem] bg-slate-200/80" />)}
                     </div>
                 ) : pts.length === 0 ? (
                     <div className="text-center py-24 bg-white rounded-[2.5rem] border border-slate-200/80 border-dashed shadow-sm space-y-4">
@@ -317,9 +301,8 @@ export default function MarketplacePage() {
                     </div>
                 ) : (
                     <>
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6.5">
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {pts.map((pt) => {
-                                // Bóc tách dữ liệu an toàn cho thẻ
                                 let showcase = pt.portfolioShowcase || {};
                                 if (typeof showcase === 'string') {
                                     try { showcase = JSON.parse(showcase); } catch (e) { showcase = {}; }
@@ -327,111 +310,143 @@ export default function MarketplacePage() {
                                 const coverPhoto = getFullImageUrl(showcase.coverPhotoUrl) || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000&auto=format&fit=crop";
                                 const displayRate = pt.offlineRate || pt.onlineRate || pt.hourlyRate;
                                 const displayUnit = pt.offlineRateUnit || pt.onlineRateUnit || pt.rateUnit || 'SESSION_60';
+                                const isCertified = pt.tier === 'TIER_1' || pt.preferredTrack === 'CERTIFIED';
 
                                 return (
                                     <Link to={`/pt-profile/${pt.id}`} key={pt.id} className="group flex">
-                                        <Card className="w-full bg-white border-slate-200/80 shadow-sm hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden rounded-[2.2rem] flex flex-col justify-between">
+                                        <Card className="w-full bg-white border-slate-200/80 shadow-sm hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 overflow-hidden rounded-[2.5rem] flex flex-col justify-between">
 
                                             {/* NỬA TRÊN: ẢNH BÌA COVER PHOTO & BADGE */}
                                             <div>
-                                                <div className="h-36 w-full relative overflow-hidden bg-slate-100">
+                                                <div className="h-44 w-full relative overflow-hidden bg-slate-100">
                                                     <img src={coverPhoto} alt="Cover" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20" />
 
-                                                    {/* Huy hiệu Hạng PT */}
-                                                    <div className="absolute top-3.5 right-3.5 z-10">
-                                                        <span className={`text-[10px] font-black px-3 py-1 rounded-xl flex items-center shadow-md backdrop-blur-md border ${
-                                                            pt.tier === 'TIER_1' || pt.preferredTrack === 'CERTIFIED'
-                                                                ? 'bg-amber-400/90 text-slate-950 border-amber-300'
-                                                                : 'bg-white/90 text-slate-800 border-white/40'
+                                                    {/* Huy hiệu Phân hạng */}
+                                                    <div className="absolute top-4 right-4 z-10">
+                                                        <span className={`text-[11px] font-black px-3.5 py-1.5 rounded-xl flex items-center shadow-md backdrop-blur-md border ${
+                                                            isCertified
+                                                                ? 'bg-amber-400/95 text-slate-950 border-amber-300'
+                                                                : 'bg-white/95 text-slate-800 border-white/60 shadow-sm'
                                                         }`}>
-                                                            <Award className={`w-3 h-3 mr-1 ${pt.tier === 'TIER_1' ? 'text-slate-950' : 'text-blue-600'}`} />
-                                                            {pt.tier === 'TIER_1' || pt.preferredTrack === 'CERTIFIED' ? 'TOP 1% CERTIFIED' : 'PT TỰ DO'}
+                                                            <Award className={`w-3.5 h-3.5 mr-1.5 ${isCertified ? 'text-slate-950' : 'text-blue-600'}`} />
+                                                            {isCertified ? 'PT CHUYÊN NGHIỆP' : 'PT TỰ DO'}
                                                         </span>
                                                     </div>
 
-                                                    {/* Hình thức tập luyện gọn góc trái */}
+                                                    {/* Hình thức tập luyện góc trái */}
                                                     {pt.trainingMode && (
-                                                        <div className="absolute bottom-3 right-3 z-10">
-                                                            <span className="bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-extrabold px-2.5 py-1 rounded-lg border border-white/10 flex items-center gap-1">
-                                                                {pt.trainingMode === 'ONLINE' ? <Monitor className="w-3 h-3 text-blue-400"/> : pt.trainingMode === 'OFFLINE' ? <Dumbbell className="w-3 h-3 text-emerald-400"/> : <Globe className="w-3 h-3 text-amber-400"/>}
+                                                        <div className="absolute bottom-3.5 right-3.5 z-10">
+                                                            <span className="bg-slate-900/85 backdrop-blur-md text-white text-[11px] font-extrabold px-3 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 shadow-sm">
+                                                                {pt.trainingMode === 'ONLINE' ? <Monitor className="w-3.5 h-3.5 text-blue-400"/> : pt.trainingMode === 'OFFLINE' ? <Dumbbell className="w-3.5 h-3.5 text-emerald-400"/> : <Globe className="w-3.5 h-3.5 text-amber-400"/>}
                                                                 {TRAINING_MODE_LABEL[pt.trainingMode]}
                                                             </span>
                                                         </div>
                                                     )}
                                                 </div>
 
-                                                <CardContent className="p-6 pt-0 relative">
+                                                <CardContent className="p-7 pt-0 relative">
                                                     {/* AVATAR OVERLAY */}
-                                                    <div className="-mt-11 mb-3.5 relative inline-block">
-                                                        <div className="w-20 h-20 rounded-2xl bg-white p-1 shadow-lg border border-slate-100/80 overflow-hidden">
+                                                    <div className="-mt-12 mb-4 relative inline-block shrink-0">
+                                                        <div className="w-[88px] h-[88px] rounded-2xl bg-white p-1 shadow-lg border border-slate-100/80 overflow-hidden flex items-center justify-center">
                                                             {pt.avatarUrl ? (
-                                                                <img src={getFullImageUrl(pt.avatarUrl)} alt={pt.fullName} className="w-full h-full rounded-xl object-cover" />
+                                                                <img
+                                                                    src={getFullImageUrl(pt.avatarUrl)}
+                                                                    alt={pt.fullName}
+                                                                    className="w-full h-full rounded-xl object-cover object-center aspect-square"
+                                                                />
                                                             ) : (
-                                                                <div className="w-full h-full rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-blue-700 font-black text-xl">
+                                                                <div className="w-full h-full rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-blue-700 font-black text-2xl aspect-square">
                                                                     {getInitials(pt.fullName)}
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        {pt.isVerified && <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm"><CheckCircle2 className="w-5 h-5 text-blue-500 fill-blue-50" /></div>}
+                                                        {pt.isVerified && (
+                                                            <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm z-10">
+                                                                <CheckCircle2 className="w-6 h-6 text-blue-500 fill-blue-50" />
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     {/* THÔNG TIN CHÍNH */}
                                                     <div>
-                                                        <h3 className="font-black text-xl text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1 flex items-center justify-between">
+                                                        <h3 className="font-black text-2xl text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1 flex items-center justify-between">
                                                             <span>{pt.fullName}</span>
                                                         </h3>
 
-                                                        {/* Kinh nghiệm & Địa điểm */}
-                                                        <div className="flex items-center gap-2 text-xs font-extrabold text-slate-500 mt-1">
-                                                            <span className="flex items-center gap-1 text-slate-600"><Briefcase className="w-3.5 h-3.5 text-blue-500"/> {pt.yearsOfExperience || pt.yearsExperience || 0} năm KN</span>
+                                                        {/* Giới tính, Kinh nghiệm & Địa điểm */}
+                                                        <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-500 mt-1.5 flex-wrap">
+                                                            {pt.gender && <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md text-[10px]">{GENDER_LABEL[pt.gender] || pt.gender}</span>}
+                                                            <span className="flex items-center gap-1 text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-md"><Briefcase className="w-3.5 h-3.5 text-blue-500"/> {pt.yearsOfExperience || pt.yearsExperience || 0} năm KN</span>
                                                             <span>·</span>
-                                                            <span className="flex items-center gap-1 truncate"><MapPin className="w-3.5 h-3.5 text-red-500 shrink-0"/> {pt.location || 'Toàn quốc'}</span>
+                                                            <span className="flex items-center gap-1 text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-md truncate"><MapPin className="w-3.5 h-3.5 text-red-500 shrink-0"/> {pt.location || 'Toàn quốc'}</span>
                                                         </div>
 
                                                         {/* Đánh giá sao */}
-                                                        <div className="flex items-center gap-1.5 mt-3 mb-3 bg-amber-50/80 w-fit px-3 py-1 rounded-xl border border-amber-200/60">
+                                                        <div className="flex items-center gap-1.5 mt-3.5 mb-4 bg-amber-50/80 w-fit px-3.5 py-1 rounded-xl border border-amber-200/60">
                                                             <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
-                                                            <span className="text-xs font-black text-amber-950">{pt.rating ? pt.rating.toFixed(1) : '5.0'}</span>
-                                                            <span className="text-[11px] font-bold text-amber-700/80">({pt.totalReviews || 0} đánh giá)</span>
+                                                            <span className="text-sm font-black text-amber-950">{pt.rating ? pt.rating.toFixed(1) : '5.0'}</span>
+                                                            <span className="text-xs font-bold text-amber-700/80">({pt.totalReviews || 0} đánh giá)</span>
                                                         </div>
 
                                                         {/* MỨC PHÍ DỊCH VỤ NỔI BẬT MÀU XANH LÁ */}
-                                                        <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 mb-4 flex items-center justify-between">
-                                                            <span className="text-xs font-black text-emerald-800 flex items-center gap-1"><Banknote className="w-3.5 h-3.5"/> Phí dịch vụ:</span>
-                                                            <span className="text-sm font-black text-emerald-600">
+                                                        <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 mb-4 flex items-center justify-between shadow-2xs">
+                                                            <span className="text-xs font-black text-emerald-800 flex items-center gap-1.5"><Banknote className="w-4 h-4"/> Phí dịch vụ:</span>
+                                                            <span className="text-base font-black text-emerald-600">
                                                                 {displayRate ? `${Number(displayRate).toLocaleString('vi-VN')}đ` : 'Liên hệ'}
-                                                                <span className="text-[10px] font-bold text-slate-500 ml-0.5">/ {RATE_UNIT_LABEL[displayUnit] || 'buổi'}</span>
+                                                                <span className="text-[11px] font-bold text-slate-500 ml-0.5">/ {RATE_UNIT_LABEL[displayUnit] || 'buổi'}</span>
                                                             </span>
                                                         </div>
 
                                                         {/* Bio */}
-                                                        <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed font-semibold mb-4">{pt.bio || 'Chuyên gia huấn luyện thể chất và tư vấn dinh dưỡng khoa học đồng hành cùng bạn.'}</p>
+                                                        <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed font-semibold mb-5">{pt.bio || 'Chuyên gia huấn luyện thể chất và tư vấn dinh dưỡng khoa học đồng hành cùng bạn chinh phục mục tiêu vóc dáng bền vững.'}</p>
 
-                                                        {/* TAGS PILLS (Mục tiêu & Chế độ ăn) */}
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            {pt.gender && <span className="text-[10px] font-extrabold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">{GENDER_LABEL[pt.gender] || pt.gender}</span>}
-                                                            {pt.preferredGoals?.slice(0, 2).map((g, i) => (
-                                                                <span key={i} className="text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md">{GOAL_LABELS[g] || g}</span>
-                                                            ))}
-                                                            {pt.preferredDietTypes?.slice(0, 1).map((d, i) => (
-                                                                <span key={i} className="text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md">{DIET_LABELS[d] || d}</span>
-                                                            ))}
+                                                        {/* PHÂN TÁCH 3 HÀNG CHUYÊN MÔN RÕ RÀNG */}
+                                                        <div className="space-y-2 pt-4 border-t border-slate-100">
+                                                            {pt.specializations?.length > 0 && (
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="text-[10px] font-black text-slate-400 uppercase w-18 shrink-0">Chuyên môn:</span>
+                                                                    {pt.specializations.slice(0, 3).map((s, i) => (
+                                                                        <span key={i} className="text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded-md">{s}</span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {pt.preferredGoals?.length > 0 && (
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="text-[10px] font-black text-slate-400 uppercase w-18 shrink-0">Mục tiêu:</span>
+                                                                    {pt.preferredGoals.slice(0, 3).map((g, i) => (
+                                                                        <span key={i} className="text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-md">{GOAL_LABELS[g] || g}</span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            {pt.preferredDietTypes?.length > 0 && (
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    <span className="text-[10px] font-black text-slate-400 uppercase w-18 shrink-0">Chế độ ăn:</span>
+                                                                    {pt.preferredDietTypes.slice(0, 3).map((d, i) => (
+                                                                        <span key={i} className="text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-md">{DIET_LABELS[d] || d}</span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </CardContent>
                                             </div>
 
                                             {/* NỬA DƯỚI: FOOTER HIỆN TRẠNG THÁI & NÚT XEM */}
-                                            <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between mt-4">
-                                                <span className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60 shadow-2xs">
-                                                    <Users className="w-3 h-3 text-emerald-600"/>
-                                                    {pt.activeClientCount != null ? `${pt.activeClientCount}/${pt.maxClients || 10} học viên` : 'Sẵn sàng nhận học viên'}
-                                                </span>
-                                                <span className="text-blue-600 group-hover:text-blue-800 font-extrabold text-xs flex items-center transition-all group-hover:translate-x-1">
-                                                    Xem chi tiết <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-                                                </span>
+                                            <div className="px-7 py-5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between mt-6">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    <span className="text-xs font-black text-slate-700">
+                                                        {pt.activeClientCount != null ? `${pt.activeClientCount}/${pt.maxClients || 10} học viên` : 'Sẵn sàng nhận học viên'}
+                                                    </span>
+                                                </div>
+
+                                                <div className="inline-flex items-center gap-1 bg-white hover:bg-blue-600 text-blue-600 hover:text-white px-4 py-2 rounded-xl font-extrabold text-xs border border-slate-200/80 shadow-2xs transition-all duration-300 group-hover:border-blue-600">
+                                                    <span>Xem chi tiết</span>
+                                                    <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                                                </div>
                                             </div>
+
                                         </Card>
                                     </Link>
                                 );
@@ -440,14 +455,14 @@ export default function MarketplacePage() {
 
                         {/* Pagination */}
                         {totalPages > 1 && (
-                            <div className="flex justify-center items-center gap-4 mt-14">
-                                <Button variant="outline" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="rounded-xl border-slate-200 text-slate-600 bg-white font-bold h-11 px-6 shadow-xs cursor-pointer">
+                            <div className="flex justify-center items-center gap-4 mt-16">
+                                <Button variant="outline" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="rounded-xl border-slate-200 text-slate-600 bg-white font-bold h-12 px-6 shadow-xs cursor-pointer">
                                     &larr; Trang trước
                                 </Button>
-                                <div className="font-extrabold text-slate-700 text-sm bg-slate-100 px-5 py-2.5 rounded-xl border border-slate-200/60">
+                                <div className="font-extrabold text-slate-700 text-sm bg-slate-100 px-6 py-3 rounded-xl border border-slate-200/60">
                                     {page + 1} / {totalPages}
                                 </div>
-                                <Button variant="outline" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded-xl border-slate-200 text-slate-600 bg-white font-bold h-11 px-6 shadow-xs cursor-pointer">
+                                <Button variant="outline" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded-xl border-slate-200 text-slate-600 bg-white font-bold h-12 px-6 shadow-xs cursor-pointer">
                                     Trang sau &rarr;
                                 </Button>
                             </div>
@@ -463,7 +478,6 @@ export default function MarketplacePage() {
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowFilterDrawer(false)}>
                     <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100" onClick={(e) => e.stopPropagation()}>
 
-                        {/* Header Drawer */}
                         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
                             <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-blue-600 text-white rounded-2xl shadow-sm">
@@ -479,10 +493,38 @@ export default function MarketplacePage() {
                             </button>
                         </div>
 
-                        {/* Content Filters */}
                         <div className="p-8 overflow-y-auto space-y-7 flex-1">
 
-                            {/* 1. Hình thức huấn luyện & Giới tính */}
+                            {/* ĐÃ TÍCH HỢP MỤC TIÊU & SẮP XẾP VÀO DRAWER */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs font-black text-slate-700 uppercase tracking-widest mb-2.5">Mục tiêu tập luyện</label>
+                                    <select
+                                        value={advFilters.goalFilter}
+                                        onChange={(e) => setAdvFilters({ ...advFilters, goalFilter: e.target.value })}
+                                        className="w-full h-12 px-4 rounded-xl border-2 border-slate-200 font-bold text-sm bg-white outline-none focus:border-blue-600 cursor-pointer"
+                                    >
+                                        <option value="">🎯 Tất cả mục tiêu</option>
+                                        <option value="WEIGHT_LOSS">🔥 Giảm cân / Giảm mỡ</option>
+                                        <option value="WEIGHT_GAIN">💪 Tăng cân / Tăng cơ</option>
+                                        <option value="MUSCLE_GAIN">⚡ Tăng cơ / Thể hình</option>
+                                        <option value="MAINTAIN">✨ Duy trì vóc dáng</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-black text-slate-700 uppercase tracking-widest mb-2.5">Sắp xếp ưu tiên</label>
+                                    <select
+                                        value={sortMode}
+                                        onChange={(e) => { setSortMode(e.target.value); setPage(0); }}
+                                        className="w-full h-12 px-4 rounded-xl border-2 border-slate-200 font-bold text-sm bg-white outline-none focus:border-blue-600 cursor-pointer"
+                                    >
+                                        <option value="tier">⚡ Theo Hạng PT Chuyên nghiệp (Tier)</option>
+                                        <option value="compatibility">🎯 Theo độ Phù hợp nhất</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-xs font-black text-slate-700 uppercase tracking-widest mb-2.5">Hình thức tập luyện</label>
@@ -512,7 +554,6 @@ export default function MarketplacePage() {
                                 </div>
                             </div>
 
-                            {/* 2. Địa điểm Tỉnh/Thành */}
                             <div>
                                 <label className="block text-xs font-black text-slate-700 uppercase tracking-widest mb-2.5">Địa điểm khu vực hoạt động</label>
                                 <ProvinceSelect
@@ -522,7 +563,6 @@ export default function MarketplacePage() {
                                 />
                             </div>
 
-                            {/* 3. Mức phí tối đa & Kinh nghiệm tối thiểu */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-xs font-black text-slate-700 uppercase tracking-widest mb-2.5">Mức phí tối đa / buổi</label>
@@ -554,7 +594,6 @@ export default function MarketplacePage() {
                                 </div>
                             </div>
 
-                            {/* 4. Chế độ ăn & Điểm đánh giá */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-xs font-black text-slate-700 uppercase tracking-widest mb-2.5">Chế độ ăn khuyến nghị</label>
@@ -587,7 +626,6 @@ export default function MarketplacePage() {
                             </div>
                         </div>
 
-                        {/* Footer Drawer Buttons */}
                         <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-4 shrink-0">
                             <Button
                                 type="button"
