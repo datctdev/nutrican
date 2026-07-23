@@ -32,4 +32,5 @@ public class ChatThreadResponse {
     private LocalDateTime periodEndsAt;
     private UUID ptProfileId;
     private LocalDateTime coachingStartedAt;
+    private boolean notificationsEnabled;
 }

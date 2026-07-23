@@ -1,8 +1,10 @@
 package com.sba.nutricanbe.chat.controller;
 
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
+import com.sba.nutricanbe.chat.dto.ChatNotificationPreferenceResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
 import com.sba.nutricanbe.chat.dto.UpdateChatMessageRequest;
+import com.sba.nutricanbe.chat.dto.UpdateChatNotificationPreferenceRequest;
 import com.sba.nutricanbe.chat.service.ChatService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
@@ -77,6 +79,21 @@ public class ChatController {
             @PathVariable UUID mappingId,
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(chatService.markRead(user.getId(), mappingId));
+    }
+
+    @GetMapping("/threads/{mappingId}/notification-preference")
+    public ResponseEntity<ApiResponse<ChatNotificationPreferenceResponse>> getNotificationPreference(
+            @PathVariable UUID mappingId,
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(chatService.getNotificationPreference(user.getId(), mappingId));
+    }
+
+    @PutMapping("/threads/{mappingId}/notification-preference")
+    public ResponseEntity<ApiResponse<ChatNotificationPreferenceResponse>> updateNotificationPreference(
+            @PathVariable UUID mappingId,
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody UpdateChatNotificationPreferenceRequest request) {
+        return ResponseEntity.ok(chatService.updateNotificationPreference(user.getId(), mappingId, request));
     }
 
     @PatchMapping("/threads/{mappingId}/messages/{messageId}")

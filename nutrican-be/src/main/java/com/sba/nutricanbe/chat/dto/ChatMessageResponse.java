@@ -29,6 +29,7 @@ public class ChatMessageResponse {
     private ChatContextType contextType;
     private UUID contextRefId;
     private String attachmentUrl;
+    private Boolean notificationMuted;
     private LocalDateTime readAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

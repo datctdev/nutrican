@@ -2,8 +2,10 @@ package com.sba.nutricanbe.chat.service;
 
 import com.sba.nutricanbe.chat.dto.ChatMessageRequest;
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
+import com.sba.nutricanbe.chat.dto.ChatNotificationPreferenceResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
 import com.sba.nutricanbe.chat.dto.UpdateChatMessageRequest;
+import com.sba.nutricanbe.chat.dto.UpdateChatNotificationPreferenceRequest;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,4 +31,9 @@ public interface ChatService {
     void deleteMessage(UUID userId, UUID mappingId, UUID messageId);
 
     ApiResponse<Void> markRead(UUID userId, UUID mappingId);
+
+    ApiResponse<ChatNotificationPreferenceResponse> getNotificationPreference(UUID userId, UUID mappingId);
+
+    ApiResponse<ChatNotificationPreferenceResponse> updateNotificationPreference(
+            UUID userId, UUID mappingId, UpdateChatNotificationPreferenceRequest request);
 }

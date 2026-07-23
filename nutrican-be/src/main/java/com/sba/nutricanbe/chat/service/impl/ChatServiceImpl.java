@@ -2,8 +2,10 @@ package com.sba.nutricanbe.chat.service.impl;
 
 import com.sba.nutricanbe.chat.dto.ChatMessageRequest;
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
+import com.sba.nutricanbe.chat.dto.ChatNotificationPreferenceResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
 import com.sba.nutricanbe.chat.dto.UpdateChatMessageRequest;
+import com.sba.nutricanbe.chat.dto.UpdateChatNotificationPreferenceRequest;
 import com.sba.nutricanbe.chat.entity.ChatMessage;
 import com.sba.nutricanbe.chat.enums.ChatContextType;
 import com.sba.nutricanbe.chat.enums.ChatMessageType;
@@ -52,9 +54,17 @@ public class ChatServiceImpl implements ChatService {
     private static final String CHAT_MESSAGE_DELETED_EVENT = "CHAT_MESSAGE_DELETED";
 
     private void publishRealtimeMessage(ChatMessageResponse message) {
-        webSocketSessionService.sendToUser(message.getSenderId(), CHAT_MESSAGE_EVENT, message);
+        webSocketSessionService.sendToUserOnly(message.getSenderId(), CHAT_MESSAGE_EVENT, message);
         if (!message.getSenderId().equals(message.getRecipientId())) {
-            webSocketSessionService.sendToUser(message.getRecipientId(), CHAT_MESSAGE_EVENT, message);
+            PtClientMapping mapping = mappingRepository.findByIdWithUsers(message.getMappingId())
+                    .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", message.getMappingId()));
+            boolean notificationsEnabled = notificationsEnabledFor(mapping, message.getRecipientId());
+            message.setNotificationMuted(!notificationsEnabled);
+            if (notificationsEnabled) {
+                webSocketSessionService.sendToUser(message.getRecipientId(), CHAT_MESSAGE_EVENT, message);
+            } else {
+                webSocketSessionService.sendToUserOnly(message.getRecipientId(), CHAT_MESSAGE_EVENT, message);
+            }
         }
     }
 
@@ -108,7 +118,9 @@ public class ChatServiceImpl implements ChatService {
                 .contextType(request.getContextType())
                 .contextRefId(request.getContextRefId())
                 .build());
-        return toMessageResponse(message);
+        ChatMessageResponse response = toMessageResponse(message);
+        publishRealtimeMessage(response);
+        return response;
     }
 
     @Override
@@ -247,6 +259,30 @@ public class ChatServiceImpl implements ChatService {
         return ApiResponse.success(null, "Messages marked as read");
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<ChatNotificationPreferenceResponse> getNotificationPreference(UUID userId, UUID mappingId) {
+        PtClientMapping mapping = getActiveMappingForUser(mappingId, userId);
+        return ApiResponse.success(toNotificationPreference(mapping, userId));
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<ChatNotificationPreferenceResponse> updateNotificationPreference(
+            UUID userId, UUID mappingId, UpdateChatNotificationPreferenceRequest request) {
+        PtClientMapping mapping = getActiveMappingForUser(mappingId, userId);
+        boolean enabled = Boolean.TRUE.equals(request.getEnabled());
+        if (mapping.getPt().getId().equals(userId)) {
+            mapping.setPtChatNotificationsEnabled(enabled);
+        } else {
+            mapping.setClientChatNotificationsEnabled(enabled);
+        }
+        mappingRepository.save(mapping);
+        return ApiResponse.success(
+                toNotificationPreference(mapping, userId),
+                enabled ? "Đã bật thông báo tin nhắn" : "Đã tắt thông báo tin nhắn");
+    }
+
     private PtClientMapping getActiveMappingForUser(UUID mappingId, UUID userId) {
         PtClientMapping mapping = mappingRepository.findByIdWithUsers(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", mappingId));
@@ -287,6 +323,7 @@ public class ChatServiceImpl implements ChatService {
                 .periodEndsAt(mapping.getPeriodEndsAt())
                 .ptProfileId(ptProfileId)
                 .coachingStartedAt(mapping.getCoachingStartedAt())
+                .notificationsEnabled(notificationsEnabledFor(mapping, userId))
                 .build();
     }
 
@@ -311,6 +348,23 @@ public class ChatServiceImpl implements ChatService {
                 .readAt(message.getReadAt())
                 .createdAt(message.getCreatedAt())
                 .updatedAt(message.getUpdatedAt())
+                .build();
+    }
+
+    private boolean notificationsEnabledFor(PtClientMapping mapping, UUID userId) {
+        return mapping.getPt().getId().equals(userId)
+                ? mapping.isPtChatNotificationsEnabled()
+                : mapping.isClientChatNotificationsEnabled();
+    }
+
+    private ChatNotificationPreferenceResponse toNotificationPreference(PtClientMapping mapping, UUID userId) {
+        UUID participantId = mapping.getPt().getId().equals(userId)
+                ? mapping.getClient().getId()
+                : mapping.getPt().getId();
+        return ChatNotificationPreferenceResponse.builder()
+                .mappingId(mapping.getId())
+                .participantId(participantId)
+                .enabled(notificationsEnabledFor(mapping, userId))
                 .build();
     }
 
