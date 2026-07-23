@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPin, Clock, User, FileText } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, MapPin, Clock, User, FileText, Bell } from 'lucide-react';
 import { Button } from '../ui/button';
 import Modal from '../common/Modal';
 import { addWeeks, formatWeekRange, getWeekStart } from '../../utils/offlineHireSlots';
@@ -34,6 +34,29 @@ const BLOCK_COLORS = {
 
 function parseDate(value) {
   if (!value) return null;
+  // Jackson sometimes serializes LocalDateTime as [y, m, d, h, min, s, nano]
+  if (Array.isArray(value) && value.length >= 5) {
+    const [y, m, d, h = 0, min = 0, s = 0] = value;
+    const dt = new Date(y, m - 1, d, h, min, s);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+  if (typeof value === 'string') {
+    // Treat "2026-07-22T20:00:00" (no Z) as local wall-clock — matches BE LocalDateTime.
+    const m = value.match(
+      /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/,
+    );
+    if (m && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(value.trim())) {
+      const dt = new Date(
+        Number(m[1]),
+        Number(m[2]) - 1,
+        Number(m[3]),
+        Number(m[4]),
+        Number(m[5]),
+        Number(m[6] || 0),
+      );
+      return Number.isNaN(dt.getTime()) ? null : dt;
+    }
+  }
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
@@ -50,6 +73,12 @@ function formatTime(date) {
 
 function statusMeta(status) {
   return SESSION_STATUS[status] || { text: status || '—', cls: 'bg-slate-100 text-slate-700 border-slate-200' };
+}
+
+/** Enable «Đã dạy xong» when session has started (during or after). */
+export function canMarkSessionDone(item, now = new Date()) {
+  if (!item || item.status !== 'SCHEDULED' || !item.sessionId || !item.start) return false;
+  return now.getTime() >= item.start.getTime();
 }
 
 /**
@@ -75,7 +104,8 @@ export function toTimetableItem(raw, extras = {}) {
     type: raw.type || 'OFFLINE',
     title: extras.title || raw.note || (raw.sequence != null ? `Buổi #${raw.sequence}` : 'Buổi offline'),
     counterpartName: extras.counterpartName || raw.counterpartName || raw.clientName || raw.ptName,
-    canCancel: extras.canCancel ?? ['PENDING', 'CONFIRMED', 'SCHEDULED'].includes(raw.status),
+    canCancel: extras.canCancel ?? ['PENDING', 'CONFIRMED'].includes(raw.status),
+    confirmDeadlineAt: raw.confirmDeadlineAt,
     raw,
   };
 }
@@ -104,7 +134,9 @@ export function mergeTimetableSources({ sessions = [], appointments = [], counte
       type: match?.type || 'OFFLINE',
       appointmentId: match?.id,
       sessionId: s.id,
+      mappingSessionId: s.id,
       counterpartName: s.counterpartName || counterpartName,
+      confirmDeadlineAt: s.confirmDeadlineAt,
     }, {
       counterpartName: s.counterpartName || counterpartName,
       canCancel: match ? ['PENDING', 'CONFIRMED'].includes(match.status) : false,
@@ -128,10 +160,32 @@ export default function CoachingTimetable({
   emptyText = 'Chưa có buổi tập trong tuần này',
   onCancel,
   cancellingId,
+  role = 'customer',
   roleLabel = 'Đối tác',
+  onMarkDone,
+  onConfirm,
+  onDispute,
+  actingId,
 }) {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [selected, setSelected] = useState(null);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') tick();
+    };
+    const id = setInterval(tick, 10_000);
+    window.addEventListener('focus', tick);
+    document.addEventListener('visibilitychange', onVisible);
+    tick();
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('focus', tick);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const days = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -147,6 +201,13 @@ export default function CoachingTimetable({
     return items.filter((item) => item.start >= weekStart && item.start < end);
   }, [items, weekStart]);
 
+  const markDoneReminders = useMemo(() => {
+    if (role !== 'pt' || !onMarkDone) return [];
+    return items
+      .filter((item) => canMarkSessionDone(item, now))
+      .sort((a, b) => a.start - b.start);
+  }, [items, now, role, onMarkDone]);
+
   const itemsByDay = useMemo(() => {
     return days.map((day) => weekItems.filter((item) => sameDay(item.start, day)));
   }, [days, weekItems]);
@@ -161,11 +222,53 @@ export default function CoachingTimetable({
     return { top, height };
   };
 
-  const today = new Date();
+  const today = now;
   const meta = selected ? statusMeta(selected.status) : null;
+  const selectedCanMarkDone = selected ? canMarkSessionDone(selected, now) : false;
 
   return (
     <div className="space-y-4">
+      {role === 'pt' && markDoneReminders.length > 0 && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <Bell className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-black text-emerald-900">Nhắc xác nhận buổi đã dạy</p>
+              <p className="text-xs text-emerald-800/80 mt-0.5">
+                Các buổi đã tới giờ dạy — bấm nhanh bên dưới hoặc mở popup trên lịch.
+              </p>
+            </div>
+          </div>
+          <ul className="space-y-2">
+            {markDoneReminders.map((item) => (
+              <li
+                key={item.sessionId || item.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2.5"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">
+                    {item.counterpartName || 'Học viên'}
+                    {item.sequence != null ? ` · Buổi #${item.sequence}` : ''}
+                  </p>
+                  <p className="text-xs font-semibold text-slate-600 mt-0.5">
+                    {item.start.toLocaleString('vi-VN')} – {formatTime(item.end)}
+                    {item.venueName ? ` · ${item.venueName}` : ''}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                  disabled={actingId === item.sessionId}
+                  onClick={() => onMarkDone(item.sessionId, item)}
+                >
+                  {actingId === item.sessionId ? 'Đang gửi...' : 'Đã dạy xong'}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2">
         <Button
           type="button"
@@ -348,23 +451,87 @@ export default function CoachingTimetable({
                   <p className="text-sm text-slate-700">{selected.note}</p>
                 </div>
               )}
+
+              {selected.status === 'AWAITING_CONFIRM' && selected.confirmDeadlineAt && (
+                <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                  Tự động xác nhận trước: {new Date(selected.confirmDeadlineAt).toLocaleString('vi-VN')}
+                </p>
+              )}
             </div>
 
-            {selected.canCancel && onCancel && (selected.appointmentId || selected.id) && (
-              <Button
-                variant="outline"
-                className="w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 font-bold"
-                disabled={cancellingId === (selected.appointmentId || selected.id)}
-                onClick={() => {
-                  const id = selected.appointmentId || selected.id;
-                  const snapshot = selected;
-                  setSelected(null);
-                  onCancel(id, snapshot);
-                }}
-              >
-                {cancellingId === (selected.appointmentId || selected.id) ? 'Đang hủy...' : 'Hủy buổi này'}
-              </Button>
-            )}
+            <div className="flex flex-col gap-2">
+              {role === 'pt' && selected.status === 'SCHEDULED' && selected.sessionId && onMarkDone && (
+                <div className="space-y-1.5">
+                  <Button
+                    className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold disabled:opacity-50"
+                    disabled={!selectedCanMarkDone || actingId === selected.sessionId}
+                    onClick={() => {
+                      if (!selectedCanMarkDone) return;
+                      const sid = selected.sessionId;
+                      setSelected(null);
+                      onMarkDone(sid, selected);
+                    }}
+                  >
+                    {actingId === selected.sessionId ? 'Đang gửi...' : 'Đã dạy xong'}
+                  </Button>
+                  {!selectedCanMarkDone && (
+                    <p className="text-xs text-center text-slate-500 font-medium">
+                      Chỉ bấm được từ {formatTime(selected.start)}{' '}
+                      ({selected.start.toLocaleString('vi-VN')}). Giờ máy hiện tại:{' '}
+                      {now.toLocaleString('vi-VN')}.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {role === 'customer' && selected.status === 'AWAITING_CONFIRM' && selected.sessionId && (
+                <>
+                  {onConfirm && (
+                    <Button
+                      className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                      disabled={actingId === selected.sessionId}
+                      onClick={() => {
+                        const sid = selected.sessionId;
+                        setSelected(null);
+                        onConfirm(sid, selected);
+                      }}
+                    >
+                      {actingId === selected.sessionId ? 'Đang xác nhận...' : 'Đồng ý / Xác nhận buổi'}
+                    </Button>
+                  )}
+                  {onDispute && (
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-xl border-amber-200 text-amber-800 hover:bg-amber-50 font-bold"
+                      disabled={actingId === selected.sessionId}
+                      onClick={() => {
+                        const sid = selected.sessionId;
+                        setSelected(null);
+                        onDispute(sid, selected);
+                      }}
+                    >
+                      Không đồng ý
+                    </Button>
+                  )}
+                </>
+              )}
+
+              {selected.canCancel && onCancel && (selected.appointmentId || selected.id) && (
+                <Button
+                  variant="outline"
+                  className="w-full rounded-xl border-red-200 text-red-600 hover:bg-red-50 font-bold"
+                  disabled={cancellingId === (selected.appointmentId || selected.id)}
+                  onClick={() => {
+                    const id = selected.appointmentId || selected.id;
+                    const snapshot = selected;
+                    setSelected(null);
+                    onCancel(id, snapshot);
+                  }}
+                >
+                  {cancellingId === (selected.appointmentId || selected.id) ? 'Đang hủy...' : 'Hủy buổi này'}
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </Modal>

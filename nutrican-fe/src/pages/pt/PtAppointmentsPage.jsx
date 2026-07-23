@@ -11,6 +11,7 @@ export default function PtAppointmentsPage() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState(null);
+  const [actingId, setActingId] = useState(null);
 
   const fetchAppts = async () => {
     setLoading(true);
@@ -64,6 +65,19 @@ export default function PtAppointmentsPage() {
     }
   };
 
+  const handleMarkDone = async (sessionId) => {
+    setActingId(sessionId);
+    try {
+      await workspaceService.markSessionDone(sessionId);
+      toast.success('Đã gửi xác nhận buổi tập cho khách');
+      fetchAppts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Không thể xác nhận buổi');
+    } finally {
+      setActingId(null);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto pb-12 space-y-6">
       <div className="flex items-center gap-3">
@@ -71,7 +85,7 @@ export default function PtAppointmentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Lịch buổi tập</h1>
           <p className="text-sm text-slate-500">
-            Thời khóa biểu offline — nhấn vào buổi để xem chi tiết. Buổi đã chốt sau thanh toán, chỉ hủy khi cần.
+            Nút «Đã dạy xong» chỉ bật khi đã tới giờ buổi. Buổi đến hạn hiện ở khung nhắc phía trên lịch.
           </p>
         </div>
       </div>
@@ -84,9 +98,12 @@ export default function PtAppointmentsPage() {
             <CoachingTimetable
               items={items}
               emptyText="Tuần này chưa có lịch offline."
+              role="pt"
               roleLabel="Học viên"
               cancellingId={cancellingId}
+              actingId={actingId}
               onCancel={handleCancel}
+              onMarkDone={handleMarkDone}
             />
           )}
         </CardContent>

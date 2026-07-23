@@ -470,6 +470,9 @@ export default function ClientListPage() {
                                         {activeTab === 'ACTIVE' && client.selectedTrainingMode === 'OFFLINE' && (client.sessions || []).length > 0 && (
                                             <div className="mt-3 rounded-xl border border-emerald-100 bg-white p-3 space-y-2">
                                                 <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Buổi tập offline</p>
+                                                <p className="text-[11px] text-slate-500 font-medium">
+                                                    Mở <span className="font-bold text-slate-700">Lịch hẹn</span> → nhấn buổi trên thời khóa biểu để bấm «Đã dạy xong».
+                                                </p>
                                                 <ul className="space-y-1.5">
                                                     {client.sessions.map((s) => (
                                                         <li key={s.id || s.sequence} className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-700">
@@ -477,29 +480,6 @@ export default function ClientListPage() {
                                                                 #{s.sequence}: {new Date(s.startTime).toLocaleString('vi-VN')}
                                                                 {s.status ? ` · ${s.status}` : ''}
                                                             </span>
-                                                            {s.status === 'SCHEDULED' && s.id && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    className="h-7 px-2 text-[11px] bg-emerald-600 text-white"
-                                                                    disabled={processingId === s.id}
-                                                                    onClick={async (e) => {
-                                                                        e.stopPropagation();
-                                                                        setProcessingId(s.id);
-                                                                        try {
-                                                                            await workspaceService.markSessionDone(s.id);
-                                                                            toast.success('Đã gửi xác nhận buổi tập cho khách');
-                                                                            const res = await workspaceService.getClients({ page: 0, size: 50, status: 'ACTIVE' });
-                                                                            setClients(res.data?.data?.content || res.data?.data?.items || []);
-                                                                        } catch (err) {
-                                                                            toast.error(err.response?.data?.message || 'Không thể xác nhận buổi');
-                                                                        } finally {
-                                                                            setProcessingId(null);
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    Đã dạy xong
-                                                                </Button>
-                                                            )}
                                                         </li>
                                                     ))}
                                                 </ul>

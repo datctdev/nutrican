@@ -26,6 +26,7 @@ import ImageLightbox from '../../components/common/ImageLightbox';
 import WithdrawModal from '../../components/wallet/WithdrawModal';
 import PtWeeklyCalendarPicker from '../../components/pt/PtWeeklyCalendarPicker';
 import CoachingTimetable, { mergeTimetableSources } from '../../components/coaching/CoachingTimetable';
+import SessionConfirmPanel from '../../components/coaching/SessionConfirmPanel';
 import { formatVnd } from '../../utils/currency';
 import { toast } from 'sonner';
 import {
@@ -552,6 +553,62 @@ export default function CoachingPage() {
   const offlineThread = ptThreads.find((t) => t.selectedTrainingMode === 'OFFLINE' && (t.status === 'ACTIVE' || t.status === 'END_REQUESTED'));
   const onlineOnlyThreads = ptThreads.filter((t) => t.selectedTrainingMode === 'ONLINE');
 
+  const resolveSessionPtName = useCallback((session) => {
+    const matchAppt = (appointments || []).find(
+      (a) => a.startTime
+        && session?.startTime
+        && Math.abs(new Date(a.startTime) - new Date(session.startTime)) < 60_000,
+    );
+    if (matchAppt?.mappingId) {
+      const thread = ptThreads.find((t) => t.mappingId === matchAppt.mappingId);
+      if (thread?.participantName) return thread.participantName;
+    }
+    return offlineThread?.participantName || ptThreads[0]?.participantName || 'Huấn luyện viên';
+  }, [appointments, offlineThread, ptThreads]);
+
+  const refreshMySessions = useCallback(async () => {
+    try {
+      const r = await profileExtensionsService.getMySessions();
+      setMySessions(r.data?.data || []);
+    } catch {
+      setMySessions([]);
+    }
+  }, []);
+
+  const handleConfirmSession = async (sessionId) => {
+    setSessionActing(sessionId);
+    try {
+      await profileExtensionsService.confirmSession(sessionId);
+      toast.success('Đã xác nhận buổi tập');
+      await refreshMySessions();
+      fetchAppointments();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Xác nhận thất bại');
+    } finally {
+      setSessionActing(null);
+    }
+  };
+
+  const handleDisputeSession = async (sessionId, reason) => {
+    const text = typeof reason === 'string' ? reason.trim() : '';
+    if (!text) {
+      const prompted = window.prompt('Lý do không đồng ý / khiếu nại?');
+      if (!prompted || !prompted.trim()) return;
+      return handleDisputeSession(sessionId, prompted.trim());
+    }
+    setSessionActing(sessionId);
+    try {
+      await profileExtensionsService.disputeSession(sessionId, { reason: text });
+      toast.success('Đã gửi khiếu nại');
+      await refreshMySessions();
+      fetchAppointments();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Gửi khiếu nại thất bại');
+    } finally {
+      setSessionActing(null);
+    }
+  };
+
   const loadExtraCalendar = useCallback(async (mappingId) => {
     const thread = ptThreads.find((t) => t.mappingId === mappingId);
     if (!thread?.ptProfileId) {
@@ -936,66 +993,13 @@ export default function CoachingPage() {
         </div>
       )}
 
-      {mySessions.some((s) => s.status === 'AWAITING_CONFIRM') && (
-        <div className="mb-6 rounded-3xl border border-blue-200 bg-blue-50 p-5 shadow-sm space-y-3">
-          <h2 className="text-lg font-black text-slate-900">Xác nhận buổi tập</h2>
-          <p className="text-sm text-slate-600">PT vừa xác nhận đã dạy xong. Bạn đồng ý trừ buổi vào gói?</p>
-          {mySessions.filter((s) => s.status === 'AWAITING_CONFIRM').map((s) => (
-            <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-100 bg-white p-3">
-              <div className="text-sm font-semibold text-slate-800">
-                Buổi #{s.sequence}: {formatSessionRange(s.startTime, s.endTime)}
-                {s.confirmDeadlineAt && (
-                  <p className="text-xs font-medium text-amber-700 mt-1">
-                    Tự động xác nhận trước: {new Date(s.confirmDeadlineAt).toLocaleString('vi-VN')}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  className="bg-emerald-600 text-white"
-                  disabled={sessionActing === s.id}
-                  onClick={async () => {
-                    setSessionActing(s.id);
-                    try {
-                      await profileExtensionsService.confirmSession(s.id);
-                      toast.success('Đã xác nhận buổi tập');
-                      const r = await profileExtensionsService.getMySessions();
-                      setMySessions(r.data?.data || []);
-                    } catch (e) {
-                      toast.error(e.response?.data?.message || 'Xác nhận thất bại');
-                    } finally {
-                      setSessionActing(null);
-                    }
-                  }}
-                >
-                  Đồng ý
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={sessionActing === s.id}
-                  onClick={async () => {
-                    const reason = window.prompt('Lý do không đồng ý / khiếu nại?');
-                    if (!reason || !reason.trim()) return;
-                    setSessionActing(s.id);
-                    try {
-                      await profileExtensionsService.disputeSession(s.id, { reason: reason.trim() });
-                      toast.success('Đã gửi khiếu nại');
-                      const r = await profileExtensionsService.getMySessions();
-                      setMySessions(r.data?.data || []);
-                    } catch (e) {
-                      toast.error(e.response?.data?.message || 'Gửi khiếu nại thất bại');
-                    } finally {
-                      setSessionActing(null);
-                    }
-                  }}
-                >
-                  Không đồng ý
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <SessionConfirmPanel
+        sessions={mySessions}
+        getCounterpartName={resolveSessionPtName}
+        actingId={sessionActing}
+        onConfirm={(sessionId) => handleConfirmSession(sessionId)}
+        onDispute={(sessionId, reason) => handleDisputeSession(sessionId, reason)}
+      />
 
       {ptThreads.length === 0 ? (
         <div className="text-center py-16 px-4 bg-white border border-slate-200 rounded-3xl shadow-sm max-w-2xl mx-auto">
@@ -1359,9 +1363,13 @@ export default function CoachingPage() {
                       emptyText={offlineThread
                         ? 'Tuần này chưa có buổi — mua thêm bên dưới nếu cần.'
                         : 'Không có buổi offline để hiển thị.'}
+                      role="customer"
                       roleLabel="Huấn luyện viên"
                       cancellingId={cancellingAppt ? cancelApptId : null}
+                      actingId={sessionActing}
                       onCancel={(apptId) => handleCancelAppointment(apptId)}
+                      onConfirm={(sessionId) => handleConfirmSession(sessionId)}
+                      onDispute={(sessionId) => handleDisputeSession(sessionId)}
                     />
                   )}
 
