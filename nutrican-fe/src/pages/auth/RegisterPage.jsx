@@ -89,10 +89,15 @@ export default function RegisterPage() {
                 phoneNumber: formData.phoneNumber.trim() || undefined
             };
             await register(payload);
-            toast.success('Đăng ký tài khoản thành công!', {
-                description: 'Chào mừng bạn đến với Nutrican. Vui lòng đăng nhập để bắt đầu.'
+            try {
+                sessionStorage.setItem('pendingVerificationEmail', formData.email.trim());
+            } catch {
+                // ignore
+            }
+            toast.success('Đăng ký thành công!', {
+                description: 'Vui lòng kiểm tra email để xác nhận tài khoản.',
             });
-            navigate('/login');
+            navigate('/check-email', { state: { email: formData.email.trim() } });
         } catch (error) {
             toast.error('Đăng ký không thành công', {
                 description: error.response?.data?.message || 'Email này có thể đã được sử dụng trong hệ thống.'

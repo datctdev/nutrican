@@ -4,11 +4,13 @@ import com.sba.nutricanbe.auth.dto.AuthResponse;
 import com.sba.nutricanbe.auth.dto.GoogleAuthRequest;
 import com.sba.nutricanbe.auth.dto.LoginRequest;
 import com.sba.nutricanbe.auth.dto.RegisterRequest;
+import com.sba.nutricanbe.auth.dto.RegisterResponse;
 import com.sba.nutricanbe.auth.dto.SetPasswordRequest;
 import com.sba.nutricanbe.auth.service.AuthService;
 import com.sba.nutricanbe.auth.service.GoogleIdTokenService;
 import com.sba.nutricanbe.auth.service.TokenRevocationService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
+import com.sba.nutricanbe.auth.entity.EmailVerificationToken;
 import com.sba.nutricanbe.auth.entity.PasswordResetToken;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.common.enums.UserRole;
@@ -17,6 +19,7 @@ import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.exception.TooManyRequestsException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
+import com.sba.nutricanbe.auth.repository.EmailVerificationTokenRepository;
 import com.sba.nutricanbe.auth.repository.PasswordResetTokenRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.infrastructure.mail.MailService;
@@ -57,14 +60,18 @@ public class AuthServiceImpl implements AuthService {
     private final TokenRevocationService tokenRevocationService;
     private final com.sba.nutricanbe.auth.service.GoogleIdTokenService googleIdTokenService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final MailService emailService;
 
     @Value("${app.security.jwt.expiration}")
     private Long jwtExpirationMs;
 
+    @Value("${app.auth.email-verification-expiry-hours:24}")
+    private int emailVerificationExpiryHours;
+
     @Override
     @Transactional
-    public ApiResponse<AuthResponse> registerCustomer(RegisterRequest request) {
+    public ApiResponse<RegisterResponse> registerCustomer(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("Email already registered");
         }
@@ -75,15 +82,80 @@ public class AuthServiceImpl implements AuthService {
                 .fullName(request.getFullName())
                 .phoneNumber(request.getPhoneNumber())
                 .role(UserRole.CUSTOMER)
-                .status(UserStatus.ACTIVE)
+                .status(UserStatus.PENDING_VERIFICATION)
                 .passwordSetRequired(false)
                 .onboardingStep(1)
                 .build();
 
         user = userRepository.save(user);
-        log.info("User registered: {}", user.getEmail());
+        issueEmailVerificationToken(user);
+        log.info("User registered (pending email verification): {}", user.getEmail());
 
-        return ApiResponse.success(buildAuthResponse(user, null, null), "Registration successful");
+        return ApiResponse.success(
+                RegisterResponse.builder().email(user.getEmail()).build(),
+                "Registration successful. Please check your email to verify your account.");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Void> verifyEmail(String token) {
+        if (token == null || token.isBlank()) {
+            throw new BadRequestException("Verification token is required");
+        }
+
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findByToken(token.trim())
+                .orElseThrow(() -> {
+                    auditLog.warn("EMAIL_VERIFY_FAILED: reason=TOKEN_NOT_FOUND");
+                    return new BadRequestException("Invalid or expired verification link");
+                });
+
+        if (Boolean.TRUE.equals(verificationToken.getUsed())) {
+            auditLog.warn("EMAIL_VERIFY_FAILED: reason=TOKEN_ALREADY_USED");
+            throw new BadRequestException("This verification link has already been used");
+        }
+
+        if (verificationToken.isExpired()) {
+            auditLog.warn("EMAIL_VERIFY_FAILED: reason=TOKEN_EXPIRED");
+            throw new BadRequestException("This verification link has expired");
+        }
+
+        User user = userRepository.findById(verificationToken.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", verificationToken.getUserId()));
+
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            verificationToken.setUsed(true);
+            emailVerificationTokenRepository.save(verificationToken);
+            return ApiResponse.success(null, "Email already verified. You can log in.");
+        }
+
+        if (user.getStatus() != UserStatus.PENDING_VERIFICATION) {
+            throw new BadRequestException("Account cannot be verified in status " + user.getStatus());
+        }
+
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
+
+        verificationToken.setUsed(true);
+        emailVerificationTokenRepository.save(verificationToken);
+
+        auditLog.info("EMAIL_VERIFIED: userId={}, email={}", user.getId(), user.getEmail());
+        return ApiResponse.success(null, "Email verified successfully. You can now log in.");
+    }
+
+    @Override
+    @Transactional
+    public void resendVerificationEmail(String email) {
+        if (!rateLimitingService.tryConsume("rl:verify:" + email, 1, Duration.ofSeconds(60))) {
+            throw new TooManyRequestsException("Please wait before requesting another verification email");
+        }
+
+        userRepository.findByEmail(email).ifPresent(user -> {
+            if (user.getStatus() != UserStatus.PENDING_VERIFICATION) {
+                return;
+            }
+            issueEmailVerificationToken(user);
+            auditLog.info("EMAIL_VERIFY_RESENT: email={}, userId={}", email, user.getId());
+        });
     }
 
     @Override
@@ -113,8 +185,13 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Please set a password before logging in. Use 'Login with Google' to complete account setup.");
         }
 
-        if (user.getStatus() == UserStatus.PENDING_APPROVAL
-                || user.getStatus() == UserStatus.PENDING_VERIFICATION) {
+        if (user.getStatus() == UserStatus.PENDING_VERIFICATION) {
+            auditLog.warn("AUTH_FAILED: email={}, userId={}, reason=EMAIL_NOT_VERIFIED",
+                    request.getEmail(), user.getId());
+            throw new BadRequestException("Please verify your email before logging in");
+        }
+
+        if (user.getStatus() == UserStatus.PENDING_APPROVAL) {
             auditLog.warn("AUTH_FAILED: email={}, userId={}, reason=ACCOUNT_PENDING",
                     request.getEmail(), user.getId());
             throw new BadRequestException("Account is pending approval");
@@ -319,6 +396,23 @@ public class AuthServiceImpl implements AuthService {
         passwordResetTokenRepository.save(resetToken);
 
         auditLog.info("PASSWORD_RESET_COMPLETED: userId={}, email={}", user.getId(), user.getEmail());
+    }
+
+    private void issueEmailVerificationToken(User user) {
+        emailVerificationTokenRepository.deleteByUserId(user.getId());
+
+        String token = UUID.randomUUID().toString();
+        Instant expiresAt = Instant.now().plusSeconds(emailVerificationExpiryHours * 3600L);
+
+        EmailVerificationToken verificationToken = EmailVerificationToken.builder()
+                .userId(user.getId())
+                .token(token)
+                .expiresAt(expiresAt)
+                .used(false)
+                .build();
+        emailVerificationTokenRepository.save(verificationToken);
+
+        emailService.sendEmailVerificationEmail(user.getEmail(), token, emailVerificationExpiryHours);
     }
 
     private AuthResponse.UserInfo buildUserInfo(User user) {

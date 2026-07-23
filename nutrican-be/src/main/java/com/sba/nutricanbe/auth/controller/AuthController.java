@@ -5,8 +5,11 @@ import com.sba.nutricanbe.auth.dto.ForgotPasswordRequest;
 import com.sba.nutricanbe.auth.dto.GoogleAuthRequest;
 import com.sba.nutricanbe.auth.dto.LoginRequest;
 import com.sba.nutricanbe.auth.dto.RegisterRequest;
+import com.sba.nutricanbe.auth.dto.RegisterResponse;
+import com.sba.nutricanbe.auth.dto.ResendVerificationRequest;
 import com.sba.nutricanbe.auth.dto.ResetPasswordRequest;
 import com.sba.nutricanbe.auth.dto.SetPasswordRequest;
+import com.sba.nutricanbe.auth.dto.VerifyEmailRequest;
 import com.sba.nutricanbe.auth.service.AuthService;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.user.entity.User;
@@ -31,9 +34,22 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> registerCustomer(
+    public ResponseEntity<ApiResponse<RegisterResponse>> registerCustomer(
             @Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.registerCustomer(request));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(
+            @Valid @RequestBody VerifyEmailRequest request) {
+        return ResponseEntity.ok(authService.verifyEmail(request.token()));
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Void> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerificationEmail(request.email());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/login")

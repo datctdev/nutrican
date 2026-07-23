@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xac nhan email</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, Helvetica, sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <tr>
+                        <td style="background-color: #10B981; padding: 32px 40px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">NutriCan PT</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 40px;">
+                            <h2 style="margin: 0 0 16px; color: #333333; font-size: 20px;">Xac nhan dia chi email</h2>
+                            <p style="margin: 0 0 24px; color: #666666; font-size: 15px; line-height: 1.6;">
+                                Cam on ban da dang ky tai khoan NutriCan PT.
+                                Click vao nut ben duoi de xac nhan email va kich hoat tai khoan.
+                            </p>
+                            <p style="margin: 0 0 32px; color: #999999; font-size: 13px;">
+                                Link nay se het han sau <strong th:text="${expiresIn}">24</strong> gio.
+                            </p>
+                            <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 24px;">
+                                <tr>
+                                    <td style="background-color: #10B981; border-radius: 6px; text-align: center;">
+                                        <a th:href="${verifyLink}" style="display: inline-block; padding: 14px 32px; color: #ffffff; font-size: 16px; font-weight: bold; text-decoration: none;">Xac nhan email</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin: 0 0 24px; color: #999999; font-size: 12px; text-align: center;">
+                                Neu ban khong the click nut, copy va dan link sau vao trinh duyet:<br>
+                                <a th:href="${verifyLink}" th:text="${verifyLink}" style="color: #10B981; word-break: break-all; font-size: 12px;">https://...</a>
+                            </p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; border-radius: 4px; margin-bottom: 32px;">
+                                <tr>
+                                    <td style="padding: 12px 16px;">
+                                        <p style="margin: 0; color: #92400E; font-size: 13px;">
+                                            Neu ban khong dang ky tai khoan NutriCan PT, vui long bo qua email nay.
+                                            Link chi duoc su dung mot lan.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="background-color: #f9f9f9; padding: 24px 40px; text-align: center; border-top: 1px solid #eeeeee;">
+                            <p style="margin: 0 0 8px; color: #999999; font-size: 12px;">
+                                Ban nhan duoc email nay vi vua dang ky tai khoan tai NutriCan PT.
+                            </p>
+                            <p style="margin: 0; color: #cccccc; font-size: 11px;">
+                                &copy; 2026 NutriCan PT. All rights reserved.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
