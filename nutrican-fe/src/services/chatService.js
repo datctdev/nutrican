@@ -25,6 +25,12 @@ export const chatService = {
         return api.put(`/chat/threads/${mappingId}/read`);
     },
 
+    getNotificationPreference: (mappingId) =>
+        api.get(`/chat/threads/${mappingId}/notification-preference`),
+
+    updateNotificationPreference: (mappingId, enabled) =>
+        api.put(`/chat/threads/${mappingId}/notification-preference`, { enabled }),
+
     sendAttachment: (mappingId, file, content, contextType, contextRefId) => {
         const formData = new FormData();
         formData.append('file', file);

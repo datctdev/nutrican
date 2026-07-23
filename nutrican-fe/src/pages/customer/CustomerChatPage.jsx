@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -8,9 +8,9 @@ import { chatService } from '../../services/chatService';
 import { sendWebSocketMessage } from '../../services/websocketService';
 import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
-import useWebSocket from '../../hooks/useWebSocket';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import ChatMessageActions from '../../components/chat/ChatMessageActions';
+import ChatParticipantProfileModal from '../../components/chat/ChatParticipantProfileModal';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 const MSG_PAGE_SIZE = 30;
@@ -28,7 +28,8 @@ function mergeUniqueById(existing, incoming, mode = 'append') {
 export default function CustomerChatPage() {
     const { user } = useAuthStore();
     const location = useLocation();
-    useWebSocket();
+    const [searchParams] = useSearchParams();
+    const mappingParam = searchParams.get('mappingId');
     const [threads, setThreads] = useState([]);
     const [activeMappingId, setActiveMappingId] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -41,6 +42,7 @@ export default function CustomerChatPage() {
     const [sending, setSending] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
+    const [profileOpen, setProfileOpen] = useState(false);
     const [msgPage, setMsgPage] = useState(0);
     const [msgLast, setMsgLast] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -72,8 +74,13 @@ export default function CustomerChatPage() {
             if (!isMounted) return;
 
             if (loadedThreads.length > 0) {
+                const requestedThread = mappingParam
+                    ? loadedThreads.find((thread) => String(thread.mappingId) === String(mappingParam))
+                    : null;
                 const targetPtId = location.state?.targetPtId;
-                if (targetPtId) {
+                if (requestedThread) {
+                    setActiveMappingId(requestedThread.mappingId);
+                } else if (targetPtId) {
                     const targetThread = loadedThreads.find(t => t.participantId === targetPtId);
                     setActiveMappingId(prev => {
                         const newId = targetThread ? targetThread.mappingId : loadedThreads[0].mappingId;
@@ -86,7 +93,7 @@ export default function CustomerChatPage() {
         };
         initChat();
         return () => { isMounted = false; };
-    }, [location.state, loadThreads]);
+    }, [location.state, loadThreads, mappingParam]);
 
     useEffect(() => {
         if (!activeMappingId) return;
@@ -417,17 +424,26 @@ export default function CustomerChatPage() {
                 ) : (
                     <>
                         <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center gap-4 z-10 shadow-sm">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-indigo-50/50 flex items-center justify-center text-primary font-bold">
-                                {activeThread?.participantAvatarUrl ? (
-                                    <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                                ) : getInitials(activeThread?.participantName)}
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-slate-800 text-lg">{activeThread?.participantName}</h3>
-                                <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Huấn luyện viên của bạn
-                                </p>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setProfileOpen(true)}
+                                className="group flex items-center gap-4 rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                title="Xem hồ sơ và cài đặt thông báo"
+                            >
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-indigo-50/50 flex items-center justify-center text-primary font-bold ring-2 ring-transparent transition group-hover:ring-primary/20">
+                                    {activeThread?.participantAvatarUrl ? (
+                                        <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                                    ) : getInitials(activeThread?.participantName)}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-lg transition group-hover:text-primary">{activeThread?.participantName}</h3>
+                                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                        Huấn luyện viên của bạn
+                                        <span className="ml-1 text-primary">• Xem hồ sơ</span>
+                                    </p>
+                                </div>
+                            </button>
                         </div>
 
                         <div
@@ -565,6 +581,19 @@ export default function CustomerChatPage() {
                 )}
             </Card>
 
+
+            <ChatParticipantProfileModal
+                open={profileOpen}
+                thread={activeThread}
+                onClose={() => setProfileOpen(false)}
+                onPreferenceChange={(mappingId, enabled) => {
+                    setThreads((current) => current.map((thread) =>
+                        thread.mappingId === mappingId
+                            ? { ...thread, notificationsEnabled: enabled }
+                            : thread
+                    ));
+                }}
+            />
 
             <ImageLightbox
                 isOpen={!!lightboxImage}

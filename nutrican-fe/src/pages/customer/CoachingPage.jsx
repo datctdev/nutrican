@@ -30,6 +30,7 @@ import CoachingTimetable, { mergeTimetableSources } from '../../components/coach
 import SessionConfirmPanel from '../../components/coaching/SessionConfirmPanel';
 import SessionDisputeThread from '../../components/coaching/SessionDisputeThread';
 import ChatMessageActions from '../../components/chat/ChatMessageActions';
+import ChatParticipantProfileModal from '../../components/chat/ChatParticipantProfileModal';
 import { formatVnd } from '../../utils/currency';
 import { toast } from 'sonner';
 import {
@@ -37,7 +38,6 @@ import {
     MessageSquare, Send, ImagePlus, UploadCloud, Clock, ShoppingCart, FileText
 } from 'lucide-react';
 import GroceryListModal from '../../components/pt/meal-plan/GroceryListModal';
-import useWebSocket from '../../hooks/useWebSocket';
 import { getWeekStart, addWeeks } from '../../utils/offlineHireSlots';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -79,6 +79,7 @@ export default function CoachingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
+  const mappingParam = searchParams.get('mappingId');
 
   useEffect(() => {
     const paymentStatus = searchParams.get('payment');
@@ -108,8 +109,6 @@ export default function CoachingPage() {
     };
   }, []);
   
-  useWebSocket();
-
   const [activeTab, setActiveTab] = useState('chat');
 
   const [ptThreads, setPtThreads] = useState([]);
@@ -127,6 +126,7 @@ export default function CoachingPage() {
   const [sending, setSending] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [lightboxImage, setLightboxImage] = useState('');
+  const [chatProfileOpen, setChatProfileOpen] = useState(false);
 
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
@@ -317,14 +317,17 @@ export default function CoachingPage() {
       if (!isMounted) return;
 
       if (loadedThreads.length > 0) {
-        setActiveMappingId(prev => prev || loadedThreads[0].mappingId);
+        const requestedThread = mappingParam
+          ? loadedThreads.find((thread) => String(thread.mappingId) === String(mappingParam))
+          : null;
+        setActiveMappingId((prev) => requestedThread?.mappingId || prev || loadedThreads[0].mappingId);
       }
     };
     if (activeTab === 'chat') {
       initChat();
     }
     return () => { isMounted = false; };
-  }, [activeTab, loadChatThreads]);
+  }, [activeTab, loadChatThreads, mappingParam]);
 
   useEffect(() => {
     if (!activeMappingId || activeTab !== 'chat') return;
@@ -1351,17 +1354,26 @@ export default function CoachingPage() {
                 ) : (
                   <>
                     <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center gap-3 z-10 shadow-sm">
-                      <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">
-                        {activeThread?.participantAvatarUrl ? (
-                          <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                        ) : getInitials(activeThread?.participantName)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-extrabold text-slate-800 text-base truncate">{activeThread?.participantName}</h3>
-                        <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Huấn luyện viên trực tiếp
-                        </p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setChatProfileOpen(true)}
+                        className="group min-w-0 flex flex-1 items-center gap-3 rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40"
+                        title="Xem hồ sơ và cài đặt thông báo"
+                      >
+                        <div className="w-9 h-9 shrink-0 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs ring-2 ring-transparent transition group-hover:ring-blue-200">
+                          {activeThread?.participantAvatarUrl ? (
+                            <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                          ) : getInitials(activeThread?.participantName)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-extrabold text-slate-800 text-base truncate transition group-hover:text-blue-600">{activeThread?.participantName}</h3>
+                          <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Huấn luyện viên trực tiếp
+                            <span className="ml-1 text-blue-600">• Xem hồ sơ</span>
+                          </p>
+                        </div>
+                      </button>
                       {activeMappingId && (
                         <Button
                           type="button"
@@ -2087,6 +2099,19 @@ export default function CoachingPage() {
         onConfirm={confirmCancelAppointment}
       />
 
+
+      <ChatParticipantProfileModal
+        open={chatProfileOpen}
+        thread={activeThread}
+        onClose={() => setChatProfileOpen(false)}
+        onPreferenceChange={(mappingId, enabled) => {
+          setPtThreads((current) => current.map((thread) =>
+            thread.mappingId === mappingId
+              ? { ...thread, notificationsEnabled: enabled }
+              : thread
+          ));
+        }}
+      />
 
       <ImageLightbox
         isOpen={!!lightboxImage}

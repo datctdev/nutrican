@@ -1,5 +1,7 @@
 import { useNotificationStore } from '../stores/notificationStore';
+import { useAuthStore } from '../stores/authStore';
 import { toast } from 'sonner';
+import { createElement } from 'react';
 
 let ws = null;
 let reconnectAttempts = 0;
@@ -8,6 +10,16 @@ let reconnectTimeoutId = null;
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 const BASE_RECONNECT_DELAY = 1000;
+
+const openChatMessage = (message) => {
+    const mappingId = message?.mappingId;
+    const role = useAuthStore.getState().user?.role || '';
+    const encodedMappingId = mappingId ? encodeURIComponent(mappingId) : '';
+    const target = role.startsWith('PT')
+        ? `/pt/chat${encodedMappingId ? `?mappingId=${encodedMappingId}` : ''}`
+        : `/coaching?tab=chat${encodedMappingId ? `&mappingId=${encodedMappingId}` : ''}`;
+    window.location.assign(target);
+};
 
 export const createWebSocketConnection = (token) => {
     if (!token) return;
@@ -91,8 +103,26 @@ const handleWebSocketMessage = (message) => {
 
         case 'CHAT_MESSAGE':
             window.dispatchEvent(new CustomEvent('realtime_chat_message', { detail: data }));
-            if (!window.location.pathname.includes('/chat')) {
-                toast.info(`Tin nhắn mới từ ${data.senderName}`, { description: data.content });
+            if (
+                !data?.notificationMuted
+                &&
+                String(data?.senderId || '') !== String(useAuthStore.getState().user?.id || '')
+                && !window.location.pathname.includes('/chat')
+            ) {
+                const description = data.content
+                    || (data.imageUrl ? 'Đã gửi một hình ảnh' : 'Bạn có một tin nhắn mới');
+                toast.custom(() => createElement(
+                    'button',
+                    {
+                        type: 'button',
+                        onClick: () => openChatMessage(data),
+                        className: 'w-full min-w-[320px] rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-left shadow-lg transition hover:bg-blue-100',
+                        'aria-label': `Mở tin nhắn từ ${data.senderName || 'người gửi'}`,
+                    },
+                    createElement('p', { className: 'text-sm font-semibold text-blue-700' },
+                        `Tin nhắn mới từ ${data.senderName || 'người gửi'}`),
+                    createElement('p', { className: 'mt-1 line-clamp-2 text-xs text-blue-700' }, description),
+                ), { duration: 6000 });
             }
             break;
 
@@ -102,6 +132,25 @@ const handleWebSocketMessage = (message) => {
 
         case 'CHAT_MESSAGE_DELETED':
             window.dispatchEvent(new CustomEvent('realtime_chat_message_deleted', { detail: data }));
+            break;
+
+        case 'PLATFORM_FEE_UPDATED':
+            window.dispatchEvent(new CustomEvent('platform_fee_updated', { detail: data }));
+            toast.custom(() => createElement(
+                'button',
+                {
+                    type: 'button',
+                    onClick: () => window.location.assign('/pt?focus=commission'),
+                    className: 'w-full min-w-[320px] rounded-xl border border-violet-100 bg-violet-50 px-4 py-3 text-left shadow-lg transition hover:bg-violet-100',
+                    'aria-label': 'Mở mức phí hoa hồng trên bảng điều khiển PT',
+                },
+                createElement('p', { className: 'text-sm font-semibold text-violet-800' },
+                    'Cập nhật phí hoa hồng'),
+                createElement('p', { className: 'mt-1 line-clamp-2 text-xs text-violet-700' },
+                    data?.message || `Phí hoa hồng mới là ${data?.newRate}%`),
+                createElement('p', { className: 'mt-2 text-[11px] font-bold text-violet-600' },
+                    'Nhấn để xem trên bảng điều khiển'),
+            ), { duration: 8000 });
             break;
 
         case 'REFUND_UPDATE': {

@@ -14,6 +14,7 @@ import ChatContextCard from './components/ChatContextCard';
 import ChatPendingReviewCard from './components/ChatPendingReviewCard';
 import ChatMessageContextCard from './components/ChatMessageContextCard';
 import ChatMessageActions from '../../components/chat/ChatMessageActions';
+import ChatParticipantProfileModal from '../../components/chat/ChatParticipantProfileModal';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 const MSG_PAGE_SIZE = 30;
@@ -53,6 +54,7 @@ export default function ChatPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const contextLogId = searchParams.get('contextLogId');
+    const mappingParam = searchParams.get('mappingId');
 
     const [threads, setThreads] = useState([]);
     const [activeMappingId, setActiveMappingId] = useState(null);
@@ -74,6 +76,7 @@ export default function ChatPage() {
     const [sending, setSending] = useState(false);
     const [dragActive, setDragActive] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
+    const [profileOpen, setProfileOpen] = useState(false);
 
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -132,8 +135,13 @@ export default function ChatPage() {
             if (!isMounted) return;
 
             if (loadedThreads.length > 0) {
+                const requestedThread = mappingParam
+                    ? loadedThreads.find((thread) => String(thread.mappingId) === String(mappingParam))
+                    : null;
                 const targetClientId = location.state?.targetClientId;
-                if (targetClientId) {
+                if (requestedThread) {
+                    setActiveMappingId(requestedThread.mappingId);
+                } else if (targetClientId) {
                     const targetThread = loadedThreads.find(t => t.participantId === targetClientId);
                     setActiveMappingId(prev => {
                         const newId = targetThread ? targetThread.mappingId : loadedThreads[0].mappingId;
@@ -149,7 +157,7 @@ export default function ChatPage() {
         };
         initChat();
         return () => { isMounted = false; };
-    }, [location.state, loadThreads, contextLogId]);
+    }, [location.state, loadThreads, contextLogId, mappingParam]);
 
     const activeThread = threads.find(t => t.mappingId === activeMappingId);
 
@@ -572,19 +580,24 @@ export default function ChatPage() {
                 ) : (
                     <>
                         <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between gap-4 z-10 shadow-sm">
-                            <div className="flex items-center gap-4 min-w-0">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-indigo-50/50 flex items-center justify-center text-primary font-bold">
-                                {activeThread?.participantAvatarUrl ? (
-                                    <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                                ) : getInitials(activeThread?.participantName)}
-                            </div>
-                            <div className="min-w-0">
-                                <h3 className="font-bold text-slate-800 text-lg truncate">{activeThread?.participantName}</h3>
-                                <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Đang kết nối
-                                </p>
-                            </div>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setProfileOpen(true)}
+                                className="group flex min-w-0 items-center gap-4 rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                title="Xem hồ sơ và cài đặt thông báo"
+                            >
+                                <div className="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-primary/10 to-indigo-50/50 flex items-center justify-center text-primary font-bold ring-2 ring-transparent transition group-hover:ring-primary/20">
+                                    {activeThread?.participantAvatarUrl ? (
+                                        <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                                    ) : getInitials(activeThread?.participantName)}
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-slate-800 text-lg truncate transition group-hover:text-primary">{activeThread?.participantName}</h3>
+                                    <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Đang kết nối
+                                    </p>
+                                </div>
+                            </button>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -757,6 +770,19 @@ export default function ChatPage() {
                 )}
             </Card>
 
+
+            <ChatParticipantProfileModal
+                open={profileOpen}
+                thread={activeThread}
+                onClose={() => setProfileOpen(false)}
+                onPreferenceChange={(mappingId, enabled) => {
+                    setThreads((current) => current.map((thread) =>
+                        thread.mappingId === mappingId
+                            ? { ...thread, notificationsEnabled: enabled }
+                            : thread
+                    ));
+                }}
+            />
 
             <ImageLightbox
                 isOpen={!!lightboxImage}

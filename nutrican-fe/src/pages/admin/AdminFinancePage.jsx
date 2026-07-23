@@ -6,7 +6,6 @@ import { adminService } from '../../services/adminService';
 import SessionDisputeThread from '../../components/coaching/SessionDisputeThread';
 import { toast } from 'sonner';
 import { Loader2, RefreshCw } from 'lucide-react';
-import useWebSocket from '../../hooks/useWebSocket';
 
 const TYPE_LABEL = {
   PAYMENT: 'Thanh toán',
@@ -74,8 +73,6 @@ export default function AdminFinancePage() {
   const [suspendDaysById, setSuspendDaysById] = useState({});
   const [falseReportById, setFalseReportById] = useState({});
   const [suspendReporterById, setSuspendReporterById] = useState({});
-
-  useWebSocket();
 
   useEffect(() => {
     if (VALID_TABS.has(tabFromUrl) && tabFromUrl !== tab) {
