@@ -3,6 +3,7 @@ package com.sba.nutricanbe.chat.service.impl;
 import com.sba.nutricanbe.chat.dto.ChatMessageRequest;
 import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.dto.ChatThreadResponse;
+import com.sba.nutricanbe.chat.dto.UpdateChatMessageRequest;
 import com.sba.nutricanbe.chat.entity.ChatMessage;
 import com.sba.nutricanbe.chat.enums.ChatContextType;
 import com.sba.nutricanbe.chat.enums.ChatMessageType;
@@ -22,6 +23,7 @@ import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -31,10 +33,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ChatServiceImpl implements ChatService {
 
     private final ChatMessageRepository chatMessageRepository;
@@ -44,6 +48,8 @@ public class ChatServiceImpl implements ChatService {
     private final StorageService storageService;
     private final WebSocketSessionService webSocketSessionService;
     private static final String CHAT_MESSAGE_EVENT = "CHAT_MESSAGE";
+    private static final String CHAT_MESSAGE_UPDATED_EVENT = "CHAT_MESSAGE_UPDATED";
+    private static final String CHAT_MESSAGE_DELETED_EVENT = "CHAT_MESSAGE_DELETED";
 
     private void publishRealtimeMessage(ChatMessageResponse message) {
         webSocketSessionService.sendToUser(message.getSenderId(), CHAT_MESSAGE_EVENT, message);
@@ -194,6 +200,47 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
+    public ChatMessageResponse updateMessage(
+            UUID userId, UUID mappingId, UUID messageId, UpdateChatMessageRequest request) {
+        getActiveMappingForUser(mappingId, userId);
+        ChatMessage message = requireOwnedMessage(userId, mappingId, messageId);
+        if (message.getMessageType() != ChatMessageType.TEXT) {
+            throw new BadRequestException("Chỉ tin nhắn chữ mới được phép chỉnh sửa");
+        }
+
+        String content = normalizeContent(request != null ? request.getContent() : null);
+        if (content == null) {
+            throw new BadRequestException("Nội dung tin nhắn không được để trống");
+        }
+        message.setContent(content);
+        ChatMessageResponse response = toMessageResponse(chatMessageRepository.save(message));
+        publishRealtimeEvent(response, CHAT_MESSAGE_UPDATED_EVENT);
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public void deleteMessage(UUID userId, UUID mappingId, UUID messageId) {
+        getActiveMappingForUser(mappingId, userId);
+        ChatMessage message = requireOwnedMessage(userId, mappingId, messageId);
+        UUID recipientId = message.getRecipientId();
+
+        deleteStoredObjectQuietly(message.getImageObjectName());
+        deleteStoredObjectQuietly(message.getAttachmentObjectName());
+        chatMessageRepository.delete(message);
+
+        Map<String, Object> payload = Map.of(
+                "messageId", messageId,
+                "mappingId", mappingId
+        );
+        webSocketSessionService.sendToUserOnly(userId, CHAT_MESSAGE_DELETED_EVENT, payload);
+        if (!userId.equals(recipientId)) {
+            webSocketSessionService.sendToUserOnly(recipientId, CHAT_MESSAGE_DELETED_EVENT, payload);
+        }
+    }
+
+    @Override
+    @Transactional
     public ApiResponse<Void> markRead(UUID userId, UUID mappingId) {
         PtClientMapping mapping = getActiveMappingForUser(mappingId, userId);
         chatMessageRepository.markRead(mapping.getId(), userId, LocalDateTime.now());
@@ -263,7 +310,38 @@ public class ChatServiceImpl implements ChatService {
                 .attachmentUrl(message.getAttachmentUrl())
                 .readAt(message.getReadAt())
                 .createdAt(message.getCreatedAt())
+                .updatedAt(message.getUpdatedAt())
                 .build();
+    }
+
+    private ChatMessage requireOwnedMessage(UUID userId, UUID mappingId, UUID messageId) {
+        ChatMessage message = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chat message", messageId));
+        if (!message.getMappingId().equals(mappingId)) {
+            throw new BadRequestException("Tin nhắn không thuộc cuộc trò chuyện này");
+        }
+        if (!message.getSenderId().equals(userId)) {
+            throw new BadRequestException("Bạn chỉ có thể sửa hoặc xóa tin nhắn của mình");
+        }
+        return message;
+    }
+
+    private void publishRealtimeEvent(ChatMessageResponse message, String event) {
+        webSocketSessionService.sendToUserOnly(message.getSenderId(), event, message);
+        if (!message.getSenderId().equals(message.getRecipientId())) {
+            webSocketSessionService.sendToUserOnly(message.getRecipientId(), event, message);
+        }
+    }
+
+    private void deleteStoredObjectQuietly(String objectName) {
+        if (objectName == null || objectName.isBlank()) {
+            return;
+        }
+        try {
+            storageService.deleteFile(objectName);
+        } catch (RuntimeException exception) {
+            log.warn("Không thể xóa object chat {} khỏi storage", objectName, exception);
+        }
     }
 
     private String normalizeContent(String content) {

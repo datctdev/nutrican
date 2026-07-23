@@ -10,6 +10,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { toast } from 'sonner';
 import useWebSocket from '../../hooks/useWebSocket';
 import ImageLightbox from '../../components/common/ImageLightbox';
+import ChatMessageActions from '../../components/chat/ChatMessageActions';
 
 const MAX_CHAT_IMAGE_SIZE = 5 * 1024 * 1024;
 const MSG_PAGE_SIZE = 30;
@@ -163,6 +164,38 @@ export default function CustomerChatPage() {
         window.addEventListener('realtime_chat_message', handleNewMessage);
         return () => window.removeEventListener('realtime_chat_message', handleNewMessage);
     }, [activeMappingId, loadThreads]);
+
+    const applyUpdatedMessage = useCallback((updated) => {
+        if (!updated?.id) return;
+        setMessages((prev) => prev.map((message) =>
+            message.id === updated.id ? { ...message, ...updated } : message
+        ));
+    }, []);
+
+    const removeMessage = useCallback((messageId) => {
+        setMessages((prev) => prev.filter((message) => message.id !== messageId));
+    }, []);
+
+    useEffect(() => {
+        const handleUpdated = (event) => {
+            if (event.detail?.mappingId === activeMappingId) {
+                applyUpdatedMessage(event.detail);
+            }
+            loadThreads();
+        };
+        const handleDeleted = (event) => {
+            if (event.detail?.mappingId === activeMappingId) {
+                removeMessage(event.detail.messageId);
+            }
+            loadThreads();
+        };
+        window.addEventListener('realtime_chat_message_updated', handleUpdated);
+        window.addEventListener('realtime_chat_message_deleted', handleDeleted);
+        return () => {
+            window.removeEventListener('realtime_chat_message_updated', handleUpdated);
+            window.removeEventListener('realtime_chat_message_deleted', handleDeleted);
+        };
+    }, [activeMappingId, applyUpdatedMessage, loadThreads, removeMessage]);
 
     const scrollToBottom = () => {
         if (!stickToBottomRef.current) return;
@@ -453,10 +486,16 @@ export default function CustomerChatPage() {
                                                 )}
                                                 {msg.content && <p>{msg.content}</p>}
                                             </div>
-                                            <span className="text-[10px] text-slate-400 mt-1.5 px-2 font-medium flex items-center gap-1">
-                                                <Clock className="w-3 h-3" /> {formatTime(msg.createdAt)}
-                                            </span>
-                                        </div>
+                                             <span className="text-[10px] text-slate-400 mt-1.5 px-2 font-medium flex items-center gap-1">
+                                                 <Clock className="w-3 h-3" /> {formatTime(msg.createdAt)}
+                                             </span>
+                                             <ChatMessageActions
+                                                 message={msg}
+                                                 isMine={isMe}
+                                                 onUpdated={applyUpdatedMessage}
+                                                 onDeleted={removeMessage}
+                                             />
+                                         </div>
                                     );
                                 })
                             )}
