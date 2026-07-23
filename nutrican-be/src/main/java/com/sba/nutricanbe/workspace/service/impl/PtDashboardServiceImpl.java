@@ -51,7 +51,8 @@ public class PtDashboardServiceImpl implements PtDashboardService {
     public ApiResponse<PtStatsDto> getStats(UUID ptId) {
         Page<PtClientMapping> allClients = mappingRepository.findByPt_Id(ptId, PageRequest.of(0, 1));
         List<UUID> clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
-                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                        || m.getStatus() == ClientMappingStatus.END_REQUESTED)
                 .map(m -> m.getClient().getId()).toList();
         long pendingCount = clientIds.isEmpty() ? 0
                 : dietLogRepository.findPendingWithCaloriesByCustomerIds(
@@ -74,7 +75,8 @@ public class PtDashboardServiceImpl implements PtDashboardService {
                 intakeControlLoopService.getActiveAlertsForPt(ptId));
 
         List<PtClientMapping> activeMappings = mappingRepository.findByPtIdWithClients(ptId).stream()
-                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                        || m.getStatus() == ClientMappingStatus.END_REQUESTED)
                 .toList();
 
         LocalDate today = DietDates.todayVn();
@@ -87,7 +89,8 @@ public class PtDashboardServiceImpl implements PtDashboardService {
                 currentWeekStart = thisMonday;
             }
 
-            List<MealPlan> plans = mealPlanRepository.findByClientIdOrderByWeekStartDesc(client.getId());
+            List<MealPlan> plans = mealPlanRepository
+                    .findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(client.getId());
             if (plans.isEmpty()) {
                 alerts.add(PtClientAlertDto.builder()
                         .clientId(client.getId())

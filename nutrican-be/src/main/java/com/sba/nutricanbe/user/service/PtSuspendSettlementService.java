@@ -15,13 +15,16 @@ import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.PtAppointmentRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
+import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,6 +41,7 @@ public class PtSuspendSettlementService {
     private final CoachingWalletService walletService;
     private final SlotHoldService slotHoldService;
     private final NotificationService notificationService;
+    private final WebSocketSessionService webSocketSessionService;
 
     @Transactional
     public void settleAllForSuspendedPt(UUID ptId) {
@@ -63,7 +67,11 @@ public class PtSuspendSettlementService {
                 "PT suspended — refund remaining coaching escrow");
         slotHoldService.releaseByMapping(mapping.getId());
         mapping.setStatus(ClientMappingStatus.INACTIVE);
+        if (mapping.getCompletedAt() == null) {
+            mapping.setCompletedAt(DietDates.nowVn());
+        }
         mappingRepository.save(mapping);
+        emitMappingInactiveWs(mapping, "PT đã bị khóa. Quan hệ coaching của bạn đã được đóng.");
 
         UUID clientId = mapping.getClient() != null ? mapping.getClient().getId() : null;
         if (clientId != null) {
@@ -83,9 +91,13 @@ public class PtSuspendSettlementService {
                 mapping.getId(),
                 "PT suspended — close unpaid hire / refund if any");
         mapping.setStatus(ClientMappingStatus.INACTIVE);
+        if (mapping.getCompletedAt() == null) {
+            mapping.setCompletedAt(DietDates.nowVn());
+        }
         mapping.setAcceptedAt(null);
         mapping.setPaymentDueAt(null);
         mappingRepository.save(mapping);
+        emitMappingInactiveWs(mapping, "PT bị khóa tài khoản. Yêu cầu coaching của bạn đã được đóng.");
 
         UUID clientId = mapping.getClient() != null ? mapping.getClient().getId() : null;
         if (clientId != null) {
@@ -96,6 +108,22 @@ public class PtSuspendSettlementService {
                     .linkType(NotificationLinkType.OTHER)
                     .linkRefId(mapping.getId())
                     .build());
+        }
+    }
+
+    private void emitMappingInactiveWs(PtClientMapping mapping, String message) {
+        UUID clientId = mapping.getClient() != null ? mapping.getClient().getId() : null;
+        UUID ptId = mapping.getPt() != null ? mapping.getPt().getId() : null;
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("mappingId", mapping.getId());
+        payload.put("ptId", ptId);
+        payload.put("clientId", clientId);
+        payload.put("message", message);
+        if (clientId != null) {
+            webSocketSessionService.sendToUser(clientId, "PT_SUSPENDED", payload);
+        }
+        if (ptId != null) {
+            webSocketSessionService.sendToUser(ptId, "PT_SUSPENDED", payload);
         }
     }
 

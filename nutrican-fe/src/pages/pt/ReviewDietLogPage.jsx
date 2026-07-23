@@ -192,11 +192,23 @@ export default function ReviewDietLogPage({ clientPage = false }) {
 
         try {
             setReviewedLoading(true);
-            const response = await dietService.getClientLogsForPt(selectedClientId, {
-                size: 50,
-                reviewStatus: 'APPROVED',
+            const [approvedRes, rejectedRes] = await Promise.all([
+                dietService.getClientLogsForPt(selectedClientId, {
+                    size: 50,
+                    reviewStatus: 'APPROVED',
+                }),
+                dietService.getClientLogsForPt(selectedClientId, {
+                    size: 50,
+                    reviewStatus: 'REJECTED',
+                }),
+            ]);
+            const approved = approvedRes.data.data.content || [];
+            const rejected = rejectedRes.data.data.content || [];
+            const content = [...approved, ...rejected].sort((a, b) => {
+                const aTime = new Date(a.ptReviewedAt || a.createdAt || 0).getTime();
+                const bTime = new Date(b.ptReviewedAt || b.createdAt || 0).getTime();
+                return bTime - aTime;
             });
-            const content = response.data.data.content || [];
             setReviewedLogs(content);
             if (selectedLogId && content.some((log) => log.id === selectedLogId)) {
                 setActiveList('APPROVED');
@@ -474,8 +486,8 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                             <CheckCircle2 className="h-5 w-5" />
                         </span>
                         <span className="min-w-0 flex-1">
-                            <span className="block font-extrabold">Đã duyệt</span>
-                            <span className="mt-0.5 block text-xs font-medium opacity-70">Lịch sử bữa ăn đã hoàn tất</span>
+                            <span className="block font-extrabold">Đã xử lý</span>
+                            <span className="mt-0.5 block text-xs font-medium opacity-70">Đã duyệt hoặc từ chối</span>
                         </span>
                         <span className={`rounded-full px-3 py-1 text-sm font-black ${activeList === 'APPROVED' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
                             {reviewedLogs.length}
@@ -562,11 +574,19 @@ export default function ReviewDietLogPage({ clientPage = false }) {
 
                                         <div className="absolute top-4 left-4 flex flex-col gap-2">
                                             <div className="bg-white/95 backdrop-blur px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm border border-slate-200/50">
-                                                {isReviewedList
-                                                    ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                                    : <Clock className="w-3.5 h-3.5 text-amber-500" />}
-                                                <span className={`text-[10px] font-black uppercase tracking-widest ${isReviewedList ? 'text-emerald-700' : 'text-amber-700'}`}>
-                                                    {isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
+                                                {log.reviewStatus === 'REJECTED'
+                                                    ? <XCircle className="w-3.5 h-3.5 text-red-500" />
+                                                    : isReviewedList
+                                                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                        : <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                                                <span className={`text-[10px] font-black uppercase tracking-widest ${
+                                                    log.reviewStatus === 'REJECTED'
+                                                        ? 'text-red-700'
+                                                        : isReviewedList ? 'text-emerald-700' : 'text-amber-700'
+                                                }`}>
+                                                    {log.reviewStatus === 'REJECTED'
+                                                        ? 'Từ chối'
+                                                        : isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
                                                 </span>
                                             </div>
                                             {log.lateTickReason && (
@@ -598,12 +618,24 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                             </div>
                                             {!reviewImage && (
                                                 <div className="flex flex-wrap justify-end gap-2">
-                                                    <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 border ${isReviewedList ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-                                                        {isReviewedList
-                                                            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                                            : <Clock className="w-3.5 h-3.5 text-amber-500" />}
-                                                        <span className={`text-[10px] font-black uppercase tracking-widest ${isReviewedList ? 'text-emerald-700' : 'text-amber-700'}`}>
-                                                            {isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
+                                                    <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 border ${
+                                                        log.reviewStatus === 'REJECTED'
+                                                            ? 'bg-red-50 border-red-200'
+                                                            : isReviewedList ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+                                                    }`}>
+                                                        {log.reviewStatus === 'REJECTED'
+                                                            ? <XCircle className="w-3.5 h-3.5 text-red-500" />
+                                                            : isReviewedList
+                                                                ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                                : <Clock className="w-3.5 h-3.5 text-amber-500" />}
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest ${
+                                                            log.reviewStatus === 'REJECTED'
+                                                                ? 'text-red-700'
+                                                                : isReviewedList ? 'text-emerald-700' : 'text-amber-700'
+                                                        }`}>
+                                                            {log.reviewStatus === 'REJECTED'
+                                                                ? 'Từ chối'
+                                                                : isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -611,20 +643,42 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                         </div>
 
                                         {isReviewedList && (
-                                            <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div className={`mb-4 flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                                                log.reviewStatus === 'REJECTED'
+                                                    ? 'border-red-200 bg-red-50/70'
+                                                    : 'border-emerald-200 bg-emerald-50/70'
+                                            }`}>
                                                 <div className="flex items-center gap-3">
-                                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                                                        <CheckCircle2 className="h-5 w-5" />
+                                                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                                                        log.reviewStatus === 'REJECTED'
+                                                            ? 'bg-red-100 text-red-600'
+                                                            : 'bg-emerald-100 text-emerald-600'
+                                                    }`}>
+                                                        {log.reviewStatus === 'REJECTED'
+                                                            ? <XCircle className="h-5 w-5" />
+                                                            : <CheckCircle2 className="h-5 w-5" />}
                                                     </span>
                                                     <div>
-                                                        <p className="text-sm font-extrabold text-emerald-900">
-                                                            {log.ptAction === 'ADJUST' ? 'Đã điều chỉnh và phê duyệt' : 'PT đã phê duyệt'}
+                                                        <p className={`text-sm font-extrabold ${
+                                                            log.reviewStatus === 'REJECTED' ? 'text-red-900' : 'text-emerald-900'
+                                                        }`}>
+                                                            {log.reviewStatus === 'REJECTED'
+                                                                ? 'PT đã từ chối'
+                                                                : log.ptAction === 'ADJUST'
+                                                                    ? 'Đã điều chỉnh và phê duyệt'
+                                                                    : 'PT đã phê duyệt'}
                                                         </p>
-                                                        {log.ptNote && <p className="mt-0.5 text-xs font-medium text-emerald-800/75">“{log.ptNote}”</p>}
+                                                        {log.ptNote && (
+                                                            <p className={`mt-0.5 text-xs font-medium ${
+                                                                log.reviewStatus === 'REJECTED' ? 'text-red-800/75' : 'text-emerald-800/75'
+                                                            }`}>“{log.ptNote}”</p>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 {log.ptReviewedAt && (
-                                                    <time className="text-xs font-bold text-emerald-700/70" dateTime={log.ptReviewedAt}>
+                                                    <time className={`text-xs font-bold ${
+                                                        log.reviewStatus === 'REJECTED' ? 'text-red-700/70' : 'text-emerald-700/70'
+                                                    }`} dateTime={log.ptReviewedAt}>
                                                         {new Date(log.ptReviewedAt).toLocaleString('vi-VN')}
                                                     </time>
                                                 )}

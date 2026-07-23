@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.payment.scheduler;
 
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
@@ -30,7 +31,7 @@ public class OnlineCoachingSettleScheduler {
     @Scheduled(cron = "${app.payment.online-settle-cron:0 0 * * * *}")
     @Transactional
     public void settleExpiredOnlineCoaching() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = DietDates.nowVn();
         List<PtClientMapping> due = mappingRepository
                 .findBySelectedTrainingModeAndStatusAndPeriodEndsAtBefore(
                         TrainingMode.ONLINE, ClientMappingStatus.ACTIVE, now);

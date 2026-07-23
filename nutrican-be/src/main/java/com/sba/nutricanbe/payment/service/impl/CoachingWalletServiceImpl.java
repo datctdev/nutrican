@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.service.SystemSettingService;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.payment.dto.WalletResponse;
 import com.sba.nutricanbe.payment.dto.WalletTransactionResponse;
 import com.sba.nutricanbe.payment.dto.WithdrawRequest;
@@ -28,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -269,7 +269,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
             return;
         }
         releaseToPtInternal(escrow, remaining, "COACHING_ESCROW", escrow.getId(),
-                "Release remaining coaching fee to PT");
+                "Release remaining coaching fee to PT", false);
     }
 
     @Override
@@ -282,7 +282,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
                             && (escrow.getStatus() == CoachingEscrowStatus.HELD
                             || escrow.getStatus() == CoachingEscrowStatus.PARTIALLY_RELEASED)) {
                         releaseToPtInternal(escrow, remaining, "COACHING_ESCROW", escrow.getId(),
-                                "Release remaining coaching fee to PT");
+                                "Release remaining coaching fee to PT", false);
                     }
                     return true;
                 })
@@ -295,7 +295,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
                             UUID referenceId, String note) {
         CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
-        releaseToPtInternal(escrow, grossAmount, referenceType, referenceId, note);
+        releaseToPtInternal(escrow, grossAmount, referenceType, referenceId, note, false);
     }
 
     @Override
@@ -304,13 +304,97 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
                                  UUID referenceId, String note) {
         CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
-        refundToCustomerInternal(escrow, grossAmount, referenceType, referenceId, note);
+        refundToCustomerInternal(escrow, grossAmount, referenceType, referenceId, note, false);
     }
 
     @Override
     @Transactional
     public void settleSplit(UUID mappingId, BigDecimal ptGross, BigDecimal customerGross,
                             String referenceType, UUID referenceId, String note) {
+        settleSplitInternal(mappingId, ptGross, customerGross, referenceType, referenceId, note, false);
+    }
+
+    @Override
+    @Transactional
+    public void forceReleaseToPt(UUID mappingId, BigDecimal grossAmount, String referenceType,
+                                 UUID referenceId, String note) {
+        CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
+        releaseToPtInternal(escrow, grossAmount, referenceType, referenceId, note, true);
+    }
+
+    @Override
+    @Transactional
+    public void forceRefundToCustomer(UUID mappingId, BigDecimal grossAmount, String referenceType,
+                                      UUID referenceId, String note) {
+        CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
+        refundToCustomerInternal(escrow, grossAmount, referenceType, referenceId, note, true);
+    }
+
+    @Override
+    @Transactional
+    public void forceSettleSplit(UUID mappingId, BigDecimal ptGross, BigDecimal customerGross,
+                                 String referenceType, UUID referenceId, String note) {
+        settleSplitInternal(mappingId, ptGross, customerGross, referenceType, referenceId, note, true);
+    }
+
+    @Override
+    @Transactional
+    public boolean refundRemainingIfPresent(UUID mappingId, String note) {
+        return escrowRepository.findByMappingIdForUpdate(mappingId)
+                .map(escrow -> {
+                    BigDecimal remaining = escrow.effectiveRemaining();
+                    if (remaining.signum() > 0) {
+                        refundToCustomerInternal(escrow, remaining, "COACHING_ESCROW", escrow.getId(),
+                                note != null ? note : "Refund remaining escrow to customer", false);
+                    }
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    @Override
+    @Transactional
+    public void creditVnPayToCustomerWallet(Payment payment) {
+        if (payment == null || payment.getId() == null) {
+            throw new BadRequestException("Payment is required");
+        }
+        BigDecimal amount = payment.getAmount();
+        if (amount == null || amount.signum() <= 0) {
+            throw new BadRequestException("Payment amount must be greater than 0");
+        }
+        PtClientMapping mapping = mappingRepository.findById(payment.getMappingId())
+                .orElseThrow(() -> new ResourceNotFoundException("PT-client mapping", payment.getMappingId()));
+        Wallet customerWallet = getOrCreateUserWalletForUpdate(mapping.getClient());
+        String dedupe = "COACHING_PAYMENT_WALLET_CREDIT:" + payment.getId();
+        if (transactionRepository.existsByDedupeKey(dedupe)) {
+            return;
+        }
+        // Also skip if the normal PAYMENT credit already landed (e.g. partial hold path).
+        String paymentDedupe = "COACHING_PAYMENT:" + payment.getId();
+        if (transactionRepository.existsByDedupeKey(paymentDedupe)) {
+            return;
+        }
+        customerWallet.addAvailable(amount);
+        transactionRepository.save(WalletTransaction.builder()
+                .fromWallet(null)
+                .toWallet(customerWallet)
+                .amount(amount)
+                .type(WalletTransactionType.PAYMENT)
+                .status(WalletTransactionStatus.SUCCESS)
+                .dedupeKey(dedupe)
+                .referenceType("COACHING_PAYMENT")
+                .referenceId(payment.getId())
+                .providerTxnNo(payment.getProviderTxnNo())
+                .note("VNPay payment credited to wallet (coaching not activated)")
+                .build());
+        walletRepository.save(customerWallet);
+    }
+
+    private void settleSplitInternal(UUID mappingId, BigDecimal ptGross, BigDecimal customerGross,
+                                     String referenceType, UUID referenceId, String note,
+                                     boolean allowDisputed) {
         CoachingEscrow escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
         BigDecimal pt = nullToZero(ptGross);
@@ -325,30 +409,14 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         }
         if (pt.signum() > 0) {
             releaseToPtInternal(escrow, pt, referenceType, referenceId,
-                    note != null ? note + " (PT share)" : "Settle PT share");
+                    note != null ? note + " (PT share)" : "Settle PT share", allowDisputed);
         }
-        // reload remaining after PT release
         escrow = escrowRepository.findByMappingIdForUpdate(mappingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Coaching escrow", mappingId));
         if (customer.signum() > 0) {
             refundToCustomerInternal(escrow, customer, referenceType, referenceId,
-                    note != null ? note + " (customer share)" : "Settle customer share");
+                    note != null ? note + " (customer share)" : "Settle customer share", allowDisputed);
         }
-    }
-
-    @Override
-    @Transactional
-    public boolean refundRemainingIfPresent(UUID mappingId, String note) {
-        return escrowRepository.findByMappingIdForUpdate(mappingId)
-                .map(escrow -> {
-                    BigDecimal remaining = escrow.effectiveRemaining();
-                    if (remaining.signum() > 0) {
-                        refundToCustomerInternal(escrow, remaining, "COACHING_ESCROW", escrow.getId(),
-                                note != null ? note : "Refund remaining escrow to customer");
-                    }
-                    return true;
-                })
-                .orElse(false);
     }
 
     @Override
@@ -360,8 +428,13 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     }
 
     private void releaseToPtInternal(CoachingEscrow escrow, BigDecimal grossAmount,
-                                     String referenceType, UUID referenceId, String note) {
-        assertEscrowPayable(escrow);
+                                     String referenceType, UUID referenceId, String note,
+                                     boolean allowDisputed) {
+        if (allowDisputed) {
+            assertEscrowPayableAllowingDisputed(escrow);
+        } else {
+            assertEscrowPayable(escrow);
+        }
         BigDecimal gross = requirePositive(grossAmount, "Release amount");
         BigDecimal remaining = escrow.effectiveRemaining();
         if (gross.compareTo(remaining) > 0) {
@@ -436,15 +509,16 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     }
 
     private void refundToCustomerInternal(CoachingEscrow escrow, BigDecimal grossAmount,
-                                          String referenceType, UUID referenceId, String note) {
+                                          String referenceType, UUID referenceId, String note,
+                                          boolean allowDisputed) {
         if (escrow.getStatus() == CoachingEscrowStatus.REFUNDED
                 && escrow.effectiveRemaining().signum() <= 0) {
             return;
         }
-        if (escrow.getStatus() != CoachingEscrowStatus.HELD
-                && escrow.getStatus() != CoachingEscrowStatus.PARTIALLY_RELEASED
-                && escrow.getStatus() != CoachingEscrowStatus.DISPUTED) {
-            throw new BadRequestException("Escrow cannot be refunded in status " + escrow.getStatus());
+        if (allowDisputed) {
+            assertEscrowPayableAllowingDisputed(escrow);
+        } else {
+            assertEscrowPayable(escrow);
         }
 
         BigDecimal gross = requirePositive(grossAmount, "Refund amount");
@@ -503,7 +577,7 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
         boolean anyCommission = nullToZero(escrow.getPlatformFeeAmount()).signum() > 0;
         if (anyCommission || !lastOpWasRefund) {
             escrow.setStatus(CoachingEscrowStatus.RELEASED);
-            escrow.setReleasedAt(LocalDateTime.now());
+            escrow.setReleasedAt(DietDates.nowVn());
         } else {
             escrow.setStatus(CoachingEscrowStatus.REFUNDED);
         }
@@ -512,7 +586,17 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     @Override
     @Transactional
     public boolean refundEscrowIfPresent(UUID mappingId) {
-        return refundRemainingIfPresent(mappingId, "Refund held coaching fee to customer wallet");
+        return escrowRepository.findByMappingIdForUpdate(mappingId)
+                .map(escrow -> {
+                    BigDecimal remaining = escrow.effectiveRemaining();
+                    if (remaining.signum() > 0) {
+                        // Admin-approved refund: escrow is DISPUTED — use force path.
+                        refundToCustomerInternal(escrow, remaining, "COACHING_ESCROW", escrow.getId(),
+                                "Refund held coaching fee to customer wallet", true);
+                    }
+                    return true;
+                })
+                .orElse(false);
     }
 
     @Override
@@ -649,6 +733,14 @@ public class CoachingWalletServiceImpl implements CoachingWalletService {
     }
 
     private void assertEscrowPayable(CoachingEscrow escrow) {
+        if (escrow.getStatus() != CoachingEscrowStatus.HELD
+                && escrow.getStatus() != CoachingEscrowStatus.PARTIALLY_RELEASED) {
+            throw new BadRequestException("Escrow cannot be released in status " + escrow.getStatus());
+        }
+    }
+
+    /** Allowed for admin dispute / refund resolution only. */
+    private void assertEscrowPayableAllowingDisputed(CoachingEscrow escrow) {
         if (escrow.getStatus() != CoachingEscrowStatus.HELD
                 && escrow.getStatus() != CoachingEscrowStatus.PARTIALLY_RELEASED
                 && escrow.getStatus() != CoachingEscrowStatus.DISPUTED) {

@@ -1014,6 +1014,19 @@ export default function CoachingPage() {
     }
   };
 
+  const hasBlockingSessions = mySessions.some(
+    (s) => s.status === 'AWAITING_CONFIRM' || s.status === 'DISPUTED'
+  );
+  const blockingEndToast =
+    'Không thể kết thúc coaching khi còn buổi chờ xác nhận hoặc đang tranh chấp.';
+  const openEndCoachingModal = () => {
+    if (hasBlockingSessions) {
+      toast.error(blockingEndToast);
+      return;
+    }
+    setEndCoachingModalOpen(true);
+  };
+
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-fade-in px-4">
 
@@ -1182,6 +1195,7 @@ export default function CoachingPage() {
       )}
 
       {ptThreads.length === 0 ? (
+        !openHireRequest && (
         <div className="text-center py-16 px-4 bg-white border border-slate-200 rounded-3xl shadow-sm max-w-2xl mx-auto">
           <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800">Bạn chưa kết nối với Huấn luyện viên (PT)</h3>
@@ -1224,6 +1238,7 @@ export default function CoachingPage() {
             </div>
           )}
         </div>
+        )
       ) : (
         <div className="flex flex-col lg:flex-row gap-8">
 
@@ -1697,12 +1712,23 @@ export default function CoachingPage() {
                               Đang chờ Huấn luyện viên xác nhận kết thúc
                             </Button>
                           ) : (
-                            <Button onClick={() => setEndCoachingModalOpen(true)} disabled={endCoachingLoading} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 font-bold px-5">
+                            <Button
+                              onClick={openEndCoachingModal}
+                              disabled={endCoachingLoading || hasBlockingSessions}
+                              title={hasBlockingSessions ? blockingEndToast : undefined}
+                              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 font-bold px-5 disabled:opacity-50"
+                            >
                               Xác nhận kết thúc coaching
                             </Button>
                           )
                         ) : (
-                          <Button variant="outline" onClick={() => setEndCoachingModalOpen(true)} disabled={endCoachingLoading} className="rounded-xl border-amber-250 text-amber-800 hover:bg-amber-50 font-bold px-5">
+                          <Button
+                            variant="outline"
+                            onClick={openEndCoachingModal}
+                            disabled={endCoachingLoading || hasBlockingSessions}
+                            title={hasBlockingSessions ? blockingEndToast : undefined}
+                            className="rounded-xl border-amber-250 text-amber-800 hover:bg-amber-50 font-bold px-5 disabled:opacity-50"
+                          >
                             Yêu cầu kết thúc coaching
                           </Button>
                         )}
@@ -1844,6 +1870,10 @@ export default function CoachingPage() {
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setEndCoachingModalOpen(false)} className="rounded-xl">Hủy</Button>
             <Button className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold" onClick={async () => {
+              if (hasBlockingSessions) {
+                toast.error(blockingEndToast);
+                return;
+              }
               setEndCoachingLoading(true);
               try {
                 if (mappingStatus === 'END_REQUESTED') {
@@ -1860,7 +1890,7 @@ export default function CoachingPage() {
               } finally {
                 setEndCoachingLoading(false);
               }
-            }} disabled={endCoachingLoading}>
+            }} disabled={endCoachingLoading || hasBlockingSessions}>
               {endCoachingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Xác nhận'}
             </Button>
           </div>

@@ -171,8 +171,8 @@ public class OfflineHireTestDataInitializer implements CommandLineRunner {
                         .preferredGoals(List.of("WEIGHT_LOSS", "WEIGHT_GAIN"))
                         .preferredDietTypes(List.of("NORMAL", "VEGETARIAN"))
                         .tier(Tier.TIER_1)
-                        .rating(BigDecimal.valueOf(4.9))
-                        .totalReviews(3)
+                        .rating(BigDecimal.ZERO)
+                        .totalReviews(0)
                         .build()));
     }
 

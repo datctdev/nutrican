@@ -16,6 +16,7 @@ import com.sba.nutricanbe.workspace.service.PtDietLogReviewService;
 import com.sba.nutricanbe.workspace.service.PtProgressService;
 import com.sba.nutricanbe.workspace.service.PtReviewService;
 import com.sba.nutricanbe.workspace.service.PtTemplateService;
+import com.sba.nutricanbe.workspace.service.support.PtWorkspaceAccessGuard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -42,6 +43,7 @@ public class PtWorkspaceController {
     private final ClientGoalService clientGoalService;
     private final com.sba.nutricanbe.user.service.BodyMetricService bodyMetricService;
     private final com.sba.nutricanbe.user.service.CoachingLifecycleService coachingLifecycleService;
+    private final PtWorkspaceAccessGuard ptWorkspaceAccessGuard;
 
     @GetMapping("/clients")
     public ResponseEntity<ApiResponse<PageResponse<ClientStatusDto>>> getClients(
@@ -118,6 +120,7 @@ public class PtWorkspaceController {
             @PathVariable UUID clientId,
             @AuthenticationPrincipal User user,
             @RequestBody java.util.Map<String, String> body) {
+        ptWorkspaceAccessGuard.requireActiveOrEndRequested(user.getId(), clientId);
         return ResponseEntity.ok(ApiResponse.success(
                 clientGoalService.addManualMilestone(clientId, body.get("title"), body.get("note")),
                 "Milestone added"));

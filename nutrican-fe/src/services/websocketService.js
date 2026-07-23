@@ -186,6 +186,11 @@ const handleWebSocketMessage = (message) => {
             window.dispatchEvent(new CustomEvent('hire_request_updated', { detail: data }));
             break;
 
+        case 'HIRE_REQUESTED':
+            toast.info(data?.message || 'Có yêu cầu thuê coaching mới.');
+            window.dispatchEvent(new CustomEvent('hire_request_updated', { detail: data }));
+            break;
+
         case 'HIRE_REJECTED':
             toast.error(data?.message || 'PT đã từ chối yêu cầu coaching.');
             window.dispatchEvent(new CustomEvent('hire_request_updated', { detail: data }));
@@ -208,6 +213,22 @@ const handleWebSocketMessage = (message) => {
 
         case 'COACHING_COMPLETED':
             toast.success(data?.message || 'Coaching đã hoàn tất và escrow đã được quyết toán.');
+            window.dispatchEvent(new CustomEvent('hire_request_updated', { detail: data }));
+            break;
+
+        case 'COACHING_END_REQUESTED':
+            toast.info(data?.message || 'Có yêu cầu kết thúc coaching.');
+            window.dispatchEvent(new CustomEvent('hire_request_updated', { detail: data }));
+            break;
+
+        case 'PT_SUSPENDED':
+        case 'MAPPING_INACTIVE':
+            toast.warning(data?.message || 'Quan hệ coaching đã bị đóng.');
+            window.dispatchEvent(new CustomEvent('hire_request_updated', { detail: data }));
+            break;
+
+        case 'HIRE_PENDING_EXPIRED':
+            toast.error(data?.message || 'Yêu cầu thuê PT đã hết hạn chờ phản hồi.');
             window.dispatchEvent(new CustomEvent('hire_request_updated', { detail: data }));
             break;
 

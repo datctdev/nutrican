@@ -313,7 +313,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
 
         Double avgRating = reviewRepository.findAverageRatingByPtId(ptId);
-        profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.valueOf(5.0));
+        profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.ZERO);
         profile.setTotalReviews((int) reviewRepository.countByPtId(ptId));
         ptProfileRepository.save(profile);
 
@@ -366,7 +366,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         PtProfile profile = ptProfileRepository.findByUserId(ptId).orElse(null);
         if (profile != null) {
             Double avgRating = reviewRepository.findAverageRatingByPtId(ptId);
-            profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.valueOf(5.0));
+            profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.ZERO);
             profile.setTotalReviews((int) reviewRepository.countByPtId(ptId));
             ptProfileRepository.save(profile);
         }

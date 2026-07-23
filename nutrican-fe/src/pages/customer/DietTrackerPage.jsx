@@ -827,12 +827,12 @@ export default function DietTrackerPage() {
                                 setDemoVnClock(next);
                                 setDemoClockUi(next);
                                 toast.message(next
-                                    ? `Đang giả lập giờ VN ${next} — reload…`
-                                    : 'Trở lại giờ thật VN — reload…');
+                                    ? `Giả lập giờ VN ${next} (cần NUTRICAN_DEMO_ALLOW_CLIENT_CLOCK=true cho BE) — reload…`
+                                    : 'Trở lại giờ máy / Asia/Ho_Chi_Minh — reload…');
                                 window.setTimeout(() => window.location.reload(), 250);
                             }}
                             className="rounded-lg border border-amber-300 bg-white px-2 py-1 text-xs font-bold text-slate-800"
-                            title="Giả lập Asia/Ho_Chi_Minh để demo khung buổi (không cần đổi timezone máy)"
+                            title="Mặc định theo giờ máy (VN). Bật NUTRICAN_DEMO_ALLOW_CLIENT_CLOCK=true nếu cần giả lập khung buổi trên BE."
                         >
                             {DEMO_CLOCK_OPTIONS.map((opt) => (
                                 <option key={opt.value || 'real'} value={opt.value}>{opt.label}</option>

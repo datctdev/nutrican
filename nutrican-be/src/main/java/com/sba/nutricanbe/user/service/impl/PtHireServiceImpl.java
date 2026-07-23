@@ -4,20 +4,24 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.user.dto.HirePtRequest;
 import com.sba.nutricanbe.user.dto.MappingSessionResponse;
+import com.sba.nutricanbe.user.dto.NotificationPayload;
 import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.PtProfile;
 import com.sba.nutricanbe.user.entity.PtVenue;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.enums.NotificationLinkType;
 import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
 import com.sba.nutricanbe.user.repository.PtVenueRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.user.service.NotificationService;
 import com.sba.nutricanbe.user.service.OfflineHireSessionService;
 import com.sba.nutricanbe.user.service.PtHireService;
 import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
@@ -51,6 +55,7 @@ public class PtHireServiceImpl implements PtHireService {
     private final PtMappingSessionRepository mappingSessionRepository;
     private final SlotHoldService slotHoldService;
     private final WebSocketSessionService webSocketSessionService;
+    private final NotificationService notificationService;
     private final UserAccountStatusHelper userAccountStatusHelper;
 
     @Value("${app.payment.accepted-request-hours:24}")
@@ -107,6 +112,7 @@ public class PtHireServiceImpl implements PtHireService {
             offlineHireSessionService.persistSessionsAndHolds(
                     mapping.getId(), ptId, comp.selectedVenue(), comp.validatedOffline());
         }
+        notifyHireRequested(mapping);
         return ApiResponse.success(toMappingResponseWithSessions(mapping), "Hiring request sent");
     }
 
@@ -260,6 +266,11 @@ public class PtHireServiceImpl implements PtHireService {
         String normalized = action != null ? action.trim().toUpperCase() : "";
         switch (normalized) {
             case "ACCEPT" -> {
+                User pt = mapping.getPt();
+                userAccountStatusHelper.ensureActiveOrLiftExpired(pt);
+                if (UserAccountStatusHelper.isCurrentlySuspended(pt)) {
+                    throw new BadRequestException("PT đang bị khóa tài khoản — không thể chấp nhận yêu cầu");
+                }
                 PtProfile profile = ptProfileRepository.findByUserIdForUpdate(ptId)
                         .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
                 int max = profile.getMaxClients() != null ? profile.getMaxClients() : 10;
@@ -276,10 +287,10 @@ public class PtHireServiceImpl implements PtHireService {
                     offlineHireSessionService.revalidateForAccept(
                             ptId, mapping.getId(), mapping.getAgreedRateUnit());
                 }
+                LocalDateTime nowVn = DietDates.nowVn();
                 mapping.setStatus(ClientMappingStatus.AWAITING_PAYMENT);
-                mapping.setAcceptedAt(LocalDateTime.now());
-                mapping.setPaymentDueAt(LocalDateTime.now()
-                        .plusHours(Math.max(1, acceptedRequestHours)));
+                mapping.setAcceptedAt(nowVn);
+                mapping.setPaymentDueAt(nowVn.plusHours(Math.max(1, acceptedRequestHours)));
             }
             case "REJECT", "DECLINE" -> {
                 mapping.setStatus(ClientMappingStatus.INACTIVE);
@@ -316,6 +327,27 @@ public class PtHireServiceImpl implements PtHireService {
                 .map(MappingSessionResponse::from)
                 .toList();
         return PtClientMappingResponse.toMappingResponse(mapping, sessions);
+    }
+
+    private void notifyHireRequested(PtClientMapping mapping) {
+        String clientName = mapping.getClient().getFullName() != null
+                ? mapping.getClient().getFullName() : "Học viên";
+        notificationService.notify(mapping.getPt().getId(), NotificationPayload.builder()
+                .type("HIRE_REQUESTED")
+                .title("Yêu cầu thuê mới")
+                .body(clientName + " vừa gửi yêu cầu thuê coaching.")
+                .linkType(NotificationLinkType.HIRE)
+                .linkRefId(mapping.getClient().getId())
+                .sendEmail(false)
+                .build());
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("mappingId", mapping.getId());
+        payload.put("ptId", mapping.getPt().getId());
+        payload.put("customerId", mapping.getClient().getId());
+        payload.put("clientName", clientName);
+        payload.put("message", clientName + " vừa gửi yêu cầu thuê coaching.");
+        webSocketSessionService.sendToUser(mapping.getPt().getId(), "HIRE_REQUESTED", payload);
     }
 
     private void notifyHireResult(PtClientMapping mapping, boolean accepted) {

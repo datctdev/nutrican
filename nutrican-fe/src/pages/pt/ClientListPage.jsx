@@ -178,6 +178,7 @@ export default function ClientListPage() {
         if (s === 'RED') return { label: 'Báo động', color: 'bg-red-100 text-red-700 border-red-200' };
         if (s === 'PENDING') return { label: 'Chờ duyệt', color: 'bg-blue-100 text-blue-700 border-blue-200' };
         if (s === 'AWAITING_PAYMENT') return { label: 'Chờ thanh toán', color: 'bg-violet-100 text-violet-700 border-violet-200' };
+        if (s === 'END_REQUESTED') return { label: 'Chờ kết thúc', color: 'bg-amber-100 text-amber-800 border-amber-300' };
         if (s === 'ACTIVE') return { label: 'Đang hoạt động', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
         return { label: 'Đang quản lý', color: 'bg-slate-100 text-slate-600 border-slate-200' };
     };
@@ -412,7 +413,11 @@ export default function ClientListPage() {
                     {filteredClients.map((client) => {
                         const currentStatus = activeTab === 'PENDING'
                             ? 'PENDING'
-                            : activeTab === 'AWAITING_PAYMENT' ? 'AWAITING_PAYMENT' : client.status;
+                            : activeTab === 'AWAITING_PAYMENT'
+                                ? 'AWAITING_PAYMENT'
+                                : client.mappingStatus === 'END_REQUESTED'
+                                    ? 'END_REQUESTED'
+                                    : client.status;
                         const badge = getStatusBadge(currentStatus);
 
                         return (

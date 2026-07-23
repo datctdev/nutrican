@@ -177,6 +177,16 @@ public class MealPlanAuthoringServiceImpl implements MealPlanAuthoringService {
         if (!plan.getPtId().equals(ptId)) {
             throw new BadRequestException("You can only publish meal plans that you created");
         }
+        assertActiveClient(ptId, plan.getClientId());
+        List<MealPlanItem> items = mealPlanItemRepository
+                .findByMealPlanIdOrderByPlanDateAscMealTypeAsc(planId);
+        boolean hasFood = items.stream().anyMatch(item ->
+                (item.getFoodCode() != null && !item.getFoodCode().isBlank())
+                        || item.getFoodItemId() != null
+                        || (item.getFreeText() != null && !item.getFreeText().isBlank()));
+        if (!hasFood) {
+            throw new BadRequestException("Cannot publish an empty meal plan — add at least one food item");
+        }
         plan.setIsPublished(true);
         mealPlanRepository.save(plan);
         webSocketSessionService.sendToUser(plan.getClientId(), "MEAL_PLAN_PUBLISHED",
@@ -368,8 +378,8 @@ public class MealPlanAuthoringServiceImpl implements MealPlanAuthoringService {
     }
 
     private void assertActiveClient(UUID ptId, UUID clientId) {
-        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                ptId, clientId, ClientMappingStatus.ACTIVE)) {
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                ptId, clientId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))) {
             throw new BadRequestException("Client not active");
         }
     }

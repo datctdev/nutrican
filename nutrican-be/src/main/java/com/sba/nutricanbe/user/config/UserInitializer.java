@@ -64,6 +64,9 @@ public class UserInitializer implements CommandLineRunner {
         ensurePlatformFeeRateSetting();
         seedDemoAccounts();
         seedBackgroundAccounts();
+        List<User> reviewers = seedReviewerCustomers();
+        seedMarketplaceReviewsForKnownPts(reviewers);
+        resyncAllPtRatingsFromReviews();
     }
 
     private void seedDemoAccounts() {
@@ -98,9 +101,6 @@ public class UserInitializer implements CommandLineRunner {
         seedDemoMacroIfAbsent(demoSolo, ActivityLevel.MODERATE, 2100, 130, 230, 70);
 
         seedMapping(mainPt, demoCustomer, ClientMappingStatus.ACTIVE);
-
-        seedPtReviewsOnce(mainPt, demoCustomer,
-                "PT tận tình, chế độ ăn sát thực tế. Sau 2 tháng mình đã có kết quả rõ rệt!");
 
         log.info("Seeded DEMO accounts (pwd {}): admin@, pt@, customer@ (có PT), solo@ (không PT)", PASSWORD);
     }
@@ -144,14 +144,19 @@ public class UserInitializer implements CommandLineRunner {
         User customerTwo = seedUser(
                 "customer2@gmail.com", "Tran Thi Hoc Vien", UserRole.CUSTOMER,
                 "0901000002", "45 Le Loi, Quan 3, TP.HCM", LocalDate.of(2000, 8, 20));
+        User endReqHv = seedUser(
+                "hv.endreq@nutrican.com", "HV End Request Demo", UserRole.CUSTOMER,
+                "0903111999", "End Request Demo, TP.HCM", LocalDate.of(1997, 2, 14));
 
         seedCustomerE2eProfile(customerOne, NutritionGoal.WEIGHT_LOSS, 170, "MALE");
         seedCustomerE2eProfile(customerTwo, NutritionGoal.WEIGHT_LOSS, 165, "FEMALE");
+        seedCustomerE2eProfile(endReqHv, NutritionGoal.MAINTAIN, 168, "FEMALE");
         seedMacroTarget(customerOne, 2000, 120, 220, 65);
         seedMacroTarget(customerTwo, 1900, 110, 200, 60);
 
         seedMapping(certifiedPt, customerOne, ClientMappingStatus.ACTIVE);
         seedMapping(freelancePt, customerTwo, ClientMappingStatus.PENDING);
+        seedMapping(certifiedPt, endReqHv, ClientMappingStatus.END_REQUESTED);
 
         if (!ptUpdateRequestRepository.existsByPtIdAndStatus(certifiedPt.getId(), RequestStatus.PENDING)) {
             ptUpdateRequestRepository.save(PtUpdateRequest.builder()
@@ -167,9 +172,6 @@ public class UserInitializer implements CommandLineRunner {
                     .status(RequestStatus.PENDING)
                     .build());
         }
-
-        seedPtReviewsOnce(certifiedPt, customerOne,
-                "Anh PT hướng dẫn rất tận tình, chế độ ăn sát với thực tế không bị ngán. Rất đáng tiền!");
 
         log.info("Seeded background accounts: {}, {}, {}, {}",
                 customerOne.getEmail(), customerTwo.getEmail(),
@@ -267,7 +269,7 @@ public class UserInitializer implements CommandLineRunner {
                         .preferredDietTypes(diets)
                         .certifications(certs)
                         .tier(Tier.TIER_1)
-                        .rating(BigDecimal.valueOf(5.0))
+                        .rating(BigDecimal.ZERO)
                         .totalReviews(0)
                         .verificationStatus(UserStatus.ACTIVE)
                         .ptRequestStatus(UserStatus.ACTIVE)
@@ -297,6 +299,9 @@ public class UserInitializer implements CommandLineRunner {
                     if (status == ClientMappingStatus.ACTIVE && mapping.getCoachingStartedAt() == null) {
                         mapping.setCoachingStartedAt(java.time.LocalDateTime.now().minusDays(14));
                     }
+                    if (status == ClientMappingStatus.END_REQUESTED && mapping.getCoachingStartedAt() == null) {
+                        mapping.setCoachingStartedAt(java.time.LocalDateTime.now().minusDays(30));
+                    }
                     ptClientMappingRepository.save(mapping);
                 }, () -> {
                     var builder = PtClientMapping.builder()
@@ -306,28 +311,102 @@ public class UserInitializer implements CommandLineRunner {
                     if (status == ClientMappingStatus.ACTIVE) {
                         builder.coachingStartedAt(java.time.LocalDateTime.now().minusDays(14));
                     }
+                    if (status == ClientMappingStatus.END_REQUESTED) {
+                        builder.coachingStartedAt(java.time.LocalDateTime.now().minusDays(30));
+                    }
                     ptClientMappingRepository.save(builder.build());
                 });
     }
 
-    private void seedPtReviewsOnce(User pt, User reviewer, String comment) {
-        if (reviewRepository.countByPtId(pt.getId()) > 0) {
-            return;
+    private static final String[] REVIEWER_NAMES = {
+            "Nguyễn Minh Hà", "Trần Quốc Bảo", "Lê Thị Mai", "Phạm Đức Anh",
+            "Hoàng Thu Trang", "Vũ Nhật Nam", "Đặng Ngọc Lan", "Bùi Thành Đạt",
+            "Đỗ Khánh Linh", "Ngô Văn Khoa", "Lý Mỹ Duyên", "Huỳnh Tấn Phát"
+    };
+
+    private static final String[] REVIEW_COMMENTS = {
+            "PT tận tình, chế độ ăn sát thực tế. Sau 2 tháng mình đã có kết quả rõ rệt!",
+            "Hướng dẫn rất chi tiết, lịch tập linh hoạt cho người đi làm.",
+            "Mình thích cách PT chỉnh macro theo tuần — không bị ngán.",
+            "Giao tiếp tốt, phản hồi nhật ký ăn nhanh trong ngày.",
+            "Buổi offline đúng giờ, kỹ thuật squat được chỉnh rất kỹ.",
+            "Giá hợp lý so với chất lượng. Sẽ giới thiệu bạn bè.",
+            "Đôi khi phản hồi hơi chậm cuối tuần, nhưng overall ổn.",
+            "Plan ăn dễ nấu, không đòi hỏi nguyên liệu đắt tiền.",
+            "PT theo dõi cân nặng và nhắc nhở đúng lúc — rất có động lực.",
+            "Chế độ tăng cơ ổn, mình lên +2kg nạc sau 6 tuần.",
+            "Tư vấn dị ứng/đồ chay rất chu đáo.",
+            "Đánh giá trung bình vì kỳ vọng cao hơn về video form check."
+    };
+
+    private static final double[] REVIEW_RATINGS = {
+            5.0, 5.0, 4.5, 5.0, 4.0, 4.5, 3.5, 5.0, 4.5, 5.0, 4.0, 3.0
+    };
+
+    private List<User> seedReviewerCustomers() {
+        List<User> reviewers = new java.util.ArrayList<>();
+        for (int i = 0; i < REVIEWER_NAMES.length; i++) {
+            String email = String.format("reviewer%02d@nutrican.com", i + 1);
+            User u = seedUser(email, REVIEWER_NAMES[i], UserRole.CUSTOMER,
+                    String.format("0905%06d", 100001 + i),
+                    "Demo Reviewer, TP.HCM",
+                    LocalDate.of(1995 + (i % 8), 1 + (i % 11), 5 + (i % 20)));
+            seedCustomerE2eProfile(u, NutritionGoal.MAINTAIN, 165 + (i % 10), i % 2 == 0 ? "FEMALE" : "MALE");
+            reviewers.add(u);
         }
-        reviewRepository.save(Review.builder()
-                .pt(pt)
-                .reviewer(reviewer)
-                .rating(5.0)
-                .comment(comment)
-                .isAnonymous(false)
-                .imageUrl("https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1470&auto=format&fit=crop")
-                .build());
-        ptProfileRepository.findByUserId(pt.getId()).ifPresent(profile -> {
-            Double avg = reviewRepository.findAverageRatingByPtId(pt.getId());
-            profile.setRating(avg != null ? BigDecimal.valueOf(avg) : BigDecimal.valueOf(5.0));
-            profile.setTotalReviews((int) reviewRepository.countByPtId(pt.getId()));
+        return reviewers;
+    }
+
+    private void seedMarketplaceReviewsForKnownPts(List<User> reviewers) {
+        for (String email : List.of(
+                "pt@nutrican.com",
+                "pt.certified@gmail.com",
+                "pt.freelance@gmail.com",
+                "pt.offline@gmail.com")) {
+            userRepository.findByEmail(email).ifPresent(pt -> seedPtReviewsBulk(pt, reviewers));
+        }
+    }
+
+    private void seedPtReviewsBulk(User pt, List<User> reviewers) {
+        String sampleImage = "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1470&auto=format&fit=crop";
+        int n = Math.min(10, reviewers.size());
+        for (int i = 0; i < n; i++) {
+            User reviewer = reviewers.get(i);
+            if (reviewRepository.existsByPtIdAndReviewerId(pt.getId(), reviewer.getId())) {
+                continue;
+            }
+            // Rotate ratings/comments per PT so averages differ slightly
+            int idx = (i + Math.floorMod(pt.getEmail().hashCode(), REVIEW_COMMENTS.length))
+                    % REVIEW_COMMENTS.length;
+            reviewRepository.save(Review.builder()
+                    .pt(pt)
+                    .reviewer(reviewer)
+                    .rating(REVIEW_RATINGS[idx])
+                    .comment(REVIEW_COMMENTS[idx])
+                    .isAnonymous(i % 4 == 0)
+                    .imageUrl(i % 3 == 0 ? sampleImage : null)
+                    .build());
+        }
+        syncPtRatingFromReviews(pt.getId());
+    }
+
+    private void syncPtRatingFromReviews(java.util.UUID ptId) {
+        ptProfileRepository.findByUserId(ptId).ifPresent(profile -> {
+            long count = reviewRepository.countByPtId(ptId);
+            Double avg = reviewRepository.findAverageRatingByPtId(ptId);
+            profile.setTotalReviews((int) count);
+            profile.setRating(count == 0 || avg == null
+                    ? BigDecimal.ZERO
+                    : BigDecimal.valueOf(avg).setScale(1, java.math.RoundingMode.HALF_UP));
             ptProfileRepository.save(profile);
         });
+    }
+
+    private void resyncAllPtRatingsFromReviews() {
+        for (PtProfile profile : ptProfileRepository.findAll()) {
+            syncPtRatingFromReviews(profile.getUser().getId());
+        }
+        log.info("Resynced PtProfile.rating/totalReviews from Review aggregates");
     }
 
     private void seedCustomerE2eProfile(User customer, NutritionGoal goal, int heightCm, String gender) {

@@ -7,6 +7,7 @@ import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.UUID;
 
 
@@ -16,8 +17,11 @@ public class PtWorkspaceAccessGuard {
 
     private final PtClientMappingRepository mappingRepository;
 
+    private static final List<ClientMappingStatus> COACHING_OPEN = List.of(
+            ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED);
+
     public void assertActiveMapping(UUID ptId, UUID clientId) {
-        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(ptId, clientId, ClientMappingStatus.ACTIVE)) {
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(ptId, clientId, COACHING_OPEN)) {
             throw new ForbiddenException("Học viên này chưa được gán hoạt động với bạn");
         }
     }
@@ -25,8 +29,14 @@ public class PtWorkspaceAccessGuard {
     public PtClientMapping requireActiveMapping(UUID ptId, UUID clientId) {
         return mappingRepository
                 .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(ptId, clientId)
-                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                        || m.getStatus() == ClientMappingStatus.END_REQUESTED)
                 .orElseThrow(() -> new ForbiddenException("Học viên này chưa được gán hoạt động với bạn"));
+    }
+
+    /** Alias — ACTIVE or END_REQUESTED (wind-down still coaching). */
+    public PtClientMapping requireActiveOrEndRequested(UUID ptId, UUID clientId) {
+        return requireActiveMapping(ptId, clientId);
     }
 
     public void requirePtClientDataAccess(UUID ptId, UUID clientId) {

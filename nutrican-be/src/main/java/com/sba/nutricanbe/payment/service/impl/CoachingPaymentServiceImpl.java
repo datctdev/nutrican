@@ -16,14 +16,18 @@ import com.sba.nutricanbe.payment.service.CoachingPaymentService;
 import com.sba.nutricanbe.payment.service.CoachingVnPayService;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.dto.NotificationPayload;
+import com.sba.nutricanbe.user.entity.ExtraSessionPurchase;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.user.enums.ExtraSessionPurchaseStatus;
 import com.sba.nutricanbe.user.enums.NotificationLinkType;
 import com.sba.nutricanbe.user.enums.TrainingMode;
+import com.sba.nutricanbe.user.repository.ExtraSessionPurchaseRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.service.ExtraSessionService;
 import com.sba.nutricanbe.user.service.NotificationService;
 import com.sba.nutricanbe.user.service.OfflinePackageAppointmentService;
+import com.sba.nutricanbe.user.service.UserAccountStatusHelper;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +62,7 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
     private final WebSocketSessionService webSocketSessionService;
     private final OfflinePackageAppointmentService offlinePackageAppointmentService;
     private final ExtraSessionService extraSessionService;
+    private final ExtraSessionPurchaseRepository extraSessionPurchaseRepository;
 
     @Override
     @Transactional
@@ -188,40 +193,38 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
             return result(payment, mapping, false, failureMessage(responseCode));
         }
 
-        if (payment.getStatus() != CoachingPaymentStatus.PENDING
-                && payment.getStatus() != CoachingPaymentStatus.CANCELLED) {
-            return result(payment, mapping, false, "Payment attempt is no longer payable");
-        }
-        if (isAttemptExpiredBeyondGrace(payment)) {
-            if (payment.getStatus() == CoachingPaymentStatus.PENDING) {
-                payment.setStatus(CoachingPaymentStatus.CANCELLED);
-                paymentRepository.save(payment);
-            }
-            return result(payment, mapping, false, "Payment attempt has expired");
-        }
-
         CoachingPaymentPurpose purpose = payment.getPurpose() != null
                 ? payment.getPurpose()
                 : CoachingPaymentPurpose.HIRE;
 
         if (purpose == CoachingPaymentPurpose.EXTRA_SESSIONS) {
-            if (mapping.getStatus() != ClientMappingStatus.ACTIVE) {
-                throw new BadRequestException("Extra sessions require ACTIVE coaching");
-            }
-            payment.setStatus(CoachingPaymentStatus.SUCCESS);
-            payment.setPaidAt(DietDates.nowVn());
-            paymentRepository.save(payment);
-            extraSessionService.fulfillFromPayment(payment, mapping);
-            notifyPaymentSuccessAfterCommit(mapping, payment);
-            return result(payment, mapping, true, "Extra sessions payment completed");
+            return processExtraSessionsVnPaySuccess(payment, mapping);
+        }
+        return processHireVnPaySuccess(payment, mapping);
+    }
+
+    private CoachingPaymentResult processHireVnPaySuccess(Payment payment, PtClientMapping mapping) {
+        if (payment.getStatus() != CoachingPaymentStatus.PENDING
+                && payment.getStatus() != CoachingPaymentStatus.CANCELLED) {
+            return result(payment, mapping, false, "Payment attempt is no longer payable");
+        }
+
+        // Late bank success after mapping expired / inactivated: credit wallet, do not activate.
+        if (mapping.getStatus() != ClientMappingStatus.AWAITING_PAYMENT) {
+            return refundOrphanVnPayToWallet(payment, mapping,
+                    "Thanh toán VNPay đã được hoàn vào ví (yêu cầu coaching không còn chờ thanh toán).");
+        }
+
+        if (payment.getStatus() == CoachingPaymentStatus.CANCELLED
+                || isAttemptExpiredBeyondGrace(payment)) {
+            return refundOrphanVnPayToWallet(payment, mapping,
+                    "Thanh toán VNPay đã được hoàn vào ví (phiên thanh toán đã hết hạn hoặc bị hủy).");
         }
 
         if (paymentRepository.existsByMappingIdAndPurposeAndStatus(
                 mapping.getId(), CoachingPaymentPurpose.HIRE, CoachingPaymentStatus.SUCCESS)) {
-            throw new BadRequestException("Another payment for this coaching request already succeeded");
-        }
-        if (mapping.getStatus() != ClientMappingStatus.AWAITING_PAYMENT) {
-            throw new BadRequestException("Coaching request is not eligible for payment activation");
+            return refundOrphanVnPayToWallet(payment, mapping,
+                    "Thanh toán VNPay đã được hoàn vào ví (coaching đã được thanh toán bởi giao dịch khác).");
         }
 
         payment.setStatus(CoachingPaymentStatus.SUCCESS);
@@ -239,8 +242,94 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         return result(payment, mapping, true, "Coaching payment completed");
     }
 
+    private CoachingPaymentResult processExtraSessionsVnPaySuccess(
+            Payment payment, PtClientMapping mapping) {
+        ExtraSessionPurchase purchase = extraSessionPurchaseRepository.findByPaymentId(payment.getId())
+                .orElse(null);
+        boolean purchaseOk = purchase != null
+                && purchase.getStatus() != ExtraSessionPurchaseStatus.CANCELLED
+                && purchase.getStatus() != ExtraSessionPurchaseStatus.FULFILLED;
+        boolean fulfillable = payment.getStatus() == CoachingPaymentStatus.PENDING
+                && mapping.getStatus() == ClientMappingStatus.ACTIVE
+                && purchaseOk
+                && !isAttemptExpiredBeyondGrace(payment);
+
+        if (!fulfillable) {
+            return refundOrphanVnPayToWallet(payment, mapping,
+                    "Thanh toán buổi thêm VNPay đã được hoàn vào ví (không thể kích hoạt buổi thêm).");
+        }
+
+        payment.setStatus(CoachingPaymentStatus.SUCCESS);
+        payment.setPaidAt(DietDates.nowVn());
+        paymentRepository.save(payment);
+        extraSessionService.fulfillFromPayment(payment, mapping);
+        notifyPaymentSuccessAfterCommit(mapping, payment);
+        return result(payment, mapping, true, "Extra sessions payment completed");
+    }
+
+    private CoachingPaymentResult refundOrphanVnPayToWallet(
+            Payment payment, PtClientMapping mapping, String message) {
+        walletService.creditVnPayToCustomerWallet(payment);
+        payment.setStatus(CoachingPaymentStatus.REFUNDED);
+        if (payment.getPaidAt() == null) {
+            payment.setPaidAt(DietDates.nowVn());
+        }
+        paymentRepository.save(payment);
+        notifyOrphanVnPayRefundAfterCommit(mapping, payment, message);
+        // success=true so IPN acknowledges bank capture while customer is refunded to wallet
+        return result(payment, mapping, true, message);
+    }
+
+    private void notifyOrphanVnPayRefundAfterCommit(
+            PtClientMapping mapping, Payment payment, String message) {
+        Runnable notification = () -> {
+            try {
+                NotificationPayload customerNotification = NotificationPayload.builder()
+                        .type("COACHING_PAYMENT_REFUNDED_TO_WALLET")
+                        .title("Thanh toán đã hoàn vào ví")
+                        .body(message)
+                        .linkType(NotificationLinkType.HIRE)
+                        .linkRefId(mapping.getPt().getId())
+                        .sendEmail(false)
+                        .build();
+                notificationService.notify(mapping.getClient().getId(), customerNotification);
+
+                Map<String, Object> event = new HashMap<>();
+                event.put("mappingId", mapping.getId());
+                event.put("paymentId", payment.getId());
+                event.put("paymentStatus", payment.getStatus().name());
+                event.put("mappingStatus", mapping.getStatus().name());
+                event.put("message", message);
+                webSocketSessionService.sendToUserOnly(
+                        mapping.getClient().getId(), "COACHING_PAYMENT_REFUNDED_TO_WALLET", event);
+            } catch (RuntimeException exception) {
+                log.warn("Payment {} wallet-credit refund notification failed",
+                        payment.getId(), exception);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            notification.run();
+                        }
+                    });
+        } else {
+            notification.run();
+        }
+    }
+
     private void applyOnlinePeriodEnd(PtClientMapping mapping, LocalDateTime startedAt) {
-        if (mapping.getSelectedTrainingMode() == TrainingMode.ONLINE && startedAt != null) {
+        if (mapping.getSelectedTrainingMode() != TrainingMode.ONLINE || startedAt == null) {
+            return;
+        }
+        String unit = mapping.getAgreedRateUnit() != null
+                ? mapping.getAgreedRateUnit().trim().toUpperCase() : "";
+        if ("WEEK".equals(unit)) {
+            mapping.setPeriodEndsAt(startedAt.plusDays(7));
+        } else {
+            // MONTH and any other/unknown unit default to 1 month
             mapping.setPeriodEndsAt(startedAt.plusMonths(1));
         }
     }
@@ -258,10 +347,12 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
             return VnPayIpnResponse.of("01", "Order not found");
         } catch (BadRequestException exception) {
             String message = exception.getMessage() == null ? "" : exception.getMessage();
-            if (message.contains("checksum") || message.contains("merchant code")) {
+            if (message.toLowerCase().contains("checksum") || message.toLowerCase().contains("merchant code")) {
                 return VnPayIpnResponse.of("97", "Invalid Checksum");
             }
-            return VnPayIpnResponse.of("00", "Confirm Success");
+            // Business failure after bank success — non-00 so VNPay retries
+            log.warn("VNPay IPN business reject: {}", message);
+            return VnPayIpnResponse.of("99", "Confirm Failed");
         } catch (RuntimeException exception) {
             log.warn("VNPay IPN processing failed", exception);
             return VnPayIpnResponse.of("99", "Unknown error");
@@ -357,6 +448,9 @@ public class CoachingPaymentServiceImpl implements CoachingPaymentService {
         }
         if (mapping.getStatus() != ClientMappingStatus.AWAITING_PAYMENT) {
             throw new BadRequestException("The coaching request is not awaiting payment");
+        }
+        if (UserAccountStatusHelper.isCurrentlySuspended(mapping.getPt())) {
+            throw new BadRequestException("PT đang bị khóa tài khoản — không thể thanh toán coaching");
         }
         if (mapping.getPaymentDueAt() != null
                 && mapping.getPaymentDueAt().isBefore(DietDates.nowVn())) {

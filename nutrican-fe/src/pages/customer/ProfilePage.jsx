@@ -119,14 +119,17 @@ export default function ProfilePage() {
 
     useEffect(() => {
         const onRefundUpdate = () => fetchAll();
+        const onHireUpdate = () => fetchAll();
         const onWeeklySummary = () => {
             setNewWeeklySummary(true);
             fetchWeeklySummaries();
         };
         window.addEventListener('refund_update', onRefundUpdate);
+        window.addEventListener('hire_request_updated', onHireUpdate);
         window.addEventListener('weekly_summary', onWeeklySummary);
         return () => {
             window.removeEventListener('refund_update', onRefundUpdate);
+            window.removeEventListener('hire_request_updated', onHireUpdate);
             window.removeEventListener('weekly_summary', onWeeklySummary);
         };
     }, []);
@@ -305,16 +308,18 @@ export default function ProfilePage() {
                 gender: editHealthForm.gender,
             });
 
-            await userService.updatePreferences({
-                dietPreference: editHealthForm.dietPreference,
-                nutritionGoal: editHealthForm.nutritionGoal,
-                activityLevel: editHealthForm.activityLevel,
-                pregnancyTrimester: editHealthForm.nutritionGoal === 'PREGNANT' ? editHealthForm.pregnancyTrimester : null,
-            });
+            await userService.updatePreferences(hasActivePt
+                ? { dietPreference: editHealthForm.dietPreference }
+                : {
+                    dietPreference: editHealthForm.dietPreference,
+                    nutritionGoal: editHealthForm.nutritionGoal,
+                    activityLevel: editHealthForm.activityLevel,
+                    pregnancyTrimester: editHealthForm.nutritionGoal === 'PREGNANT' ? editHealthForm.pregnancyTrimester : null,
+                });
 
             await userService.updateAllergies({ allergyNotes: editHealthForm.allergyNotes });
 
-            if (editHealthForm.targetWeight) {
+            if (!hasActivePt && editHealthForm.targetWeight) {
                 await profileExtensionsService.saveGoals({
                     nutritionGoal: editHealthForm.nutritionGoal,
                     targetWeight: Number(editHealthForm.targetWeight),
@@ -833,7 +838,7 @@ export default function ProfilePage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5 min-w-0">
                             <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Cân nặng mục tiêu (kg)</label>
-                            <Input type="number" step="0.1" placeholder="60.0" value={editHealthForm.targetWeight} onChange={(e) => setEditHealthForm((f) => ({ ...f, targetWeight: e.target.value }))} className="rounded-xl py-5 bg-slate-50 font-extrabold text-blue-600 w-full min-w-0 focus:bg-white" />
+                            <Input type="number" step="0.1" placeholder="60.0" value={editHealthForm.targetWeight} onChange={(e) => setEditHealthForm((f) => ({ ...f, targetWeight: e.target.value }))} disabled={hasActivePt} className={`rounded-xl py-5 bg-slate-50 font-extrabold text-blue-600 w-full min-w-0 focus:bg-white ${hasActivePt ? 'opacity-60 cursor-not-allowed' : ''}`} />
                         </div>
                         <div className="space-y-1.5 min-w-0">
                             <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Giới tính sinh học</label>
@@ -856,7 +861,7 @@ export default function ProfilePage() {
                             <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Mức độ vận động (TDEE)</label>
                             <ActivityLevelInfoTooltip />
                         </div>
-                        <select value={editHealthForm.activityLevel} onChange={(e) => setEditHealthForm((f) => ({ ...f, activityLevel: e.target.value }))} className="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 font-extrabold text-sm text-slate-800 outline-none focus:bg-white focus:border-emerald-500 min-w-0 cursor-pointer truncate">
+                        <select value={editHealthForm.activityLevel} onChange={(e) => setEditHealthForm((f) => ({ ...f, activityLevel: e.target.value }))} disabled={hasActivePt} className={`w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 font-extrabold text-sm text-slate-800 outline-none focus:bg-white focus:border-emerald-500 min-w-0 truncate ${hasActivePt ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
                             {ACTIVITY_LEVEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                     </div>
@@ -864,8 +869,8 @@ export default function ProfilePage() {
                     {/* Mục tiêu */}
                     <div className="space-y-1.5 min-w-0">
                         <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Mục tiêu cân nặng / sức khỏe</label>
-                        {hasActivePt && <p className="text-xs text-amber-700 font-semibold bg-amber-50 p-2.5 rounded-xl border border-amber-200">⚠️ Bạn đang có PT đồng hành, việc đổi mục tiêu nên thảo luận trước với PT.</p>}
-                        <select value={editHealthForm.nutritionGoal} onChange={(e) => setEditHealthForm((f) => ({ ...f, nutritionGoal: e.target.value }))} className="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 font-extrabold text-sm text-slate-800 outline-none focus:bg-white focus:border-emerald-500 min-w-0 cursor-pointer truncate">
+                        {hasActivePt && <p className="text-xs text-amber-700 font-semibold bg-amber-50 p-2.5 rounded-xl border border-amber-200">Mục tiêu và mức vận động đang do PT quản lý — bạn vẫn có thể ghi cân nặng.</p>}
+                        <select value={editHealthForm.nutritionGoal} onChange={(e) => setEditHealthForm((f) => ({ ...f, nutritionGoal: e.target.value }))} disabled={hasActivePt} className={`w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 font-extrabold text-sm text-slate-800 outline-none focus:bg-white focus:border-emerald-500 min-w-0 truncate ${hasActivePt ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
                             {GOAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                     </div>
@@ -874,7 +879,7 @@ export default function ProfilePage() {
                     {editHealthForm.nutritionGoal === 'PREGNANT' && (
                         <div className="space-y-1.5 p-4 bg-purple-50/80 rounded-2xl border border-purple-200 min-w-0 animate-fade-in">
                             <label className="text-xs font-extrabold text-purple-900 uppercase tracking-wider block">Giai đoạn thai kỳ (Tam cá nguyệt)</label>
-                            <select value={editHealthForm.pregnancyTrimester} onChange={(e) => setEditHealthForm((f) => ({ ...f, pregnancyTrimester: Number(e.target.value) }))} className="w-full px-3.5 py-3 rounded-xl bg-white border border-purple-200 font-extrabold text-sm text-purple-950 outline-none focus:ring-2 focus:ring-purple-500 min-w-0 cursor-pointer">
+                            <select value={editHealthForm.pregnancyTrimester} onChange={(e) => setEditHealthForm((f) => ({ ...f, pregnancyTrimester: Number(e.target.value) }))} disabled={hasActivePt} className={`w-full px-3.5 py-3 rounded-xl bg-white border border-purple-200 font-extrabold text-sm text-purple-950 outline-none focus:ring-2 focus:ring-purple-500 min-w-0 ${hasActivePt ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
                                 {[1, 2, 3].map((t) => <option key={t} value={t}>Tam cá nguyệt thứ {t} (3 tháng {t === 1 ? 'đầu' : t === 2 ? 'giữa' : 'cuối'})</option>)}
                             </select>
                         </div>
@@ -897,7 +902,7 @@ export default function ProfilePage() {
                     <div className="flex gap-3 pt-4 border-t border-slate-100">
                         <Button type="button" variant="outline" onClick={() => setIsHealthModalOpen(false)} className="flex-1 rounded-xl py-6 font-bold border-slate-300 hover:bg-slate-50">Hủy bỏ</Button>
                         <Button type="button" onClick={handleSaveHealth} disabled={isSavingHealth} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl py-6 font-extrabold text-sm shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/30 transition-all hover:scale-[1.01]">
-                            {isSavingHealth ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Lưu chỉ số & Tính lại Macro'}
+                            {isSavingHealth ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (hasActivePt ? 'Lưu chỉ số sức khỏe' : 'Lưu chỉ số & Tính lại Macro')}
                         </Button>
                     </div>
                 </div>

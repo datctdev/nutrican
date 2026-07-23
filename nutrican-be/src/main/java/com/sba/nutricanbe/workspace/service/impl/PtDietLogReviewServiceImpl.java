@@ -58,15 +58,16 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
         List<UUID> clientIds;
 
         if (clientId != null) {
-            boolean isActiveClient = mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                    ptId, clientId, ClientMappingStatus.ACTIVE);
+            boolean isActiveClient = mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                    ptId, clientId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED));
             if (!isActiveClient) {
                 throw new ForbiddenException("Bạn chỉ xem được bữa chờ duyệt của học viên đang được bạn huấn luyện");
             }
             clientIds = List.of(clientId);
         } else {
             clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
-                    .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                    .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                            || m.getStatus() == ClientMappingStatus.END_REQUESTED)
                     .map(m -> m.getClient().getId())
                     .toList();
         }
@@ -82,8 +83,8 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
     @Transactional(readOnly = true)
     public ApiResponse<PageResponse<DietLogReviewResponse>> getClientDietLogs(
             UUID ptId, UUID clientId, int page, int size, DietLogReviewStatus reviewStatus) {
-        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                ptId, clientId, ClientMappingStatus.ACTIVE)) {
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                ptId, clientId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))) {
             throw new ForbiddenException("Bạn chỉ xem được nhật ký của học viên đang được bạn huấn luyện");
         }
 
@@ -146,8 +147,9 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
         userRepository.findById(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
 
-        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                ptId, dietLog.getCustomerId(), ClientMappingStatus.ACTIVE)) {
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                ptId, dietLog.getCustomerId(),
+                List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))) {
             throw new ForbiddenException("Bạn chỉ duyệt được bữa ăn của học viên đang được bạn huấn luyện");
         }
 
@@ -207,8 +209,10 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
     public ApiResponse<DietLogReviewResponse> submitBlindEstimate(UUID logId, UUID ptId, BlindEstimateRequest request) {
         DietLog dietLog = dietLogRepository.findByIdWithCustomer(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
-        if (!mappingRepository.existsByPt_IdAndClient_Id(ptId, dietLog.getCustomerId())) {
-            throw new ForbiddenException("Bạn chỉ ước lượng macro cho học viên được gán");
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                ptId, dietLog.getCustomerId(),
+                List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))) {
+            throw new ForbiddenException("Bạn chỉ ước lượng macro cho học viên đang được bạn huấn luyện");
         }
         MacroNutrients blind = MacroUtils.buildAdjustedMacroMap(
                 request.getCalories(), request.getProtein(), request.getCarb(), request.getFat());
