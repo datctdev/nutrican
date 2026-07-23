@@ -154,12 +154,50 @@ public class MarketplaceServiceImpl implements MarketplaceService {
     }
 
     private boolean matchesFilters(PtProfileResponse r, PtSearchRequest request) {
-        if (request.getGoalFilter() != null && !Boolean.TRUE.equals(r.getGoalMatch())) {
-            return false;
+        if (request.getGoalFilter() != null && !request.getGoalFilter().isBlank()) {
+            if (r.getPreferredGoals() == null || !r.getPreferredGoals().contains(request.getGoalFilter())) {
+                return false;
+            }
         }
-        if (request.getDietFilter() != null && !Boolean.TRUE.equals(r.getDietMatch())) {
-            return false;
+        if (request.getDietFilter() != null && !request.getDietFilter().isBlank()) {
+            if (r.getPreferredDietTypes() == null || !r.getPreferredDietTypes().contains(request.getDietFilter())) {
+                return false;
+            }
         }
+        // 1. Lọc theo Giới tính
+        if (request.getGender() != null && !request.getGender().isBlank() && !"ALL".equalsIgnoreCase(request.getGender())) {
+            if (r.getGender() == null || !r.getGender().equalsIgnoreCase(request.getGender())) {
+                return false;
+            }
+        }
+        // 2. Lọc theo Hình thức (Online / Offline)
+        if (request.getTrainingMode() != null && !request.getTrainingMode().isBlank() && !"ALL".equalsIgnoreCase(request.getTrainingMode())) {
+            if (r.getTrainingMode() == null || (!r.getTrainingMode().name().equalsIgnoreCase(request.getTrainingMode()) && !"BOTH".equalsIgnoreCase(r.getTrainingMode().name()))) {
+                return false;
+            }
+        }
+        // 3. Lọc theo Địa điểm Tỉnh/Thành
+        if (request.getLocation() != null && !request.getLocation().isBlank()) {
+            if (r.getLocation() == null || !r.getLocation().toLowerCase(Locale.ROOT).contains(request.getLocation().toLowerCase(Locale.ROOT))) {
+                return false;
+            }
+        }
+        // 4. Lọc theo Kinh nghiệm tối thiểu
+        if (request.getMinExperience() != null && request.getMinExperience() > 0) {
+            int exp = r.getYearsOfExperience() != null ? r.getYearsOfExperience() : 0;
+            if (exp < request.getMinExperience()) return false;
+        }
+        // 5. Lọc theo Phí dịch vụ tối đa
+        if (request.getMaxRate() != null && request.getMaxRate().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal rate = r.getOfflineRate() != null ? r.getOfflineRate() : r.getOnlineRate();
+            if (rate != null && rate.compareTo(request.getMaxRate()) > 0) return false;
+        }
+        // 6. Lọc theo Điểm đánh giá tối thiểu
+        if (request.getMinRating() != null && request.getMinRating().compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal rating = r.getRating() != null ? r.getRating() : BigDecimal.ZERO;
+            if (rating.compareTo(request.getMinRating()) < 0) return false;
+        }
+
         String term = request.getSearch();
         if (term == null || term.isBlank()) {
             term = request.getSpecialization();
