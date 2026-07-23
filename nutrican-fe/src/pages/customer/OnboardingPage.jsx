@@ -17,6 +17,7 @@ import {
     ActivityLevelInfoTooltip,
 } from './components/activityLevelOptions';
 import logo from '../../assets/nutrican_logo.png';
+import AllergySelector from './components/AllergySelector';
 
 const getGoalsByGender = (gender) => {
     const base = [
@@ -539,9 +540,9 @@ export default function OnboardingPage() {
                             </div>
 
                             <div className="space-y-1.5">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
                                     <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                        <Heart className="w-4 h-4 text-rose-500" /> Mức độ vận động hàng ngày
+                                        <Heart className="w-4 h-4 text-rose-500" /> Mức độ vận động
                                     </label>
                                     <ActivityLevelInfoTooltip />
                                 </div>
@@ -556,17 +557,10 @@ export default function OnboardingPage() {
                                 </select>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">
-                                    Ghi chú dị ứng thực phẩm <span className="text-slate-400 font-normal">(Tùy chọn)</span>
-                                </label>
-                                <textarea
-                                    value={step2.allergyNotes}
-                                    onChange={(e) => setStep2((s) => ({ ...s, allergyNotes: e.target.value }))}
-                                    placeholder="Ví dụ: Dị ứng đậu phộng, hải sản, tôm cua, sữa bò..."
-                                    className="w-full min-h-[80px] p-4 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 font-semibold text-sm text-slate-800 shadow-sm outline-none resize-none"
-                                />
-                            </div>
+                            <AllergySelector
+                                value={step2.allergyNotes}
+                                onChange={(val) => setStep2((s) => ({ ...s, allergyNotes: val }))}
+                            />
 
                             <div className="flex gap-3 pt-2">
                                 <Button
@@ -651,17 +645,19 @@ export default function OnboardingPage() {
                         </div>
                     )}
 
-                    {/* Footer Skip Link */}
-                    <div className="pt-4 border-t border-slate-100 text-center">
-                        <button
-                            type="button"
-                            onClick={handleSkip}
-                            disabled={submitting}
-                            className="text-xs font-bold text-slate-400 hover:text-slate-700 hover:underline transition-all"
-                        >
-                            Bỏ qua bước khảo sát — Tôi sẽ thiết lập sau trong phần Cài đặt
-                        </button>
-                    </div>
+                    {/* Footer Skip Link - Chỉ hiển thị ở Bước 1 và Bước 2 */}
+                    {step < 3 && (
+                        <div className="pt-4 border-t border-slate-100 text-center animate-fade-in">
+                            <button
+                                type="button"
+                                onClick={handleSkip}
+                                disabled={submitting}
+                                className="text-xs font-bold text-slate-400 hover:text-slate-700 hover:underline transition-all cursor-pointer"
+                            >
+                                Bỏ qua bước khảo sát — Tôi sẽ thiết lập sau
+                            </button>
+                        </div>
+                    )}
 
                 </div>
             </div>
