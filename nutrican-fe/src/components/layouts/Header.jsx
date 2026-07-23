@@ -21,6 +21,40 @@ async function fetchNotificationSnapshot() {
     };
 }
 
+function formatNotificationBody(notification) {
+    const raw = notification?.body || notification?.message || '';
+    if (notification?.type !== 'CHAT_MESSAGE' || !raw.trim().startsWith('{')) {
+        return raw;
+    }
+    try {
+        const message = JSON.parse(raw);
+        const sender = message.senderName?.trim();
+        const content = message.content?.trim();
+        let summary;
+        if (message.messageType === 'IMAGE' || message.imageUrl) {
+            summary = content ? `Ảnh: ${content}` : 'Đã gửi một hình ảnh';
+        } else if (message.messageType === 'FILE' || message.attachmentUrl) {
+            summary = content ? `Tệp PDF: ${content}` : 'Đã gửi một tệp PDF';
+        } else {
+            summary = content || 'Bạn có một tin nhắn mới';
+        }
+        return sender ? `${sender}: ${summary}` : summary;
+    } catch {
+        return raw;
+    }
+}
+
+function getNotificationChatMappingId(notification) {
+    if (notification?.linkRefId) return notification.linkRefId;
+    const raw = notification?.body || notification?.message || '';
+    if (notification?.type !== 'CHAT_MESSAGE' || !raw.trim().startsWith('{')) return null;
+    try {
+        return JSON.parse(raw).mappingId || null;
+    } catch {
+        return null;
+    }
+}
+
 export default function Header() {
     const { user, logout, isAuthenticated, activeRole, setActiveRole } = useAuthStore();
     const navigate = useNavigate();
@@ -150,6 +184,9 @@ export default function Header() {
             if (role === 'ADMIN') return '/admin/finance?tab=pt-reports';
             return isPtMode ? '/pt/clients' : '/coaching?tab=contract';
         }
+        if (n.type === 'PLATFORM_FEE_UPDATED') {
+            return '/pt?focus=commission';
+        }
         switch (link) {
             case 'DIET_LOG':
                 return isPtMode ? '/pt/reviews' : '/diet';
@@ -177,13 +214,16 @@ export default function Header() {
         }
         setNotifOpen(false);
         const base = navigateFromNotification(n);
+        if (n.linkType === 'CHAT') {
+            const mappingId = getNotificationChatMappingId(n);
+            navigate(user?.role?.startsWith('PT')
+                ? `/pt/chat${mappingId ? `?mappingId=${encodeURIComponent(mappingId)}` : ''}`
+                : `/coaching?tab=chat${mappingId ? `&mappingId=${encodeURIComponent(mappingId)}` : ''}`);
+            return;
+        }
         if (n.linkRefId) {
             if (n.linkType === 'DIET_LOG') {
                 navigate(rolePath(base, n.linkRefId, 'log'));
-                return;
-            }
-            if (n.linkType === 'CHAT') {
-                navigate(user?.role?.startsWith('PT') ? `/pt/chat` : '/chat');
                 return;
             }
         }
@@ -316,7 +356,7 @@ export default function Header() {
                                                         onClick={() => handleNotificationClick(n)}
                                                     >
                                                         <p className="text-sm font-medium text-slate-900">{n.title || n.type}</p>
-                                                        <p className="text-xs text-slate-500 line-clamp-2">{n.body || n.message}</p>
+                                                        <p className="text-xs text-slate-500 line-clamp-2">{formatNotificationBody(n)}</p>
                                                     </button>
                                                 )) : (
                                                     <div className="px-4 py-8 text-center">

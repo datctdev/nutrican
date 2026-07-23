@@ -6,7 +6,6 @@ import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
 import { RefreshCw, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import useWebSocket from '../../hooks/useWebSocket';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
 
 import NutritionProgress from './components/NutritionProgress';
@@ -71,7 +70,6 @@ function schedulePostMealPrompt(logId) {
 }
 
 export default function DietTrackerPage() {
-    useWebSocket();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const initialDate = clampDateParam(searchParams.get('date'));
