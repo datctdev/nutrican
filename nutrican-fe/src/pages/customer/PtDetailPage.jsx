@@ -7,7 +7,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { marketplaceService } from '../../services/marketplaceService';
 import { coachingPaymentService } from '../../services/coachingPaymentService';
-import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, Quote, UserCircle, Edit, Trash2, Camera, EyeOff, AlertTriangle, Target, MapPin, Banknote, ShieldCheck, GraduationCap, Link as LinkIcon, Wifi, CreditCard, Wallet, ImageIcon, ExternalLink, Users, Filter, Image as ImageIcon2 } from 'lucide-react';
+import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, Quote, UserCircle, Edit, Trash2, Camera, EyeOff, AlertTriangle, Target, MapPin, Banknote, ShieldCheck, GraduationCap, Link as LinkIcon, Wifi, CreditCard, Wallet, ImageIcon, ExternalLink, Users, Filter, Image as ImageIcon2, UserCheck, ShieldAlert, Check, Dumbbell, Monitor, Globe, Utensils, Flame } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import Modal from '../../components/common/Modal';
@@ -95,21 +95,21 @@ const LinkedinIcon = ({ className }) => (
 );
 
 const GOAL_LABELS = {
-    'WEIGHT_LOSS': 'Giảm cân / Giảm mỡ',
-    'WEIGHT_GAIN': 'Tăng cân / Tăng cơ',
-    'MUSCLE_GAIN': 'Tăng cơ / Thể hình',
-    'FAT_LOSS': 'Đốt mỡ siêu tốc',
-    'MAINTAIN': 'Duy trì vóc dáng',
-    'PREGNANT': 'Dinh dưỡng thai kỳ',
-    'RECOVERY': 'Phục hồi thể chất'
+    'WEIGHT_LOSS': 'Giảm cân',
+    'WEIGHT_GAIN': 'Tăng cân',
+    'MUSCLE_GAIN': 'Tăng cơ',
+    'FAT_LOSS': 'Đốt mỡ',
+    'MAINTAIN': 'Duy trì',
+    'PREGNANT': 'Mang thai',
+    'RECOVERY': 'Phục hồi'
 };
 
 const DIET_LABELS = {
-    'NORMAL': 'Ăn thường (Đầy đủ chất)',
+    'NORMAL': 'Ăn thường',
     'VEGETARIAN': 'Ăn chay',
-    'VEGAN': 'Thuần chay (Vegan)',
-    'KETO': 'Chế độ Keto',
-    'EAT_CLEAN': 'Eat Clean'
+    'VEGAN': 'Thuần chay',
+    'KETO': 'Keto',
+    'EAT_CLEAN': 'Eat clean'
 };
 
 const RATE_UNIT_LABELS = { 'SESSION_60': 'buổi (60 phút)', 'SESSION_90': 'buổi (90 phút)', 'HOUR': 'giờ', 'MONTH': 'tháng' };
@@ -131,8 +131,8 @@ export default function PtDetailPage() {
     const [submittingReview, setSubmittingReview] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
 
-    // --- STATE BỘ LỌC ĐÁNH GIÁ ---
-    const [starFilter, setStarFilter] = useState('ALL'); // 'ALL' | '5' | '4' | '3' | '2' | '1' | 'IMAGE'
+    const [starFilter, setStarFilter] = useState('ALL');
+    const [selectedReviewer, setSelectedReviewer] = useState(null);
 
     const [hireStatus, setHireStatus] = useState('NONE');
     const [hiring, setHiring] = useState(false);
@@ -161,7 +161,6 @@ export default function PtDetailPage() {
             }
 
             try {
-                // Tăng size lên 100 để có đầy đủ danh sách đánh giá phục vụ thống kê & lọc
                 const revRes = await marketplaceService.getPtReviews(ptData.userId, { page: 0, size: 100 });
                 setReviews(revRes.data.data.content || []);
             } catch (err) {
@@ -211,7 +210,6 @@ export default function PtDetailPage() {
         };
     }, []);
 
-    // --- TÍNH TOÁN THỐNG KÊ ĐÁNH GIÁ (USEMEMO) ---
     const reviewStats = useMemo(() => {
         const total = reviews.length;
         const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
@@ -229,7 +227,6 @@ export default function PtDetailPage() {
         return { total, dist, hasImageCount, avg };
     }, [reviews, pt?.rating]);
 
-    // --- DANH SÁCH ĐÁNH GIÁ ĐÃ LỌC ---
     const displayedReviews = useMemo(() => {
         return reviews.filter(r => {
             if (starFilter === 'ALL') return true;
@@ -816,7 +813,7 @@ export default function PtDetailPage() {
                             </div>
                         )}
 
-                        {/* --- SECTION ĐÁNH GIÁ TỪ HỌC VIÊN ĐÃ NÂNG CẤP THỐNG KÊ & BỘ LỌC --- */}
+                        {/* --- SECTION ĐÁNH GIÁ TỪ HỌC VIÊN --- */}
                         <div id="review-form-section" className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
 
                             {/* Title Header */}
@@ -834,9 +831,8 @@ export default function PtDetailPage() {
                                 )}
                             </div>
 
-                            {/* --- KHỐI THỐNG KÊ TỔNG QUAN (REVIEW STATS DASHBOARD) --- */}
+                            {/* KHỐI THỐNG KÊ TỔNG QUAN */}
                             <div className="bg-gradient-to-br from-slate-50 to-indigo-50/20 p-6 sm:p-8 rounded-[2rem] border border-slate-200/80 mb-8 grid grid-cols-1 md:grid-cols-12 gap-6 items-center shadow-2xs">
-                                {/* Left: Big Average Star */}
                                 <div className="md:col-span-5 flex flex-col items-center justify-center text-center md:border-r border-slate-200/60 md:pr-6">
                                     <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Điểm đánh giá trung bình</p>
                                     <h4 className="text-6xl font-black text-amber-500 tracking-tight">{reviewStats.avg}</h4>
@@ -848,7 +844,6 @@ export default function PtDetailPage() {
                                     </p>
                                 </div>
 
-                                {/* Right: Progress Bars Distribution */}
                                 <div className="md:col-span-7 space-y-2.5 md:pl-2">
                                     {[5, 4, 3, 2, 1].map(star => {
                                         const count = reviewStats.dist[star] || 0;
@@ -874,7 +869,7 @@ export default function PtDetailPage() {
                                 </div>
                             </div>
 
-                            {/* --- BỘ LỌC ĐÁNH GIÁ (FILTER PILLS BAR) --- */}
+                            {/* BỘ LỌC ĐÁNH GIÁ */}
                             <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-8 border-b border-slate-100 no-scrollbar">
                                 <span className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mr-2 shrink-0">
                                     <Filter className="w-3.5 h-3.5 text-blue-600" /> Lọc theo:
@@ -888,7 +883,7 @@ export default function PtDetailPage() {
                                 </button>
                                 {[5, 4, 3, 2, 1].map(star => {
                                     const count = reviewStats.dist[star] || 0;
-                                    if (count === 0 && reviewStats.total > 0) return null; // Ẩn mức sao không có đánh giá cho gọn
+                                    if (count === 0 && reviewStats.total > 0) return null;
                                     return (
                                         <button
                                             key={star}
@@ -971,7 +966,7 @@ export default function PtDetailPage() {
                                 </Card>
                             )}
 
-                            {/* Danh sách bài đánh giá (Đã tích hợp lọc) */}
+                            {/* --- DANH SÁCH ĐÁNH GIÁ --- */}
                             <div className="space-y-6">
                                 {displayedReviews.length > 0 ? displayedReviews.map(r => (
                                     <div key={r.id} className="p-6 sm:p-8 bg-gradient-to-br from-white to-slate-50/50 border border-slate-100 rounded-[2rem] shadow-sm hover:shadow-md transition-shadow relative group">
@@ -988,18 +983,28 @@ export default function PtDetailPage() {
                                         )}
 
                                         <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6 pr-24">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 flex items-center justify-center font-black text-xl shadow-inner border border-white">
+                                            <div
+                                                className={`flex items-center gap-4 ${!r.isAnonymous ? 'cursor-pointer group/user' : ''}`}
+                                                onClick={() => !r.isAnonymous && setSelectedReviewer(r)}
+                                                title={!r.isAnonymous ? "Bấm để xem hồ sơ xác thực học viên" : ""}
+                                            >
+                                                <div className={`w-14 h-14 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 flex items-center justify-center font-black text-xl shadow-inner border-2 border-white transition-transform ${!r.isAnonymous ? 'group-hover/user:scale-105 group-hover/user:border-blue-400' : ''}`}>
                                                     {r.isAnonymous ? <EyeOff className="w-6 h-6 text-blue-400" /> : (r.reviewerName?.charAt(0) || 'U')}
                                                 </div>
                                                 <div>
-                                                    <p className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
-                                                        {r.reviewerName || 'Học viên ẩn danh'}
-                                                        {r.isAnonymous && <span className="bg-slate-800 text-white text-[10px] px-2.5 py-0.5 rounded-md uppercase tracking-wider font-bold shadow-sm">Ẩn danh</span>}
+                                                    <p className={`font-extrabold text-slate-900 text-lg flex items-center gap-2 transition-colors ${!r.isAnonymous ? 'group-hover/user:text-blue-600' : ''}`}>
+                                                        <span>{r.reviewerName || 'Học viên ẩn danh'}</span>
+                                                        {r.isAnonymous ? (
+                                                            <span className="bg-slate-800 text-white text-[10px] px-2.5 py-0.5 rounded-md uppercase tracking-wider font-bold shadow-sm">Ẩn danh</span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[11px] font-black px-2.5 py-0.5 rounded-full border border-emerald-200/80 shadow-2xs">
+                                                                <Check className="w-3 h-3 text-emerald-600 stroke-[3]" /> Đã xác thực coaching
+                                                            </span>
+                                                        )}
                                                     </p>
-                                                    <div className="text-sm font-semibold text-slate-400 mt-1 flex items-center gap-1.5">
-                                                        <Clock className="w-3.5 h-3.5" />
-                                                        {new Date(r.createdAt).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                                    <div className="text-sm font-semibold text-slate-400 mt-1 flex items-center gap-2">
+                                                        <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {new Date(r.createdAt).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                                        {!r.isAnonymous && <span className="text-xs text-blue-500 font-bold group-hover/user:underline">  </span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1165,6 +1170,122 @@ export default function PtDetailPage() {
                     </div>
                 </div>
             </Modal>
+
+            {/* ================================================================================= */}
+            {/* --- MODAL CHI TIẾT HỌC VIÊN ĐÁNH GIÁ (XÁC THỰC UY TÍN - SIÊU THOÁNG MAX-W-2XL) --- */}
+            {/* ================================================================================= */}
+            {selectedReviewer && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setSelectedReviewer(null)}>
+
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200 border border-slate-100 relative no-scrollbar" onClick={(e) => e.stopPropagation()}>
+
+                        <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 h-24 relative p-5 flex justify-end">
+                            <button onClick={() => setSelectedReviewer(null)} className="w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 text-white flex items-center justify-center transition-all cursor-pointer backdrop-blur-md font-bold">
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="px-8 pb-8 pt-0 relative">
+
+                            <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 mb-6 border-b border-slate-100 pb-5">
+                                <div className="flex flex-col sm:flex-row items-center sm:items-end gap-5 text-center sm:text-left w-full">
+
+                                    <div className="-mt-14 relative inline-block shrink-0 z-10">
+                                        <div className="w-24 h-24 rounded-full bg-white p-1.5 shadow-xl border-2 border-slate-100 flex items-center justify-center">
+                                            <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 font-black text-3xl flex items-center justify-center">
+                                                {selectedReviewer.reviewerName?.charAt(0) || 'U'}
+                                            </div>
+                                        </div>
+                                        <div className="absolute bottom-1 right-1 bg-emerald-500 text-white rounded-full p-1.5 shadow-md border-2 border-white" title="Khách hàng đã xác thực">
+                                            <Check className="w-4 h-4 stroke-[3]" />
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 sm:pt-0 sm:pb-1 flex-1 min-w-0">
+                                        <h3 className="text-2xl font-black text-slate-900 leading-tight truncate">{selectedReviewer.reviewerName}</h3>
+                                        <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 flex-wrap">
+                                            <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 text-xs font-black px-3 py-1 rounded-full border border-emerald-200/80 shadow-2xs">
+                                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Học viên xác thực
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 text-xs font-black px-3 py-1 rounded-full border border-blue-200/80 shadow-2xs">
+                                                <UserCheck className="w-3.5 h-3.5 text-blue-600" /> Thành viên Nutrican
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* --- HUYỆT ĐẠO UY TÍN: 4 THÔNG SỐ TRẢI NGHIỆM ĐỒNG HÀNH --- */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-50/80 border border-slate-100">
+                                <div className="p-3 bg-white rounded-xl border border-slate-200/60 text-center sm:text-left">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">HLV đồng hành:</p>
+                                    <p className="text-xs font-black text-slate-800 truncate mt-0.5">{pt.fullName}</p>
+                                </div>
+                                <div className="p-3 bg-white rounded-xl border border-slate-200/60 text-center sm:text-left">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Hình thức học:</p>
+                                    <p className="text-xs font-black text-blue-600 truncate mt-0.5 flex items-center justify-center sm:justify-start gap-1">
+                                        {selectedReviewer.trainingMode === 'ONLINE' ? <Monitor className="w-3 h-3"/> : <Dumbbell className="w-3 h-3 text-emerald-600"/>}
+                                        {selectedReviewer.trainingMode === 'ONLINE' ? 'Online' : 'Trực tiếp'}
+                                    </p>
+                                </div>
+                                <div className="p-3 bg-white rounded-xl border border-slate-200/60 text-center sm:text-left">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Hài lòng:</p>
+                                    <div className="flex items-center justify-center sm:justify-start gap-1 mt-0.5">
+                                        <span className="text-amber-600 font-black text-xs">{selectedReviewer.rating}.0</span>
+                                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                                    </div>
+                                </div>
+                                <div className="p-3 bg-white rounded-xl border border-slate-200/60 text-center sm:text-left">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase">Ngày nhận xét:</p>
+                                    <p className="text-xs font-extrabold text-slate-800 mt-0.5">{new Date(selectedReviewer.createdAt).toLocaleDateString('vi-VN')}</p>
+                                </div>
+                            </div>
+
+                            {/* --- BỔ SUNG MỚI: HỒ SƠ THỂ CHẤT & DINH DƯỠNG CỦA HỌC VIÊN --- */}
+                            <div className="mt-4 p-4 rounded-2xl bg-blue-50/50 border border-blue-100 text-left space-y-2.5">
+                                <p className="text-[10px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1">
+                                    <Target className="w-3.5 h-3.5 text-blue-600" /> Mục tiêu & Chế độ ăn của học viên này:
+                                </p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 bg-white text-emerald-700 border border-emerald-200/80 px-3 py-1 rounded-lg text-xs font-black shadow-2xs">
+                                        <Flame className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
+                                        Mục tiêu: {GOAL_LABELS[selectedReviewer.reviewerGoal] || selectedReviewer.reviewerGoal || 'Giảm cân / Giảm mỡ'}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 bg-white text-indigo-700 border border-indigo-200/80 px-3 py-1 rounded-lg text-xs font-black shadow-2xs">
+                                        <Utensils className="w-3.5 h-3.5 text-indigo-500" />
+                                        Chế độ ăn: {DIET_LABELS[selectedReviewer.reviewerDiet] || selectedReviewer.reviewerDiet || 'Eat Clean'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Lời nhận xét trích dẫn */}
+                            <div className="mt-4 p-5 rounded-2xl bg-amber-50/60 border border-amber-200/60 text-left">
+                                <p className="text-[10px] font-black text-amber-800 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                    <Quote className="w-3.5 h-3.5 text-amber-600" /> Lời đánh giá thực tế:
+                                </p>
+                                <p className="text-sm font-bold text-amber-950 italic leading-relaxed">
+                                    "{selectedReviewer.comment}"
+                                </p>
+                            </div>
+
+                            <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 text-center sm:text-left">
+                                    <ShieldAlert className="w-4 h-4 text-blue-500 shrink-0" />
+                                    <span>Để bảo vệ quyền riêng tư cá nhân, thông tin liên lạc chi tiết của học viên được bảo mật bởi hệ thống.</span>
+                                </div>
+
+                                <Button
+                                    onClick={() => setSelectedReviewer(null)}
+                                    className="w-full sm:w-auto px-8 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl h-11 shadow-md cursor-pointer shrink-0"
+                                >
+                                    Đóng hồ sơ
+                                </Button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <ImageLightbox
                 isOpen={!!lightboxImage}
