@@ -34,8 +34,9 @@ public class FinanceAdminServiceImpl implements FinanceAdminService {
     private final SystemSettingService systemSettingService;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ApiResponse<FinanceOverviewDto> getOverview(LocalDateTime from, LocalDateTime to) {
+        // Not readOnly: getSystemWallet may create missing system wallets.
         WalletResponse escrow = walletService.getSystemWallet(WalletType.ESCROW);
         WalletResponse platform = walletService.getSystemWallet(WalletType.PLATFORM);
 
