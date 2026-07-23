@@ -20,6 +20,7 @@ public class PtProfileResponse {
     private UUID id;
     private UUID userId;
     private String fullName;
+    private String gender;
     private String email;
     private String avatarUrl;
     private Boolean isVerified;
@@ -95,6 +96,11 @@ public class PtProfileResponse {
                 .maxClients(profile.getMaxClients())
                 .preferredGoals(profile.getPreferredGoals())
                 .preferredDietTypes(profile.getPreferredDietTypes())
+                .portfolioShowcase(profile.getPortfolioShowcase())
+                .certifications(profile.getCertifications())
+                .instagramUrl(profile.getInstagramUrl())
+                .linkedinUrl(profile.getLinkedinUrl())
+                .gender(profile.getGender() != null ? profile.getGender().name() : (user.getGender() != null ? user.getGender() : null))
                 .build();
     }
 }

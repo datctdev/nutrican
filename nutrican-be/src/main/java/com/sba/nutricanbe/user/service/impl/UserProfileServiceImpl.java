@@ -449,6 +449,9 @@ public class UserProfileServiceImpl implements UserProfileService {
     }
 
     private PtProfileSummary toPtProfileSummary(PtProfile ptProfile) {
+        BigDecimal displayRate = ptProfile.getOfflineRate() != null ? ptProfile.getOfflineRate() : ptProfile.getOnlineRate();
+        String displayUnit = ptProfile.getOfflineRateUnit() != null ? ptProfile.getOfflineRateUnit() : ptProfile.getOnlineRateUnit();
+
         return PtProfileSummary.builder()
                 .id(ptProfile.getId())
                 .isVerified(ptProfile.getIsVerified())
@@ -464,6 +467,11 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .onlineRateUnit(ptProfile.getOnlineRateUnit())
                 .offlineRate(ptProfile.getOfflineRate())
                 .offlineRateUnit(ptProfile.getOfflineRateUnit())
+                .hourlyRate(displayRate)
+                .rateUnit(displayUnit != null ? displayUnit : "SESSION_60")
+                .maxClients(ptProfile.getMaxClients() != null ? ptProfile.getMaxClients() : 10)
+                .preferredGoals(ptProfile.getPreferredGoals())
+                .preferredDietTypes(ptProfile.getPreferredDietTypes())
                 .specializations(ptProfile.getSpecializations())
                 .certifications(ptProfile.getCertifications())
                 .rating(ptProfile.getRating())
@@ -476,6 +484,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .adminRejectNote(ptProfile.getAdminRejectNote())
                 .ptRequestStatus(ptProfile.getPtRequestStatus() != null ? ptProfile.getPtRequestStatus().name() : null)
                 .verificationStatus(ptProfile.getVerificationStatus() != null ? ptProfile.getVerificationStatus().name() : null)
+                .portfolioShowcase(ptProfile.getPortfolioShowcase())
                 .build();
     }
 
@@ -599,7 +608,9 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Transactional(readOnly = true)
     public ApiResponse<PtUpdateRequestDto> getPendingPtUpdateRequest(UUID ptId) {
         return ptUpdateRequestRepository.findFirstByPtIdOrderByCreatedAtDesc(ptId)
-                .filter(req -> req.getStatus() == RequestStatus.PENDING || req.getStatus() == RequestStatus.REJECTED)
+                .filter(req -> req.getStatus() == RequestStatus.PENDING
+                        || req.getStatus() == RequestStatus.REJECTED
+                        || req.getStatus() == RequestStatus.APPROVED)
                 .map(req -> ApiResponse.success(PtUpdateRequestDto.fromEntity(req)))
                 .orElse(ApiResponse.<PtUpdateRequestDto>success(null));
     }

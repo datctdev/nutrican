@@ -31,6 +31,11 @@ public class PtProfileSummary {
     private String onlineRateUnit;
     private BigDecimal offlineRate;
     private String offlineRateUnit;
+    private BigDecimal hourlyRate;
+    private String rateUnit;
+    private Integer maxClients;
+    private List<String> preferredGoals;
+    private List<String> preferredDietTypes;
     private List<String> specializations;
     private List<CertificationData> certifications;
     private Map<String, Object> portfolioShowcase;

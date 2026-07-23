@@ -190,21 +190,36 @@ public class PtAdminServiceImpl implements PtAdminService {
         if (data.containsKey("linkedinUrl")) profile.setLinkedinUrl((String) data.get("linkedinUrl"));
         if (data.containsKey("cvUrl")) profile.setCvUrl((String) data.get("cvUrl"));
 
-        if (data.containsKey("rateUnit")) profile.setOnlineRateUnit((String) data.get("rateUnit"));
-
         if (data.containsKey("gender") && data.get("gender") != null && !data.get("gender").toString().isBlank()) {
-            profile.setGender(Gender.valueOf(data.get("gender").toString().toUpperCase()));
+            Gender newGender = Gender.valueOf(data.get("gender").toString().toUpperCase());
+            profile.setGender(newGender);
+            if (profile.getUser() != null) {
+                profile.getUser().setGender(newGender.name());
+                userRepository.save(profile.getUser());
+            }
         }
+
+        TrainingMode currentMode = profile.getTrainingMode();
         if (data.containsKey("trainingMode") && data.get("trainingMode") != null) {
             String modeStr = data.get("trainingMode").toString().toUpperCase();
-            if ("HYBRID".equals(modeStr)) {
-                modeStr = "BOTH";
-            }
-            profile.setTrainingMode(TrainingMode.valueOf(modeStr));
+            if ("HYBRID".equals(modeStr)) modeStr = "BOTH";
+            currentMode = TrainingMode.valueOf(modeStr);
+            profile.setTrainingMode(currentMode);
         }
 
-        if (data.containsKey("hourlyRate") && data.get("hourlyRate") != null && !data.get("hourlyRate").toString().isBlank()) {
-            profile.setOnlineRate(new BigDecimal(data.get("hourlyRate").toString()));
+        String unit = data.containsKey("rateUnit") && data.get("rateUnit") != null ? data.get("rateUnit").toString() : null;
+        BigDecimal rate = data.containsKey("hourlyRate") && data.get("hourlyRate") != null && !data.get("hourlyRate").toString().isBlank()
+                ? new BigDecimal(data.get("hourlyRate").toString()) : null;
+
+        if (rate != null) {
+            if (currentMode == TrainingMode.ONLINE || currentMode == TrainingMode.BOTH) {
+                profile.setOnlineRate(rate);
+                if (unit != null) profile.setOnlineRateUnit(unit);
+            }
+            if (currentMode == TrainingMode.OFFLINE || currentMode == TrainingMode.BOTH) {
+                profile.setOfflineRate(rate);
+                if (unit != null) profile.setOfflineRateUnit(unit);
+            }
         }
 
         if (data.containsKey("experienceStartDate") && data.get("experienceStartDate") != null) {
@@ -222,6 +237,7 @@ public class PtAdminServiceImpl implements PtAdminService {
         if (data.containsKey("preferredDietTypes") && data.get("preferredDietTypes") != null) {
             profile.setPreferredDietTypes((List<String>) data.get("preferredDietTypes"));
         }
+
         if (data.containsKey("certifications") && data.get("certifications") != null) {
             List<CertificationData> certs = objectMapper.convertValue(
                     data.get("certifications"), new com.fasterxml.jackson.core.type.TypeReference<List<CertificationData>>() {});
