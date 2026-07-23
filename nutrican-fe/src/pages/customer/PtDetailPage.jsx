@@ -1,3 +1,4 @@
+// src/pages/customer/PtDetailPage.jsx
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../../components/ui/card';
@@ -6,7 +7,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { toast } from 'sonner';
 import { marketplaceService } from '../../services/marketplaceService';
 import { coachingPaymentService } from '../../services/coachingPaymentService';
-import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, Quote, UserCircle, Edit, Trash2, Camera, EyeOff, AlertTriangle, Target, MapPin, Banknote, ShieldCheck, GraduationCap, LinkIcon, Wifi, CreditCard, Wallet } from 'lucide-react';
+import { Star, CheckCircle2, ArrowLeft, MessageSquare, Briefcase, Clock, Send, Award, Quote, UserCircle, Edit, Trash2, Camera, EyeOff, AlertTriangle, Target, MapPin, Banknote, ShieldCheck, GraduationCap, Link as LinkIcon, Wifi, CreditCard, Wallet, ImageIcon, ExternalLink, Users, Filter, Image as ImageIcon2 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import Modal from '../../components/common/Modal';
@@ -15,9 +16,12 @@ import PtWeeklyCalendarPicker from '../../components/pt/PtWeeklyCalendarPicker';
 
 const RATE_UNIT_LABEL = {
     MONTH: 'tháng',
-    SESSION_60: 'buổi',
-    SESSION_90: 'buổi',
+    SESSION_60: 'buổi (60 phút)',
+    SESSION_90: 'buổi (90 phút)',
+    HOUR: 'giờ',
 };
+
+const GENDER_LABEL = { MALE: 'Nam giới', FEMALE: 'Nữ giới', OTHER: 'Khác' };
 
 function OfflinePackageSummary({ pt, tone = 'emerald' }) {
     if (!pt?.venueName) return null;
@@ -60,9 +64,18 @@ const getPermanentUrl = (url) => {
 
 const getFullImageUrl = (url) => {
     if (!url) return '';
-    if (url.startsWith('http')) return getPermanentUrl(url);
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
+        return getPermanentUrl(url);
+    }
     const minioUrl = import.meta.env.VITE_MINIO_URL || 'http://localhost:9000/nutrican-media';
-    return getPermanentUrl(`${minioUrl}/${url}`);
+    const cleanPath = url.startsWith('/') ? url.slice(1) : url;
+    return getPermanentUrl(`${minioUrl}/${cleanPath}`);
+};
+
+const formatMonthYear = (ym) => {
+    if (!ym) return null;
+    const [year, month] = ym.split('-');
+    return `${month}/${year}`;
 };
 
 const InstagramIcon = ({ className }) => (
@@ -81,10 +94,26 @@ const LinkedinIcon = ({ className }) => (
     </svg>
 );
 
-const GOAL_LABELS = { 'WEIGHT_LOSS': 'Giảm cân', 'WEIGHT_GAIN': 'Tăng cân', 'MAINTAIN': 'Duy trì', 'PREGNANT': 'Mang thai', 'RECOVERY': 'Phục hồi' };
-const DIET_LABELS = { 'NORMAL': 'Ăn thường', 'VEGETARIAN': 'Ăn chay', 'VEGAN': 'Thuần chay', 'KETO': 'Keto', 'EAT_CLEAN': 'Eat clean' };
-const RATE_UNIT_LABELS = { 'SESSION_60': 'buổi 60 phút', 'SESSION_90': 'buổi 90 phút', 'HOUR': 'giờ', 'MONTH': 'tháng' };
-const TRAINING_MODE_LABELS = { 'OFFLINE': 'Trực tiếp (Offline)', 'ONLINE': 'Online', 'BOTH': 'Cả hai' };
+const GOAL_LABELS = {
+    'WEIGHT_LOSS': 'Giảm cân / Giảm mỡ',
+    'WEIGHT_GAIN': 'Tăng cân / Tăng cơ',
+    'MUSCLE_GAIN': 'Tăng cơ / Thể hình',
+    'FAT_LOSS': 'Đốt mỡ siêu tốc',
+    'MAINTAIN': 'Duy trì vóc dáng',
+    'PREGNANT': 'Dinh dưỡng thai kỳ',
+    'RECOVERY': 'Phục hồi thể chất'
+};
+
+const DIET_LABELS = {
+    'NORMAL': 'Ăn thường (Đầy đủ chất)',
+    'VEGETARIAN': 'Ăn chay',
+    'VEGAN': 'Thuần chay (Vegan)',
+    'KETO': 'Chế độ Keto',
+    'EAT_CLEAN': 'Eat Clean'
+};
+
+const RATE_UNIT_LABELS = { 'SESSION_60': 'buổi (60 phút)', 'SESSION_90': 'buổi (90 phút)', 'HOUR': 'giờ', 'MONTH': 'tháng' };
+const TRAINING_MODE_LABELS = { 'OFFLINE': 'Trực tiếp (Offline)', 'ONLINE': 'Online', 'BOTH': 'Cả hai (Online & Offline)' };
 
 export default function PtDetailPage() {
     const { id } = useParams();
@@ -101,6 +130,9 @@ export default function PtDetailPage() {
     const [reviewImagePreview, setReviewImagePreview] = useState('');
     const [submittingReview, setSubmittingReview] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
+
+    // --- STATE BỘ LỌC ĐÁNH GIÁ ---
+    const [starFilter, setStarFilter] = useState('ALL'); // 'ALL' | '5' | '4' | '3' | '2' | '1' | 'IMAGE'
 
     const [hireStatus, setHireStatus] = useState('NONE');
     const [hiring, setHiring] = useState(false);
@@ -129,7 +161,8 @@ export default function PtDetailPage() {
             }
 
             try {
-                const revRes = await marketplaceService.getPtReviews(ptData.userId, { page: 0, size: 10 });
+                // Tăng size lên 100 để có đầy đủ danh sách đánh giá phục vụ thống kê & lọc
+                const revRes = await marketplaceService.getPtReviews(ptData.userId, { page: 0, size: 100 });
                 setReviews(revRes.data.data.content || []);
             } catch (err) {
                 console.error('Lỗi khi tải đánh giá:', err);
@@ -178,6 +211,33 @@ export default function PtDetailPage() {
         };
     }, []);
 
+    // --- TÍNH TOÁN THỐNG KÊ ĐÁNH GIÁ (USEMEMO) ---
+    const reviewStats = useMemo(() => {
+        const total = reviews.length;
+        const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        let hasImageCount = 0;
+        let sum = 0;
+
+        reviews.forEach(r => {
+            const star = Math.round(r.rating) || 5;
+            if (dist[star] !== undefined) dist[star] += 1;
+            if (r.imageUrl) hasImageCount += 1;
+            sum += r.rating || 5;
+        });
+
+        const avg = total > 0 ? (sum / total).toFixed(1) : (pt?.rating ? pt.rating.toFixed(1) : '5.0');
+        return { total, dist, hasImageCount, avg };
+    }, [reviews, pt?.rating]);
+
+    // --- DANH SÁCH ĐÁNH GIÁ ĐÃ LỌC ---
+    const displayedReviews = useMemo(() => {
+        return reviews.filter(r => {
+            if (starFilter === 'ALL') return true;
+            if (starFilter === 'IMAGE') return !!r.imageUrl;
+            return Math.round(r.rating) === Number(starFilter);
+        });
+    }, [reviews, starFilter]);
+
     const handleReviewImageSelect = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -209,7 +269,7 @@ export default function PtDetailPage() {
                 toast.success('Đã gửi đánh giá thành công!');
             }
             resetReviewForm();
-            const revRes = await marketplaceService.getPtReviews(pt.userId, { page: 0, size: 10 });
+            const revRes = await marketplaceService.getPtReviews(pt.userId, { page: 0, size: 100 });
             setReviews(revRes.data.data.content || []);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Không thể gửi đánh giá');
@@ -246,7 +306,7 @@ export default function PtDetailPage() {
         try {
             await marketplaceService.deleteReview(pt.userId, reviewToDelete);
             toast.success("Xóa đánh giá thành công!");
-            const revRes = await marketplaceService.getPtReviews(pt.userId, { page: 0, size: 10 });
+            const revRes = await marketplaceService.getPtReviews(pt.userId, { page: 0, size: 100 });
             setReviews(revRes.data.data.content || []);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Không thể xóa đánh giá');
@@ -418,28 +478,40 @@ export default function PtDetailPage() {
 
     if (!pt) return null;
 
-    const showcase = pt.portfolioShowcase || {};
-    const transformations = showcase.transformations || [];
-    const coverPhoto = getPermanentUrl(showcase.coverPhotoUrl) || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1470&auto=format&fit=crop";
+    let showcase = pt.portfolioShowcase || pt.ptProfile?.portfolioShowcase || pt.showcase || {};
+    if (typeof showcase === 'string') {
+        try { showcase = JSON.parse(showcase); } catch (e) { showcase = {}; }
+    }
 
+    let transformations = showcase.transformations || pt.transformations || pt.ptProfile?.transformations || [];
+    if (typeof transformations === 'string') {
+        try { transformations = JSON.parse(transformations); } catch (e) { transformations = []; }
+    }
+
+    let certifications = pt.certifications || pt.ptProfile?.certifications || [];
+    if (typeof certifications === 'string') {
+        try { certifications = JSON.parse(certifications); } catch (e) { certifications = []; }
+    }
+
+    const displayRate = pt.offlineRate || pt.onlineRate || pt.hourlyRate;
+    const displayUnit = pt.offlineRateUnit || pt.onlineRateUnit || pt.rateUnit || 'SESSION_60';
+
+    const coverPhoto = getFullImageUrl(showcase.coverPhotoUrl || pt.coverPhotoUrl) || "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1470&auto=format&fit=crop";
     const userReview = reviews.find(r => r.reviewerId === user?.id);
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50/40 to-slate-50 pb-24 animate-fade-in relative">
 
-
             <div className="relative h-[350px] md:h-[420px] w-full overflow-hidden shadow-inner bg-slate-100">
                 <img src={coverPhoto} alt="Cover" className="absolute inset-0 w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/10"></div>
-                <button onClick={() => navigate(-1)} className="absolute top-6 left-6 z-20 flex items-center gap-2 text-white hover:text-white bg-black/30 hover:bg-black/50 px-5 py-2.5 rounded-full backdrop-blur-md transition-all font-bold border border-white/20 shadow-sm">
+                <button onClick={() => navigate(-1)} className="absolute top-6 left-6 z-20 flex items-center gap-2 text-white hover:text-white bg-black/30 hover:bg-black/50 px-5 py-2.5 rounded-full backdrop-blur-md transition-all font-bold border border-white/20 shadow-sm cursor-pointer">
                     <ArrowLeft className="w-4 h-4" /> Trở lại
                 </button>
             </div>
 
-
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 -mt-32 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-
 
                     <div className="lg:col-span-4 xl:col-span-3 sticky top-24 pt-16">
                         <div className="bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-slate-100 p-8 text-center relative backdrop-blur-xl">
@@ -447,7 +519,7 @@ export default function PtDetailPage() {
                             <div className="absolute -top-20 left-1/2 -translate-x-1/2 z-20">
                                 <div className="relative w-40 h-40">
                                     <div className="w-full h-full rounded-full border-[6px] border-white shadow-xl bg-slate-100 overflow-hidden">
-                                        <img src={pt.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(pt.fullName)}&size=200&background=random`} alt={pt.fullName} className="w-full h-full object-cover" />
+                                        <img src={getFullImageUrl(pt.avatarUrl) || `https://ui-avatars.com/api/?name=${encodeURIComponent(pt.fullName)}&size=200&background=random`} alt={pt.fullName} className="w-full h-full object-cover" />
                                     </div>
                                     {pt.isVerified && (
                                         <div className="absolute bottom-2 right-2 bg-white rounded-full p-1 shadow-lg border border-slate-50 z-30">
@@ -466,18 +538,18 @@ export default function PtDetailPage() {
 
                                 <div className="flex items-center justify-center gap-2 mt-5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100/50 rounded-2xl w-fit mx-auto px-5 py-2.5 shadow-sm">
                                     <Star className="w-5 h-5 fill-amber-400 text-amber-500 drop-shadow-sm" />
-                                    <span className="text-xl font-black text-amber-900">{pt.rating ? pt.rating.toFixed(1) : '5.0'}</span>
-                                    <span className="text-sm font-bold text-amber-700/60">({pt.totalReviews || 0} Đánh giá)</span>
+                                    <span className="text-xl font-black text-amber-900">{reviewStats.avg}</span>
+                                    <span className="text-sm font-bold text-amber-700/60">({reviewStats.total} Đánh giá)</span>
                                 </div>
 
                                 <div className="mt-8 space-y-3">
                                     {hireStatus === 'ACTIVE' || hireStatus === 'END_REQUESTED' ? (
-                                        <Button onClick={() => navigate('/chat', { state: { targetPtId: pt.userId } })} className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-bold rounded-2xl shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5">
+                                        <Button onClick={() => navigate('/chat', { state: { targetPtId: pt.userId } })} className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-bold rounded-2xl shadow-lg shadow-emerald-500/20 transition-all hover:-translate-y-0.5 cursor-pointer">
                                             <MessageSquare className="w-5 h-5 mr-2" /> Nhắn tin ngay
                                         </Button>
                                     ) : hireStatus === 'AWAITING_PAYMENT' ? (
                                         <div className="space-y-2">
-                                            <Button onClick={handlePayment} disabled={paying || payingWithWallet} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-black rounded-xl shadow-lg shadow-emerald-500/20">
+                                            <Button onClick={handlePayment} disabled={paying || payingWithWallet} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-black rounded-xl shadow-lg shadow-emerald-500/20 cursor-pointer">
                                                 <CreditCard className="w-4 h-4 mr-2" />
                                                 {paying ? 'Đang chuyển đến VNPay...' : 'Thanh toán qua VNPay'}
                                             </Button>
@@ -490,7 +562,7 @@ export default function PtDetailPage() {
                                                         <Button
                                                             onClick={handlePayWithWallet}
                                                             disabled={!enough || paying || payingWithWallet}
-                                                            className="w-full h-12 bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-base font-black rounded-xl disabled:opacity-50"
+                                                            className="w-full h-12 bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-base font-black rounded-xl disabled:opacity-50 cursor-pointer"
                                                         >
                                                             <Wallet className="w-4 h-4 mr-2" />
                                                             {payingWithWallet ? 'Đang xử lý...' : 'Thanh toán bằng số dư ví'}
@@ -534,7 +606,7 @@ export default function PtDetailPage() {
                                                     Đã hoàn thành khóa trước đó — có thể đăng ký lại
                                                 </p>
                                             )}
-                                            <Button onClick={openHireModal} disabled={hiring} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-base font-black rounded-2xl shadow-lg shadow-blue-500/20 transition-all group hover:-translate-y-0.5">
+                                            <Button onClick={openHireModal} disabled={hiring} className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white text-base font-black rounded-2xl shadow-lg shadow-blue-500/20 transition-all group hover:-translate-y-0.5 cursor-pointer">
                                                 <Send className={`w-5 h-5 mr-2 ${hiring ? 'animate-pulse' : 'group-hover:translate-x-1 transition-transform'}`} />
                                                 {hiring ? 'Đang gửi...' : hireStatus === 'COMPLETED' ? 'Đăng ký lại Coaching' : 'Đăng ký Coaching'}
                                             </Button>
@@ -559,7 +631,6 @@ export default function PtDetailPage() {
                             </div>
                         </div>
                     </div>
-
 
                     <div className="lg:col-span-8 xl:col-span-9 space-y-8 lg:mt-24">
 
@@ -586,9 +657,7 @@ export default function PtDetailPage() {
                             </div>
                         )}
 
-
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
 
                             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between">
                                 <div>
@@ -596,18 +665,26 @@ export default function PtDetailPage() {
                                         <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl"><Target className="w-5 h-5" /></div> Thông tin Dịch vụ
                                     </h3>
 
-                                    <div className="space-y-5">
+                                    <div className="space-y-4">
                                         <div className="flex items-center justify-between border-b border-slate-50 pb-3">
                                             <span className="text-slate-500 font-semibold flex items-center gap-2"><MapPin className="w-4 h-4"/> Hình thức</span>
                                             <span className="font-bold text-slate-800">{TRAINING_MODE_LABELS[pt.trainingMode] || '—'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+                                            <span className="text-slate-500 font-semibold flex items-center gap-2"><MapPin className="w-4 h-4"/> Địa điểm</span>
+                                            <span className="font-bold text-slate-800">{pt.location || 'Toàn quốc'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between border-b border-slate-50 pb-3">
+                                            <span className="text-slate-500 font-semibold flex items-center gap-2"><UserCircle className="w-4 h-4"/> Giới tính</span>
+                                            <span className="font-bold text-slate-800">{GENDER_LABEL[pt.gender] || pt.gender || '—'}</span>
                                         </div>
                                         <div className="flex items-center justify-between border-b border-slate-50 pb-3">
                                             <span className="text-slate-500 font-semibold flex items-center gap-2"><Briefcase className="w-4 h-4"/> Kinh nghiệm</span>
                                             <span className="font-bold text-slate-800">{pt.yearsOfExperience || 0} năm</span>
                                         </div>
                                         <div className="flex items-center justify-between border-b border-slate-50 pb-3">
-                                            <span className="text-slate-500 font-semibold flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/> Max Học viên</span>
-                                            <span className="font-bold text-slate-800">{pt.maxClients || '10'} người</span>
+                                            <span className="text-slate-500 font-semibold flex items-center gap-2"><Users className="w-4 h-4"/> Max Học viên</span>
+                                            <span className="font-bold text-slate-800">{pt.maxClients || 10} người</span>
                                         </div>
                                     </div>
                                 </div>
@@ -615,12 +692,11 @@ export default function PtDetailPage() {
                                 <div className="mt-6 p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex justify-between items-center">
                                     <span className="text-emerald-800 font-bold flex items-center gap-2"><Banknote className="w-5 h-5"/> Phí dịch vụ</span>
                                     <span className="text-lg font-black text-emerald-600">
-                                        {pt.hourlyRate ? parseInt(pt.hourlyRate).toLocaleString('vi-VN') + 'đ' : 'Liên hệ'}
-                                        <span className="text-xs font-semibold text-slate-500 ml-1">/ {RATE_UNIT_LABELS[pt.rateUnit] || 'buổi'}</span>
+                                        {displayRate ? parseInt(displayRate).toLocaleString('vi-VN') + 'đ' : 'Liên hệ'}
+                                        <span className="text-xs font-semibold text-slate-500 ml-1">/ {RATE_UNIT_LABELS[displayUnit] || displayUnit}</span>
                                     </span>
                                 </div>
                             </div>
-
 
                             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-6">
                                 <div>
@@ -636,7 +712,9 @@ export default function PtDetailPage() {
                                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Mục tiêu hỗ trợ</h3>
                                     <div className="flex flex-wrap gap-2">
                                         {pt.preferredGoals?.length > 0 ? pt.preferredGoals.map((goal, i) => (
-                                            <span key={i} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-bold px-3 py-1.5 rounded-lg">{GOAL_LABELS[goal] || goal}</span>
+                                            <span key={i} className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-xs font-bold px-3 py-1.5 rounded-lg">
+                                                {GOAL_LABELS[goal] || (goal === 'MUSCLE_GAIN' ? 'Tăng cơ' : goal)}
+                                            </span>
                                         )) : <span className="text-slate-400 text-sm italic">Đang cập nhật</span>}
                                     </div>
                                 </div>
@@ -651,28 +729,36 @@ export default function PtDetailPage() {
                                 </div>
                             </div>
 
-
-                            {pt.certifications?.length > 0 && (
+                            {certifications.length > 0 && (
                                 <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                                     <h3 className="text-xl font-black text-slate-800 mb-6 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><GraduationCap className="w-5 h-5" /></div> Bằng cấp & Chứng chỉ
+                                            <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><GraduationCap className="w-5 h-5" /></div> Bằng cấp & Chứng chỉ ({certifications.length})
                                         </div>
                                     </h3>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {pt.certifications.map((cert, i) => (
-                                            <div key={i} className="flex items-start gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors group">
-                                                <div className="w-12 h-12 bg-white rounded-full border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
-                                                    <ShieldCheck className="w-6 h-6 text-amber-500" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-bold text-slate-800 truncate">{cert.name}</h4>
-                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-1">{cert.issuingOrganization}</p>
-                                                    <p className="text-xs text-slate-500 mt-1">Cấp: {cert.issueDate}</p>
+                                        {certifications.map((cert, i) => (
+                                            <div key={i} className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors group">
+                                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                                    <div className="w-12 h-12 bg-white rounded-full border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
+                                                        <ShieldCheck className="w-6 h-6 text-amber-500" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <h4 className="font-extrabold text-slate-800 truncate text-sm">{cert.name}</h4>
+                                                        <p className="text-xs font-bold text-slate-500 mt-0.5">{cert.issuingOrganization}</p>
+                                                        <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-wider">
+                                                            Cấp: {formatMonthYear(cert.issueDate) || '—'} {cert.neverExpires ? '· Vô thời hạn ∞' : cert.expiryDate ? `đến ${formatMonthYear(cert.expiryDate)}` : ''}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                                 {cert.certificateImageUrl && (
-                                                    <button onClick={() => setLightboxImage(getFullImageUrl(cert.certificateImageUrl))} className="shrink-0 p-2 bg-white border border-slate-200 rounded-xl text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all cursor-zoom-in" title="Xem ảnh chứng chỉ">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setLightboxImage(getFullImageUrl(cert.certificateImageUrl))}
+                                                        className="shrink-0 p-2.5 bg-white border border-slate-200 rounded-xl text-blue-600 hover:bg-blue-50 transition-all cursor-zoom-in shadow-2xs"
+                                                        title="Xem ảnh chứng chỉ"
+                                                    >
                                                         <ImageIcon className="w-4 h-4" />
                                                     </button>
                                                 )}
@@ -683,9 +769,8 @@ export default function PtDetailPage() {
                             )}
                         </div>
 
-
                         {transformations.length > 0 && (
-                            <div className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                            <div className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm animate-fade-in">
                                 <h3 className="text-2xl font-black text-slate-800 mb-8 flex items-center gap-3">
                                     <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl"><Award className="w-6 h-6" /></div> Kết quả Học viên (Before & After)
                                 </h3>
@@ -696,27 +781,33 @@ export default function PtDetailPage() {
 
                                             <div className="relative w-full md:w-5/12 xl:w-2/5 flex shrink-0 bg-slate-100 overflow-hidden min-h-[300px]">
 
-                                                <div className="w-1/2 h-full border-r-[2px] border-white relative z-10">
+                                                <div className="w-1/2 h-full border-r-[2px] border-white relative z-10 group/img">
                                                     {t.beforeUrl ? (
-                                                        <img src={getPermanentUrl(t.beforeUrl)} alt="Before" className="w-full h-full object-cover" />
+                                                        <>
+                                                            <img src={getFullImageUrl(t.beforeUrl)} alt="Before" className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500" />
+                                                            <button onClick={() => setLightboxImage(getFullImageUrl(t.beforeUrl))} className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs">Phóng to</button>
+                                                        </>
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase">No Image</div>
                                                     )}
-                                                    <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm">Before</div>
+                                                    <div className="absolute bottom-4 left-4 bg-slate-900/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm pointer-events-none">Before</div>
                                                 </div>
 
-                                                <div className="w-1/2 h-full relative">
+                                                <div className="w-1/2 h-full relative group/img">
                                                     {t.afterUrl ? (
-                                                        <img src={getPermanentUrl(t.afterUrl)} alt="After" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                                        <>
+                                                            <img src={getFullImageUrl(t.afterUrl)} alt="After" className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500" />
+                                                            <button onClick={() => setLightboxImage(getFullImageUrl(t.afterUrl))} className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs">Phóng to</button>
+                                                        </>
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase">No Image</div>
                                                     )}
-                                                    <div className="absolute bottom-4 right-4 bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm">After</div>
+                                                    <div className="absolute bottom-4 right-4 bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm pointer-events-none">After</div>
                                                 </div>
                                             </div>
 
                                             <div className="p-8 sm:p-10 flex-1 flex flex-col justify-center bg-gradient-to-br from-slate-50 to-white">
-                                                <h4 className="font-extrabold text-2xl text-slate-900 mb-5 leading-tight">{t.title || 'Hành trình thay đổi'}</h4>
+                                                <h4 className="font-extrabold text-2xl text-slate-900 mb-5 leading-tight">{t.title || 'Hành trình thay đổi ngoạn mục'}</h4>
                                                 <p className="text-base text-slate-600 font-medium leading-relaxed whitespace-pre-line">{t.story}</p>
                                             </div>
                                         </div>
@@ -725,9 +816,11 @@ export default function PtDetailPage() {
                             </div>
                         )}
 
-
+                        {/* --- SECTION ĐÁNH GIÁ TỪ HỌC VIÊN ĐÃ NÂNG CẤP THỐNG KÊ & BỘ LỌC --- */}
                         <div id="review-form-section" className="bg-white p-8 sm:p-10 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-10 pb-8 border-b border-slate-100">
+
+                            {/* Title Header */}
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 pb-6 border-b border-slate-100">
                                 <div>
                                     <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3">
                                         <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl"><MessageSquare className="w-6 h-6" /></div> Đánh giá từ Học viên
@@ -735,12 +828,93 @@ export default function PtDetailPage() {
                                     <p className="text-sm font-medium text-slate-500 mt-2">Khách hàng nói gì về {pt.fullName}?</p>
                                 </div>
                                 {hireStatus === 'COMPLETED' && !userReview && !showReviewForm && (
-                                    <Button onClick={() => setShowReviewForm(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-12 px-8 shadow-lg shadow-blue-500/20 transition-all hover:-translate-y-0.5">
+                                    <Button onClick={() => setShowReviewForm(true)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold h-12 px-8 shadow-lg shadow-blue-500/20 transition-all hover:-translate-y-0.5 cursor-pointer">
                                         Viết đánh giá
                                     </Button>
                                 )}
                             </div>
 
+                            {/* --- KHỐI THỐNG KÊ TỔNG QUAN (REVIEW STATS DASHBOARD) --- */}
+                            <div className="bg-gradient-to-br from-slate-50 to-indigo-50/20 p-6 sm:p-8 rounded-[2rem] border border-slate-200/80 mb-8 grid grid-cols-1 md:grid-cols-12 gap-6 items-center shadow-2xs">
+                                {/* Left: Big Average Star */}
+                                <div className="md:col-span-5 flex flex-col items-center justify-center text-center md:border-r border-slate-200/60 md:pr-6">
+                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Điểm đánh giá trung bình</p>
+                                    <h4 className="text-6xl font-black text-amber-500 tracking-tight">{reviewStats.avg}</h4>
+                                    <div className="my-2.5">
+                                        {renderStars(Number(reviewStats.avg))}
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-600 bg-white px-3 py-1 rounded-full border border-slate-200/60 shadow-2xs">
+                                        Dựa trên <span className="text-blue-600">{reviewStats.total}</span> đánh giá từ học viên
+                                    </p>
+                                </div>
+
+                                {/* Right: Progress Bars Distribution */}
+                                <div className="md:col-span-7 space-y-2.5 md:pl-2">
+                                    {[5, 4, 3, 2, 1].map(star => {
+                                        const count = reviewStats.dist[star] || 0;
+                                        const percentage = reviewStats.total > 0 ? Math.round((count / reviewStats.total) * 100) : 0;
+                                        return (
+                                            <div key={star} className="flex items-center gap-3 text-xs font-bold">
+                                                <div className="flex items-center gap-1 w-12 shrink-0 text-slate-700">
+                                                    <span>{star}</span>
+                                                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                                                </div>
+                                                <div className="flex-1 h-2.5 bg-slate-200/80 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-amber-400 rounded-full transition-all duration-700 ease-out"
+                                                        style={{ width: `${percentage}%` }}
+                                                    />
+                                                </div>
+                                                <span className="w-16 shrink-0 text-right text-slate-500 font-semibold">
+                                                    {count} <span className="text-[10px] text-slate-400">({percentage}%)</span>
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* --- BỘ LỌC ĐÁNH GIÁ (FILTER PILLS BAR) --- */}
+                            <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-8 border-b border-slate-100 no-scrollbar">
+                                <span className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mr-2 shrink-0">
+                                    <Filter className="w-3.5 h-3.5 text-blue-600" /> Lọc theo:
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setStarFilter('ALL')}
+                                    className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${starFilter === 'ALL' ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10' : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200 border border-slate-200/60'}`}
+                                >
+                                    Tất cả ({reviewStats.total})
+                                </button>
+                                {[5, 4, 3, 2, 1].map(star => {
+                                    const count = reviewStats.dist[star] || 0;
+                                    if (count === 0 && reviewStats.total > 0) return null; // Ẩn mức sao không có đánh giá cho gọn
+                                    return (
+                                        <button
+                                            key={star}
+                                            type="button"
+                                            onClick={() => setStarFilter(String(star))}
+                                            className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 flex items-center gap-1 cursor-pointer ${starFilter === String(star) ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20' : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200 border border-slate-200/60'}`}
+                                        >
+                                            <span>{star}</span>
+                                            <Star className={`w-3 h-3 ${starFilter === String(star) ? 'fill-white text-white' : 'fill-amber-400 text-amber-500'}`} />
+                                            <span>({count})</span>
+                                        </button>
+                                    );
+                                })}
+                                {reviewStats.hasImageCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setStarFilter('IMAGE')}
+                                        className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ml-auto ${starFilter === 'IMAGE' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60'}`}
+                                    >
+                                        <ImageIcon2 className="w-3.5 h-3.5" />
+                                        <span>Có hình ảnh ({reviewStats.hasImageCount})</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Form viết/sửa đánh giá */}
                             {showReviewForm && (
                                 <Card className="p-8 bg-gradient-to-br from-blue-50/80 to-indigo-50/30 border-blue-100 rounded-3xl mb-12 animate-in slide-in-from-top-4 fade-in duration-300 shadow-sm">
                                     <h4 className="font-extrabold text-blue-900 mb-6 text-lg">{reviewData.id ? 'Chỉnh sửa đánh giá' : 'Chia sẻ trải nghiệm của bạn'}</h4>
@@ -797,8 +971,9 @@ export default function PtDetailPage() {
                                 </Card>
                             )}
 
+                            {/* Danh sách bài đánh giá (Đã tích hợp lọc) */}
                             <div className="space-y-6">
-                                {reviews.length > 0 ? reviews.map(r => (
+                                {displayedReviews.length > 0 ? displayedReviews.map(r => (
                                     <div key={r.id} className="p-6 sm:p-8 bg-gradient-to-br from-white to-slate-50/50 border border-slate-100 rounded-[2rem] shadow-sm hover:shadow-md transition-shadow relative group">
 
                                         {user?.id === r.reviewerId && !showReviewForm && (
@@ -819,7 +994,7 @@ export default function PtDetailPage() {
                                                 </div>
                                                 <div>
                                                     <p className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
-                                                        {r.reviewerName}
+                                                        {r.reviewerName || 'Học viên ẩn danh'}
                                                         {r.isAnonymous && <span className="bg-slate-800 text-white text-[10px] px-2.5 py-0.5 rounded-md uppercase tracking-wider font-bold shadow-sm">Ẩn danh</span>}
                                                     </p>
                                                     <div className="text-sm font-semibold text-slate-400 mt-1 flex items-center gap-1.5">
@@ -840,6 +1015,7 @@ export default function PtDetailPage() {
                                             {r.imageUrl && (
                                                 <div className="mt-5">
                                                     <button
+                                                        type="button"
                                                         onClick={() => setLightboxImage(getFullImageUrl(r.imageUrl))}
                                                         className="block w-32 h-32 rounded-2xl border-4 border-white shadow-md overflow-hidden cursor-zoom-in hover:scale-105 transition-transform"
                                                     >
@@ -850,12 +1026,19 @@ export default function PtDetailPage() {
                                         </div>
                                     </div>
                                 )) : (
-                                    <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-slate-200 shadow-sm">
-                                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-5 shadow-sm border border-slate-100">
-                                            <MessageSquare className="w-10 h-10 text-slate-300" />
+                                    <div className="text-center py-16 bg-slate-50/50 rounded-[2rem] border border-dashed border-slate-200 shadow-2xs">
+                                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-slate-100">
+                                            <Filter className="w-8 h-8 text-slate-300" />
                                         </div>
-                                        <h4 className="text-xl font-bold text-slate-800">Chưa có đánh giá nào</h4>
-                                        <p className="text-slate-500 font-medium mt-2 text-base">Hãy là người đầu tiên để lại nhận xét cho Huấn luyện viên này nhé.</p>
+                                        <h4 className="text-lg font-bold text-slate-700">Không tìm thấy đánh giá nào phù hợp</h4>
+                                        <p className="text-slate-400 font-medium mt-1 text-sm">Hãy thử chọn mức sao khác hoặc bấm &quot;Tất cả&quot; để xem toàn bộ danh sách.</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setStarFilter('ALL')}
+                                            className="mt-4 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs shadow-sm hover:bg-blue-700 transition-colors cursor-pointer"
+                                        >
+                                            Quay lại xem Tất cả ({reviewStats.total})
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -879,7 +1062,7 @@ export default function PtDetailPage() {
                         <button
                             type="button"
                             onClick={() => setSelectedMode('ONLINE')}
-                            className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${selectedMode === 'ONLINE' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-200'}`}
+                            className={`w-full rounded-2xl border-2 p-4 text-left transition-all cursor-pointer ${selectedMode === 'ONLINE' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-200'}`}
                         >
                             <div className="flex items-start gap-3">
                                 <div className="rounded-xl bg-blue-100 p-2 text-blue-700"><Wifi className="h-5 w-5" /></div>
@@ -900,7 +1083,7 @@ export default function PtDetailPage() {
                                 setSelectedVenueId(null);
                                 setSelectedSessions([]);
                             }}
-                            className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${selectedMode === 'OFFLINE' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-emerald-200'}`}
+                            className={`w-full rounded-2xl border-2 p-4 text-left transition-all cursor-pointer ${selectedMode === 'OFFLINE' ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-emerald-200'}`}
                         >
                             <div className="flex items-start gap-3">
                                 <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><MapPin className="h-5 w-5" /></div>
@@ -929,7 +1112,7 @@ export default function PtDetailPage() {
                                                     key={venue.id}
                                                     type="button"
                                                     onClick={() => setSelectedVenueId(venue.id)}
-                                                    className={`w-full rounded-xl border p-3 text-left ${selectedVenueId === venue.id ? 'border-emerald-500 bg-white' : 'border-slate-200 bg-white/70'}`}
+                                                    className={`w-full rounded-xl border p-3 text-left cursor-pointer ${selectedVenueId === venue.id ? 'border-emerald-500 bg-white' : 'border-slate-200 bg-white/70'}`}
                                                 >
                                                     <p className="font-bold text-slate-900">{venue.name}</p>
                                                     <p className="text-xs text-slate-600">{venue.address}</p>
@@ -1006,13 +1189,13 @@ export default function PtDetailPage() {
                             <Button
                                 variant="outline"
                                 onClick={closeDeleteModal}
-                                className="flex-1 rounded-xl font-bold border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 h-14 text-base transition-colors"
+                                className="flex-1 rounded-xl font-bold border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 h-14 text-base transition-colors cursor-pointer"
                             >
                                 Hủy bỏ
                             </Button>
                             <Button
                                 onClick={confirmDeleteReview}
-                                className="flex-1 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30 h-14 text-base transition-all hover:-translate-y-0.5"
+                                className="flex-1 rounded-xl font-bold bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/30 h-14 text-base transition-all hover:-translate-y-0.5 cursor-pointer"
                             >
                                 Xóa vĩnh viễn
                             </Button>
