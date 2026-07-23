@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.MacroNutrients;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.common.exception.ForbiddenException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.diet.entity.DietLog;
@@ -57,15 +58,16 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
         List<UUID> clientIds;
 
         if (clientId != null) {
-            boolean isActiveClient = mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                    ptId, clientId, ClientMappingStatus.ACTIVE);
+            boolean isActiveClient = mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                    ptId, clientId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED));
             if (!isActiveClient) {
-                throw new BadRequestException("You can only view pending logs from your active clients");
+                throw new ForbiddenException("Bạn chỉ xem được bữa chờ duyệt của học viên đang được bạn huấn luyện");
             }
             clientIds = List.of(clientId);
         } else {
             clientIds = mappingRepository.findByPtIdWithClients(ptId).stream()
-                    .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE)
+                    .filter(m -> m.getStatus() == ClientMappingStatus.ACTIVE
+                            || m.getStatus() == ClientMappingStatus.END_REQUESTED)
                     .map(m -> m.getClient().getId())
                     .toList();
         }
@@ -74,42 +76,66 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
             return ApiResponse.success(PageResponse.from(Page.empty(pageable)));
         }
 
-        Page<DietLog> logPage = dietLogRepository.findByCustomerIdInAndReviewStatus(
-                clientIds, DietLogReviewStatus.PENDING, pageable);
-
-        List<DietLogReviewResponse> filteredResponses = logPage.getContent().stream()
-                .filter(log -> log.getMacrosJson() != null && log.getMacrosJson().calories() != null)
-                .map(this::toReviewResponse)
-                .toList();
-
-        PageResponse<DietLogReviewResponse> customPageResponse = PageResponse.<DietLogReviewResponse>builder()
-                .content(filteredResponses)
-                .page(logPage.getNumber())
-                .size(logPage.getSize())
-                .totalElements(filteredResponses.size())
-                .totalPages((int) Math.ceil((double) filteredResponses.size() / size))
-                .last(logPage.isLast())
-                .build();
-
-        return ApiResponse.success(customPageResponse);
+        return ApiResponse.success(pagePendingWithCalories(clientIds, page, size));
     }
 
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<PageResponse<DietLogReviewResponse>> getClientDietLogs(
             UUID ptId, UUID clientId, int page, int size, DietLogReviewStatus reviewStatus) {
-        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                ptId, clientId, ClientMappingStatus.ACTIVE)) {
-            throw new BadRequestException("You can only view diet logs from your active clients");
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                ptId, clientId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))) {
+            throw new ForbiddenException("Bạn chỉ xem được nhật ký của học viên đang được bạn huấn luyện");
+        }
+
+        if (reviewStatus == DietLogReviewStatus.PENDING) {
+            return ApiResponse.success(pagePendingWithCalories(List.of(clientId), page, size));
         }
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("ptReviewedAt").descending()
                 .and(Sort.by("createdAt").descending()));
-        Page<DietLogReviewResponse> logPage = dietLogRepository
-                .findByCustomerIdInAndReviewStatus(List.of(clientId), reviewStatus, pageable)
-                .map(this::toReviewResponse);
+        Page<DietLog> rawPage = dietLogRepository
+                .findByCustomerIdInAndReviewStatus(List.of(clientId), reviewStatus, pageable);
 
-        return ApiResponse.success(PageResponse.from(logPage));
+        List<DietLogReviewResponse> content = rawPage.getContent().stream()
+                .map(this::toReviewResponse)
+                .toList();
+
+        PageResponse<DietLogReviewResponse> response = PageResponse.<DietLogReviewResponse>builder()
+                .content(content)
+                .page(rawPage.getNumber())
+                .size(rawPage.getSize())
+                .totalElements(rawPage.getTotalElements())
+                .totalPages(rawPage.getTotalPages())
+                .last(rawPage.isLast())
+                .build();
+
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * PENDING chỉ hiện khi có calo — paginate ở DB (jsonb), mỗi page đủ size trừ trang cuối.
+     */
+    private PageResponse<DietLogReviewResponse> pagePendingWithCalories(
+            List<UUID> clientIds, int page, int size) {
+        int safeSize = Math.max(size, 1);
+        int safePage = Math.max(page, 0);
+        // Native query đã ORDER BY created_at DESC — Pageable unsorted tránh double-sort lỗi.
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+        Page<DietLog> logPage = dietLogRepository.findPendingWithCaloriesByCustomerIds(
+                clientIds, DietLogReviewStatus.PENDING.name(), pageable);
+        List<DietLogReviewResponse> content = logPage.getContent().stream()
+                .map(this::toReviewResponse)
+                .toList();
+        return PageResponse.<DietLogReviewResponse>builder()
+                .content(content)
+                .page(logPage.getNumber())
+                .size(logPage.getSize())
+                .totalElements(logPage.getTotalElements())
+                .totalPages(logPage.getTotalPages())
+                .first(logPage.isFirst())
+                .last(logPage.isLast())
+                .build();
     }
 
     @Override
@@ -121,9 +147,14 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
         userRepository.findById(ptId)
                 .orElseThrow(() -> new ResourceNotFoundException("PT", ptId));
 
-        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                ptId, dietLog.getCustomerId(), ClientMappingStatus.ACTIVE)) {
-            throw new BadRequestException("You can only review logs from your active clients");
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                ptId, dietLog.getCustomerId(),
+                List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))) {
+            throw new ForbiddenException("Bạn chỉ duyệt được bữa ăn của học viên đang được bạn huấn luyện");
+        }
+
+        if (dietLog.getReviewStatus() != DietLogReviewStatus.PENDING) {
+            throw new BadRequestException("Chỉ duyệt bữa đang chờ xử lý");
         }
 
         dietLog.setPtReviewerId(ptId);
@@ -178,8 +209,10 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
     public ApiResponse<DietLogReviewResponse> submitBlindEstimate(UUID logId, UUID ptId, BlindEstimateRequest request) {
         DietLog dietLog = dietLogRepository.findByIdWithCustomer(logId)
                 .orElseThrow(() -> new ResourceNotFoundException("DietLog", logId));
-        if (!mappingRepository.existsByPt_IdAndClient_Id(ptId, dietLog.getCustomerId())) {
-            throw new BadRequestException("You can only estimate logs from your assigned clients");
+        if (!mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                ptId, dietLog.getCustomerId(),
+                List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED))) {
+            throw new ForbiddenException("Bạn chỉ ước lượng macro cho học viên đang được bạn huấn luyện");
         }
         MacroNutrients blind = MacroUtils.buildAdjustedMacroMap(
                 request.getCalories(), request.getProtein(), request.getCarb(), request.getFat());

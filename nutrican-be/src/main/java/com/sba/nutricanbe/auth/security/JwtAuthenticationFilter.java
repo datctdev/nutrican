@@ -4,6 +4,7 @@ import com.sba.nutricanbe.auth.service.TokenRevocationService;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.common.enums.UserStatus;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.user.service.UserAccountStatusHelper;
 import com.sba.nutricanbe.common.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -31,6 +32,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
     private final TokenRevocationService tokenRevocationService;
+    private final UserAccountStatusHelper userAccountStatusHelper;
 
     @Override
     protected void doFilterInternal(
@@ -84,8 +86,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean isActiveForAuthentication(User user) {
-        return user != null
-                && user.getStatus() != UserStatus.SUSPENDED
-                && user.getStatus() != UserStatus.INACTIVE;
+        if (user == null) return false;
+        if (user.getStatus() == UserStatus.INACTIVE) return false;
+        return userAccountStatusHelper.ensureActiveOrLiftExpired(user);
     }
 }

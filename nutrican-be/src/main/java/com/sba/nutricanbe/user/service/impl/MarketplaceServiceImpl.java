@@ -10,6 +10,7 @@ import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.Tier;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.common.enums.UserRole;
+import com.sba.nutricanbe.common.enums.UserStatus;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
@@ -25,6 +26,7 @@ import com.sba.nutricanbe.user.service.PtVenueAvailabilityService;
 import com.sba.nutricanbe.user.dto.MappingSessionResponse;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import com.sba.nutricanbe.user.service.MarketplaceService;
+import com.sba.nutricanbe.user.service.UserAccountStatusHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -82,6 +84,11 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         }
 
         java.util.List<PtProfileResponse> mapped = page.getContent().stream()
+                .filter(profile -> {
+                    if (profile.getUser() == null) return false;
+                    if (profile.getUser().getStatus() == UserStatus.INACTIVE) return false;
+                    return !UserAccountStatusHelper.isCurrentlySuspended(profile.getUser());
+                })
                 .map(profile -> enrichSearchResult(profile, request))
                 .filter(r -> matchesFilters(r, request))
                 .toList();
@@ -306,7 +313,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
                 .orElseThrow(() -> new ResourceNotFoundException("PT Profile", ptId));
 
         Double avgRating = reviewRepository.findAverageRatingByPtId(ptId);
-        profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.valueOf(5.0));
+        profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.ZERO);
         profile.setTotalReviews((int) reviewRepository.countByPtId(ptId));
         ptProfileRepository.save(profile);
 
@@ -359,7 +366,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         PtProfile profile = ptProfileRepository.findByUserId(ptId).orElse(null);
         if (profile != null) {
             Double avgRating = reviewRepository.findAverageRatingByPtId(ptId);
-            profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.valueOf(5.0));
+            profile.setRating(avgRating != null ? BigDecimal.valueOf(avgRating) : BigDecimal.ZERO);
             profile.setTotalReviews((int) reviewRepository.countByPtId(ptId));
             ptProfileRepository.save(profile);
         }

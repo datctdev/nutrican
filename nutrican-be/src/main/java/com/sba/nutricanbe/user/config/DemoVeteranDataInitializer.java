@@ -29,12 +29,18 @@ import com.sba.nutricanbe.diet.repository.SelfPlanSubmissionRepository;
 import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.user.entity.ClientGoal;
 import com.sba.nutricanbe.user.entity.MacroTarget;
+import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.repository.ClientGoalRepository;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
+import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.chat.entity.ChatMessage;
+import com.sba.nutricanbe.chat.enums.ChatMessageType;
+import com.sba.nutricanbe.chat.repository.ChatMessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -74,6 +80,8 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
     private final BodyMetricRepository bodyMetricRepository;
     private final ClientGoalRepository clientGoalRepository;
     private final MacroTargetRepository macroTargetRepository;
+    private final PtClientMappingRepository mappingRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
 
     private static final double[] MEAL_CAL_SHARE = {0.22, 0.28, 0.18, 0.27, 0.05};
@@ -135,7 +143,94 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             refreshYesterdayOvernightDemo(coached, food, today, pt);
             refreshTodayLateTickDemo(coached, food, today);
             refreshTodayEveningReviewDemo(coached, pt, food, today);
+            ensureDemoMappingReady(pt, coached);
+            refreshDemoChatHistory(pt, coached);
         }));
+    }
+
+    /** Ensure ACTIVE mapping + coachingStartedAt (≥8 days ago) for weekly-summary / chat demos. */
+    private void ensureDemoMappingReady(User pt, User coached) {
+        mappingRepository.findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(pt.getId(), coached.getId())
+                .ifPresentOrElse(mapping -> {
+                    boolean dirty = false;
+                    if (mapping.getStatus() != ClientMappingStatus.ACTIVE) {
+                        mapping.setStatus(ClientMappingStatus.ACTIVE);
+                        dirty = true;
+                    }
+                    if (mapping.getCoachingStartedAt() == null
+                            || mapping.getCoachingStartedAt().toLocalDate().isAfter(DietDates.todayVn().minusDays(8))) {
+                        mapping.setCoachingStartedAt(DietDates.nowVn().minusDays(14));
+                        dirty = true;
+                    }
+                    if (dirty) {
+                        mappingRepository.save(mapping);
+                        log.info("Demo mapping ready: {} ↔ {} (coachingStartedAt={})",
+                                pt.getEmail(), coached.getEmail(), mapping.getCoachingStartedAt());
+                    }
+                }, () -> {
+                    PtClientMapping created = mappingRepository.save(PtClientMapping.builder()
+                            .pt(pt)
+                            .client(coached)
+                            .status(ClientMappingStatus.ACTIVE)
+                            .coachingStartedAt(DietDates.nowVn().minusDays(14))
+                            .build());
+                    log.info("Created demo ACTIVE mapping {} for chat/progress", created.getId());
+                });
+    }
+
+    /**
+     * Seed ~45 messages across several days so FE scroll-up pagination can be demoed.
+     * Idempotent: skips when mapping already has ≥40 messages.
+     */
+    private void refreshDemoChatHistory(User pt, User coached) {
+        Optional<PtClientMapping> mappingOpt = mappingRepository
+                .findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(pt.getId(), coached.getId());
+        if (mappingOpt.isEmpty() || mappingOpt.get().getStatus() != ClientMappingStatus.ACTIVE) {
+            return;
+        }
+        PtClientMapping mapping = mappingOpt.get();
+        long existing = chatMessageRepository
+                .findByMappingIdOrderByCreatedAtDesc(mapping.getId(),
+                        org.springframework.data.domain.PageRequest.of(0, 1))
+                .getTotalElements();
+        if (existing >= 40) {
+            return;
+        }
+
+        String[] ptLines = {
+                "Chào bạn, hôm nay mình check tiến độ nhé.",
+                "Calo sáng ổn rồi, nhớ uống đủ nước.",
+                "Buổi chiều ưu tiên protein trước tinh bột.",
+                "Nếu đói nhẹ có thể thêm sữa chua không đường.",
+                "Mai gửi ảnh InBody nếu tiện nhé."
+        };
+        String[] clientLines = {
+                "Dạ em chào PT ạ.",
+                "Em vừa cập nhật cân nặng rồi ạ.",
+                "Bữa trưa em ăn cơm tấm, hơi no.",
+                "Em sẽ chỉnh lại khẩu phần tối.",
+                "Cảm ơn PT, em làm theo."
+        };
+
+        int saved = 0;
+        for (int day = 0; day < 5; day++) {
+            for (int i = 0; i < 9; i++) {
+                boolean fromPt = i % 2 == 0;
+                String content = fromPt
+                        ? ptLines[i % ptLines.length] + " (ngày " + (day + 1) + "#" + (i + 1) + ")"
+                        : clientLines[i % clientLines.length] + " (ngày " + (day + 1) + "#" + (i + 1) + ")";
+                chatMessageRepository.save(ChatMessage.builder()
+                        .mappingId(mapping.getId())
+                        .senderId(fromPt ? pt.getId() : coached.getId())
+                        .recipientId(fromPt ? coached.getId() : pt.getId())
+                        .content(content)
+                        .messageType(ChatMessageType.TEXT)
+                        .build());
+                saved++;
+            }
+        }
+        chatMessageRepository.stampDemoChatTimestamps(mapping.getId());
+        log.info("Demo chat seeded {} messages for mapping {}", saved, mapping.getId());
     }
 
 

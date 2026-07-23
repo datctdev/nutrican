@@ -222,6 +222,19 @@ export function addDaysIso(iso, delta) {
 
 
 export const DEMO_VN_CLOCK_KEY = 'nutrican.demoVnClock';
+const DEMO_VN_CLOCK_OS_PREF_KEY = 'nutrican.demoVnClock.preferOsV1';
+
+/** One-time: clear frozen demo clock so plan day follows OS / Asia/Ho_Chi_Minh. */
+(function preferOsClockOnce() {
+    try {
+        if (!localStorage.getItem(DEMO_VN_CLOCK_OS_PREF_KEY)) {
+            localStorage.removeItem(DEMO_VN_CLOCK_KEY);
+            localStorage.setItem(DEMO_VN_CLOCK_OS_PREF_KEY, '1');
+        }
+    } catch {
+        // ignore
+    }
+})();
 
 export function getDemoVnClock() {
     try {

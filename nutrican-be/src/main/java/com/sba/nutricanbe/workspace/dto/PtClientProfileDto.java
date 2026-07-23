@@ -1,5 +1,6 @@
 package com.sba.nutricanbe.workspace.dto;
 
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.DietPreference;
 import com.sba.nutricanbe.user.enums.NutritionGoal;
 
@@ -26,10 +27,14 @@ public class PtClientProfileDto {
     private LocalDate dateOfBirth;
     private BigDecimal weight;
     private BigDecimal bodyFatPercent;
+    /** Read-only on GET: mirrors MacroTarget.dailyCalories. PUT ignores this field (use macro-target). */
     private BigDecimal tdee;
     private String allergyNotes;
+    /** Food catalog codes (additive; keeps allergyNotes free-text). */
+    private List<String> allergicFoodCodes;
     private DietPreference dietPreference;
     private String specialNotes;
+    private ActivityLevel activityLevel;
 
     private NutritionGoal nutritionGoal;
     private BigDecimal protein;

@@ -26,6 +26,8 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
 
     Page<PtClientMapping> findByPt_IdAndStatusIn(UUID ptId, List<ClientMappingStatus> statuses, Pageable pageable);
 
+    List<PtClientMapping> findAllByPt_IdAndStatusIn(UUID ptId, List<ClientMappingStatus> statuses);
+
     Page<PtClientMapping> findByClient_Id(UUID clientId, Pageable pageable);
 
     Optional<PtClientMapping> findFirstByPt_IdAndClient_IdOrderByCreatedAtDesc(
@@ -47,6 +49,10 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
     boolean existsByPt_IdAndClient_Id(UUID ptId, UUID clientId);
 
     boolean existsByPt_IdAndClient_IdAndStatus(UUID ptId, UUID clientId, ClientMappingStatus status);
+
+    boolean existsByPt_IdAndClient_IdAndStatusIn(UUID ptId, UUID clientId, List<ClientMappingStatus> statuses);
+
+    boolean existsByClient_IdAndStatusIn(UUID clientId, List<ClientMappingStatus> statuses);
 
     @Query("""
             SELECT m FROM PtClientMapping m
@@ -104,6 +110,12 @@ public interface PtClientMappingRepository extends JpaRepository<PtClientMapping
             ClientMappingStatus status, java.time.LocalDateTime paymentDueAt);
 
     List<PtClientMapping> findByClient_IdAndStatusOrderByCompletedAtDesc(UUID clientId, ClientMappingStatus status);
+
+    List<PtClientMapping> findByClient_IdAndStatusIn(UUID clientId, List<ClientMappingStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<PtClientMapping> findByStatusAndCreatedAtBefore(
+            ClientMappingStatus status, LocalDateTime createdAt);
 
     List<PtClientMapping> findBySelectedTrainingModeAndStatusAndPeriodEndsAtBefore(
             TrainingMode selectedTrainingMode,

@@ -48,6 +48,12 @@ public class BodyMetricServiceImpl implements BodyMetricService {
     @Override
     @Transactional
     public BodyMetric recordMetric(UUID userId, BodyMetricRequest request) {
+        if (request.getWeight() == null || request.getWeight().signum() <= 0) {
+            throw new BadRequestException("Cân nặng là bắt buộc và phải lớn hơn 0");
+        }
+        if (request.getWeight().compareTo(new BigDecimal("300")) > 0) {
+            throw new BadRequestException("Cân nặng không hợp lệ");
+        }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
         LocalDate date = request.getRecordDate() != null ? request.getRecordDate() : LocalDate.now();
@@ -88,8 +94,8 @@ public class BodyMetricServiceImpl implements BodyMetricService {
     @Override
     @Transactional(readOnly = true)
     public Page<BodyMetricDto> listMetricsForClient(UUID ptId, UUID clientId, Pageable pageable) {
-        boolean allowed = mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                ptId, clientId, ClientMappingStatus.ACTIVE);
+        boolean allowed = mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(
+                ptId, clientId, List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED));
         if (!allowed) {
             throw new UnauthorizedException("No active mapping with this client");
         }

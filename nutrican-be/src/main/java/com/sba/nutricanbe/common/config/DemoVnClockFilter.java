@@ -22,7 +22,7 @@ public class DemoVnClockFilter extends OncePerRequestFilter {
     private final boolean allowClientClock;
 
     public DemoVnClockFilter(
-            @Value("${nutrican.demo.allow-client-clock:true}") boolean allowClientClock,
+            @Value("${nutrican.demo.allow-client-clock:false}") boolean allowClientClock,
             @Value("${nutrican.demo.vn-clock:}") String fixedClock) {
         this.allowClientClock = allowClientClock;
         LocalDateTime fixed = DietDates.parseDemoClock(fixedClock);

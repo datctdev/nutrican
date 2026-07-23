@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.diet.entity;
 
 import com.sba.nutricanbe.common.entity.BaseEntity;
+import com.sba.nutricanbe.diet.enums.MealPlanWeekBasis;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,6 +25,12 @@ public class MealPlan extends BaseEntity {
 
     @Column(name = "week_start", nullable = false)
     private LocalDate weekStart;
+
+    /** Additive: MONDAY = legacy calendar week; COACHING = coachingStartedAt + 7*i. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "week_basis", length = 20)
+    @Builder.Default
+    private MealPlanWeekBasis weekBasis = MealPlanWeekBasis.MONDAY;
 
     @Column(columnDefinition = "TEXT")
     private String notes;

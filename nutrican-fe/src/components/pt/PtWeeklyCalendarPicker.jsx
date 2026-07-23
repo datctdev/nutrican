@@ -11,6 +11,10 @@ import {
   DAY_LABELS,
 } from '../../utils/offlineHireSlots';
 
+/**
+ * Weekly free/busy slot picker (hire Extra + PT add/reschedule).
+ * Additive props: selectionMode, showPackageTotal, now — defaults preserve Extra buy UX.
+ */
 export default function PtWeeklyCalendarPicker({
   availability = [],
   occupiedSlots = [],
@@ -19,14 +23,18 @@ export default function PtWeeklyCalendarPicker({
   weeksAhead = 8,
   selectedSessions = [],
   onSelectedSessionsChange,
+  selectionMode = 'multi',
+  showPackageTotal = true,
+  now: nowProp = null,
 }) {
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
-  const minWeek = getWeekStart(new Date());
+  const clock = nowProp instanceof Date && !Number.isNaN(nowProp.getTime()) ? nowProp : new Date();
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(clock));
+  const minWeek = getWeekStart(clock);
   const maxWeek = addWeeks(minWeek, weeksAhead - 1);
 
   const weekSlots = useMemo(
-    () => generateWeeklySlots(availability, rateUnit, weekStart, occupiedSlots),
-    [availability, rateUnit, weekStart, occupiedSlots],
+    () => generateWeeklySlots(availability, rateUnit, weekStart, occupiedSlots, clock),
+    [availability, rateUnit, weekStart, occupiedSlots, clock],
   );
 
   const slotsByDay = useMemo(() => {
@@ -41,6 +49,14 @@ export default function PtWeeklyCalendarPicker({
   const selectedSet = useMemo(() => new Set(selectedSessions), [selectedSessions]);
 
   const toggleSlot = (iso) => {
+    if (selectionMode === 'single') {
+      if (selectedSet.has(iso)) {
+        onSelectedSessionsChange([]);
+      } else {
+        onSelectedSessionsChange([iso]);
+      }
+      return;
+    }
     if (selectedSet.has(iso)) {
       onSelectedSessionsChange(selectedSessions.filter((s) => s !== iso));
     } else {
@@ -98,13 +114,20 @@ export default function PtWeeklyCalendarPicker({
         ))}
       </div>
 
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-        <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Tổng gói</p>
-        <p className="mt-1 text-sm font-bold text-slate-800">
-          {selectedSessions.length} buổi × {Number(perSessionRate).toLocaleString('vi-VN')}đ/buổi ({duration} phút)
+      {showPackageTotal && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+          <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Tổng gói</p>
+          <p className="mt-1 text-sm font-bold text-slate-800">
+            {selectedSessions.length} buổi × {Number(perSessionRate).toLocaleString('vi-VN')}đ/buổi ({duration} phút)
+          </p>
+          <p className="mt-1 text-lg font-black text-emerald-700">{total.toLocaleString('vi-VN')}đ</p>
+        </div>
+      )}
+      {selectionMode === 'single' && !showPackageTotal && (
+        <p className="text-xs text-slate-500">
+          Mỗi ô = {duration} phút trong khung nhận HV. Slot bận đã ẩn.
         </p>
-        <p className="mt-1 text-lg font-black text-emerald-700">{total.toLocaleString('vi-VN')}đ</p>
-      </div>
+      )}
     </div>
   );
 }

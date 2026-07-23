@@ -32,11 +32,11 @@ public class AppointmentSlotHelper {
 
     public void validateSlot(LocalDateTime start, LocalDateTime end) {
         if (!end.isAfter(start)) {
-            throw new BadRequestException("endTime must be after startTime");
+            throw new BadRequestException("Giờ kết thúc phải sau giờ bắt đầu");
         }
         long minutes = Duration.between(start, end).toMinutes();
         if (minutes < MIN_MINUTES || minutes > MAX_MINUTES) {
-            throw new BadRequestException("Appointment slot must be between 30 and 120 minutes");
+            throw new BadRequestException("Mỗi buổi tập phải từ 30 đến 120 phút");
         }
     }
 
@@ -57,14 +57,14 @@ public class AppointmentSlotHelper {
 
     public void assertNoOverlap(UUID ptId, LocalDateTime start, LocalDateTime end, UUID excludeApptId) {
         if (hasOverlap(ptId, start, end, excludeApptId)) {
-            throw new BadRequestException("PT has overlapping appointment or held slot");
+            throw new BadRequestException("Khung giờ này trùng lịch hẹn hoặc slot đang giữ của PT");
         }
     }
 
     public void assertNoOverlapExcludingMapping(
             UUID ptId, LocalDateTime start, LocalDateTime end, UUID excludeMappingId) {
         if (hasOverlapExcludingMapping(ptId, start, end, excludeMappingId)) {
-            throw new BadRequestException("PT has overlapping appointment or held slot");
+            throw new BadRequestException("Khung giờ này trùng lịch hẹn hoặc slot đang giữ của PT");
         }
     }
 
@@ -74,7 +74,7 @@ public class AppointmentSlotHelper {
             for (int j = i + 1; j < slots.size(); j++) {
                 LocalDateTime[] right = slots.get(j);
                 if (left[0].isBefore(right[1]) && right[0].isBefore(left[1])) {
-                    throw new BadRequestException("Selected sessions overlap each other");
+                    throw new BadRequestException("Các buổi đã chọn trùng giờ với nhau");
                 }
             }
         }
@@ -121,21 +121,21 @@ public class AppointmentSlotHelper {
         List<PtAvailabilityWindow> windows = availabilityRepository
                 .findByPtProfile_IdOrderByDayOfWeekAscStartTimeAsc(ptProfileId);
         if (windows.isEmpty()) {
-            throw new BadRequestException("PT has not configured availability");
+            throw new BadRequestException("PT chưa cấu hình khung giờ nhận học viên");
         }
         DayOfWeek day = start.getDayOfWeek();
         int dayOfWeek = day.getValue();
         LocalTime slotStart = start.toLocalTime();
         LocalTime slotEnd = end.toLocalTime();
         if (!start.toLocalDate().equals(end.toLocalDate())) {
-            throw new BadRequestException("First session must start and end on the same day");
+            throw new BadRequestException("Buổi tập phải bắt đầu và kết thúc trong cùng một ngày");
         }
         boolean fits = windows.stream()
                 .filter(window -> window.getDayOfWeek().equals(dayOfWeek))
                 .anyMatch(window -> !slotStart.isBefore(window.getStartTime())
                         && !slotEnd.isAfter(window.getEndTime()));
         if (!fits) {
-            throw new BadRequestException("Selected time is outside PT availability");
+            throw new BadRequestException("Khung giờ nằm ngoài lịch nhận học viên của PT");
         }
     }
 
@@ -144,20 +144,20 @@ public class AppointmentSlotHelper {
             LocalDateTime start,
             LocalDateTime end) {
         if (windows == null || windows.isEmpty()) {
-            throw new BadRequestException("PT has not configured availability");
+            throw new BadRequestException("PT chưa cấu hình khung giờ nhận học viên");
         }
         int dayOfWeek = start.getDayOfWeek().getValue();
         LocalTime slotStart = start.toLocalTime();
         LocalTime slotEnd = end.toLocalTime();
         if (!start.toLocalDate().equals(end.toLocalDate())) {
-            throw new BadRequestException("First session must start and end on the same day");
+            throw new BadRequestException("Buổi tập phải bắt đầu và kết thúc trong cùng một ngày");
         }
         boolean fits = windows.stream()
                 .filter(window -> window.getDayOfWeek().equals(dayOfWeek))
                 .anyMatch(window -> !slotStart.isBefore(window.getStartTime())
                         && !slotEnd.isAfter(window.getEndTime()));
         if (!fits) {
-            throw new BadRequestException("Selected time is outside PT availability");
+            throw new BadRequestException("Khung giờ nằm ngoài lịch nhận học viên của PT");
         }
     }
 }

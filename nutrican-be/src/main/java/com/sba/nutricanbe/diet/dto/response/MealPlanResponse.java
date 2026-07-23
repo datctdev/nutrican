@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.diet.dto.response;
 
 import com.sba.nutricanbe.diet.entity.MealPlan;
+import com.sba.nutricanbe.diet.enums.MealPlanWeekBasis;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +22,8 @@ public class MealPlanResponse {
     private UUID clientId;
     private UUID ptId;
     private LocalDate weekStart;
+    /** MONDAY | COACHING — additive for dual week model. */
+    private String weekBasis;
     private String notes;
     private Boolean isPublished;
 
@@ -32,6 +35,7 @@ public class MealPlanResponse {
                 .clientId(plan.getClientId())
                 .ptId(plan.getPtId())
                 .weekStart(plan.getWeekStart())
+                .weekBasis(plan.getWeekBasis() != null ? plan.getWeekBasis().name() : MealPlanWeekBasis.MONDAY.name())
                 .notes(plan.getNotes())
                 .isPublished(plan.getIsPublished())
                 .build();

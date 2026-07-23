@@ -26,7 +26,7 @@ public class FinanceAdminController {
     public ResponseEntity<ApiResponse<FinanceOverviewDto>> overview(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
-        return ResponseEntity.ok(financeAdminService.getOverview(from, to));
+        return ResponseEntity.ok(ApiResponse.success(financeAdminService.getOverview(from, to)));
     }
 
     @GetMapping("/transactions")
@@ -36,6 +36,7 @@ public class FinanceAdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(financeAdminService.getTransactions(type, from, to, page, size));
+        return ResponseEntity.ok(ApiResponse.success(
+                financeAdminService.getTransactions(type, from, to, page, size)));
     }
 }

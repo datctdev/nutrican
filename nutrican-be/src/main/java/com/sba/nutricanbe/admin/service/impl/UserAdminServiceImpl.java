@@ -9,6 +9,8 @@ import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.user.repository.UserRepository;
+import com.sba.nutricanbe.user.service.PtSuspendSettlementService;
+import com.sba.nutricanbe.user.service.UserAccountStatusHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -26,6 +28,8 @@ import java.util.UUID;
 public class UserAdminServiceImpl implements UserAdminService {
 
     private final UserRepository userRepository;
+    private final UserAccountStatusHelper userAccountStatusHelper;
+    private final PtSuspendSettlementService suspendSettlementService;
 
     @Override
     @Transactional(readOnly = true)
@@ -57,10 +61,25 @@ public class UserAdminServiceImpl implements UserAdminService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
-        user.setStatus(UserStatus.valueOf(newStatus));
-        userRepository.save(user);
+        UserStatus status = UserStatus.valueOf(newStatus);
+        if (status == UserStatus.ACTIVE) {
+            userAccountStatusHelper.unsuspendUser(user);
+        } else if (status == UserStatus.SUSPENDED) {
+            if (isPtRole(user.getRole())) {
+                suspendSettlementService.settleAllForSuspendedPt(user.getId());
+            }
+            // Indefinite lock from User Management (no days picker on this screen)
+            userAccountStatusHelper.suspendUser(user, null);
+        } else {
+            user.setStatus(status);
+            userRepository.save(user);
+        }
         log.info("User {} status updated to {}", userId, newStatus);
         return ApiResponse.success(null, "User status updated");
+    }
+
+    private static boolean isPtRole(UserRole role) {
+        return role == UserRole.PT_CERTIFIED || role == UserRole.PT_FREELANCE;
     }
 
     private UserAdminDto toDto(User user) {

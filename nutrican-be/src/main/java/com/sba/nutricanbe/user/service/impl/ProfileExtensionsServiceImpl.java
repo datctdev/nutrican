@@ -53,16 +53,29 @@ public class ProfileExtensionsServiceImpl implements ProfileExtensionsService {
     @Transactional
     public void updatePreferences(UUID userId, UserPreferencesRequest request) {
         User user = loadUser(userId);
+        boolean coached = dietLogHelper.hasActivePt(userId);
         if (request.getDietPreference() != null) {
             user.setDietPreference(request.getDietPreference());
         }
         if (request.getNutritionGoal() != null) {
+            if (coached) {
+                throw new BadRequestException(
+                        "Mục tiêu dinh dưỡng đang do PT quản lý — liên hệ PT để thay đổi");
+            }
             user.setNutritionGoal(request.getNutritionGoal());
         }
         if (request.getActivityLevel() != null) {
+            if (coached) {
+                throw new BadRequestException(
+                        "Mức vận động đang do PT quản lý — liên hệ PT để thay đổi");
+            }
             user.setActivityLevel(request.getActivityLevel());
         }
         if (request.getPregnancyTrimester() != null) {
+            if (coached) {
+                throw new BadRequestException(
+                        "Thông tin thai kỳ coaching đang do PT quản lý — liên hệ PT để thay đổi");
+            }
             user.setPregnancyTrimester(request.getPregnancyTrimester());
         }
         if (request.getNotificationOptIn() != null) {

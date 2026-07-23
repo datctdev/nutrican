@@ -25,6 +25,7 @@ import { isMealPeriodOpen, canLateTickMealPeriod, nowInVn, todayLocalIso } from 
 import ImageLightbox from '../../components/common/ImageLightbox';
 import WithdrawModal from '../../components/wallet/WithdrawModal';
 import PtWeeklyCalendarPicker from '../../components/pt/PtWeeklyCalendarPicker';
+import { preferMealPlanWeekStartIso } from '../../utils/coachingWeeks';
 import CoachingTimetable, { mergeTimetableSources } from '../../components/coaching/CoachingTimetable';
 import SessionConfirmPanel from '../../components/coaching/SessionConfirmPanel';
 import SessionDisputeThread from '../../components/coaching/SessionDisputeThread';
@@ -47,8 +48,11 @@ function toLocalDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-function getCurrentWeekStart() {
-  const date = new Date();
+function getCurrentWeekStart(coachingStartedAt) {
+  if (coachingStartedAt) {
+    return preferMealPlanWeekStartIso(coachingStartedAt, nowInVn());
+  }
+  const date = nowInVn();
   const daysSinceMonday = (date.getDay() + 6) % 7;
   date.setHours(0, 0, 0, 0);
   date.setDate(date.getDate() - daysSinceMonday);
@@ -155,6 +159,13 @@ export default function CoachingPage() {
 
   const [endCoachingLoading, setEndCoachingLoading] = useState(false);
   const [endCoachingModalOpen, setEndCoachingModalOpen] = useState(false);
+  const [reportPtOpen, setReportPtOpen] = useState(false);
+  const [reportPtReason, setReportPtReason] = useState('');
+  const [reportMappingId, setReportMappingId] = useState(null);
+  const [reportingPt, setReportingPt] = useState(false);
+  const [reportEvidenceFiles, setReportEvidenceFiles] = useState([]);
+  const [reportEvidencePreviews, setReportEvidencePreviews] = useState([]);
+  const [myPtReports, setMyPtReports] = useState([]);
   const [refundForm, setRefundForm] = useState({ mappingId: '', reason: 'CUSTOMER_REQUEST', note: '' });
   const [submittingRefund, setSubmittingRefund] = useState(false);
   const [coachingHistory, setCoachingHistory] = useState([]);
@@ -228,6 +239,10 @@ export default function CoachingPage() {
       profileExtensionsService.getSessionDisputes({ status: 'PENDING' })
         .then((r) => setMyDisputes(r.data?.data || []))
         .catch(() => setMyDisputes([]));
+
+      profileExtensionsService.getMyPtReports()
+        .then((r) => setMyPtReports(r.data?.data || []))
+        .catch(() => setMyPtReports([]));
 
       if (activeThreads.length > 0) {
         setRefundForm((f) => ({ ...f, mappingId: activeThreads[0].mappingId }));
@@ -476,6 +491,98 @@ export default function CoachingPage() {
 
   const activeThread = ptThreads.find(t => t.mappingId === activeMappingId);
 
+  const openReportPtModal = (mappingId) => {
+    if (!mappingId) return;
+    setReportMappingId(mappingId);
+    setReportPtReason('');
+    setReportEvidenceFiles([]);
+    setReportEvidencePreviews((prev) => {
+      prev.forEach((url) => URL.revokeObjectURL(url));
+      return [];
+    });
+    setReportPtOpen(true);
+  };
+
+  const clearReportEvidence = () => {
+    setReportEvidencePreviews((prev) => {
+      prev.forEach((url) => URL.revokeObjectURL(url));
+      return [];
+    });
+    setReportEvidenceFiles([]);
+  };
+
+  const onReportEvidenceChange = (e) => {
+    const picked = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!picked.length) return;
+    const next = [...reportEvidenceFiles, ...picked].slice(0, 3);
+    setReportEvidencePreviews((prev) => {
+      prev.forEach((url) => URL.revokeObjectURL(url));
+      return next.map((f) => URL.createObjectURL(f));
+    });
+    setReportEvidenceFiles(next);
+  };
+
+  const removeReportEvidenceAt = (idx) => {
+    setReportEvidenceFiles((files) => files.filter((_, i) => i !== idx));
+    setReportEvidencePreviews((prev) => {
+      const url = prev[idx];
+      if (url) URL.revokeObjectURL(url);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  const loadMyPtReports = useCallback(() => {
+    profileExtensionsService.getMyPtReports()
+      .then((r) => setMyPtReports(r.data?.data || []))
+      .catch(() => setMyPtReports([]));
+  }, []);
+
+  const hasPendingReportFor = (mappingId) =>
+    Boolean(mappingId) && myPtReports.some(
+      (r) => String(r.mappingId) === String(mappingId) && r.status === 'PENDING',
+    );
+
+  const reportOutcomeLabel = (r) => {
+    if (r.status === 'PENDING') return 'Đang chờ admin xem xét';
+    if (r.status === 'DISMISSED' && r.falseReport) {
+      return 'Admin đánh dấu báo cáo giả — tạm không báo cáo lại PT này trong 7 ngày';
+    }
+    if (r.status === 'DISMISSED') return 'Admin đóng: không đủ căn cứ / không vi phạm';
+    if (r.status === 'REVIEWED' && r.ptSuspended) {
+      if (r.ptCurrentlySuspended === false) {
+        return 'Admin đã khóa PT (đã mở lại) — bạn có thể thuê lại trên marketplace';
+      }
+      if (r.suspendUntil) {
+        return `Admin đã khóa PT đến ${new Date(r.suspendUntil).toLocaleString('vi-VN')} — tiền buổi chưa dạy đã hoàn ví`;
+      }
+      return 'Admin đã khóa PT — buổi chưa dạy đã hủy, tiền còn lại đã về ví';
+    }
+    if (r.status === 'REVIEWED') return 'Admin đã tiếp nhận / xử lý';
+    return r.status;
+  };
+
+  const recentPtSuspendRefund = myPtReports.find(
+    (r) => r.status === 'REVIEWED' && r.ptSuspended,
+  );
+
+  const reportReasonLen = reportPtReason.trim().length;
+  const canSubmitReportPt =
+    reportReasonLen >= 10
+    && reportReasonLen <= 1000
+    && Boolean(reportMappingId)
+    && reportEvidenceFiles.length >= 1
+    && reportEvidenceFiles.length <= 3;
+
+  useEffect(() => {
+    loadMyPtReports();
+  }, [loadMyPtReports]);
+
+  useEffect(() => {
+    if (activeTab === 'contract') loadMyPtReports();
+  }, [activeTab, loadMyPtReports]);
+
+
   const fetchMealPlan = async (requestedWeekStart) => {
     setLoadingMealPlan(true);
     try {
@@ -483,7 +590,8 @@ export default function CoachingPage() {
       const availableWeeks = weeksRes.data.data || [];
       setMealPlanWeeks(availableWeeks);
 
-      const currentWeekStart = getCurrentWeekStart();
+      const thread = ptThreads.find((t) => t.mappingId === activeMappingId);
+      const currentWeekStart = getCurrentWeekStart(thread?.coachingStartedAt);
       const requestedWeekExists = availableWeeks.some(
         (week) => week.weekStart === requestedWeekStart,
       );
@@ -543,8 +651,12 @@ export default function CoachingPage() {
     if (!cancelApptId) return;
     setCancellingAppt(true);
     try {
-      await appointmentService.cancel(cancelApptId);
-      toast.success('Đã hủy lịch — hoàn tiền buổi chưa dạy vào ví (nếu còn trong escrow)');
+      const res = await appointmentService.cancel(cancelApptId);
+      const msg = res?.data?.message;
+      const refunded = Number(res?.data?.data?.refundedAmount || 0);
+      if (msg) toast.success(msg);
+      else if (refunded > 0) toast.success(`Đã hủy buổi và hoàn ${refunded.toLocaleString('vi-VN')}đ vào ví`);
+      else toast.success('Đã hủy buổi (không còn tiền trong escrow để hoàn)');
       setCancelApptId(null);
       fetchAppointments();
       profileExtensionsService.getMySessions()
@@ -902,6 +1014,19 @@ export default function CoachingPage() {
     }
   };
 
+  const hasBlockingSessions = mySessions.some(
+    (s) => s.status === 'AWAITING_CONFIRM' || s.status === 'DISPUTED'
+  );
+  const blockingEndToast =
+    'Không thể kết thúc coaching khi còn buổi chờ xác nhận hoặc đang tranh chấp.';
+  const openEndCoachingModal = () => {
+    if (hasBlockingSessions) {
+      toast.error(blockingEndToast);
+      return;
+    }
+    setEndCoachingModalOpen(true);
+  };
+
   return (
     <div className="max-w-7xl mx-auto pb-12 animate-fade-in px-4">
 
@@ -1030,6 +1155,28 @@ export default function CoachingPage() {
         onDispute={(sessionId, reason) => handleDisputeSession(sessionId, reason)}
       />
 
+      {recentPtSuspendRefund && (
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-amber-900">
+              {recentPtSuspendRefund.ptCurrentlySuspended === false
+                ? 'PT đã được mở khóa'
+                : 'PT của bạn đã bị khóa'}
+            </p>
+            <p className="text-xs text-amber-800 mt-0.5">
+              {recentPtSuspendRefund.ptCurrentlySuspended === false
+                ? 'Quan hệ coaching cũ đã kết thúc. Bạn có thể thuê lại PT này (hoặc PT khác) trên marketplace.'
+                : 'Buổi chưa dạy đã hủy; phí còn lại đã hoàn về ví. Bạn có thể thuê PT khác trên marketplace.'}
+            </p>
+          </div>
+          <Link to="/marketplace">
+            <Button size="sm" className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 shrink-0">
+              Tới Chợ PT
+            </Button>
+          </Link>
+        </div>
+      )}
+
       {myDisputes.length > 0 && (
         <div className="mb-6 space-y-3">
           <h2 className="text-sm font-black uppercase tracking-wider text-rose-700">
@@ -1048,6 +1195,7 @@ export default function CoachingPage() {
       )}
 
       {ptThreads.length === 0 ? (
+        !openHireRequest && (
         <div className="text-center py-16 px-4 bg-white border border-slate-200 rounded-3xl shadow-sm max-w-2xl mx-auto">
           <User className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800">Bạn chưa kết nối với Huấn luyện viên (PT)</h3>
@@ -1066,16 +1214,31 @@ export default function CoachingPage() {
             <div className="mt-12 pt-8 border-t border-slate-100 text-left max-w-md mx-auto space-y-3">
               <p className="text-xs font-black text-slate-450 uppercase tracking-wider">Lịch sử coaching trước đây</p>
               {coachingHistory.map((h) => (
-                <div key={h.mappingId} className="flex justify-between items-center text-sm text-slate-600 border border-slate-100 rounded-xl px-4 py-2.5 bg-slate-50/50">
-                  <span className="font-bold text-slate-700">{h.ptName}</span>
-                  <span className="text-xs text-slate-400">
-                    {h.completedAt ? new Date(h.completedAt).toLocaleDateString('vi-VN') : '—'}
-                  </span>
+                <div key={h.mappingId} className="flex justify-between items-center gap-3 text-sm text-slate-600 border border-slate-100 rounded-xl px-4 py-2.5 bg-slate-50/50">
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-700 block truncate">{h.ptName}</span>
+                    <span className="text-xs text-slate-400">
+                      {h.completedAt ? new Date(h.completedAt).toLocaleDateString('vi-VN') : '—'}
+                    </span>
+                  </div>
+                  {h.mappingId && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-bold disabled:opacity-50"
+                      disabled={hasPendingReportFor(h.mappingId)}
+                      onClick={() => openReportPtModal(h.mappingId)}
+                    >
+                      {hasPendingReportFor(h.mappingId) ? 'Đã gửi (chờ)' : 'Báo cáo PT'}
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
+        )
       ) : (
         <div className="flex flex-col lg:flex-row gap-8">
 
@@ -1159,12 +1322,24 @@ export default function CoachingPage() {
                           <img src={activeThread.participantAvatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
                         ) : getInitials(activeThread?.participantName)}
                       </div>
-                      <div>
-                        <h3 className="font-extrabold text-slate-800 text-base">{activeThread?.participantName}</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-extrabold text-slate-800 text-base truncate">{activeThread?.participantName}</h3>
                         <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Huấn luyện viên trực tiếp
                         </p>
                       </div>
+                      {activeMappingId && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-bold disabled:opacity-50"
+                          disabled={hasPendingReportFor(activeMappingId)}
+                          onClick={() => openReportPtModal(activeMappingId)}
+                        >
+                          {hasPendingReportFor(activeMappingId) ? 'Đã báo cáo' : 'Báo cáo PT'}
+                        </Button>
+                      )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-5 bg-slate-50/50 space-y-4">
@@ -1313,6 +1488,7 @@ export default function CoachingPage() {
                             value={selectedMealPlanWeek}
                             loading={loadingMealPlan}
                             onChange={fetchMealPlan}
+                            coachingStartedAt={activeThread?.coachingStartedAt}
                           />
                         )}
                         {mealPlanItems.length > 0 && (
@@ -1536,27 +1712,98 @@ export default function CoachingPage() {
                               Đang chờ Huấn luyện viên xác nhận kết thúc
                             </Button>
                           ) : (
-                            <Button onClick={() => setEndCoachingModalOpen(true)} disabled={endCoachingLoading} className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 font-bold px-5">
+                            <Button
+                              onClick={openEndCoachingModal}
+                              disabled={endCoachingLoading || hasBlockingSessions}
+                              title={hasBlockingSessions ? blockingEndToast : undefined}
+                              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 font-bold px-5 disabled:opacity-50"
+                            >
                               Xác nhận kết thúc coaching
                             </Button>
                           )
                         ) : (
-                          <Button variant="outline" onClick={() => setEndCoachingModalOpen(true)} disabled={endCoachingLoading} className="rounded-xl border-amber-250 text-amber-800 hover:bg-amber-50 font-bold px-5">
+                          <Button
+                            variant="outline"
+                            onClick={openEndCoachingModal}
+                            disabled={endCoachingLoading || hasBlockingSessions}
+                            title={hasBlockingSessions ? blockingEndToast : undefined}
+                            className="rounded-xl border-amber-250 text-amber-800 hover:bg-amber-50 font-bold px-5 disabled:opacity-50"
+                          >
                             Yêu cầu kết thúc coaching
+                          </Button>
+                        )}
+                        {activeMappingId && (
+                          <Button
+                            variant="outline"
+                            onClick={() => openReportPtModal(activeMappingId)}
+                            disabled={hasPendingReportFor(activeMappingId)}
+                            className="rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 font-bold px-5 disabled:opacity-50"
+                          >
+                            {hasPendingReportFor(activeMappingId) ? 'Đã gửi báo cáo (chờ admin)' : 'Báo cáo PT lên admin'}
                           </Button>
                         )}
                       </div>
                     </div>
 
+                    {myPtReports.length > 0 && (
+                      <div className="space-y-2 pt-4 border-t border-slate-100">
+                        <p className="text-xs font-black text-slate-450 uppercase tracking-widest">Báo cáo đã gửi</p>
+                        {myPtReports.map((r) => (
+                          <div key={r.id} className="text-sm border border-slate-100 rounded-xl px-4 py-2.5 bg-slate-50/50 space-y-2">
+                            <div className="flex justify-between gap-2">
+                              <span className="font-bold text-slate-700 truncate">{r.ptName || 'PT'}</span>
+                              <span className={`text-[11px] font-bold shrink-0 text-right ${
+                                r.status === 'PENDING' ? 'text-amber-600'
+                                  : r.status === 'REVIEWED' ? 'text-emerald-600' : 'text-slate-500'
+                              }`}
+                              >
+                                {reportOutcomeLabel(r)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 line-clamp-2 whitespace-pre-wrap">{r.reason}</p>
+                            {Array.isArray(r.evidenceUrls) && r.evidenceUrls.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {r.evidenceUrls.map((url) => (
+                                  <a key={url} href={url} target="_blank" rel="noreferrer" className="block">
+                                    <img src={url} alt="Bằng chứng" className="w-14 h-14 rounded-lg object-cover border border-slate-200" />
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                            {r.adminNote && (
+                              <p className="text-[11px] text-slate-500">Admin: {r.adminNote}</p>
+                            )}
+                            <p className="text-[10px] text-slate-400">
+                              {r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {coachingHistory.length > 0 && (
                       <div className="space-y-2 pt-4 border-t border-slate-100">
                         <p className="text-xs font-black text-slate-450 uppercase tracking-widest">Lịch sử coaching trước đây</p>
                         {coachingHistory.map((h) => (
-                          <div key={h.mappingId} className="flex justify-between items-center text-sm text-slate-650 border border-slate-100 rounded-xl px-4 py-2.5 bg-slate-50/50">
-                            <span className="font-bold text-slate-700">{h.ptName}</span>
-                            <span className="text-xs text-slate-400">
-                              {h.completedAt ? new Date(h.completedAt).toLocaleDateString('vi-VN') : '—'}
-                            </span>
+                          <div key={h.mappingId} className="flex justify-between items-center gap-3 text-sm text-slate-650 border border-slate-100 rounded-xl px-4 py-2.5 bg-slate-50/50">
+                            <div className="min-w-0">
+                              <span className="font-bold text-slate-700 block truncate">{h.ptName}</span>
+                              <span className="text-xs text-slate-400">
+                                {h.completedAt ? new Date(h.completedAt).toLocaleDateString('vi-VN') : '—'}
+                              </span>
+                            </div>
+                            {h.mappingId && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="shrink-0 rounded-xl border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-bold disabled:opacity-50"
+                                disabled={hasPendingReportFor(h.mappingId)}
+                                onClick={() => openReportPtModal(h.mappingId)}
+                              >
+                                {hasPendingReportFor(h.mappingId) ? 'Đã gửi (chờ)' : 'Báo cáo PT'}
+                              </Button>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1623,6 +1870,10 @@ export default function CoachingPage() {
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setEndCoachingModalOpen(false)} className="rounded-xl">Hủy</Button>
             <Button className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold" onClick={async () => {
+              if (hasBlockingSessions) {
+                toast.error(blockingEndToast);
+                return;
+              }
               setEndCoachingLoading(true);
               try {
                 if (mappingStatus === 'END_REQUESTED') {
@@ -1639,8 +1890,113 @@ export default function CoachingPage() {
               } finally {
                 setEndCoachingLoading(false);
               }
-            }} disabled={endCoachingLoading}>
+            }} disabled={endCoachingLoading || hasBlockingSessions}>
               {endCoachingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Xác nhận'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={reportPtOpen}
+        onClose={() => {
+          setReportPtOpen(false);
+          setReportMappingId(null);
+          setReportPtReason('');
+          clearReportEvidence();
+        }}
+        title="Báo cáo PT lên admin"
+        size="md"
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Mô tả sự việc và đính kèm ít nhất 1 ảnh bằng chứng (tối đa 3 ảnh, JPEG/PNG/WebP, mỗi ảnh ≤ 5MB).
+            Admin sẽ xem xét; bạn theo dõi trạng thái ở tab Hợp đồng.
+          </p>
+          <textarea
+            rows={4}
+            maxLength={1000}
+            value={reportPtReason}
+            onChange={(e) => setReportPtReason(e.target.value)}
+            placeholder="Mô tả sự việc (tối thiểu 10 ký tự)…"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm resize-none"
+          />
+          <div className="flex justify-between text-[11px] text-slate-400">
+            <span>{reportReasonLen < 10 ? `Còn thiếu ${10 - reportReasonLen} ký tự` : 'Đủ độ dài tối thiểu'}</span>
+            <span>{reportReasonLen}/1000</span>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-650 block">Bằng chứng ảnh (bắt buộc)</label>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={onReportEvidenceChange}
+              className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-bold"
+            />
+            {reportEvidencePreviews.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {reportEvidencePreviews.map((url, idx) => (
+                  <div key={url} className="relative">
+                    <img src={url} alt={`Evidence ${idx + 1}`} className="w-16 h-16 rounded-lg object-cover border border-slate-200" />
+                    <button
+                      type="button"
+                      onClick={() => removeReportEvidenceAt(idx)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-slate-400">
+              {reportEvidenceFiles.length === 0
+                ? 'Chưa có ảnh — bắt buộc ít nhất 1 ảnh'
+                : `${reportEvidenceFiles.length}/3 ảnh`}
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => {
+                setReportPtOpen(false);
+                setReportMappingId(null);
+                setReportPtReason('');
+                clearReportEvidence();
+              }}
+            >
+              Hủy
+            </Button>
+            <Button
+              className="rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold disabled:opacity-50"
+              disabled={reportingPt || !canSubmitReportPt}
+              onClick={async () => {
+                if (!canSubmitReportPt) {
+                  toast.error('Cần lý do 10–1000 ký tự và ít nhất 1 ảnh bằng chứng');
+                  return;
+                }
+                setReportingPt(true);
+                try {
+                  const formData = new FormData();
+                  formData.append('reason', reportPtReason.trim());
+                  reportEvidenceFiles.forEach((f) => formData.append('files', f));
+                  await profileExtensionsService.reportPt(reportMappingId, formData);
+                  toast.success('Đã nhận báo cáo — admin đang xem xét');
+                  setReportPtOpen(false);
+                  setReportPtReason('');
+                  setReportMappingId(null);
+                  clearReportEvidence();
+                  loadMyPtReports();
+                } catch (e) {
+                  toast.error(e.response?.data?.message || 'Không gửi được báo cáo');
+                } finally {
+                  setReportingPt(false);
+                }
+              }}
+            >
+              {reportingPt ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Gửi báo cáo'}
             </Button>
           </div>
         </div>

@@ -31,4 +31,5 @@ public class ChatThreadResponse {
     private String venueName;
     private LocalDateTime periodEndsAt;
     private UUID ptProfileId;
+    private LocalDateTime coachingStartedAt;
 }

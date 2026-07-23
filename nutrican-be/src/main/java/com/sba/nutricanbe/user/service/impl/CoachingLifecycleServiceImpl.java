@@ -35,6 +35,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,15 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
         PtClientMapping mapping = resolveActiveMapping(actorId, clientId, actorIsPt);
         if (mapping.getStatus() == ClientMappingStatus.END_REQUESTED) {
             throw new BadRequestException("End coaching already requested");
+        }
+        if (mapping.getSelectedTrainingMode() == TrainingMode.OFFLINE) {
+            long blocking = mappingSessionRepository.countByMappingIdAndStatusIn(
+                    mapping.getId(),
+                    List.of(MappingSessionStatus.AWAITING_CONFIRM, MappingSessionStatus.DISPUTED));
+            if (blocking > 0) {
+                throw new BadRequestException(
+                        "Cannot end coaching while sessions are awaiting confirmation or disputed");
+            }
         }
         mapping.setStatus(ClientMappingStatus.END_REQUESTED);
         mapping.setEndRequestedBy(actorIsPt ? CoachingEndRequestedBy.PT : CoachingEndRequestedBy.CUSTOMER);
@@ -203,8 +213,17 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
     @Override
     @Transactional(readOnly = true)
     public List<CoachingHistoryDto> getCoachingHistory(UUID customerId) {
-        return mappingRepository.findByClient_IdAndStatusOrderByCompletedAtDesc(
-                        customerId, ClientMappingStatus.COMPLETED).stream()
+        return mappingRepository.findByClient_IdAndStatusIn(
+                        customerId,
+                        List.of(ClientMappingStatus.COMPLETED, ClientMappingStatus.INACTIVE))
+                .stream()
+                .filter(m -> m.getStatus() == ClientMappingStatus.COMPLETED
+                        || m.getCoachingStartedAt() != null)
+                .sorted(Comparator.comparing(
+                        (PtClientMapping m) -> m.getCompletedAt() != null
+                                ? m.getCompletedAt()
+                                : m.getCoachingStartedAt(),
+                        Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(m -> {
                     boolean hasReviewed = reviewRepository.existsByPtIdAndReviewerId(m.getPt().getId(), customerId);
 

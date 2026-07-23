@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.dto.MappingSessionResponse;
 import com.sba.nutricanbe.user.dto.SessionDisputeMessageRequest;
@@ -30,9 +31,12 @@ import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.MappingSessionConfirmService;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -47,8 +51,8 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
-@RequiredArgsConstructor
 public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmService {
 
     private final PtMappingSessionRepository sessionRepository;
@@ -58,9 +62,29 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
     private final UserRepository userRepository;
     private final CoachingWalletService walletService;
     private final WebSocketSessionService webSocketSessionService;
+    private final MappingSessionConfirmService self;
 
     @Value("${app.session.confirm-timeout-hours:24}")
     private int confirmTimeoutHours;
+
+    public MappingSessionConfirmServiceImpl(
+            PtMappingSessionRepository sessionRepository,
+            PtClientMappingRepository mappingRepository,
+            SessionDisputeRepository disputeRepository,
+            SessionDisputeMessageRepository messageRepository,
+            UserRepository userRepository,
+            CoachingWalletService walletService,
+            WebSocketSessionService webSocketSessionService,
+            @Lazy MappingSessionConfirmService self) {
+        this.sessionRepository = sessionRepository;
+        this.mappingRepository = mappingRepository;
+        this.disputeRepository = disputeRepository;
+        this.messageRepository = messageRepository;
+        this.userRepository = userRepository;
+        this.walletService = walletService;
+        this.webSocketSessionService = webSocketSessionService;
+        this.self = self;
+    }
 
     @Override
     @Transactional
@@ -74,8 +98,11 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
         if (session.getStatus() != MappingSessionStatus.SCHEDULED) {
             throw new BadRequestException("Session cannot be marked done in status " + session.getStatus());
         }
+        LocalDateTime now = DietDates.nowVn();
+        if (session.getStartTime() != null && session.getStartTime().isAfter(now)) {
+            throw new BadRequestException("Chỉ xác nhận đã dạy khi buổi đã bắt đầu");
+        }
 
-        LocalDateTime now = LocalDateTime.now();
         session.setStatus(MappingSessionStatus.AWAITING_CONFIRM);
         session.setPtMarkedDoneAt(now);
         session.setConfirmDeadlineAt(now.plusHours(confirmTimeoutHours));
@@ -154,7 +181,7 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public MappingSessionResponse autoConfirmExpired(UUID sessionId) {
         PtMappingSession session = sessionRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Mapping session", sessionId));
@@ -166,17 +193,16 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
     }
 
     @Override
-    @Transactional
     public int autoConfirmOverdueSessions() {
         List<PtMappingSession> overdue = sessionRepository.findByStatusAndConfirmDeadlineAtBefore(
-                MappingSessionStatus.AWAITING_CONFIRM, LocalDateTime.now());
+                MappingSessionStatus.AWAITING_CONFIRM, DietDates.nowVn());
         int count = 0;
         for (PtMappingSession session : overdue) {
             try {
-                autoConfirmExpired(session.getId());
+                self.autoConfirmExpired(session.getId());
                 count++;
-            } catch (RuntimeException ignored) {
-                // continue other sessions
+            } catch (RuntimeException ex) {
+                log.warn("Auto-confirm failed for session {}: {}", session.getId(), ex.getMessage());
             }
         }
         return count;
@@ -330,13 +356,13 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
         }
 
         if (ptAmount.signum() > 0 && customerAmount.signum() > 0) {
-            walletService.settleSplit(mapping.getId(), ptAmount, customerAmount,
+            walletService.forceSettleSplit(mapping.getId(), ptAmount, customerAmount,
                     "SESSION_DISPUTE", dispute.getId(), "Admin split session dispute");
         } else if (ptAmount.signum() > 0) {
-            walletService.releaseToPt(mapping.getId(), ptAmount,
+            walletService.forceReleaseToPt(mapping.getId(), ptAmount,
                     "SESSION_DISPUTE", dispute.getId(), "Admin awarded session to PT");
         } else if (customerAmount.signum() > 0) {
-            walletService.refundToCustomer(mapping.getId(), customerAmount,
+            walletService.forceRefundToCustomer(mapping.getId(), customerAmount,
                     "SESSION_DISPUTE", dispute.getId(), "Admin refunded disputed session to customer");
         }
 
