@@ -117,5 +117,21 @@ public class PtClientMapping extends BaseEntity {
 
     @Column(name = "coaching_eval_updated_at")
     private LocalDateTime coachingEvalUpdatedAt;
+
+    /**
+     * Whether the PT wants notification-center/toast notifications for messages
+     * received from this client. Messages themselves are always delivered.
+     */
+    @Column(name = "pt_chat_notifications_enabled", nullable = false)
+    @Builder.Default
+    private boolean ptChatNotificationsEnabled = true;
+
+    /**
+     * Whether the client wants notification-center/toast notifications for
+     * messages received from this PT. Messages themselves are always delivered.
+     */
+    @Column(name = "client_chat_notifications_enabled", nullable = false)
+    @Builder.Default
+    private boolean clientChatNotificationsEnabled = true;
 }
 

@@ -3,7 +3,6 @@ package com.sba.nutricanbe.workspace.handler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sba.nutricanbe.chat.dto.ChatMessageRequest;
-import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
 import com.sba.nutricanbe.chat.service.ChatService;
 import com.sba.nutricanbe.common.util.JwtUtil;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
@@ -25,7 +24,6 @@ public class WorkspaceWebSocketHandler extends TextWebSocketHandler {
 
     private static final String USER_ID_ATTRIBUTE = "USER_ID";
     private static final String CHAT_SEND_EVENT = "CHAT_SEND";
-    private static final String CHAT_MESSAGE_EVENT = "CHAT_MESSAGE";
     private static final String ERROR_EVENT = "ERROR";
 
     private final JwtUtil jwtUtil;
@@ -92,12 +90,7 @@ public class WorkspaceWebSocketHandler extends TextWebSocketHandler {
 
     private void handleChatSend(UUID senderId, JsonNode data) {
         ChatMessageRequest request = objectMapper.convertValue(data, ChatMessageRequest.class);
-        ChatMessageResponse response = chatService.sendMessage(senderId, request);
-
-        sessionService.sendToUser(senderId, CHAT_MESSAGE_EVENT, response);
-        if (!senderId.equals(response.getRecipientId())) {
-            sessionService.sendToUser(response.getRecipientId(), CHAT_MESSAGE_EVENT, response);
-        }
+        chatService.sendMessage(senderId, request);
     }
 
     private void sendError(WebSocketSession session, String message) throws Exception {

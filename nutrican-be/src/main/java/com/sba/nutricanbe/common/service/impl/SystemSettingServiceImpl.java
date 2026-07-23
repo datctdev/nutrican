@@ -2,9 +2,11 @@ package com.sba.nutricanbe.common.service.impl;
 
 import com.sba.nutricanbe.common.entity.SystemSetting;
 import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.common.event.PlatformFeeUpdatedEvent;
 import com.sba.nutricanbe.common.repository.SystemSettingRepository;
 import com.sba.nutricanbe.common.service.SystemSettingService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     public static final String PLATFORM_FEE_RATE_DEFAULT = "10";
 
     private final SystemSettingRepository systemSettingRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -63,10 +66,27 @@ public class SystemSettingServiceImpl implements SystemSettingService {
         if (rate == null || rate.signum() < 0 || rate.compareTo(BigDecimal.valueOf(100)) > 0) {
             throw new BadRequestException("Platform fee rate must be between 0 and 100");
         }
+        BigDecimal normalizedRate = rate.stripTrailingZeros();
+        BigDecimal previousRate = systemSettingRepository.findById(PLATFORM_FEE_RATE)
+                .map(SystemSetting::getValue)
+                .map(this::parseRateOrNull)
+                .orElse(null);
+        if (previousRate != null && previousRate.compareTo(normalizedRate) == 0) {
+            return;
+        }
         SystemSetting setting = SystemSetting.builder()
                 .key(PLATFORM_FEE_RATE)
-                .value(rate.stripTrailingZeros().toPlainString())
+                .value(normalizedRate.toPlainString())
                 .build();
         systemSettingRepository.save(setting);
+        eventPublisher.publishEvent(new PlatformFeeUpdatedEvent(previousRate, normalizedRate));
+    }
+
+    private BigDecimal parseRateOrNull(String value) {
+        try {
+            return value != null ? new BigDecimal(value) : null;
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 }

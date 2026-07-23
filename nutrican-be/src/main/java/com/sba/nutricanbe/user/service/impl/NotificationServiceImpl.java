@@ -1,6 +1,8 @@
 package com.sba.nutricanbe.user.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sba.nutricanbe.chat.dto.ChatMessageResponse;
+import com.sba.nutricanbe.chat.enums.ChatMessageType;
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
@@ -75,8 +77,8 @@ public class NotificationServiceImpl implements NotificationService {
         if (user == null) {
             return;
         }
-        String title = eventToTitle(event);
-        String body = summarizeData(data);
+        String title = eventToTitle(event, data);
+        String body = summarizeEventData(event, data);
         Notification notification = Notification.builder()
                 .user(user)
                 .type(event)
@@ -157,7 +159,13 @@ public class NotificationServiceImpl implements NotificationService {
         };
     }
 
-    private String eventToTitle(String event) {
+    private String eventToTitle(String event, Object data) {
+        if ("CHAT_MESSAGE".equals(event) && data instanceof ChatMessageResponse message) {
+            String senderName = message.getSenderName();
+            return senderName != null && !senderName.isBlank()
+                    ? "Tin nhắn mới từ " + senderName
+                    : "Tin nhắn mới";
+        }
         return switch (event) {
             case "NEW_DIET_LOG" -> "Nhật ký ăn mới";
             case "DIET_LOG_REVIEWED" -> "PT đã duyệt nhật ký";
@@ -178,6 +186,20 @@ public class NotificationServiceImpl implements NotificationService {
             case "BODY_METRIC_REMINDER" -> "Nhắc ghi cân nặng";
             default -> event;
         };
+    }
+
+    private String summarizeEventData(String event, Object data) {
+        if ("CHAT_MESSAGE".equals(event) && data instanceof ChatMessageResponse message) {
+            String content = message.getContent() != null ? message.getContent().trim() : "";
+            if (message.getMessageType() == ChatMessageType.IMAGE || message.getImageUrl() != null) {
+                return content.isBlank() ? "Đã gửi một hình ảnh" : "Ảnh: " + content;
+            }
+            if (message.getMessageType() == ChatMessageType.FILE || message.getAttachmentUrl() != null) {
+                return content.isBlank() ? "Đã gửi một tệp PDF" : "Tệp PDF: " + content;
+            }
+            return content.isBlank() ? "Bạn có một tin nhắn mới" : content;
+        }
+        return summarizeData(data);
     }
 
     private NotificationLinkType eventToLinkType(String event) {
@@ -228,6 +250,9 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     private UUID extractLinkRefId(Object data) {
+        if (data instanceof ChatMessageResponse message) {
+            return message.getMappingId();
+        }
         if (!(data instanceof Map<?, ?> map)) {
             return null;
         }
