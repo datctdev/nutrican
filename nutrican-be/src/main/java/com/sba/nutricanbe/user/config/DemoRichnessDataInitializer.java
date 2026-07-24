@@ -58,7 +58,7 @@ public class DemoRichnessDataInitializer implements CommandLineRunner {
     };
 
     private static final double[] REVIEW_RATINGS = {
-            5.0, 5.0, 4.5, 5.0, 4.0, 4.5, 3.5, 5.0, 4.5, 5.0
+            5.0, 5.0, 4.0, 5.0, 4.0, 5.0, 3.0, 5.0, 5.0, 5.0
     };
 
     private final SystemSettingRepository systemSettingRepository;
