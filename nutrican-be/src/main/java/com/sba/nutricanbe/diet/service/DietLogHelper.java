@@ -28,6 +28,8 @@ public interface DietLogHelper {
     void assignPtReviewerIfNeeded(DietLog dietLog, UUID customerId);
     Optional<PtClientMapping> findActivePt(UUID customerId);
     void notifyPtOfNewLog(DietLog dietLog);
+    /** Reject PENDING PT reviews when coaching ends/suspends; does not touch eaten/APPROVED/NOT_REQUIRED. */
+    int closePendingReviews(UUID customerId, String systemNote);
     MealType parseMealType(String mealTypeStr);
     DietLogResponse toResponse(DietLog dietLog);
 }

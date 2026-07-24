@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.auth.controller;
 
 import com.sba.nutricanbe.auth.dto.AuthResponse;
+import com.sba.nutricanbe.auth.dto.ChangePasswordRequest;
 import com.sba.nutricanbe.auth.dto.ForgotPasswordRequest;
 import com.sba.nutricanbe.auth.dto.GoogleAuthRequest;
 import com.sba.nutricanbe.auth.dto.LoginRequest;
@@ -86,6 +87,19 @@ public class AuthController {
             @AuthenticationPrincipal User user,
             @Valid @RequestBody SetPasswordRequest request) {
         return ResponseEntity.ok(authService.setPassword(user.getId(), request));
+    }
+
+    @PostMapping("/skip-password-setup")
+    public ResponseEntity<ApiResponse<AuthResponse>> skipPasswordSetup(
+            @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(authService.skipPasswordSetup(user.getId()));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<AuthResponse>> changePassword(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        return ResponseEntity.ok(authService.changePassword(user.getId(), request));
     }
 
     @PostMapping("/forgot-password")

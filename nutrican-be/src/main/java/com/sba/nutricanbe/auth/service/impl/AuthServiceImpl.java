@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.auth.service.impl;
 
 import com.sba.nutricanbe.auth.dto.AuthResponse;
+import com.sba.nutricanbe.auth.dto.ChangePasswordRequest;
 import com.sba.nutricanbe.auth.dto.GoogleAuthRequest;
 import com.sba.nutricanbe.auth.dto.LoginRequest;
 import com.sba.nutricanbe.auth.dto.RegisterRequest;
@@ -275,6 +276,11 @@ public class AuthServiceImpl implements AuthService {
     public ApiResponse<AuthResponse> googleAuth(GoogleAuthRequest request) {
         GoogleIdTokenService.GoogleTokenPayload payload = googleIdTokenService.verify(request.googleIdToken());
 
+        if (!payload.emailVerified()) {
+            auditLog.warn("GOOGLE_AUTH_FAILED: reason=EMAIL_NOT_VERIFIED, email={}", payload.email());
+            throw new BadRequestException("Google email is not verified");
+        }
+
         String email = payload.email();
         String googleId = payload.googleId();
         String name = payload.name();
@@ -286,38 +292,54 @@ public class AuthServiceImpl implements AuthService {
         if (byGoogleId.isPresent()) {
             user = byGoogleId.get();
             userAccountStatusHelper.assertNotSuspendedOrThrow(user);
+            if (user.getStatus() == UserStatus.PENDING_PASSWORD) {
+                user.setStatus(UserStatus.ACTIVE);
+                user.setPasswordSetRequired(false);
+                user = userRepository.save(user);
+            }
         } else {
             Optional<User> byEmail = userRepository.findByEmail(email);
             if (byEmail.isPresent()) {
                 User existing = byEmail.get();
-                // Must check before overwriting status (e.g. PENDING_PASSWORD would clear SUSPENDED)
                 userAccountStatusHelper.assertNotSuspendedOrThrow(existing);
+                if (existing.getStatus() == UserStatus.PENDING_VERIFICATION) {
+                    auditLog.warn("GOOGLE_AUTH_FAILED: reason=LOCAL_EMAIL_UNVERIFIED, email={}, userId={}",
+                            email, existing.getId());
+                    throw new BadRequestException(
+                            "Please verify your email before linking Google sign-in");
+                }
+                if (StringUtils.hasText(existing.getGoogleId())
+                        && !existing.getGoogleId().equals(googleId)) {
+                    auditLog.warn("GOOGLE_AUTH_FAILED: reason=GOOGLE_ID_CONFLICT, email={}, userId={}",
+                            email, existing.getId());
+                    throw new BadRequestException(
+                            "This account is already linked to a different Google identity");
+                }
                 existing.setGoogleId(googleId);
                 existing.setGooglePictureUrl(picture);
-                existing.setPasswordSetRequired(true);
-                existing.setStatus(UserStatus.PENDING_PASSWORD);
+                if (!StringUtils.hasText(existing.getPasswordHash())
+                        && existing.getStatus() == UserStatus.PENDING_PASSWORD) {
+                    existing.setStatus(UserStatus.ACTIVE);
+                    existing.setPasswordSetRequired(false);
+                }
                 user = userRepository.save(existing);
+                auditLog.info("GOOGLE_LINK: email={}, userId={}, hasPassword={}",
+                        email, user.getId(), StringUtils.hasText(user.getPasswordHash()));
             } else {
                 user = userRepository.save(User.createGoogleUser(email, googleId, name, picture));
+                auditLog.info("GOOGLE_AUTH: email={}, userId={}, newGoogleUser=true",
+                        email, user.getId());
             }
         }
 
-        auditLog.info("GOOGLE_AUTH: email={}, userId={}, passwordRequired={}",
-                user.getEmail(), user.getId(), user.getPasswordSetRequired());
+        boolean suggestPassword = !StringUtils.hasText(user.getPasswordHash());
+        auditLog.info("GOOGLE_AUTH: email={}, userId={}, suggestPasswordSetup={}",
+                user.getEmail(), user.getId(), suggestPassword);
 
-        if (user.getPasswordSetRequired() != null && user.getPasswordSetRequired()) {
-            String limitedToken = jwtUtil.generateLimitedToken(user.getEmail(), user.getId(), user.getRole().name());
-            AuthResponse.UserInfo userInfo = buildUserInfo(user);
-            return ApiResponse.success(AuthResponse.builder()
-                    .accessToken(limitedToken)
-                    .tokenType("Bearer")
-                    .expiresIn(jwtExpirationMs / 1000)
-                    .user(userInfo)
-                    .requiresPasswordSetup(true)
-                    .build(), "Google authentication successful");
-        }
-
-        return ApiResponse.success(buildAuthResponse(user, null, null), "Google authentication successful");
+        AuthResponse response = buildAuthResponse(user, null, null);
+        response.setRequiresPasswordSetup(suggestPassword);
+        response.setSuggestPasswordSetup(suggestPassword);
+        return ApiResponse.success(response, "Google authentication successful");
     }
 
     @Override
@@ -329,18 +351,85 @@ public class AuthServiceImpl implements AuthService {
                     return new UnauthorizedException("User not found");
                 });
 
-        if (user.getPasswordSetRequired() == null || !user.getPasswordSetRequired()) {
+        if (StringUtils.hasText(user.getPasswordHash())) {
             auditLog.warn("SET_PASSWORD_FAILED: userId={}, reason=PASSWORD_ALREADY_SET", userId);
             throw new BadRequestException("Password has already been set for this account");
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setPasswordSetRequired(false);
-        user.setStatus(UserStatus.ACTIVE);
+        if (user.getStatus() == UserStatus.PENDING_PASSWORD) {
+            user.setStatus(UserStatus.ACTIVE);
+        }
         userRepository.save(user);
 
         auditLog.info("PASSWORD_SET: userId={}, email={}", userId, user.getEmail());
         return ApiResponse.success(buildAuthResponse(user, null, null), "Password set successfully");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<AuthResponse> skipPasswordSetup(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    auditLog.warn("SKIP_PASSWORD_FAILED: userId={}, reason=USER_NOT_FOUND", userId);
+                    return new UnauthorizedException("User not found");
+                });
+
+        if (StringUtils.hasText(user.getPasswordHash())) {
+            auditLog.warn("SKIP_PASSWORD_FAILED: userId={}, reason=PASSWORD_ALREADY_SET", userId);
+            throw new BadRequestException("Password is already set for this account");
+        }
+
+        user.setPasswordSetRequired(false);
+        if (user.getStatus() == UserStatus.PENDING_PASSWORD) {
+            user.setStatus(UserStatus.ACTIVE);
+        }
+        userRepository.save(user);
+
+        auditLog.info("GOOGLE_SKIP_PASSWORD: userId={}, email={}", userId, user.getEmail());
+        AuthResponse response = buildAuthResponse(user, null, null);
+        response.setRequiresPasswordSetup(false);
+        response.setSuggestPasswordSetup(false);
+        return ApiResponse.success(response, "Password setup skipped");
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<AuthResponse> changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> {
+                    auditLog.warn("CHANGE_PASSWORD_FAILED: userId={}, reason=USER_NOT_FOUND", userId);
+                    return new UnauthorizedException("User not found");
+                });
+
+        if (!StringUtils.hasText(user.getPasswordHash())) {
+            auditLog.warn("CHANGE_PASSWORD_FAILED: userId={}, reason=NO_PASSWORD_HASH", userId);
+            throw new BadRequestException(
+                    "No password is set for this account. Use set-password or sign in with Google first.");
+        }
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            auditLog.warn("CHANGE_PASSWORD_FAILED: userId={}, reason=INVALID_CURRENT_PASSWORD", userId);
+            throw new BadRequestException("Current password is incorrect");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
+            auditLog.warn("CHANGE_PASSWORD_FAILED: userId={}, reason=SAME_AS_CURRENT", userId);
+            throw new BadRequestException("New password must be different from the current password");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        if (Boolean.TRUE.equals(user.getPasswordSetRequired())) {
+            user.setPasswordSetRequired(false);
+            if (user.getStatus() == UserStatus.PENDING_PASSWORD) {
+                user.setStatus(UserStatus.ACTIVE);
+            }
+        }
+        userRepository.save(user);
+
+        auditLog.info("CHANGE_PASSWORD: userId={}, email={}", userId, user.getEmail());
+        return ApiResponse.success(buildAuthResponse(user, null, null), "Password changed successfully");
     }
 
     @Override
@@ -422,6 +511,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private AuthResponse.UserInfo buildUserInfo(User user) {
+        boolean hasPassword = StringUtils.hasText(user.getPasswordHash());
         return AuthResponse.UserInfo.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -429,6 +519,8 @@ public class AuthServiceImpl implements AuthService {
                 .role(user.getRole().name())
                 .avatarUrl(user.getAvatarUrl())
                 .isKycVerified(user.getIsKycVerified())
+                .passwordSetRequired(Boolean.TRUE.equals(user.getPasswordSetRequired()))
+                .hasPassword(hasPassword)
                 .build();
     }
 
@@ -444,14 +536,8 @@ public class AuthServiceImpl implements AuthService {
             tokenRevocationService.revoke(oldRefreshToken);
         }
 
-        AuthResponse.UserInfo userInfo = AuthResponse.UserInfo.builder()
-                .id(user.getId())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .role(user.getRole().name())
-                .avatarUrl(user.getAvatarUrl())
-                .isKycVerified(user.getIsKycVerified())
-                .build();
+        AuthResponse.UserInfo userInfo = buildUserInfo(user);
+        boolean suggestPassword = !Boolean.TRUE.equals(userInfo.getHasPassword());
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -459,7 +545,8 @@ public class AuthServiceImpl implements AuthService {
                 .tokenType("Bearer")
                 .expiresIn(jwtExpirationMs / 1000)
                 .user(userInfo)
-                .requiresPasswordSetup(false)
+                .requiresPasswordSetup(suggestPassword)
+                .suggestPasswordSetup(suggestPassword)
                 .build();
     }
 

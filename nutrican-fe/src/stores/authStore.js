@@ -45,20 +45,7 @@ export const useAuthStore = create(
         try {
           const { idToken } = await signInWithGoogle();
           const response = await authService.googleAuth(idToken);
-          const { accessToken, user, requiresPasswordSetup } = response.data.data;
-
-          if (requiresPasswordSetup) {
-            set({
-              user,
-              accessToken,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null,
-              activeRole: user?.role,
-            });
-            window.location.href = '/set-password';
-            return response;
-          }
+          const { accessToken, user, requiresPasswordSetup, suggestPasswordSetup } = response.data.data;
 
           set({
             user,
@@ -68,6 +55,13 @@ export const useAuthStore = create(
             error: null,
             activeRole: user?.role,
           });
+
+          // Soft suggest: invite set-password when no local password (user can skip)
+          const suggest = suggestPasswordSetup || requiresPasswordSetup || user?.hasPassword === false;
+          if (suggest) {
+            window.location.href = '/set-password';
+            return response;
+          }
 
           const role = user?.role;
           let redirectPath = '/diet';
@@ -110,6 +104,52 @@ export const useAuthStore = create(
           set({
             isLoading: false,
             error: error.response?.data?.message || 'Failed to set password',
+          });
+          throw error;
+        }
+      },
+
+      skipPasswordSetup: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await authService.skipPasswordSetup();
+          const { accessToken, user } = response.data.data;
+          set({
+            user: user ? { ...get().user, ...user } : get().user,
+            accessToken: accessToken || get().accessToken,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+            activeRole: user?.role || get().activeRole,
+          });
+          return response;
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error.response?.data?.message || 'Failed to skip password setup',
+          });
+          throw error;
+        }
+      },
+
+      changePassword: async (currentPassword, newPassword) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await authService.changePassword(currentPassword, newPassword);
+          const { accessToken, user } = response.data.data;
+          set({
+            user: user ? { ...get().user, ...user } : get().user,
+            accessToken: accessToken || get().accessToken,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+            activeRole: user?.role || get().activeRole,
+          });
+          return response;
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: error.response?.data?.message || 'Failed to change password',
           });
           throw error;
         }

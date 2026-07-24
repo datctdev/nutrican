@@ -88,6 +88,10 @@ public interface DietLogRepository extends JpaRepository<DietLog, UUID> {
             LocalDate logDate,
             com.sba.nutricanbe.diet.enums.DietLogReviewStatus reviewStatus);
 
+    List<DietLog> findByCustomerIdAndReviewStatus(
+            UUID customerId,
+            com.sba.nutricanbe.diet.enums.DietLogReviewStatus reviewStatus);
+
     @Query("SELECT d FROM DietLog d WHERE d.ptReviewedAt IS NOT NULL AND d.logDate BETWEEN :from AND :to ORDER BY d.ptReviewedAt DESC")
     List<DietLog> findReviewedBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 

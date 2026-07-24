@@ -1,5 +1,7 @@
 package com.sba.nutricanbe.user.service.impl;
 
+import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.user.dto.ClientGoalDto;
 import com.sba.nutricanbe.user.dto.ClientGoalRequest;
 import com.sba.nutricanbe.user.entity.ClientGoal;
@@ -23,6 +25,7 @@ public class ClientGoalServiceImpl implements ClientGoalService {
 
     private final ClientGoalRepository clientGoalRepository;
     private final ClientGoalMilestoneRepository milestoneRepository;
+    private final DietLogHelper dietLogHelper;
 
     @Override
     @Transactional(readOnly = true)
@@ -33,6 +36,20 @@ public class ClientGoalServiceImpl implements ClientGoalService {
     @Override
     @Transactional
     public ClientGoalDto saveGoals(UUID userId, ClientGoalRequest request) {
+        return persistGoals(userId, request);
+    }
+
+    @Override
+    @Transactional
+    public ClientGoalDto saveGoalsForSelf(UUID userId, ClientGoalRequest request) {
+        if (dietLogHelper.hasActivePt(userId)) {
+            throw new BadRequestException(
+                    "Bạn đang có PT đồng hành — vui lòng nhờ PT cập nhật mục tiêu");
+        }
+        return persistGoals(userId, request);
+    }
+
+    private ClientGoalDto persistGoals(UUID userId, ClientGoalRequest request) {
         ClientGoal goal = clientGoalRepository.findByUserId(userId)
                 .orElse(ClientGoal.builder().userId(userId).build());
         if (request.getNutritionGoal() != null) goal.setNutritionGoal(request.getNutritionGoal());

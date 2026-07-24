@@ -1,0 +1,16 @@
+﻿{
+    "success":  true,
+    "data":  {
+                 "content":  [
+
+                             ],
+                 "page":  0,
+                 "size":  20,
+                 "totalElements":  0,
+                 "totalPages":  0,
+                 "first":  true,
+                 "last":  true
+             },
+    "message":  null,
+    "timestamp":  "2026-07-24T20:19:51.5999247"
+}

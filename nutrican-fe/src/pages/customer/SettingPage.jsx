@@ -189,10 +189,24 @@ export default function SettingPage() {
                                 </div>
 
                                 <Button asChild variant="outline" className="w-full rounded-xl border-slate-300 font-bold text-xs hover:bg-white hover:border-amber-500 hover:text-amber-600 transition-colors py-5">
-                                    <Link to="/set-password" className="flex items-center justify-center gap-2">
-                                        <Lock className="w-3.5 h-3.5" /> Đổi / Thiết lập mật khẩu mới
+                                    <Link
+                                        to={user?.hasPassword === false ? '/set-password' : '/change-password'}
+                                        className="flex items-center justify-center gap-2"
+                                    >
+                                        <Lock className="w-3.5 h-3.5" />
+                                        {user?.hasPassword === false
+                                            ? 'Thiết lập mật khẩu'
+                                            : 'Đổi mật khẩu'}
                                     </Link>
                                 </Button>
+                                {user?.hasPassword !== false && (
+                                <p className="text-center text-[11px] text-slate-500 font-medium">
+                                    Quên mật khẩu?{' '}
+                                    <Link to="/forgot-password" className="text-amber-600 hover:text-amber-700 font-bold underline-offset-2 hover:underline">
+                                        Đặt lại qua email
+                                    </Link>
+                                </p>
+                                )}
                             </div>
 
                             {/* Trust Badges */}

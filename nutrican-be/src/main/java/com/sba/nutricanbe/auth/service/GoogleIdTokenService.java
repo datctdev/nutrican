@@ -8,6 +8,7 @@ public interface GoogleIdTokenService {
             String email,
             String googleId,
             String name,
-            String picture
+            String picture,
+            boolean emailVerified
     ) {}
 }

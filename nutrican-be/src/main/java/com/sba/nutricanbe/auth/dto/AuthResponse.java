@@ -16,7 +16,10 @@ public class AuthResponse {
     private String tokenType;
     private Long expiresIn;
     private UserInfo user;
+    /** True when account has no password yet — UI may suggest set-password (not a hard gate). */
     private boolean requiresPasswordSetup;
+    /** Alias for clearer FE: same as requiresPasswordSetup when !hasPassword. */
+    private boolean suggestPasswordSetup;
 
     @Data
     @Builder
@@ -29,5 +32,7 @@ public class AuthResponse {
         private String role;
         private String avatarUrl;
         private Boolean isKycVerified;
+        private Boolean passwordSetRequired;
+        private Boolean hasPassword;
     }
 }

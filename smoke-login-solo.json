@@ -1,0 +1,20 @@
+﻿{
+    "success":  true,
+    "data":  {
+                 "accessToken":  "eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIzMDQ3OWU5My1hNjRkLTQ4MzYtYmY5NC03ZDdhNjc0NWViN2QiLCJzdWIiOiJzb2xvQG51dHJpY2FuLmNvbSIsInVzZXJJZCI6IjNlNjM5Y2Q3LTFjYTItNGY0Zi1iYTYyLTJlYTZiMmViNzJkNyIsInJvbGUiOiJDVVNUT01FUiIsImlhdCI6MTc4NDg5OTA4MSwiZXhwIjoxNzg0OTg1NDgxfQ.wB8LkdSDq95nMuu0vsCdtYNggzwuqBlqBK3wlo_-Nk8",
+                 "refreshToken":  null,
+                 "tokenType":  "Bearer",
+                 "expiresIn":  86400,
+                 "user":  {
+                              "id":  "3e639cd7-1ca2-4f4f-ba62-2ea6b2eb72d7",
+                              "email":  "solo@nutrican.com",
+                              "fullName":  "KhÃ¡ch HÃ ng Solo (KhÃ´ng PT)",
+                              "role":  "CUSTOMER",
+                              "avatarUrl":  null,
+                              "isKycVerified":  true
+                          },
+                 "requiresPasswordSetup":  false
+             },
+    "message":  "Login successful",
+    "timestamp":  "2026-07-24T20:18:01.7904911"
+}

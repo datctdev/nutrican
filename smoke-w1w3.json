@@ -1,0 +1,67 @@
+﻿[
+    {
+        "id":  "W1.1 login solo",
+        "ok":  true,
+        "detail":  "token ok"
+    },
+    {
+        "id":  "W1.2 bad password",
+        "ok":  true,
+        "detail":  "rejected as expected"
+    },
+    {
+        "id":  "W1.3 login customer",
+        "ok":  true,
+        "detail":  "token ok"
+    },
+    {
+        "id":  "W1.4 login pt",
+        "ok":  true,
+        "detail":  "token ok"
+    },
+    {
+        "id":  "W1.5 login admin",
+        "ok":  true,
+        "detail":  "token ok"
+    },
+    {
+        "id":  "W1.6 customer denied admin finance",
+        "ok":  true,
+        "detail":  "code=403"
+    },
+    {
+        "id":  "W2.1 solo hasActivePt=false",
+        "ok":  false,
+        "detail":  "hasActivePt=False raw-ok=False"
+    },
+    {
+        "id":  "W2.2 solo macro endpoint",
+        "ok":  true,
+        "detail":  "ok"
+    },
+    {
+        "id":  "W2.3 solo body-metrics list",
+        "ok":  false,
+        "detail":  "500"
+    },
+    {
+        "id":  "W3.1 customer hasActivePt=true",
+        "ok":  false,
+        "detail":  "hasActivePt=False"
+    },
+    {
+        "id":  "W3.2 customer goals get",
+        "ok":  false,
+        "detail":  "500"
+    },
+    {
+        "id":  "W3.3 pt clients list",
+        "ok":  true,
+        "detail":  "ok"
+    },
+    {
+        "id":  "W3.4 pt diet review queue",
+        "ok":  false,
+        "detail":  "500 The remote server returned an error: (500) Internal Server Error."
+    }
+]
