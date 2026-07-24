@@ -87,6 +87,13 @@ export default function NutritionProgress({
     const targetCal = Number(summary?.targetCalories) || 2000;
     const hasPlanPending = plannedTotals != null && pendingCal > 0;
 
+    // Bữa chờ PT kiểm tra đã nằm trong consumedCal — chỉ nêu rõ phần nào còn là ước tính
+    const estimatedCal = (summary?.logs || []).reduce((sum, log) => (
+        log?.reviewStatus === 'PENDING'
+            ? sum + (Number(log?.macrosJson?.calories) || 0)
+            : sum
+    ), 0);
+
     const draftStatus = computeIntakeStatus(consumedCal, targetCal);
     const intakeStatus = draftStatus.intakeStatus;
 
@@ -126,6 +133,11 @@ export default function NutritionProgress({
                                     +{Math.round(pendingCal)} kcal từ plan chưa ăn
                                 </p>
                             )}
+                            {estimatedCal > 0 && (
+                                <p className="text-[10px] text-amber-700 font-semibold mt-0.5">
+                                    {Math.round(estimatedCal)} kcal đang là ước tính, chờ PT kiểm tra
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="h-4 bg-slate-200/80 rounded-full overflow-hidden flex shadow-inner">
@@ -146,7 +158,7 @@ export default function NutritionProgress({
                     </div>
                     {coachedMode && (
                         <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
-                            Thực đơn PT chỉ tính sau khi bạn tick đã ăn. Đề xuất chờ duyệt không cộng vào đây.
+                            Tổng này chỉ cộng nhật ký đã ghi (Thực tế). Tick plan sẽ tạo nhật ký tương ứng; đề xuất bị từ chối không cộng.
                         </p>
                     )}
                 </div>

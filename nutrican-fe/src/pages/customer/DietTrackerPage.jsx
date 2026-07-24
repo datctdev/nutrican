@@ -5,8 +5,9 @@ import PostMealRatingSheet from './components/PostMealRatingSheet';
 import ImageLightbox from '../../components/common/ImageLightbox';
 import { toast } from 'sonner';
 import { RefreshCw, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
+import { userService } from '../../services/userService';
 
 import NutritionProgress from './components/NutritionProgress';
 import FoodInputCard from './components/FoodInputCard';
@@ -27,21 +28,10 @@ import {
     addDaysIso,
     monthKeyFromIso,
     fetchAllDietLogsForRange,
-    getDemoVnClock,
-    setDemoVnClock,
 } from './components/dietUtils';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const POST_MEAL_PROMPT_KEY = 'nutrican_post_meal_prompt';
-const DEMO_CLOCK_OPTIONS = [
-    { value: '', label: 'Giờ thật VN' },
-    { value: '09:00', label: 'Demo 09:00 · sáng' },
-    { value: '12:00', label: 'Demo 12:00 · trưa' },
-    { value: '15:00', label: 'Demo 15:00 · chiều' },
-    { value: '21:00', label: 'Demo 21:00 · tối' },
-    { value: '23:00', label: 'Demo 23:00 · khuya' },
-    { value: '01:00', label: 'Demo 01:00 · qua đêm' },
-];
 
 function maxPlanDateIso() {
     return addDaysIso(todayLocalIso(), 14);
@@ -71,6 +61,7 @@ function schedulePostMealPrompt(logId) {
 
 export default function DietTrackerPage() {
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
 
     const initialDate = clampDateParam(searchParams.get('date'));
     const [selectedDate, setSelectedDate] = useState(initialDate);
@@ -78,6 +69,7 @@ export default function DietTrackerPage() {
     const [viewingMonth, setViewingMonth] = useState(monthKeyFromIso(initialDate));
     const [dottedDates, setDottedDates] = useState(() => new Set());
     const [dotsLoading, setDotsLoading] = useState(false);
+    const [dietContext, setDietContext] = useState({ nutritionGoal: null, dietPreference: null, hasActivePt: false });
 
     const selectedDateRef = useRef(selectedDate);
     const viewingMonthRef = useRef(viewingMonth);
@@ -118,7 +110,6 @@ export default function DietTrackerPage() {
     const [postMealPrompt, setPostMealPrompt] = useState(null);
     const [onboardingBanner, setOnboardingBanner] = useState(false);
     const [lightboxImage, setLightboxImage] = useState('');
-    const [demoClock, setDemoClockUi] = useState(() => getDemoVnClock());
 
     const isToday = isTodayIso(selectedDate);
     const isFuture = isFutureIso(selectedDate);
@@ -261,6 +252,18 @@ export default function DietTrackerPage() {
         profileExtensionsService.getOnboardingStatus()
             .then((res) => setOnboardingBanner(!!res.data?.data?.showBanner))
             .catch(() => setOnboardingBanner(false));
+
+        Promise.all([
+            userService.getProfile().catch(() => null),
+            profileExtensionsService.hasActivePt().catch(() => null),
+        ]).then(([profileRes, ptRes]) => {
+            const p = profileRes?.data?.data;
+            setDietContext({
+                nutritionGoal: p?.nutritionGoal || null,
+                dietPreference: p?.dietPreference || null,
+                hasActivePt: Boolean(ptRes?.data?.data?.hasActivePt),
+            });
+        });
 
         const handleRealtimeUpdate = () => {
             if (timeoutId) clearTimeout(timeoutId);
@@ -620,13 +623,16 @@ export default function DietTrackerPage() {
             if (isToday) {
                 setManualMealPeriod(period);
             }
-            const newLogId = await createAndSendMeal({
+            // Món lấy từ thư viện thực phẩm đã có số liệu kiểm duyệt nên không cần PT xem lại
+            const hasCustomIngredient = ingredientItems.some((it) => it.isCustom || !it.foodItemId);
+            const needsPtReview = hasCustomIngredient && Boolean(hasActivePt);
+            await createAndSendMeal({
                 mealType: periodToMealType(period),
                 mealPeriod: period,
                 makeupForPeriod: makeupForPeriod || undefined,
                 mealSource: 'HOME_COOKED',
                 logDate: selectedDate,
-                sendToPt: Boolean(hasActivePt),
+                sendToPt: needsPtReview,
                 items: ingredientItems.map((it) => (
                     it.isCustom || !it.foodItemId
                         ? {
@@ -640,7 +646,9 @@ export default function DietTrackerPage() {
                         : { foodItemId: it.foodItemId, quantityG: it.quantityG }
                 )),
             });
-            toast.success(hasActivePt ? 'Đã ghi nhật ký và gửi PT duyệt!' : 'Đã lưu bữa ăn!');
+            toast.success(needsPtReview
+                ? 'Đã ghi nhật ký · nguyên liệu tự nhập sẽ chờ PT kiểm tra'
+                : 'Đã lưu bữa ăn từ dữ liệu thực phẩm');
             setIngredientItems([]);
             setMakeupForPeriod(null);
             clearMealImages();
@@ -772,6 +780,33 @@ export default function DietTrackerPage() {
                 <div>
                     <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight font-sans">Nhật Ký Dinh Dưỡng</h1>
                     <p className="text-slate-500 mt-1 font-medium">Phân tích bữa ăn tức thì và đạt mục tiêu hàng ngày.</p>
+                    {(dietContext.nutritionGoal || dietContext.dietPreference) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-600">
+                            {dietContext.nutritionGoal && (
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-800">
+                                    Mục tiêu: {dietContext.nutritionGoal}
+                                </span>
+                            )}
+                            {dietContext.dietPreference && (
+                                <span className="px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-800">
+                                    Chế độ ăn: {dietContext.dietPreference}
+                                </span>
+                            )}
+                            {dietContext.hasActivePt && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const draft = `PT ơi, mình muốn điều chỉnh mục tiêu / chế độ ăn trên nhật ký dinh dưỡng. PT hỗ trợ mình nhé!`;
+                                        sessionStorage.setItem('nutrican_chat_draft', draft);
+                                        navigate('/chat?draft=1');
+                                    }}
+                                    className="px-2.5 py-1 rounded-full bg-amber-50 border border-amber-100 text-amber-800 hover:bg-amber-100"
+                                >
+                                    Nhắn PT chỉnh mục tiêu
+                                </button>
+                            )}
+                        </div>
+                    )}
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                         <button
                             type="button"
@@ -816,27 +851,6 @@ export default function DietTrackerPage() {
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <label className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-900 shadow-sm">
-                        <span className="whitespace-nowrap">Giờ demo VN</span>
-                        <select
-                            value={demoClock}
-                            onChange={(e) => {
-                                const next = e.target.value;
-                                setDemoVnClock(next);
-                                setDemoClockUi(next);
-                                toast.message(next
-                                    ? `Giả lập giờ VN ${next} (cần NUTRICAN_DEMO_ALLOW_CLIENT_CLOCK=true cho BE) — reload…`
-                                    : 'Trở lại giờ máy / Asia/Ho_Chi_Minh — reload…');
-                                window.setTimeout(() => window.location.reload(), 250);
-                            }}
-                            className="rounded-lg border border-amber-300 bg-white px-2 py-1 text-xs font-bold text-slate-800"
-                            title="Mặc định theo giờ máy (VN). Bật NUTRICAN_DEMO_ALLOW_CLIENT_CLOCK=true nếu cần giả lập khung buổi trên BE."
-                        >
-                            {DEMO_CLOCK_OPTIONS.map((opt) => (
-                                <option key={opt.value || 'real'} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </label>
                     <Button onClick={syncAll} variant="outline" className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm rounded-xl">
                         <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Đồng bộ dữ liệu
                     </Button>

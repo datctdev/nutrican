@@ -104,6 +104,13 @@ public class User extends BaseEntity {
     @Builder.Default
     private ActivityLevel activityLevel = ActivityLevel.MODERATE;
 
+    /** Exercise load inputs used to derive {@link #activityLevel}; nullable for legacy/demo users. */
+    @Column(name = "exercise_sessions_per_week")
+    private Integer exerciseSessionsPerWeek;
+
+    @Column(name = "exercise_minutes_per_session")
+    private Integer exerciseMinutesPerSession;
+
     @Column(name = "pregnancy_trimester")
     private Integer pregnancyTrimester;
 

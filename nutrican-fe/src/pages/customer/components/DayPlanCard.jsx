@@ -243,15 +243,20 @@ export default function DayPlanCard({
                 excludeItemId: editId,
                 dateIso: selectedDate,
                 coachedMode,
+                logs: allActualLogs,
             });
             onPlannedTotalsChange(totals);
         }, 300);
         return clear;
-    }, [dayPlan, draftMacros, editDraft, editId, addMealPeriod, onPlannedTotalsChange, selectedDate, coachedMode]);
+    }, [dayPlan, draftMacros, editDraft, editId, addMealPeriod, onPlannedTotalsChange, selectedDate, coachedMode, allActualLogs]);
 
     const planProgress = useMemo(
-        () => computePlanProgressBreakdown(dayPlan?.items || [], { dateIso: selectedDate, coachedMode }),
-        [dayPlan, selectedDate, coachedMode],
+        () => computePlanProgressBreakdown(dayPlan?.items || [], {
+            dateIso: selectedDate,
+            coachedMode,
+            logs: allActualLogs,
+        }),
+        [dayPlan, selectedDate, coachedMode, allActualLogs],
     );
 
     const visibleItems = useMemo(() => {

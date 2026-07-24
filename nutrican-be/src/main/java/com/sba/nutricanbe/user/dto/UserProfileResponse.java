@@ -34,6 +34,8 @@ public class UserProfileResponse {
     private DietPreference dietPreference;
     private NutritionGoal nutritionGoal;
     private ActivityLevel activityLevel;
+    private Integer exerciseSessionsPerWeek;
+    private Integer exerciseMinutesPerSession;
     private Integer pregnancyTrimester;
     private Integer heightCm;
     private String gender;

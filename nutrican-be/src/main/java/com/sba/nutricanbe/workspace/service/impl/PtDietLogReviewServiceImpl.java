@@ -13,6 +13,7 @@ import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.PtCorrectionReason;
 import com.sba.nutricanbe.diet.enums.PtReviewAction;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
+import com.sba.nutricanbe.diet.service.IntakeControlLoopService;
 import com.sba.nutricanbe.infrastructure.storage.StorageService;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
@@ -33,6 +34,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -44,12 +46,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
 
+    private static final int MAX_FOOD_DESCRIPTION_LEN = 255;
+    private static final BigDecimal MAX_MACRO_VALUE = BigDecimal.valueOf(20000);
+
     private final PtClientMappingRepository mappingRepository;
     private final DietLogRepository dietLogRepository;
     private final UserRepository userRepository;
     private final UserQueryService userQueryService;
     private final StorageService storageService;
     private final WebSocketSessionService webSocketSessionService;
+    private final IntakeControlLoopService intakeControlLoopService;
 
     @Override
     @Transactional(readOnly = true)
@@ -157,51 +163,113 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
             throw new BadRequestException("Chỉ duyệt bữa đang chờ xử lý");
         }
 
-        dietLog.setPtReviewerId(ptId);
-        dietLog.setMacrosAtReview(MacroUtils.copyMacroMap(dietLog.getMacrosJson()));
-        PtCorrectionReason reason = request.getCorrectionReason() != null
-                ? request.getCorrectionReason() : PtCorrectionReason.OTHER;
-        dietLog.setPtCorrectionReason(reason);
-        dietLog.setPtReviewedAt(LocalDateTime.now());
+        String action = request.getAction() != null ? request.getAction().trim().toUpperCase() : "";
+        boolean approveOnly = "APPROVE".equals(action);
+        // REJECT của API cũ chỉ còn hợp lệ khi kèm dữ liệu sửa, và được xử lý như một lần chỉnh lại
+        boolean adjust = "ADJUST".equals(action) || "ADJUST_MACROS".equals(action) || "REJECT".equals(action);
+        if (!approveOnly && !adjust) {
+            throw new BadRequestException("Invalid action: " + request.getAction());
+        }
+        if ("REJECT".equals(action) && request.getAdjustedCalories() == null) {
+            throw new BadRequestException(
+                    "Không còn thao tác từ chối để đó. Hãy chọn \"Chỉnh lại kết quả\" và nhập calo/macro đúng cho bữa ăn.");
+        }
 
-        switch (request.getAction().toUpperCase()) {
-            case "APPROVE" -> {
-                dietLog.setStatus(DietLogStatus.LOGGED);
-                dietLog.setReviewStatus(DietLogReviewStatus.APPROVED);
-                dietLog.setPtAction(PtReviewAction.APPROVE);
-                dietLog.setPtAdjustedMacros(MacroUtils.copyMacroMap(dietLog.getMacrosAtReview()));
-                if (request.getNote() != null) dietLog.setPtNote(request.getNote());
+        MacroNutrients before = dietLog.getMacrosJson();
+        MacroNutrients adjusted = null;
+        String newName = null;
+        boolean nameChanged = false;
+        // Validate trước khi ghi để log giữ nguyên PENDING nếu dữ liệu sửa không dùng được
+        if (!approveOnly) {
+            adjusted = validateAdjustedMacros(request);
+            newName = normalizeFoodDescription(request.getAdjustedFoodDescription());
+            if (newName == null) {
+                throw new BadRequestException(
+                        "Tên món không được để trống khi chỉnh lại kết quả");
             }
-            case "ADJUST", "ADJUST_MACROS" -> {
-                dietLog.setStatus(DietLogStatus.LOGGED);
-                dietLog.setReviewStatus(DietLogReviewStatus.APPROVED);
-                dietLog.setPtAction(PtReviewAction.ADJUST);
-                MacroNutrients adjusted = MacroUtils.buildAdjustedMacroMap(
-                        request.getAdjustedCalories(),
-                        request.getAdjustedProtein(),
-                        request.getAdjustedCarb(),
-                        request.getAdjustedFat()
-                );
-                dietLog.setMacrosJson(adjusted);
-                dietLog.setPtAdjustedMacros(adjusted);
-                dietLog.setPtNote(request.getNote());
+            String beforeName = normalizeFoodDescription(dietLog.getFoodDescription());
+            nameChanged = beforeName == null || !newName.equals(beforeName);
+            boolean macrosChanged = before == null || !MacroUtils.fieldsChanged(before, adjusted).isEmpty();
+            if (!nameChanged && !macrosChanged) {
+                throw new BadRequestException(
+                        "Chưa có thay đổi nào. Nếu bữa ăn đã đúng, hãy chọn \"Duyệt đúng\".");
             }
-            case "REJECT" -> {
-                dietLog.setStatus(DietLogStatus.LOGGED);
-                dietLog.setReviewStatus(DietLogReviewStatus.REJECTED);
-                dietLog.setPtAction(PtReviewAction.REJECT);
-                dietLog.setPtAdjustedMacros(null);
-                dietLog.setPtNote(request.getNote());
+        }
+
+        dietLog.setPtReviewerId(ptId);
+        dietLog.setMacrosAtReview(MacroUtils.copyMacroMap(before));
+        dietLog.setPtReviewedAt(LocalDateTime.now());
+        dietLog.setStatus(DietLogStatus.LOGGED);
+        dietLog.setReviewStatus(DietLogReviewStatus.APPROVED);
+
+        if (approveOnly) {
+            dietLog.setPtAction(PtReviewAction.APPROVE);
+            dietLog.setPtAdjustedMacros(MacroUtils.copyMacroMap(before));
+            if (request.getNote() != null) dietLog.setPtNote(request.getNote());
+        } else {
+            dietLog.setPtAction(PtReviewAction.ADJUST);
+            dietLog.setPtCorrectionReason(request.getCorrectionReason() != null
+                    ? request.getCorrectionReason() : PtCorrectionReason.OTHER);
+            dietLog.setMacrosJson(adjusted);
+            dietLog.setPtAdjustedMacros(adjusted);
+            if (nameChanged) {
+                dietLog.setFoodDescription(newName);
+                dietLog.setMatchedFoodName(newName);
             }
-            default -> throw new BadRequestException("Invalid action: " + request.getAction());
+            dietLog.setPtNote(request.getNote());
         }
 
         dietLog = dietLogRepository.save(dietLog);
-        log.info("Diet log {} reviewed by PT {}: action={}", logId, ptId, request.getAction());
+        log.info("Diet log {} reviewed by PT {}: action={} -> {}", logId, ptId, action, dietLog.getPtAction());
 
-        notifyClientOfReview(dietLog.getCustomerId(), logId, dietLog.getReviewStatus().name());
+        notifyClientOfReview(dietLog.getCustomerId(), logId,
+                dietLog.getReviewStatus().name(), dietLog.getPtAction().name());
+        // Macro vừa đổi: đánh giá lại OVER/UNDER/AT_RISK cho ngày đó
+        intakeControlLoopService.evaluateAfterLog(dietLog.getCustomerId(), dietLog.getLogDate(), true);
 
         return ApiResponse.success(toReviewResponse(dietLog), "Log reviewed successfully");
+    }
+
+    /**
+     * PT không được "từ chối rồi bỏ đó": mọi lần chỉnh phải để lại calo/macro dùng được cho tổng ngày.
+     */
+    private MacroNutrients validateAdjustedMacros(ReviewActionRequest request) {
+        BigDecimal calories = requireMacro(request.getAdjustedCalories(), "Calo");
+        if (calories.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Calo sau khi chỉnh phải lớn hơn 0");
+        }
+        return MacroNutrients.of(
+                calories,
+                requireMacro(request.getAdjustedProtein(), "Protein"),
+                requireMacro(request.getAdjustedCarb(), "Carb"),
+                requireMacro(request.getAdjustedFat(), "Fat"));
+    }
+
+    private BigDecimal requireMacro(BigDecimal value, String label) {
+        if (value == null) {
+            throw new BadRequestException(label + " là bắt buộc khi chỉnh lại kết quả");
+        }
+        if (value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException(label + " không được âm");
+        }
+        if (value.compareTo(MAX_MACRO_VALUE) > 0) {
+            throw new BadRequestException(label + " vượt quá giới hạn cho phép");
+        }
+        return value;
+    }
+
+    private String normalizeFoodDescription(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim().replaceAll("\\s+", " ");
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > MAX_FOOD_DESCRIPTION_LEN) {
+            trimmed = trimmed.substring(0, MAX_FOOD_DESCRIPTION_LEN);
+        }
+        return trimmed;
     }
 
     @Override
@@ -283,11 +351,12 @@ public class PtDietLogReviewServiceImpl implements PtDietLogReviewService {
         return storedUrl;
     }
 
-    private void notifyClientOfReview(UUID clientId, UUID logId, String status) {
-        log.info("Notifying client {} about review of log {}: status={}", clientId, logId, status);
+    private void notifyClientOfReview(UUID clientId, UUID logId, String status, String action) {
+        log.info("Notifying client {} about review of log {}: status={} action={}", clientId, logId, status, action);
         Map<String, Object> payload = new HashMap<>();
         payload.put("logId", logId);
         payload.put("status", status);
+        payload.put("action", action);
         webSocketSessionService.sendToUser(clientId, "DIET_LOG_REVIEWED", payload);
     }
 }

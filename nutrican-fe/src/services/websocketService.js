@@ -94,12 +94,18 @@ const handleWebSocketMessage = (message) => {
             window.dispatchEvent(new CustomEvent('realtime_update'));
             break;
 
-        case 'DIET_LOG_REVIEWED':
-            addNotification({ id: data.logId, type: 'success', title: 'PT đã đánh giá bữa ăn', message: `Bữa ăn của bạn đã được PT chuyển sang trạng thái: ${data.status}.`, isRead: false, createdAt: new Date().toISOString() });
-            toast.success(`PT đã đánh giá bữa ăn: Chuyển sang trạng thái ${data.status}.`);
+        case 'DIET_LOG_REVIEWED': {
+            const reviewMessage = data.status === 'REJECTED'
+                ? 'PT đã từ chối bữa ăn của bạn.'
+                : data.action === 'ADJUST'
+                    ? 'PT đã chỉnh lại chỉ số bữa ăn — mục tiêu hôm nay đã cập nhật theo số mới.'
+                    : 'PT đã duyệt bữa ăn của bạn là đúng.';
+            addNotification({ id: data.logId, type: 'success', title: 'PT đã kiểm tra bữa ăn', message: reviewMessage, isRead: false, createdAt: new Date().toISOString() });
+            toast.success(reviewMessage);
             window.dispatchEvent(new CustomEvent('DIET_LOG_REVIEWED', { detail: data }));
             window.dispatchEvent(new CustomEvent('realtime_update_client'));
             break;
+        }
 
         case 'CHAT_MESSAGE':
             window.dispatchEvent(new CustomEvent('realtime_chat_message', { detail: data }));

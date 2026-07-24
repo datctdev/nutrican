@@ -95,8 +95,8 @@ public class UserInitializer implements CommandLineRunner {
         User demoSolo = seedUser("solo@nutrican.com", "Khách Hàng Solo (Không PT)", UserRole.CUSTOMER,
                 "0911000000", "Solo Demo, TP.HCM", LocalDate.of(1998, 5, 15));
 
-        seedCustomerE2eProfile(demoCustomer, NutritionGoal.MAINTAIN, 165, "FEMALE");
-        seedCustomerE2eProfile(demoSolo, NutritionGoal.WEIGHT_LOSS, 172, "MALE");
+        seedCustomerE2eProfile(demoCustomer, NutritionGoal.MAINTAIN, 165, "female");
+        seedCustomerE2eProfile(demoSolo, NutritionGoal.WEIGHT_LOSS, 172, "male");
         seedDemoMacroIfAbsent(demoCustomer, ActivityLevel.LIGHT, 1850, 105, 200, 60);
         seedDemoMacroIfAbsent(demoSolo, ActivityLevel.MODERATE, 2100, 130, 230, 70);
 
@@ -148,9 +148,9 @@ public class UserInitializer implements CommandLineRunner {
                 "hv.endreq@nutrican.com", "HV End Request Demo", UserRole.CUSTOMER,
                 "0903111999", "End Request Demo, TP.HCM", LocalDate.of(1997, 2, 14));
 
-        seedCustomerE2eProfile(customerOne, NutritionGoal.WEIGHT_LOSS, 170, "MALE");
-        seedCustomerE2eProfile(customerTwo, NutritionGoal.WEIGHT_LOSS, 165, "FEMALE");
-        seedCustomerE2eProfile(endReqHv, NutritionGoal.MAINTAIN, 168, "FEMALE");
+        seedCustomerE2eProfile(customerOne, NutritionGoal.WEIGHT_LOSS, 170, "male");
+        seedCustomerE2eProfile(customerTwo, NutritionGoal.WEIGHT_LOSS, 165, "female");
+        seedCustomerE2eProfile(endReqHv, NutritionGoal.MAINTAIN, 168, "female");
         seedMacroTarget(customerOne, 2000, 120, 220, 65);
         seedMacroTarget(customerTwo, 1900, 110, 200, 60);
 
@@ -351,7 +351,7 @@ public class UserInitializer implements CommandLineRunner {
                     String.format("0905%06d", 100001 + i),
                     "Demo Reviewer, TP.HCM",
                     LocalDate.of(1995 + (i % 8), 1 + (i % 11), 5 + (i % 20)));
-            seedCustomerE2eProfile(u, NutritionGoal.MAINTAIN, 165 + (i % 10), i % 2 == 0 ? "FEMALE" : "MALE");
+            seedCustomerE2eProfile(u, NutritionGoal.MAINTAIN, 165 + (i % 10), i % 2 == 0 ? "female" : "male");
             reviewers.add(u);
         }
         return reviewers;

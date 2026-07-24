@@ -29,6 +29,8 @@ export default function LogItemCompact({
     const timeLabel = formatLogTime(log);
     const thumb = getFullImageUrl(log.imageUrl);
     const pendingReview = log.reviewStatus === 'PENDING';
+    const ptAdjusted = log.reviewStatus === 'APPROVED' && log.ptAction === 'ADJUST';
+    const legacyRejected = log.reviewStatus === 'REJECTED';
 
     return (
         <div className="rounded-lg border border-slate-200/80 bg-white overflow-hidden">
@@ -52,6 +54,15 @@ export default function LogItemCompact({
                         {timeLabel && <span className="text-slate-400"> · {timeLabel}</span>}
                         {log.makeupForPeriod && MEAL_PERIOD_LABELS[log.makeupForPeriod] && (
                             <span className="text-amber-700"> · Bù {MEAL_PERIOD_LABELS[log.makeupForPeriod]}</span>
+                        )}
+                        {pendingReview && (
+                            <span className="text-amber-700 font-semibold"> · Ước tính, chờ PT</span>
+                        )}
+                        {ptAdjusted && (
+                            <span className="text-blue-700 font-semibold"> · PT đã chỉnh</span>
+                        )}
+                        {legacyRejected && (
+                            <span className="text-red-600 font-semibold"> · PT từ chối (cũ)</span>
                         )}
                     </span>
                 </span>

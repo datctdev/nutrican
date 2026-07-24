@@ -33,12 +33,20 @@ public class AppointmentResponse {
     private LocalDateTime updatedAt;
     /** Số tiền đã hoàn về ví học viên khi hủy (0 nếu không hoàn). */
     private BigDecimal refundedAmount;
+    /** Tên học viên — dùng trên UI PT (dashboard / lịch). */
+    private String clientName;
+    /** Tên PT — dùng trên UI học viên. */
+    private String ptName;
 
     public static AppointmentResponse from(PtAppointment a) {
-        return from(a, null);
+        return from(a, null, null, null);
     }
 
     public static AppointmentResponse from(PtAppointment a, BigDecimal refundedAmount) {
+        return from(a, null, null, refundedAmount);
+    }
+
+    public static AppointmentResponse from(PtAppointment a, String clientName, String ptName, BigDecimal refundedAmount) {
         if (a == null) {
             return null;
         }
@@ -62,6 +70,8 @@ public class AppointmentResponse {
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
                 .refundedAmount(refundedAmount != null ? refundedAmount : BigDecimal.ZERO)
+                .clientName(clientName)
+                .ptName(ptName)
                 .build();
     }
 }

@@ -423,11 +423,12 @@ export default function PtDashboardPage() {
                             </Card>
                         ) : (
                             <div className="bg-white border border-slate-200/80 shadow-sm rounded-3xl divide-y divide-slate-100 overflow-hidden">
-                                {upcomingAppts.map((appt, idx) => {
+                                {upcomingAppts.map((appt) => {
                                     const isOffline = appt.type === 'OFFLINE' || appt.trainingMode === 'OFFLINE';
                                     const apptDate = new Date(appt.startTime || appt.start);
+                                    const displayName = appt.clientName || appt.counterpartName || 'Học viên';
                                     return (
-                                        <div key={idx} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors">
+                                        <div key={appt.id || `${appt.clientId}-${appt.startTime}`} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors">
                                             <div className="flex items-start gap-4 min-w-0">
                                                 <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-100 flex flex-col items-center justify-center shrink-0 text-violet-700 font-bold">
                                                     <span className="text-[10px] uppercase font-black">{apptDate.toLocaleDateString('vi-VN', { weekday: 'short' })}</span>
@@ -435,7 +436,7 @@ export default function PtDashboardPage() {
                                                 </div>
                                                 <div className="min-w-0 space-y-1">
                                                     <div className="flex items-center gap-2">
-                                                        <h4 className="font-extrabold text-slate-900 text-base truncate">{appt.clientName || appt.counterpartName || 'Học viên'}</h4>
+                                                        <h4 className="font-extrabold text-slate-900 text-base truncate" title={displayName}>{displayName}</h4>
                                                         <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${isOffline ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>
                                                             {isOffline ? 'Offline' : 'Online'}
                                                         </span>

@@ -5,6 +5,8 @@ export const workspaceService = {
     getPendingLogs: (params) => api.get('/workspace/diet-logs/pending', { params }),
     reviewLog: (id, data) => api.put(`/workspace/diet-logs/${id}/review`, data),
     getClientProgress: (clientId, params) => api.get(`/workspace/progress/${clientId}`, { params }),
+    /** Same BodyMetricDto shape/order as HV GET /profile/body-metrics (DESC). Prefer for BodyCompositionChart. */
+    getClientBodyMetrics: (clientId, params) => api.get(`/workspace/clients/${clientId}/body-metrics`, { params }),
     assignClient: (clientId) => api.post(`/workspace/clients/${clientId}/assign`),
     getStats: () => api.get('/workspace/stats'),
     getAlerts: () => api.get('/workspace/alerts'),

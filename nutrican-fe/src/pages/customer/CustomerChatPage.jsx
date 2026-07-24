@@ -30,6 +30,7 @@ export default function CustomerChatPage() {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const mappingParam = searchParams.get('mappingId');
+    const draftParam = searchParams.get('draft');
     const [threads, setThreads] = useState([]);
     const [activeMappingId, setActiveMappingId] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -94,6 +95,19 @@ export default function CustomerChatPage() {
         initChat();
         return () => { isMounted = false; };
     }, [location.state, loadThreads, mappingParam]);
+
+    useEffect(() => {
+        if (!draftParam) return;
+        try {
+            const draft = sessionStorage.getItem('nutrican_chat_draft');
+            if (draft) {
+                setNewMessage(draft);
+                sessionStorage.removeItem('nutrican_chat_draft');
+            }
+        } catch {
+            // ignore
+        }
+    }, [draftParam, activeMappingId]);
 
     useEffect(() => {
         if (!activeMappingId) return;

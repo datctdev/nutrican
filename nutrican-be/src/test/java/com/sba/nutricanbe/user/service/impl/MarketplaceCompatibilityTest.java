@@ -56,6 +56,30 @@ class MarketplaceCompatibilityTest {
     }
 
     @Test
+    void searchPts_muscleGainAliasMatchesWeightGain() {
+        User u = org.mockito.Mockito.mock(User.class);
+        UUID uid = UUID.randomUUID();
+        when(u.getId()).thenReturn(uid);
+        when(u.getFullName()).thenReturn("PT");
+        PtProfile profile = PtProfile.builder()
+                .user(u)
+                .isVerified(true)
+                .preferredGoals(List.of("MUSCLE_GAIN"))
+                .maxClients(10)
+                .build();
+        when(ptProfileRepository.findByIsVerifiedTrue(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(profile)));
+
+        PtSearchRequest req = new PtSearchRequest();
+        req.setVerifiedOnly(true);
+        req.setGoalFilter("WEIGHT_GAIN");
+
+        var page = marketplaceService.searchPts(req, null).getData();
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getGoalMatch()).isTrue();
+    }
+
+    @Test
     void searchPts_filtersByDietType() {
         User u = org.mockito.Mockito.mock(User.class);
         UUID uid = UUID.randomUUID();

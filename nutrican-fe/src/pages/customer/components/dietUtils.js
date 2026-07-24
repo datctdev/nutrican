@@ -221,37 +221,15 @@ export function addDaysIso(iso, delta) {
 }
 
 
-export const DEMO_VN_CLOCK_KEY = 'nutrican.demoVnClock';
-const DEMO_VN_CLOCK_OS_PREF_KEY = 'nutrican.demoVnClock.preferOsV1';
-
-/** One-time: clear frozen demo clock so plan day follows OS / Asia/Ho_Chi_Minh. */
-(function preferOsClockOnce() {
+/** Clear leftover FE demo-clock keys from older builds. */
+(function clearLegacyDemoVnClock() {
     try {
-        if (!localStorage.getItem(DEMO_VN_CLOCK_OS_PREF_KEY)) {
-            localStorage.removeItem(DEMO_VN_CLOCK_KEY);
-            localStorage.setItem(DEMO_VN_CLOCK_OS_PREF_KEY, '1');
-        }
+        localStorage.removeItem('nutrican.demoVnClock');
+        localStorage.removeItem('nutrican.demoVnClock.preferOsV1');
     } catch {
         // ignore
     }
 })();
-
-export function getDemoVnClock() {
-    try {
-        return localStorage.getItem(DEMO_VN_CLOCK_KEY) || '';
-    } catch {
-        return '';
-    }
-}
-
-export function setDemoVnClock(value) {
-    try {
-        if (!value) localStorage.removeItem(DEMO_VN_CLOCK_KEY);
-        else localStorage.setItem(DEMO_VN_CLOCK_KEY, value);
-    } catch {
-        // ignore storage failures (private mode / quota)
-    }
-}
 
 function vnWallParts(date = new Date()) {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -275,29 +253,8 @@ function vnWallParts(date = new Date()) {
     };
 }
 
-
-export function parseDemoVnClock(raw, baseDate = new Date()) {
-    if (!raw || typeof raw !== 'string') return null;
-    const value = raw.trim();
-    if (!value) return null;
-    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
-        const [h, m, s = '0'] = value.split(':');
-        const wall = vnWallParts(baseDate);
-        return new Date(wall.year, wall.month - 1, wall.day, Number(h), Number(m), Number(s), 0);
-    }
-    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
-    if (m) {
-        return new Date(
-            Number(m[1]), Number(m[2]) - 1, Number(m[3]),
-            Number(m[4]), Number(m[5]), Number(m[6] || 0), 0,
-        );
-    }
-    return null;
-}
-
+/** Wall clock in Asia/Ho_Chi_Minh (follows OS time). */
 export function nowInVn() {
-    const demo = parseDemoVnClock(getDemoVnClock());
-    if (demo) return demo;
     const wall = vnWallParts();
     return new Date(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second, 0);
 }
@@ -536,11 +493,11 @@ export function canLateTickMealPeriod(planDate, period, now = nowInVn()) {
 }
 
 
+// Đồng bộ với backend getSummary: mọi log LOGGED đều là bữa đã ăn, kể cả đang chờ PT
+// kiểm tra (số tạm) hoặc REJECTED của luồng cũ.
 function isActualIntakeLog(log) {
     if (!log) return false;
-    if (log.status && log.status !== 'LOGGED') return false;
-    const rs = log.reviewStatus;
-    return !rs || rs === 'NOT_REQUIRED' || rs === 'APPROVED';
+    return !log.status || log.status === 'LOGGED';
 }
 
 
@@ -606,8 +563,11 @@ export function scaleFoodMacros(food, quantityG) {
 
 export function isPlanItemInDietLogTotals(item) {
     if (!item?.eaten) return false;
+    // Tick plan (PT / self / override) đều tạo DietLog → calo đã nằm trong summary.logs.
+    // Không cộng lại qua compliance (tránh 2237 = thực tế + tick trùng).
     if (item.source === 'SELF') return true;
-    if (item.sourceType === 'SELF_OVERRIDE') return true;
+    if (item.sourceType === 'SELF_OVERRIDE' || item.sourceType === 'PT_ORIGINAL') return true;
+    if (item.source === 'PT') return true;
     return false;
 }
 
@@ -665,11 +625,12 @@ export function computePlanProgressBreakdown(items = [], {
     excludeItemId = null,
     dateIso = null,
     coachedMode = false,
+    logs = [],
 } = {}) {
     const list = Array.isArray(items) ? items : [];
     const pastDate = dateIso ? isPastIso(dateIso) : false;
     const settledPeriods = new Set(
-        MEAL_PERIODS.filter((p) => isMealPeriodSettled(p, list)),
+        MEAL_PERIODS.filter((p) => isMealPeriodSettled(p, list, logs)),
     );
     const pendingReplacePeriods = new Set();
     list.forEach((i) => {

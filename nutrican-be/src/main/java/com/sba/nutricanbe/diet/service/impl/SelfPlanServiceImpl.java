@@ -4,7 +4,7 @@ import com.sba.nutricanbe.common.dto.MacroNutrients;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ConflictException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
-import com.sba.nutricanbe.common.util.DayPlanRules;
+import com.sba.nutricanbe.diet.util.DayPlanRules;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MealPeriodLabels;
 import com.sba.nutricanbe.common.util.MealPeriods;

@@ -5,7 +5,7 @@ import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
 import com.sba.nutricanbe.common.util.CoachingWeeks;
-import com.sba.nutricanbe.common.util.DayPlanRules;
+import com.sba.nutricanbe.diet.util.DayPlanRules;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.diet.dto.request.SelfPlanSubmissionReviewRequest;
 import com.sba.nutricanbe.diet.dto.response.SelfPlanItemResponse;

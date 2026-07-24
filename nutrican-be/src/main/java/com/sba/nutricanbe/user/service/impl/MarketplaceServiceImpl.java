@@ -152,7 +152,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
         String dietForMatch = request.getDietFilter() != null
                 ? request.getDietFilter() : request.getCustomerDietPreference();
         if (goalForMatch != null && profile.getPreferredGoals() != null) {
-            response.setGoalMatch(profile.getPreferredGoals().contains(goalForMatch));
+            response.setGoalMatch(goalsCompatible(profile.getPreferredGoals(), goalForMatch));
         }
         if (dietForMatch != null && profile.getPreferredDietTypes() != null) {
             response.setDietMatch(profile.getPreferredDietTypes().contains(dietForMatch));
@@ -162,7 +162,7 @@ public class MarketplaceServiceImpl implements MarketplaceService {
 
     private boolean matchesFilters(PtProfileResponse r, PtSearchRequest request) {
         if (request.getGoalFilter() != null && !request.getGoalFilter().isBlank()) {
-            if (r.getPreferredGoals() == null || !r.getPreferredGoals().contains(request.getGoalFilter())) {
+            if (r.getPreferredGoals() == null || !goalsCompatible(r.getPreferredGoals(), request.getGoalFilter())) {
                 return false;
             }
         }
@@ -225,6 +225,20 @@ public class MarketplaceServiceImpl implements MarketplaceService {
             }
         }
         return true;
+    }
+
+    /** MUSCLE_GAIN (PT free-text) ≡ WEIGHT_GAIN (customer NutritionGoal). */
+    static boolean goalsCompatible(List<String> preferredGoals, String filter) {
+        if (preferredGoals == null || filter == null || filter.isBlank()) {
+            return false;
+        }
+        if (preferredGoals.contains(filter)) {
+            return true;
+        }
+        if ("MUSCLE_GAIN".equals(filter) || "WEIGHT_GAIN".equals(filter)) {
+            return preferredGoals.contains("MUSCLE_GAIN") || preferredGoals.contains("WEIGHT_GAIN");
+        }
+        return false;
     }
 
     private int compatibilityScore(PtProfileResponse r) {

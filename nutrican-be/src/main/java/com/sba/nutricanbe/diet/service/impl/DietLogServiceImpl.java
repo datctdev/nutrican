@@ -4,10 +4,12 @@ import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.DietLogImage;
+import com.sba.nutricanbe.diet.entity.DietLogItem;
 import com.sba.nutricanbe.diet.entity.FoodItem;
 import com.sba.nutricanbe.user.entity.MacroTarget;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
+import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.ExperimentCohort;
 import com.sba.nutricanbe.diet.enums.MealComplexity;
@@ -26,6 +28,7 @@ import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.common.util.MealPeriods;
 import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
+import com.sba.nutricanbe.diet.dto.request.DietLogItemRequest;
 import com.sba.nutricanbe.diet.dto.response.DietLogResponse;
 import com.sba.nutricanbe.diet.dto.response.DietSummaryResponse;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
@@ -78,6 +81,20 @@ public class DietLogServiceImpl implements DietLogService {
     @Override
     @Transactional
     public ApiResponse<DietLogResponse> createLog(UUID customerId, CreateDietLogRequest request) {
+        return persistNewLog(customerId, request, false);
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<DietLogResponse> createPlanComplianceLog(UUID customerId, CreateDietLogRequest request) {
+        return persistNewLog(customerId, request, true);
+    }
+
+    /**
+     * @param planCompliance true = tick from PT meal plan (calo already approved); never PENDING / never notify review
+     */
+    private ApiResponse<DietLogResponse> persistNewLog(
+            UUID customerId, CreateDietLogRequest request, boolean planCompliance) {
         User customer = userQueryService.findUserById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", customerId));
 
@@ -94,10 +111,6 @@ public class DietLogServiceImpl implements DietLogService {
 
         MealSource mealSource = request.getMealSource() != null ? request.getMealSource() : MealSource.HOME_COOKED;
         MealComplexity mealComplexity = request.getMealComplexity() != null ? request.getMealComplexity() : MealComplexity.SIMPLE;
-        // Có PT ACTIVE: luôn PENDING (không tin FE bỏ tick sendToPt)
-        boolean hasActivePt = dietLogHelper.hasActivePt(customerId);
-        boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt()) || hasActivePt;
-        var reviewStatus = dietLogHelper.resolveReviewStatus(customerId, sendToPt);
 
         DietLog dietLog = DietLog.builder()
                 .customerId(customerId)
@@ -107,7 +120,7 @@ public class DietLogServiceImpl implements DietLogService {
                 .foodDescription(request.getFoodDescription())
                 .logDate(logDate)
                 .status(DietLogStatus.LOGGED)
-                .reviewStatus(reviewStatus)
+                .reviewStatus(DietLogReviewStatus.NOT_REQUIRED)
                 .mealSource(mealSource)
                 .mealComplexity(mealComplexity)
                 .restaurantName(request.getRestaurantName())
@@ -118,8 +131,11 @@ public class DietLogServiceImpl implements DietLogService {
                 .isPtNotified(false)
                 .build();
 
-        if (request.getRecipeId() != null) {
-            var recipeItems = userRecipeService.toLogItems(customerId, request.getRecipeId());
+        List<DietLogItemRequest> recipeItems = request.getRecipeId() != null
+                ? userRecipeService.toLogItems(customerId, request.getRecipeId())
+                : null;
+        boolean macrosFromCatalog = false;
+        if (recipeItems != null) {
             dietLogHelper.applyItemsToLog(dietLog, recipeItems);
             dietLog.setRecognitionSource(RecognitionSource.MANUAL_RECIPE);
             dietLog.setMealSource(MealSource.HOME_COOKED);
@@ -136,22 +152,32 @@ public class DietLogServiceImpl implements DietLogService {
                 FoodItem food = foodOpt.get();
                 dietLog.setMacrosJson(dietLogHelper.macrosForFood(food, food.getServingSizeG()));
                 dietLog.setFoodDescription(food.getNameVi());
+                macrosFromCatalog = true;
             }
         }
+
+        DietLogReviewStatus reviewStatus;
+        if (planCompliance || isFullyCatalogBacked(dietLog, macrosFromCatalog)) {
+            reviewStatus = DietLogReviewStatus.NOT_REQUIRED;
+        } else {
+            boolean sendToPt = Boolean.TRUE.equals(request.getSendToPt()) || dietLogHelper.hasActivePt(customerId);
+            reviewStatus = dietLogHelper.resolveReviewStatus(customerId, sendToPt);
+        }
+        dietLog.setReviewStatus(reviewStatus);
 
         dietLogHelper.assignPtReviewerIfNeeded(dietLog, customerId);
         DietPreference pref = customer.getDietPreference() != null ? customer.getDietPreference() : DietPreference.NORMAL;
         dietLog.setExperimentCohortKey(RblCohortUtil.resolveKey(
                 dietLog.getMealSource(), dietLog.getMealComplexity(), dietLog.getRecognitionSource(), pref));
         dietLog = dietLogRepository.save(dietLog);
-        boolean pendingReview = reviewStatus == com.sba.nutricanbe.diet.enums.DietLogReviewStatus.PENDING;
+        boolean pendingReview = reviewStatus == DietLogReviewStatus.PENDING;
         if (pendingReview) {
             dietLog.setIsPtNotified(true);
             dietLogHelper.notifyPtOfNewLog(dietLog);
         }
-        log.info("Diet log created: {} by user: {}", dietLog.getId(), customerId);
+        log.info("Diet log created: {} by user: {} (planCompliance={})", dietLog.getId(), customerId, planCompliance);
         DietLogResponse response = dietLogHelper.toResponse(dietLog);
-        applyManualWarnings(customerId, request, response);
+        applyManualWarnings(customerId, request, recipeItems, response);
         IntakeControlResult loop = intakeControlLoopService.evaluateAfterLog(
                 customerId, dietLog.getLogDate(), !pendingReview);
         if (loop != null) {
@@ -162,26 +188,28 @@ public class DietLogServiceImpl implements DietLogService {
         return ApiResponse.success(response, "Diet log created");
     }
 
-    private void applyManualWarnings(UUID customerId, CreateDietLogRequest request, DietLogResponse response) {
-        List<UUID> foodItemIds = new ArrayList<>();
+    /**
+     * Chỉ tin dữ liệu đã resolve được từ food catalog: item custom (foodItemId null sau khi build)
+     * hoặc calo tự gõ đều không được xem là "đã kiểm duyệt".
+     */
+    private boolean isFullyCatalogBacked(DietLog dietLog, boolean macrosFromCatalog) {
+        List<DietLogItem> items = dietLog.getItems();
+        if (items != null && !items.isEmpty()) {
+            return items.stream().allMatch(item -> item.getFoodItemId() != null);
+        }
+        return macrosFromCatalog;
+    }
+
+    private void applyManualWarnings(UUID customerId, CreateDietLogRequest request,
+                                    List<DietLogItemRequest> recipeItems, DietLogResponse response) {
+        List<DietLogItemRequest> sourceItems = recipeItems != null ? recipeItems : request.getItems();
         List<FoodItem> foods = new ArrayList<>();
-        if (request.getRecipeId() != null) {
-            userRecipeService.toLogItems(customerId, request.getRecipeId()).forEach(item -> {
+        if (sourceItems != null) {
+            for (DietLogItemRequest item : sourceItems) {
                 if (item.getFoodItemId() != null) {
-                    foodItemIds.add(item.getFoodItemId());
-                    foodItemRepository.findById(item.getFoodItemId()).ifPresent(foods::add);
-                }
-            });
-        } else if (request.getItems() != null) {
-            for (var item : request.getItems()) {
-                if (item.getFoodItemId() != null) {
-                    foodItemIds.add(item.getFoodItemId());
                     foodItemRepository.findById(item.getFoodItemId()).ifPresent(foods::add);
                 }
             }
-        }
-        if (!foodItemIds.isEmpty()) {
-
         }
         if (!foods.isEmpty()) {
             var prefWarnings = dietPrefCheckService.checkFoodItems(customerId, foods);

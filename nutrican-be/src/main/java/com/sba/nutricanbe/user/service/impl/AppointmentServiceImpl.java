@@ -14,6 +14,7 @@ import com.sba.nutricanbe.user.entity.PtAppointment;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.PtMappingSession;
 import com.sba.nutricanbe.user.entity.PtProfile;
+import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.user.enums.AppointmentCancelType;
 import com.sba.nutricanbe.user.enums.AppointmentStatus;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
@@ -23,6 +24,7 @@ import com.sba.nutricanbe.user.repository.PtAppointmentRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
+import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.AppointmentService;
 import com.sba.nutricanbe.user.service.AppointmentSlotHelper;
 import com.sba.nutricanbe.user.service.OfflinePackageAppointmentService;
@@ -33,8 +35,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -51,27 +58,28 @@ public class AppointmentServiceImpl implements AppointmentService {
     private final AppointmentSlotHelper appointmentSlotHelper;
     private final PtProfileRepository ptProfileRepository;
     private final OfflinePackageAppointmentService offlinePackageAppointmentService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
-    public PtAppointment book(UUID customerId, UUID ptId, BookAppointmentRequest request) {
+    public AppointmentResponse book(UUID customerId, UUID ptId, BookAppointmentRequest request) {
         throw new BadRequestException(
                 "Không thể đặt lịch trống. Với coaching offline, vui lòng mua thêm buổi từ mục Coaching.");
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<PtAppointment> upcomingForCustomer(UUID customerId) {
-        return appointmentRepository.findByClientIdAndStatusInOrderByStartTimeAsc(
-                customerId, List.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED));
+    public List<AppointmentResponse> upcomingForCustomer(UUID customerId) {
+        return toResponses(appointmentRepository.findByClientIdAndStatusInOrderByStartTimeAsc(
+                customerId, List.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED)));
     }
 
     @Override
     @Transactional
-    public List<PtAppointment> upcomingForPt(UUID ptId) {
+    public List<AppointmentResponse> upcomingForPt(UUID ptId) {
         expireStale();
-        return appointmentRepository.findByPtIdAndStatusInOrderByStartTimeAsc(
-                ptId, List.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED));
+        return toResponses(appointmentRepository.findByPtIdAndStatusInOrderByStartTimeAsc(
+                ptId, List.of(AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED)));
     }
 
     @Override
@@ -110,7 +118,7 @@ public class AppointmentServiceImpl implements AppointmentService {
         }
 
         PtAppointment saved = appointmentRepository.save(appt);
-        return AppointmentResponse.from(saved, refunded);
+        return toResponse(saved, refunded);
     }
 
     @Override
@@ -147,7 +155,7 @@ public class AppointmentServiceImpl implements AppointmentService {
         BigDecimal refunded = settleCancelledSession(
                 appt, "CUSTOMER", noFee ? CancelMoneyPolicy.REFUND_CUSTOMER : CancelMoneyPolicy.FORFEIT_TO_PT);
         PtAppointment saved = appointmentRepository.save(appt);
-        return AppointmentResponse.from(saved, refunded);
+        return toResponse(saved, refunded);
     }
 
     private enum CancelMoneyPolicy {
@@ -290,7 +298,7 @@ public class AppointmentServiceImpl implements AppointmentService {
         appt.setStartTime(start);
         appt.setEndTime(end);
         PtAppointment saved = appointmentRepository.save(appt);
-        return AppointmentResponse.from(saved);
+        return toResponse(saved);
     }
 
     @Override
@@ -392,6 +400,70 @@ public class AppointmentServiceImpl implements AppointmentService {
             appt.setMappingSessionId(session.getId());
             appt = appointmentRepository.save(appt);
         }
-        return AppointmentResponse.from(appt);
+        return toResponse(appt);
+    }
+
+    private List<AppointmentResponse> toResponses(List<PtAppointment> appointments) {
+        if (appointments == null || appointments.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> ids = new HashSet<>();
+        for (PtAppointment a : appointments) {
+            collectParticipantIds(a, ids);
+        }
+        Map<UUID, String> names = resolveDisplayNames(ids);
+        return appointments.stream()
+                .map(a -> AppointmentResponse.from(
+                        a, nameOf(names, a.getClientId()), nameOf(names, a.getPtId()), null))
+                .toList();
+    }
+
+    private AppointmentResponse toResponse(PtAppointment appointment) {
+        return toResponse(appointment, null);
+    }
+
+    private AppointmentResponse toResponse(PtAppointment appointment, BigDecimal refundedAmount) {
+        if (appointment == null) {
+            return null;
+        }
+        Set<UUID> ids = new HashSet<>();
+        collectParticipantIds(appointment, ids);
+        Map<UUID, String> names = resolveDisplayNames(ids);
+        return AppointmentResponse.from(
+                appointment,
+                nameOf(names, appointment.getClientId()),
+                nameOf(names, appointment.getPtId()),
+                refundedAmount);
+    }
+
+    private static void collectParticipantIds(PtAppointment appointment, Set<UUID> target) {
+        if (appointment.getClientId() != null) {
+            target.add(appointment.getClientId());
+        }
+        if (appointment.getPtId() != null) {
+            target.add(appointment.getPtId());
+        }
+    }
+
+    private Map<UUID, String> resolveDisplayNames(Collection<UUID> userIds) {
+        Map<UUID, String> names = new HashMap<>();
+        if (userIds == null || userIds.isEmpty()) {
+            return names;
+        }
+        List<User> users = userRepository.findAllById(userIds);
+        if (users == null || users.isEmpty()) {
+            return names;
+        }
+        for (User u : users) {
+            names.put(
+                    u.getId(),
+                    u.getFullName() != null && !u.getFullName().isBlank() ? u.getFullName() : u.getEmail());
+        }
+        return names;
+    }
+
+    private static String nameOf(Map<UUID, String> names, UUID userId) {
+        return userId != null ? names.get(userId) : null;
     }
 }
+

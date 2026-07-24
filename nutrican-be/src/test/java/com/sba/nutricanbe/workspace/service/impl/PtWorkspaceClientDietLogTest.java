@@ -3,7 +3,6 @@ package com.sba.nutricanbe.workspace.service.impl;
 import com.sba.nutricanbe.common.exception.ForbiddenException;
 import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
-import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +17,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,8 +36,8 @@ class PtWorkspaceClientDietLogTest {
     void returnsApprovedLogsForRequestedActiveClient() {
         UUID ptId = UUID.randomUUID();
         UUID clientId = UUID.randomUUID();
-        when(mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                ptId, clientId, ClientMappingStatus.ACTIVE)).thenReturn(true);
+        when(mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(eq(ptId), eq(clientId), anyList()))
+                .thenReturn(true);
         when(dietLogRepository.findByCustomerIdInAndReviewStatus(
                 eq(List.of(clientId)),
                 eq(DietLogReviewStatus.APPROVED),
@@ -53,11 +53,31 @@ class PtWorkspaceClientDietLogTest {
     }
 
     @Test
+    void returnsLegacyRejectedLogsForHistoryTab() {
+        UUID ptId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        when(mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(eq(ptId), eq(clientId), anyList()))
+                .thenReturn(true);
+        when(dietLogRepository.findByCustomerIdInAndReviewStatus(
+                eq(List.of(clientId)),
+                eq(DietLogReviewStatus.REJECTED),
+                any(Pageable.class))).thenReturn(Page.empty());
+
+        ptWorkspaceService.getClientDietLogs(
+                ptId, clientId, 0, 20, DietLogReviewStatus.REJECTED);
+
+        verify(dietLogRepository).findByCustomerIdInAndReviewStatus(
+                eq(List.of(clientId)),
+                eq(DietLogReviewStatus.REJECTED),
+                any(Pageable.class));
+    }
+
+    @Test
     void rejectsHistoryForClientOutsideActiveMapping() {
         UUID ptId = UUID.randomUUID();
         UUID clientId = UUID.randomUUID();
-        when(mappingRepository.existsByPt_IdAndClient_IdAndStatus(
-                ptId, clientId, ClientMappingStatus.ACTIVE)).thenReturn(false);
+        when(mappingRepository.existsByPt_IdAndClient_IdAndStatusIn(eq(ptId), eq(clientId), anyList()))
+                .thenReturn(false);
 
         assertThrows(ForbiddenException.class, () -> ptWorkspaceService.getClientDietLogs(
                 ptId, clientId, 0, 20, DietLogReviewStatus.APPROVED));

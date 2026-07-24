@@ -18,8 +18,12 @@ public class OnboardingRequest {
     private NutritionGoal nutritionGoal;
     private DietPreference dietPreference;
     private Boolean wantsPt;
+    private BigDecimal targetWeight;
 
     private ActivityLevel activityLevel;
     private BigDecimal activityFactor;
+    /** Optional; when both set, preferred over activityLevel for deriving enum. */
+    private Integer sessionsPerWeek;
+    private Integer minutesPerSession;
     private Integer pregnancyTrimester;
 }

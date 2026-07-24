@@ -360,6 +360,7 @@ public class DietLogHelperImpl implements DietLogHelper {
                 .aiFoodCode(aiFoodCode)
                 .ptReviewerId(dietLog.getPtReviewerId())
                 .ptNote(dietLog.getPtNote())
+                .ptAction(dietLog.getPtAction())
                 .ptCorrectionReason(dietLog.getPtCorrectionReason())
                 .logDate(dietLog.getLogDate())
                 .lateTickReason(dietLog.getLateTickReason())

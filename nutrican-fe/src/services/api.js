@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { useAuthStore } from '../stores/authStore';
-import { DEMO_VN_CLOCK_KEY } from '../pages/customer/components/dietUtils';
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1',
@@ -16,14 +15,6 @@ api.interceptors.request.use(
         const accessToken = useAuthStore.getState().accessToken;
         if (accessToken) {
             config.headers.Authorization = `Bearer ${accessToken}`;
-        }
-        try {
-            const demoClock = localStorage.getItem(DEMO_VN_CLOCK_KEY);
-            if (demoClock) {
-                config.headers['X-Nutrican-Demo-Vn-Clock'] = demoClock;
-            }
-        } catch {
-            // ignore storage failures
         }
         if (config.data instanceof FormData) {
             delete config.headers['Content-Type'];

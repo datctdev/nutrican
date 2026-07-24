@@ -8,6 +8,7 @@ import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.diet.enums.PtCorrectionReason;
+import com.sba.nutricanbe.diet.enums.PtReviewAction;
 import com.sba.nutricanbe.diet.enums.RecognitionSource;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -40,6 +41,7 @@ public class DietLogResponse {
     private String aiFoodCode;
     private UUID ptReviewerId;
     private String ptNote;
+    private PtReviewAction ptAction;
     private PtCorrectionReason ptCorrectionReason;
     private LocalDate logDate;
     private String lateTickReason;

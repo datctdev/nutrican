@@ -19,8 +19,6 @@ import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.MealPlan;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
 import com.sba.nutricanbe.diet.entity.MealPlanSuggestion;
-import com.sba.nutricanbe.diet.enums.DietLogReviewStatus;
-import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.MealPeriod;
 import com.sba.nutricanbe.diet.enums.MealPlanItemSourceType;
 import com.sba.nutricanbe.diet.enums.MealPlanReplacementReason;
@@ -193,9 +191,9 @@ public class MealPlanInteractionServiceImpl implements MealPlanInteractionServic
             if (Boolean.TRUE.equals(item.getEaten())) {
                 throw new BadRequestException("Món này đã được ghi nhận ăn rồi");
             }
-            if (!hasActualIntakeInPeriod(customerId, item.getPlanDate(), item.getMealPeriod())) {
-                createDietLogFromPlanItem(customerId, item, lateTickReason);
-            }
+            // Mỗi món plan được tick phải có DietLog riêng (hiện ở Thực tế + cộng đúng kcal),
+            // kể cả khi buổi đã có nhật ký khác — tránh tick "ảo" chỉ gắn eaten=true.
+            createDietLogFromPlanItem(customerId, item, lateTickReason);
         }
 
         item.setEaten(eaten);
@@ -219,21 +217,6 @@ public class MealPlanInteractionServiceImpl implements MealPlanInteractionServic
                         "weekStart", owned.plan().getWeekStart(),
                         "planDate", item.getPlanDate()));
         return MealPlanItemResponse.from(saved, mealPlanItemMacrosResolver.resolve(saved));
-    }
-
-    private boolean hasActualIntakeInPeriod(UUID customerId, LocalDate planDate, MealPeriod mealPeriod) {
-        if (planDate == null || mealPeriod == null) {
-            return false;
-        }
-        return dietLogRepository.findByCustomerIdAndLogDate(customerId, planDate).stream()
-                .filter(log -> log.getStatus() == DietLogStatus.LOGGED)
-                .filter(log -> mealPeriod.equals(log.getMealPeriod()))
-                .anyMatch(log -> {
-                    DietLogReviewStatus reviewStatus = log.getReviewStatus();
-                    return reviewStatus == null
-                            || reviewStatus == DietLogReviewStatus.NOT_REQUIRED
-                            || reviewStatus == DietLogReviewStatus.APPROVED;
-                });
     }
 
     private void createDietLogFromPlanItem(UUID customerId, MealPlanItem item, String lateTickReason) {
@@ -264,8 +247,12 @@ public class MealPlanInteractionServiceImpl implements MealPlanInteractionServic
                 line.setFat(macros.fat());
             });
         }
+        if (line.getCalories() == null || line.getCalories().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException(
+                    "Không ghi nhận món plan khi chưa có calo hợp lệ — gắn thực phẩm catalog hoặc khẩu phần có calo > 0");
+        }
         logReq.setItems(List.of(line));
-        dietLogService.createLog(customerId, logReq);
+        dietLogService.createPlanComplianceLog(customerId, logReq);
     }
 
     @Override

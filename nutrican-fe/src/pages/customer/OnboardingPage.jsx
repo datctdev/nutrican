@@ -12,12 +12,14 @@ import {
     CheckCircle2, Zap, Trophy, AlertCircle
 } from 'lucide-react';
 import {
-    ACTIVITY_LEVEL_OPTIONS,
     DEFAULT_ACTIVITY_LEVEL,
     ActivityLevelInfoTooltip,
+    ActivityLoadInputs,
+    deriveActivityLevel,
 } from './components/activityLevelOptions';
 import logo from '../../assets/nutrican_logo.png';
 import AllergySelector from './components/AllergySelector';
+import { normalizeGender } from '../../utils/gender';
 
 const getGoalsByGender = (gender) => {
     const base = [
@@ -90,6 +92,9 @@ export default function OnboardingPage() {
         dietPreference: 'NORMAL',
         allergyNotes: '',
         activityLevel: DEFAULT_ACTIVITY_LEVEL,
+        sessionsPerWeek: 3,
+        minutesPerSession: 40,
+        targetWeight: '',
         pregnancyTrimester: 1,
     });
 
@@ -196,7 +201,7 @@ export default function OnboardingPage() {
                 heightCm: Number(step1.heightCm),
                 weightKg: Number(step1.weightKg),
                 dateOfBirth: step1.dateOfBirth || undefined,
-                gender: step1.gender,
+                gender: normalizeGender(step1.gender) || step1.gender,
             });
             setStep(res.data.data?.step || 2);
             toast.success('Đã lưu chỉ số cơ thể cơ bản!');
@@ -208,13 +213,21 @@ export default function OnboardingPage() {
     };
 
     const submitStep2 = async () => {
+        const derived = deriveActivityLevel(step2.sessionsPerWeek, step2.minutesPerSession);
+        if (!derived) {
+            toast.error('Nhập đủ buổi/tuần và phút/buổi hợp lệ (0 buổi thì phút = 0)');
+            return;
+        }
         setSubmitting(true);
         try {
             const res = await profileExtensionsService.submitOnboarding({
                 step: 2,
                 nutritionGoal: step2.nutritionGoal,
                 dietPreference: step2.dietPreference,
-                activityLevel: step2.activityLevel,
+                sessionsPerWeek: Number(step2.sessionsPerWeek),
+                minutesPerSession: Number(step2.minutesPerSession),
+                activityLevel: derived,
+                targetWeight: step2.targetWeight ? Number(step2.targetWeight) : undefined,
                 pregnancyTrimester: step2.nutritionGoal === 'PREGNANT' ? step2.pregnancyTrimester : null,
                 weightKg: Number(step1.weightKg) || undefined,
             });
@@ -546,16 +559,41 @@ export default function OnboardingPage() {
                                     </label>
                                     <ActivityLevelInfoTooltip />
                                 </div>
-                                <select
-                                    value={step2.activityLevel}
-                                    onChange={(e) => setStep2((s) => ({ ...s, activityLevel: e.target.value }))}
-                                    className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 font-bold text-sm text-slate-800 shadow-sm outline-none cursor-pointer"
-                                >
-                                    {ACTIVITY_LEVEL_OPTIONS.map((o) => (
-                                        <option key={o.value} value={o.value}>{o.label}</option>
-                                    ))}
-                                </select>
+                                <ActivityLoadInputs
+                                    sessionsPerWeek={step2.sessionsPerWeek}
+                                    minutesPerSession={step2.minutesPerSession}
+                                    onSessionsChange={(v) => setStep2((s) => {
+                                        const next = { ...s, sessionsPerWeek: v };
+                                        const d = deriveActivityLevel(v, s.minutesPerSession);
+                                        if (d) next.activityLevel = d;
+                                        return next;
+                                    })}
+                                    onMinutesChange={(v) => setStep2((s) => {
+                                        const next = { ...s, minutesPerSession: v };
+                                        const d = deriveActivityLevel(s.sessionsPerWeek, v);
+                                        if (d) next.activityLevel = d;
+                                        return next;
+                                    })}
+                                />
                             </div>
+
+                            {(step2.nutritionGoal === 'WEIGHT_LOSS' || step2.nutritionGoal === 'WEIGHT_GAIN') && (
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+                                        Cân nặng mục tiêu (kg, tùy chọn)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min={30}
+                                        max={300}
+                                        step="0.1"
+                                        value={step2.targetWeight}
+                                        onChange={(e) => setStep2((s) => ({ ...s, targetWeight: e.target.value }))}
+                                        className="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 font-bold text-sm text-slate-800 shadow-sm outline-none"
+                                        placeholder="VD: 65"
+                                    />
+                                </div>
+                            )}
 
                             <AllergySelector
                                 value={step2.allergyNotes}

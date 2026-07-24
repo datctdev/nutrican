@@ -12,6 +12,8 @@ public class UserPreferencesRequest {
     private DietPreference dietPreference;
     private NutritionGoal nutritionGoal;
     private ActivityLevel activityLevel;
+    private Integer sessionsPerWeek;
+    private Integer minutesPerSession;
     private Integer pregnancyTrimester;
     private Map<String, Boolean> notificationOptIn;
 }

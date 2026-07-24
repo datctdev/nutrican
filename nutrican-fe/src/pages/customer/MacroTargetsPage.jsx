@@ -15,6 +15,8 @@ import {
     ACTIVITY_LEVEL_OPTIONS,
     DEFAULT_ACTIVITY_LEVEL,
     ActivityLevelInfoTooltip,
+    ActivityLoadInputs,
+    deriveActivityLevel,
 } from './components/activityLevelOptions';
 import { validateInbodyFile } from '../../utils/inbodyUpload';
 
@@ -24,8 +26,11 @@ export default function MacroTargetsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [macros, setMacros] = useState({ dailyCalories: 0, protein: 0, carb: 0, fat: 0 });
     const [nutritionGoal, setNutritionGoal] = useState('MAINTAIN');
+    const [dietPreference, setDietPreference] = useState(null);
     const [pregnancyTrimester, setPregnancyTrimester] = useState(1);
     const [activityLevel, setActivityLevel] = useState(DEFAULT_ACTIVITY_LEVEL);
+    const [sessionsPerWeek, setSessionsPerWeek] = useState('');
+    const [minutesPerSession, setMinutesPerSession] = useState('');
     const [isRecalculating, setIsRecalculating] = useState(false);
     const [hasActivePt, setHasActivePt] = useState(false);
     const [progressGoals, setProgressGoals] = useState(null);
@@ -55,6 +60,18 @@ export default function MacroTargetsPage() {
         targetDate: ''
     });
 
+    const activityPayload = () => {
+        const derived = deriveActivityLevel(sessionsPerWeek, minutesPerSession);
+        if (derived != null) {
+            return {
+                sessionsPerWeek: Number(sessionsPerWeek),
+                minutesPerSession: Number(minutesPerSession),
+                activityLevel: derived,
+            };
+        }
+        return { activityLevel };
+    };
+
     useEffect(() => {
         if (!recalcMenuOpen || hasActivePt) return;
         let cancelled = false;
@@ -63,7 +80,7 @@ export default function MacroTargetsPage() {
                 const suggestionRes = await userService.getMacroSuggestion({
                     nutritionGoal,
                     pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
-                    activityLevel,
+                    ...activityPayload(),
                 });
                 const m = suggestionRes.data?.data;
                 if (!cancelled && m) {
@@ -79,7 +96,7 @@ export default function MacroTargetsPage() {
             }
         })();
         return () => { cancelled = true; };
-    }, [activityLevel, recalcMenuOpen, hasActivePt, nutritionGoal, pregnancyTrimester]);
+    }, [activityLevel, sessionsPerWeek, minutesPerSession, recalcMenuOpen, hasActivePt, nutritionGoal, pregnancyTrimester]);
 
     const openGoalModal = () => {
         setEditGoalForm({
@@ -121,7 +138,7 @@ export default function MacroTargetsPage() {
             if (!hasActivePt && editGoalForm.nutritionGoal !== previousGoal) {
                 try {
                     const res = await userService.recalculateMacros({
-                        activityLevel,
+                        ...activityPayload(),
                         nutritionGoal: editGoalForm.nutritionGoal,
                         pregnancyTrimester: editGoalForm.nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
                     });
@@ -176,8 +193,11 @@ export default function MacroTargetsPage() {
 
             if (profileRes.data?.data) {
                 setNutritionGoal(profileRes.data.data.nutritionGoal || 'MAINTAIN');
+                setDietPreference(profileRes.data.data.dietPreference || null);
                 setPregnancyTrimester(profileRes.data.data.pregnancyTrimester || 1);
                 setActivityLevel(profileRes.data.data.activityLevel || DEFAULT_ACTIVITY_LEVEL);
+                setSessionsPerWeek(profileRes.data.data.exerciseSessionsPerWeek ?? '');
+                setMinutesPerSession(profileRes.data.data.exerciseMinutesPerSession ?? '');
             }
 
             if (goalsRes.data?.data) {
@@ -252,7 +272,7 @@ export default function MacroTargetsPage() {
                 const suggestionRes = await userService.getMacroSuggestion({
                     nutritionGoal,
                     pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
-                    activityLevel,
+                    ...activityPayload(),
                 });
 
                 const newMacros = suggestionRes.data?.data;
@@ -286,12 +306,19 @@ export default function MacroTargetsPage() {
     };
 
     const handleRecalculateMacros = async () => {
+        const payload = activityPayload();
+        if (sessionsPerWeek !== '' || minutesPerSession !== '') {
+            if (deriveActivityLevel(sessionsPerWeek, minutesPerSession) == null) {
+                toast.error('Nhập đủ buổi/tuần và phút/buổi hợp lệ (0 buổi thì phút = 0)');
+                return;
+            }
+        }
         setShowRecalcConfirm(false);
         setRecalcMenuOpen(false);
         setIsRecalculating(true);
         try {
             const res = await userService.recalculateMacros({
-                activityLevel,
+                ...payload,
                 nutritionGoal,
                 pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
             });
@@ -322,7 +349,7 @@ export default function MacroTargetsPage() {
             const suggestionRes = await userService.getMacroSuggestion({
                 nutritionGoal,
                 pregnancyTrimester: nutritionGoal === 'PREGNANT' ? pregnancyTrimester : null,
-                activityLevel,
+                ...activityPayload(),
             });
             const m = suggestionRes.data?.data;
             if (m) {
@@ -463,9 +490,22 @@ export default function MacroTargetsPage() {
 
             {/* ĐÃ SỬA LỖI UI: KHUNG CẢNH BÁO MÀU VÀNG KHÔNG CÒN BỊ ÉP NGHẸT CHỮ */}
             {hasActivePt && (
-                <div className="flex items-start sm:items-center gap-3.5 bg-amber-50 border border-amber-200/80 rounded-2xl p-4 sm:p-5 text-sm text-amber-900 font-semibold shadow-sm leading-relaxed">
-                    <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500 mt-0.5 sm:mt-0" />
-                    <span>Mục tiêu dinh dưỡng và mức vận động đang do Huấn Luyện Viên (PT) quản lý — liên hệ PT để thay đổi. Bạn vẫn có thể ghi nhận tiến độ cân nặng bên dưới.</span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 bg-amber-50 border border-amber-200/80 rounded-2xl p-4 sm:p-5 text-sm text-amber-900 font-semibold shadow-sm leading-relaxed">
+                    <div className="flex items-start gap-3.5 flex-1">
+                        <AlertTriangle className="w-5 h-5 shrink-0 text-amber-500 mt-0.5 sm:mt-0" />
+                        <span>Mục tiêu / vận động do PT quản lý — bạn vẫn ghi cân nặng. Muốn chỉnh mục tiêu hãy nhắn PT.</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const draft = `PT ơi, mình muốn điều chỉnh mục tiêu dinh dưỡng / mức vận động. PT hỗ trợ mình nhé!`;
+                            sessionStorage.setItem('nutrican_chat_draft', draft);
+                            window.location.href = '/chat?draft=1';
+                        }}
+                        className="shrink-0 text-xs font-extrabold px-4 py-2 rounded-xl bg-amber-600 text-white hover:bg-amber-700"
+                    >
+                        Nhắn PT chỉnh mục tiêu
+                    </button>
                 </div>
             )}
 
@@ -547,19 +587,35 @@ export default function MacroTargetsPage() {
 
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-1.5">
-                                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Mức độ vận động hàng ngày</label>
+                                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Buổi × phút / tuần</label>
                                         <ActivityLevelInfoTooltip />
                                     </div>
-                                    <select
-                                        value={activityLevel}
-                                        onChange={(e) => setActivityLevel(e.target.value)}
+                                    {(nutritionGoal || dietPreference) && (
+                                        <p className="text-[11px] text-slate-500 font-medium">
+                                            Mục tiêu: <span className="font-bold text-slate-700">{nutritionGoal}</span>
+                                            {dietPreference ? <> · Chế độ ăn: <span className="font-bold text-slate-700">{dietPreference}</span></> : null}
+                                        </p>
+                                    )}
+                                    {hasActivePt && (
+                                        <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 font-semibold">
+                                            Mục tiêu / vận động do PT quản lý — nhắn PT nếu cần chỉnh.
+                                        </p>
+                                    )}
+                                    <ActivityLoadInputs
+                                        sessionsPerWeek={sessionsPerWeek}
+                                        minutesPerSession={minutesPerSession}
+                                        onSessionsChange={(v) => {
+                                            setSessionsPerWeek(v);
+                                            const d = deriveActivityLevel(v, minutesPerSession);
+                                            if (d) setActivityLevel(d);
+                                        }}
+                                        onMinutesChange={(v) => {
+                                            setMinutesPerSession(v);
+                                            const d = deriveActivityLevel(sessionsPerWeek, v);
+                                            if (d) setActivityLevel(d);
+                                        }}
                                         disabled={hasActivePt}
-                                        className={`w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm bg-slate-50 text-slate-800 font-semibold focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all ${hasActivePt ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                    >
-                                        {ACTIVITY_LEVEL_OPTIONS.map((o) => (
-                                            <option key={o.value} value={o.value}>{o.label}</option>
-                                        ))}
-                                    </select>
+                                    />
                                 </div>
                             </div>
 

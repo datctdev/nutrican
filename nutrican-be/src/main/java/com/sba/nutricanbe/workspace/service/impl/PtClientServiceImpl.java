@@ -6,16 +6,21 @@ import com.sba.nutricanbe.common.enums.UserRole;
 import com.sba.nutricanbe.common.enums.UserStatus;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.ActivityLoadMapper;
 import com.sba.nutricanbe.common.util.DietDates;
+import com.sba.nutricanbe.common.util.GenderNormalizer;
+import com.sba.nutricanbe.common.util.MacroSuggestionCalculator;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
+import com.sba.nutricanbe.user.dto.MacroSuggestionResponse;
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.MacroTargetResponse;
 import com.sba.nutricanbe.user.dto.MappingSessionResponse;
 import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.user.entity.PtClientMapping;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.enums.ClientMappingStatus;
 import com.sba.nutricanbe.user.enums.CoachingEvaluation;
 import com.sba.nutricanbe.user.enums.CoachingHealthStatus;
@@ -47,6 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -119,7 +125,7 @@ public class PtClientServiceImpl implements PtClientService {
                 .email(client.getEmail())
                 .phoneNumber(client.getPhoneNumber())
                 .heightCm(client.getHeightCm())
-                .gender(normalizeGenderForRead(client.getGender()))
+                .gender(GenderNormalizer.normalize(client.getGender()))
                 .dateOfBirth(client.getDateOfBirth())
                 .weight(weight)
                 .bodyFatPercent(bodyFat)
@@ -129,6 +135,8 @@ public class PtClientServiceImpl implements PtClientService {
                 .dietPreference(client.getDietPreference())
                 .specialNotes(client.getAddress())
                 .activityLevel(client.getActivityLevel())
+                .exerciseSessionsPerWeek(client.getExerciseSessionsPerWeek())
+                .exerciseMinutesPerSession(client.getExerciseMinutesPerSession())
                 .nutritionGoal(client.getNutritionGoal())
                 .protein(protein)
                 .carb(carb)
@@ -145,17 +153,30 @@ public class PtClientServiceImpl implements PtClientService {
 
         validateProfileUpdate(request);
 
-        if (request.getFullName() != null) client.setFullName(request.getFullName());
-        if (request.getPhoneNumber() != null) client.setPhoneNumber(request.getPhoneNumber());
+        ActivityLevel previousLevel = client.getActivityLevel();
+        Integer previousSessions = client.getExerciseSessionsPerWeek();
+        Integer previousMinutes = client.getExerciseMinutesPerSession();
+
+        // Identity / diet / allergies are student-owned — PT may only view them.
         if (request.getHeightCm() != null) client.setHeightCm(request.getHeightCm());
-        if (request.getGender() != null) client.setGender(normalizeGenderForWrite(request.getGender()));
-        if (request.getDateOfBirth() != null) client.setDateOfBirth(request.getDateOfBirth());
-        if (request.getAllergyNotes() != null) client.setAllergyNotes(request.getAllergyNotes());
-        if (request.getAllergicFoodCodes() != null) client.setAllergicFoodCodes(request.getAllergicFoodCodes());
-        if (request.getDietPreference() != null) client.setDietPreference(request.getDietPreference());
         if (request.getSpecialNotes() != null) client.setAddress(request.getSpecialNotes());
-        if (request.getActivityLevel() != null) client.setActivityLevel(request.getActivityLevel());
         if (request.getNutritionGoal() != null) client.setNutritionGoal(request.getNutritionGoal());
+
+        boolean activityChanged = false;
+        if (ActivityLoadMapper.hasSessionInputs(
+                request.getExerciseSessionsPerWeek(), request.getExerciseMinutesPerSession())) {
+            ActivityLevel derived = ActivityLoadMapper.toLevel(
+                    request.getExerciseSessionsPerWeek(), request.getExerciseMinutesPerSession());
+            client.setExerciseSessionsPerWeek(request.getExerciseSessionsPerWeek());
+            client.setExerciseMinutesPerSession(request.getExerciseMinutesPerSession());
+            client.setActivityLevel(derived);
+            activityChanged = !Objects.equals(previousLevel, derived)
+                    || !Objects.equals(previousSessions, request.getExerciseSessionsPerWeek())
+                    || !Objects.equals(previousMinutes, request.getExerciseMinutesPerSession());
+        } else if (request.getActivityLevel() != null) {
+            client.setActivityLevel(request.getActivityLevel());
+            activityChanged = !Objects.equals(previousLevel, request.getActivityLevel());
+        }
 
         userRepository.save(client);
 
@@ -175,9 +196,35 @@ public class PtClientServiceImpl implements PtClientService {
             bodyMetricRepository.save(metric);
         }
 
-        // tdee on PUT is ignored — use PUT .../macro-target so profile save does not overwrite macros.
+        // Auto-recalc only when activity load changed — allergies/diet/weight-only saves keep MacroTarget.
+        if (activityChanged) {
+            recalculateClientMacros(client);
+        }
 
         return getClientProfile(ptId, clientId);
+    }
+
+    private void recalculateClientMacros(User client) {
+        BigDecimal weight = bodyMetricRepository.findTopByUserIdOrderByRecordDateDesc(client.getId())
+                .map(BodyMetric::getWeight)
+                .orElse(null);
+        Integer height = client.getHeightCm();
+        ActivityLevel level = ActivityLevel.orDefault(client.getActivityLevel());
+        MacroSuggestionResponse suggestion = MacroSuggestionCalculator.calculate(
+                client,
+                weight,
+                height != null ? BigDecimal.valueOf(height) : null,
+                null,
+                client.getGender(),
+                level.toFactor(),
+                client.getNutritionGoal(),
+                client.getPregnancyTrimester());
+        MacroTargetRequest macroReq = new MacroTargetRequest();
+        macroReq.setDailyCalories(suggestion.getDailyCalories());
+        macroReq.setProtein(suggestion.getProtein());
+        macroReq.setCarb(suggestion.getCarb());
+        macroReq.setFat(suggestion.getFat());
+        userProfileService.setMacroTarget(client.getId(), macroReq);
     }
 
     @Override
@@ -341,22 +388,8 @@ public class PtClientServiceImpl implements PtClientService {
                 || request.getBodyFatPercent().compareTo(BigDecimal.valueOf(60)) > 0)) {
             throw new BadRequestException("Tỷ lệ mỡ phải từ 3–60%");
         }
-        if (request.getDateOfBirth() != null) {
-            if (request.getDateOfBirth().isAfter(DietDates.todayVn())) {
-                throw new BadRequestException("Ngày sinh không được ở tương lai");
-            }
-            if (request.getDateOfBirth().isAfter(DietDates.todayVn().minusYears(10))) {
-                throw new BadRequestException("Học viên phải từ 10 tuổi trở lên");
-            }
-        }
-        if (request.getPhoneNumber() != null && request.getPhoneNumber().length() > 20) {
-            throw new BadRequestException("Số điện thoại tối đa 20 ký tự");
-        }
         if (request.getSpecialNotes() != null && request.getSpecialNotes().length() > 1000) {
             throw new BadRequestException("Ghi chú tối đa 1000 ký tự");
-        }
-        if (request.getAllergyNotes() != null && request.getAllergyNotes().length() > 1000) {
-            throw new BadRequestException("Ghi chú dị ứng tối đa 1000 ký tự");
         }
     }
 
@@ -409,29 +442,6 @@ public class PtClientServiceImpl implements PtClientService {
         if (grams.compareTo(BigDecimal.ZERO) < 0 || grams.compareTo(BigDecimal.valueOf(1000)) > 0) {
             throw new BadRequestException(label + " phải từ 0–1000 g");
         }
-    }
-
-    /** Accept male/MALE/female/FEMALE; return canonical uppercase or null. */
-    private static String normalizeGenderForWrite(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        String g = raw.trim().toUpperCase();
-        if ("MALE".equals(g) || "FEMALE".equals(g)) {
-            return g;
-        }
-        throw new BadRequestException("Giới tính chỉ nhận Nam (MALE) hoặc Nữ (FEMALE)");
-    }
-
-    private static String normalizeGenderForRead(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        String g = raw.trim().toUpperCase();
-        if ("MALE".equals(g) || "FEMALE".equals(g)) {
-            return g;
-        }
-        return raw;
     }
 
     private static String labelForConfirmed(CoachingHealthStatus status) {

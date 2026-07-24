@@ -62,7 +62,7 @@ public class OfflineHireTestDataInitializer implements CommandLineRunner {
                 "88 Vo Van Tan, Q.3, TP.HCM");
 
         offlineCustomer.setHeightCm(168);
-        offlineCustomer.setGender("FEMALE");
+        offlineCustomer.setGender("female");
         offlineCustomer.setNutritionGoal(NutritionGoal.WEIGHT_LOSS);
         offlineCustomer.setOnboardingCompletedAt(LocalDateTime.now());
         offlineCustomer.setOnboardingStep(null);

@@ -32,6 +32,7 @@ class OnboardingServiceTest {
     @Mock private MacroTargetRepository macroTargetRepository;
     @Mock private BodyMetricService bodyMetricService;
     @Mock private UserProfileService userProfileService;
+    @Mock private com.sba.nutricanbe.user.service.ClientGoalService clientGoalService;
 
     @InjectMocks
     private OnboardingServiceImpl service;

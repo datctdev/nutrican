@@ -253,6 +253,7 @@ export default function PtMealPlanPage() {
       const breakdown = computePlanProgressBreakdown(dayItems, {
         dateIso: selectedDate,
         coachedMode: true,
+        logs: summary.logs || [],
       });
       const logCal = Number(summary.totalCalories) || 0;
       const logPro = Number(summary.totalProtein) || 0;

@@ -417,9 +417,9 @@ export default function ConfirmFoodModal({
                                 readOnly
                             />
                             <span className="text-xs text-violet-900">
-                                <strong>Ghi vào nhật ký & gửi PT duyệt</strong>
+                                <strong>Ghi vào nhật ký & gửi PT kiểm tra</strong>
                                 <span className="block text-violet-700/80 mt-0.5">
-                                    Bạn đang có PT — mọi thay đổi calo/macro sẽ được gửi lại để PT xác nhận (không tắt được).
+                                    Kết quả nhận diện từ ảnh luôn được PT kiểm tra (không tắt được). Bữa ăn vẫn tính vào mục tiêu hôm nay; nếu AI sai, PT sẽ chỉnh lại chỉ số.
                                 </span>
                             </span>
                         </label>

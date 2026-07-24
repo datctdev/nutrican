@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
     Camera, Trash2, CheckCircle2, Clock, XCircle,
-    Activity, Star, Edit, ChevronDown, ChevronUp,
+    Activity, Star, Edit, ChevronDown, ChevronUp, SlidersHorizontal,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -31,13 +31,14 @@ function SafeImage({ src, alt, className }) {
     );
 }
 
-function StatusBadge({ status, reviewStatus }) {
+function StatusBadge({ status, reviewStatus, ptAction }) {
     const displayKey = reviewStatus === 'PENDING' ? 'REVIEW_PENDING'
-        : reviewStatus === 'APPROVED' ? 'REVIEW_APPROVED'
+        : reviewStatus === 'APPROVED' ? (ptAction === 'ADJUST' ? 'REVIEW_ADJUSTED' : 'REVIEW_APPROVED')
         : reviewStatus === 'REJECTED' ? 'REVIEW_REJECTED'
         : status;
     const map = {
         REVIEW_APPROVED: { color: 'bg-secondary/10 text-secondary border-secondary/20', icon: CheckCircle2 },
+        REVIEW_ADJUSTED: { color: 'bg-blue-50 text-blue-700 border-blue-200', icon: SlidersHorizontal },
         REVIEW_PENDING: { color: 'bg-warning/10 text-warning border-warning/20', icon: Clock },
         REVIEW_REJECTED: { color: 'bg-danger/10 text-danger border-danger/20', icon: XCircle },
         PENDING_AI: { color: 'bg-primary/10 text-primary border-primary/20', icon: Activity },
@@ -49,8 +50,9 @@ function StatusBadge({ status, reviewStatus }) {
     const Icon = config.icon;
     const statusVi = {
         REVIEW_APPROVED: 'PT đã duyệt',
-        REVIEW_PENDING: 'Chờ PT duyệt',
-        REVIEW_REJECTED: 'PT từ chối',
+        REVIEW_ADJUSTED: 'PT đã chỉnh chỉ số',
+        REVIEW_PENDING: 'Ước tính · chờ PT kiểm tra',
+        REVIEW_REJECTED: 'PT từ chối (cũ)',
         PENDING_AI: 'AI đang xử lý',
         DRAFT: 'Nháp',
         MANUAL_REQUIRED: 'Cần nhập tay',
@@ -130,7 +132,9 @@ export default function LogCard({
 }) {
     const [detailsOpen, setDetailsOpen] = useState(false);
     const macros = log.macrosJson || {};
-    const isReviewRejected = log.reviewStatus === 'REJECTED' || log.status === 'REJECTED';
+    // REJECTED chỉ còn là dữ liệu cũ; luồng mới luôn kết thúc ở APPROVED (duyệt đúng hoặc đã chỉnh)
+    const isReviewRejected = log.reviewStatus === 'REJECTED';
+    const isPtAdjusted = log.reviewStatus === 'APPROVED' && log.ptAction === 'ADJUST';
     const hasAi = Boolean(log.imageUrl || log.recognitionSource === 'HYBRID' || log.recognitionSource === 'RESNET'
         || log.aiFoodCode || log.aiConfidenceScore != null);
     const title = getLogFoodTitle(log);
@@ -157,7 +161,7 @@ export default function LogCard({
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                        <StatusBadge status={log.status} reviewStatus={log.reviewStatus} />
+                        <StatusBadge status={log.status} reviewStatus={log.reviewStatus} ptAction={log.ptAction} />
                         {log.makeupForPeriod && MEAL_PERIOD_LABELS[log.makeupForPeriod] && (
                             <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
                                 Bù: {MEAL_PERIOD_LABELS[log.makeupForPeriod]}
@@ -244,10 +248,18 @@ export default function LogCard({
                     )}
 
                     {(log.ptNote || log.ptCorrectionReason) && log.status !== 'DRAFT' && log.status !== 'MANUAL_REQUIRED' && (
-                        <div className={`mt-3 p-3 rounded-xl border text-sm ${isReviewRejected ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
+                        <div className={`mt-3 p-3 rounded-xl border text-sm ${isReviewRejected
+                            ? 'bg-red-50 border-red-200 text-red-800'
+                            : isPtAdjusted
+                                ? 'bg-blue-50 border-blue-200 text-blue-800'
+                                : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
                             <p className="font-extrabold mb-1 flex items-center gap-2">
-                                {isReviewRejected ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                                Phản hồi từ Huấn luyện viên
+                                {isReviewRejected
+                                    ? <XCircle className="w-4 h-4" />
+                                    : isPtAdjusted
+                                        ? <SlidersHorizontal className="w-4 h-4" />
+                                        : <CheckCircle2 className="w-4 h-4" />}
+                                {isPtAdjusted ? 'PT đã chỉnh lại chỉ số bữa ăn' : 'Phản hồi từ Huấn luyện viên'}
                             </p>
                             {log.ptCorrectionReason && log.ptCorrectionReason !== 'OTHER' && (
                                 <p className="font-bold text-xs opacity-75 mb-1 uppercase tracking-widest">

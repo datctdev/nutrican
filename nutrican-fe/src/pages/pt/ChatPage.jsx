@@ -295,11 +295,11 @@ export default function ChatPage() {
         };
     }, [selectedImagePreview]);
 
-    const handleQuickReview = async (logId, action) => {
+    const handleQuickApprove = async (logId) => {
         setReviewingLogId(logId);
         try {
-            await workspaceService.reviewLog(logId, { action, note: action === 'APPROVE' ? 'Duyệt nhanh từ chat' : undefined });
-            toast.success(action === 'APPROVE' ? 'Đã duyệt bữa ăn' : 'Đã từ chối');
+            await workspaceService.reviewLog(logId, { action: 'APPROVE', note: 'Duyệt nhanh từ chat' });
+            toast.success('Đã duyệt bữa ăn');
             await refreshPendingLogs(activeThread?.participantId);
             await refreshChatContext(activeThread?.participantId);
         } catch (err) {
@@ -307,6 +307,17 @@ export default function ChatPage() {
         } finally {
             setReviewingLogId(null);
         }
+    };
+
+    // Chỉnh lại cần nhập calo/macro đúng nên mở trang duyệt thay vì gọi API ngay từ chat
+    const openAdjustInReviewPage = (logId) => {
+        if (!activeThread?.participantId) return;
+        const params = new URLSearchParams({
+            clientId: activeThread.participantId,
+            clientName: activeThread.participantName || 'Học viên',
+            logId,
+        });
+        navigate(`/pt/clients/dietlog?${params.toString()}`);
     };
 
     const handleFile = (file) => {
@@ -542,8 +553,8 @@ export default function ChatPage() {
                         logs={pendingLogs}
                         loading={loadingPending}
                         reviewingLogId={reviewingLogId}
-                        onApprove={(id) => handleQuickReview(id, 'APPROVE')}
-                        onReject={(id) => handleQuickReview(id, 'REJECT')}
+                        onApprove={handleQuickApprove}
+                        onAdjust={openAdjustInReviewPage}
                         onOpenFull={() => {
                             const params = new URLSearchParams({
                                 clientId: activeThread.participantId,
@@ -815,8 +826,11 @@ export default function ChatPage() {
                             logs={pendingLogs}
                             loading={loadingPending}
                             reviewingLogId={reviewingLogId}
-                            onApprove={(id) => handleQuickReview(id, 'APPROVE')}
-                            onReject={(id) => handleQuickReview(id, 'REJECT')}
+                            onApprove={handleQuickApprove}
+                            onAdjust={(id) => {
+                                setMobileSideOpen(false);
+                                openAdjustInReviewPage(id);
+                            }}
                             onOpenFull={() => {
                                 setMobileSideOpen(false);
                                 const params = new URLSearchParams({

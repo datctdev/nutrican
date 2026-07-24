@@ -12,6 +12,8 @@ public record MacroSuggestionQuery(
         String gender,
         BigDecimal activityFactor,
         ActivityLevel activityLevel,
+        Integer sessionsPerWeek,
+        Integer minutesPerSession,
         NutritionGoal nutritionGoal,
         Integer pregnancyTrimester) {
 }

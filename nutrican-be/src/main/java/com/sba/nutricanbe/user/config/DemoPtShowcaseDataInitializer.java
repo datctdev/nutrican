@@ -92,9 +92,9 @@ public class DemoPtShowcaseDataInitializer implements CommandLineRunner {
     private enum EscrowFixture { NORMAL, HEADROOM, EMPTY }
 
     private static final String[][] EXTRA_CLIENTS = {
-            {"hv.an@nutrican.com", "Nguyễn Minh An", "0903111001", "MALE", "172"},
-            {"hv.bao@nutrican.com", "Trần Thị Bảo", "0903111002", "FEMALE", "160"},
-            {"hv.chi@nutrican.com", "Lê Hoàng Chi", "0903111003", "FEMALE", "165"},
+            {"hv.an@nutrican.com", "Nguyễn Minh An", "0903111001", "male", "172"},
+            {"hv.bao@nutrican.com", "Trần Thị Bảo", "0903111002", "female", "160"},
+            {"hv.chi@nutrican.com", "Lê Hoàng Chi", "0903111003", "female", "165"},
     };
 
     private final SystemSettingRepository systemSettingRepository;
@@ -645,7 +645,8 @@ public class DemoPtShowcaseDataInitializer implements CommandLineRunner {
                 .anyMatch(l -> l.getMealPeriod() == period && l.getReviewStatus() == DietLogReviewStatus.PENDING);
         if (exists) return;
 
-        MacroNutrients macros = scaleFood(food, BigDecimal.valueOf(160 + period.ordinal() * 15L));
+        // Macro cố định theo buổi — không scaleFood(Gạo tẻ × 200g) vì dễ ra 700–1000 kcal ảo
+        MacroNutrients macros = demoPendingMacros(period);
         dietLogRepository.save(DietLog.builder()
                 .customerId(client.getId())
                 .mealType(MealPeriods.toMealType(period))
@@ -662,6 +663,22 @@ public class DemoPtShowcaseDataInitializer implements CommandLineRunner {
                 .mealSource(MealSource.HOME_COOKED)
                 .recognitionSource(RecognitionSource.MANUAL)
                 .build());
+    }
+
+    /** Khẩu phần demo hợp lý theo buổi; tối hôm trước ~480 kcal (không >700). */
+    private MacroNutrients demoPendingMacros(MealPeriod period) {
+        MealPeriod p = period != null ? period : MealPeriod.NOON;
+        return switch (p) {
+            case MORNING -> MacroNutrients.of(bd(420), bd(18), bd(55), bd(12));
+            case NOON -> MacroNutrients.of(bd(500), bd(28), bd(60), bd(14));
+            case AFTERNOON -> MacroNutrients.of(bd(220), bd(10), bd(25), bd(8));
+            case EVENING -> MacroNutrients.of(bd(480), bd(30), bd(45), bd(16));
+            case LATE -> MacroNutrients.of(bd(150), bd(20), bd(8), bd(4));
+        };
+    }
+
+    private static BigDecimal bd(double v) {
+        return BigDecimal.valueOf(v).setScale(2, RoundingMode.HALF_UP);
     }
 
     private MacroNutrients scaleFood(FoodItem food, BigDecimal qtyGrams) {

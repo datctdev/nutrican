@@ -87,11 +87,13 @@ public class ProfileExtensionsController {
             @RequestParam(required = false) String gender,
             @RequestParam(required = false) BigDecimal activityFactor,
             @RequestParam(required = false) ActivityLevel activityLevel,
+            @RequestParam(required = false) Integer sessionsPerWeek,
+            @RequestParam(required = false) Integer minutesPerSession,
             @RequestParam(required = false) NutritionGoal nutritionGoal,
             @RequestParam(required = false) Integer pregnancyTrimester) {
         MacroSuggestionQuery query = new MacroSuggestionQuery(
                 weightKg, heightCm, age, gender, activityFactor,
-                activityLevel, nutritionGoal, pregnancyTrimester);
+                activityLevel, sessionsPerWeek, minutesPerSession, nutritionGoal, pregnancyTrimester);
         return ResponseEntity.ok(ApiResponse.success(
                 profileExtensionsService.suggestMacros(user.getId(), query)));
     }

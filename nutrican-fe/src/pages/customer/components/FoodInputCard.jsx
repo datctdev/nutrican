@@ -29,7 +29,7 @@ export default function FoodInputCard({
     setMakeupForPeriod,
     addIngredientFromSearch,
     addCustomIngredient,
-    ingredientItems,
+    ingredientItems = [],
     updateIngredientQty,
     removeIngredient,
     ingredientTotals,
@@ -49,6 +49,7 @@ export default function FoodInputCard({
     const currentPeriod = getCurrentMealPeriod();
     const pastForMakeup = applyAiPeriodLock ? getPastMealPeriodsForMakeup() : [];
     const currentLabel = MEAL_PERIOD_LABELS[currentPeriod] || currentPeriod;
+    const hasCustomIngredient = ingredientItems.some((it) => it.isCustom || !it.foodItemId);
 
     const renderPeriodOptions = () => MEAL_PERIODS.map((period) => (
         <option key={period} value={period}>
@@ -199,6 +200,16 @@ export default function FoodInputCard({
                             onSelect={addIngredientFromSearch}
                             onAddCustom={addCustomIngredient}
                         />
+
+                        {hasActivePt && (
+                            <p className={`rounded-xl border px-3 py-2 text-[11px] font-semibold ${hasCustomIngredient
+                                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
+                                {hasCustomIngredient
+                                    ? 'Có nguyên liệu tự nhập — bữa này sẽ chờ PT kiểm tra chỉ số.'
+                                    : 'Món chọn từ thư viện thực phẩm được ghi nhận ngay, không cần PT duyệt. Nguyên liệu tự nhập sẽ chờ PT kiểm tra.'}
+                            </p>
+                        )}
 
                         {ingredientItems.length > 0 && (
                             <div className="space-y-2">

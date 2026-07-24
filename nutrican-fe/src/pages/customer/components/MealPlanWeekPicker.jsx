@@ -14,7 +14,7 @@ function toLocalDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-/** Monday fallback when no coaching / currentWeekStart prop. Uses VN demo clock. */
+/** Monday fallback when no coaching / currentWeekStart prop. Uses VN wall clock. */
 function getMondayWeekStart() {
   const date = nowInVn();
   const daysSinceMonday = (date.getDay() + 6) % 7;

@@ -4,6 +4,7 @@ import com.sba.nutricanbe.common.dto.MacroNutrients;
 import com.sba.nutricanbe.common.entity.SystemSetting;
 import com.sba.nutricanbe.common.repository.SystemSettingRepository;
 import com.sba.nutricanbe.common.util.DietDates;
+import com.sba.nutricanbe.common.util.GoalWeightConsistency;
 import com.sba.nutricanbe.common.util.MealPeriods;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.FoodItem;
@@ -64,10 +65,23 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DemoVeteranDataInitializer implements CommandLineRunner {
 
-    public static final String FLAG_KEY = "DEMO_VETERAN_FIXTURES_V4";
+    /** Bump when goal/weight fixtures must re-apply on existing DBs. */
+    public static final String FLAG_KEY = "DEMO_VETERAN_FIXTURES_V5";
     private static final String SOLO_EMAIL = "solo@nutrican.com";
     private static final String COACHED_EMAIL = "customer@nutrican.com";
     private static final String PT_EMAIL = "pt@nutrican.com";
+
+    /** Solo WEIGHT_LOSS: current ends at 71.0 → target 65 (&lt; current). */
+    private static final double SOLO_START_KG = 72.0;
+    private static final double SOLO_WEEKLY_DELTA = -0.25;
+    private static final BigDecimal SOLO_BASELINE = bd(72);
+    private static final BigDecimal SOLO_TARGET = bd(65);
+
+    /** Coached MAINTAIN: current ends ≈ 63.1 → target 63 (ổn định). */
+    private static final double COACHED_START_KG = 63.5;
+    private static final double COACHED_WEEKLY_DELTA = -0.1;
+    private static final BigDecimal COACHED_BASELINE = bd(64);
+    private static final BigDecimal COACHED_TARGET = bd(63);
 
     private final SystemSettingRepository systemSettingRepository;
     private final UserRepository userRepository;
@@ -115,10 +129,11 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
             User pt = ptOpt.get();
             LocalDate today = DietDates.todayVn();
 
-            seedGoals(solo, NutritionGoal.WEIGHT_LOSS, bd(72), bd(65));
-            seedGoals(coached, NutritionGoal.MAINTAIN, bd(64), bd(60));
-            seedBodyMetrics(solo, today, 72.0, -0.25);
-            seedBodyMetrics(coached, today, 63.5, -0.1);
+            // latest = start + weeklyDelta * 4  (see seedBodyMetrics)
+            seedAlignedGoalsAndWeights(solo, NutritionGoal.WEIGHT_LOSS,
+                    SOLO_BASELINE, SOLO_TARGET, SOLO_START_KG, SOLO_WEEKLY_DELTA, today);
+            seedAlignedGoalsAndWeights(coached, NutritionGoal.MAINTAIN,
+                    COACHED_BASELINE, COACHED_TARGET, COACHED_START_KG, COACHED_WEEKLY_DELTA, today);
 
             seedHistoryLogs(solo, food, today, false);
             seedHistoryLogs(coached, food, today, true);
@@ -346,8 +361,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
 
         dietLogRepository.findByCustomerIdAndLogDate(user.getId(), today).stream()
                 .filter(log -> log.getMealPeriod() != null
-                        && log.getMealPeriod().ordinal() < current.ordinal()
-                        && (!coached || log.getMealPeriod() != MealPeriod.AFTERNOON))
+                        && log.getMealPeriod().ordinal() < current.ordinal())
                 .forEach(dietLogRepository::delete);
 
         if (!coached) {
@@ -387,6 +401,8 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                                 item.setLateTickReason(null);
                                 mealPlanItemRepository.save(item);
                             }));
+            // Buổi chiều demo: Sữa chua tick trễ → có DietLog; Rau giền bị từ chối → không vào Thực tế
+            ensureCoachedAfternoonLateTickDemo(user, food, today);
         }
         log.debug("Late-tick demo refreshed for {} on {}", user.getEmail(), today);
     }
@@ -400,7 +416,24 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
         return all.isEmpty() ? null : all.get(0);
     }
 
+    private void seedAlignedGoalsAndWeights(
+            User user,
+            NutritionGoal goal,
+            BigDecimal baseline,
+            BigDecimal target,
+            double startKg,
+            double weeklyDelta,
+            LocalDate today) {
+        double latestKg = startKg + weeklyDelta * 4;
+        BigDecimal current = BigDecimal.valueOf(latestKg).setScale(1, RoundingMode.HALF_UP);
+        GoalWeightConsistency.requireConsistent(goal, current, target);
+        seedGoals(user, goal, baseline, target);
+        seedBodyMetrics(user, today, startKg, weeklyDelta);
+    }
+
     private void seedGoals(User user, NutritionGoal goal, BigDecimal baseline, BigDecimal target) {
+        user.setNutritionGoal(goal);
+        userRepository.save(user);
         clientGoalRepository.findByUserId(user.getId()).ifPresentOrElse(existing -> {
             existing.setNutritionGoal(goal);
             existing.setBaselineWeight(baseline);
@@ -419,16 +452,13 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
     private void seedBodyMetrics(User user, LocalDate today, double startKg, double weeklyDelta) {
         for (int w = 4; w >= 0; w--) {
             LocalDate d = today.minusWeeks(w);
-            if (bodyMetricRepository.findByUser_IdAndRecordDate(user.getId(), d).isPresent()) {
-                continue;
-            }
             double kg = startKg + weeklyDelta * (4 - w);
-            bodyMetricRepository.save(BodyMetric.builder()
-                    .user(user)
-                    .recordDate(d)
-                    .weight(BigDecimal.valueOf(kg).setScale(1, RoundingMode.HALF_UP))
-                    .note(w == 0 ? "Cân hôm nay (demo fixture)" : "Cân tuần demo")
-                    .build());
+            BigDecimal weight = BigDecimal.valueOf(kg).setScale(1, RoundingMode.HALF_UP);
+            BodyMetric metric = bodyMetricRepository.findByUser_IdAndRecordDate(user.getId(), d)
+                    .orElse(BodyMetric.builder().user(user).recordDate(d).build());
+            metric.setWeight(weight);
+            metric.setNote(w == 0 ? "Cân hôm nay (demo fixture)" : "Cân tuần demo");
+            bodyMetricRepository.save(metric);
         }
     }
 
@@ -662,28 +692,7 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
     }
 
     private void seedTodaySettledScenario(User coached, User pt, FoodItem food, LocalDate today) {
-        if (!hasSelfPlanForPeriod(coached.getId(), today, MealPeriod.AFTERNOON)) {
-            saveSelf(coached, food, today, MealPeriod.AFTERNOON, false, null);
-        }
         cleanupDuplicateSelfItems(coached.getId(), today, MealPeriod.EVENING);
-        mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(coached.getId()).stream()
-                .filter(p -> {
-                    LocalDate start = p.getWeekStart();
-                    if (start == null) return false;
-                    LocalDate end = start.plusDays(6);
-                    return !today.isBefore(start) && !today.isAfter(end);
-                })
-                .findFirst()
-                .ifPresent(plan -> mealPlanItemRepository
-                        .findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId()).stream()
-                        .filter(i -> today.equals(i.getPlanDate()) && i.getMealPeriod() == MealPeriod.AFTERNOON)
-                        .filter(i -> i.getSourceType() == MealPlanItemSourceType.PT_ORIGINAL)
-                        .findFirst()
-                        .ifPresent(item -> {
-                            item.setEaten(true);
-                            item.setLateTickReason("Demo: tick trễ buổi chiều");
-                            mealPlanItemRepository.save(item);
-                        }));
         mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(coached.getId()).stream()
                 .filter(p -> {
                     LocalDate start = p.getWeekStart();
@@ -701,10 +710,113 @@ public class DemoVeteranDataInitializer implements CommandLineRunner {
                             item.setLateTickReason(null);
                             mealPlanItemRepository.save(item);
                         }));
+        ensureCoachedAfternoonLateTickDemo(coached, food, today);
         if (!selfPlanSubmissionRepository.existsByCustomerIdAndPlanDateAndStatus(
                 coached.getId(), today, SelfPlanSubmissionStatus.PENDING)) {
             seedPendingSubmission(coached, pt, food, today, MealPeriod.EVENING);
         }
+    }
+
+    /**
+     * Scenario buổi chiều demo (customer@):
+     * - PT "Sữa chua" đã tick trễ → có DietLog ~333 kcal trong Thực tế
+     * - Đề xuất "Rau giền…" bị PT từ chối → chỉ hiện gạch ở Kế hoạch, không có DietLog
+     */
+    private void ensureCoachedAfternoonLateTickDemo(User coached, FoodItem food, LocalDate today) {
+        dietLogRepository.findByCustomerIdAndLogDate(coached.getId(), today).stream()
+                .filter(l -> l.getMealPeriod() == MealPeriod.AFTERNOON)
+                .forEach(dietLogRepository::delete);
+
+        mealPlanRepository.findByClientIdAndIsPublishedTrueOrderByWeekStartDesc(coached.getId()).stream()
+                .filter(p -> {
+                    LocalDate start = p.getWeekStart();
+                    if (start == null) return false;
+                    LocalDate end = start.plusDays(6);
+                    return !today.isBefore(start) && !today.isAfter(end);
+                })
+                .findFirst()
+                .ifPresent(plan -> {
+                    MealPlanItem yogurt = mealPlanItemRepository
+                            .findByMealPlanIdOrderByPlanDateAscMealTypeAsc(plan.getId()).stream()
+                            .filter(i -> today.equals(i.getPlanDate()) && i.getMealPeriod() == MealPeriod.AFTERNOON)
+                            .filter(i -> i.getSourceType() == MealPlanItemSourceType.PT_ORIGINAL)
+                            .findFirst()
+                            .orElse(null);
+                    if (yogurt == null) {
+                        return;
+                    }
+                    yogurt.setEaten(true);
+                    yogurt.setLateTickReason("Demo: tick trễ buổi chiều");
+                    yogurt.setSkipReason(null);
+                    yogurt.setSkipNote(null);
+                    mealPlanItemRepository.save(yogurt);
+                    savePlanComplianceLog(coached, yogurt, food);
+                    ensureRejectedAfternoonSuggestion(coached, plan.getPtId(), food, today);
+                });
+    }
+
+    private void savePlanComplianceLog(User customer, MealPlanItem item, FoodItem food) {
+        String name = item.getFreeText() != null && !item.getFreeText().isBlank()
+                ? item.getFreeText()
+                : (food != null ? food.getNameVi() : "Món plan");
+        boolean exists = dietLogRepository.findByCustomerIdAndLogDate(customer.getId(), item.getPlanDate()).stream()
+                .anyMatch(l -> item.getMealPeriod() == l.getMealPeriod()
+                        && name.equals(l.getFoodDescription()));
+        if (exists) {
+            return;
+        }
+        BigDecimal qty = item.getPortionGrams() != null ? item.getPortionGrams() : BigDecimal.valueOf(150);
+        FoodItem macroFood = item.getFoodItemId() != null
+                ? foodItemRepository.findById(item.getFoodItemId()).orElse(food)
+                : food;
+        MacroNutrients macros = macroFood != null ? scaleFood(macroFood, qty) : MacroNutrients.of(
+                BigDecimal.valueOf(mealCalTarget(resolveDailyCalories(customer), item.getMealPeriod())),
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        dietLogRepository.save(DietLog.builder()
+                .customerId(customer.getId())
+                .mealType(item.getMealType() != null ? item.getMealType() : MealPeriods.toMealType(item.getMealPeriod()))
+                .mealPeriod(item.getMealPeriod())
+                .foodDescription(name)
+                .matchedFoodName(macroFood != null ? macroFood.getNameVi() : name)
+                .foodItemId(macroFood != null ? macroFood.getId() : null)
+                .logDate(item.getPlanDate())
+                .macrosJson(macros)
+                .status(DietLogStatus.LOGGED)
+                .reviewStatus(DietLogReviewStatus.NOT_REQUIRED)
+                .lateTickReason(item.getLateTickReason())
+                .mealSource(MealSource.HOME_COOKED)
+                .recognitionSource(RecognitionSource.MANUAL)
+                .build());
+    }
+
+    private void ensureRejectedAfternoonSuggestion(User coached, java.util.UUID ptId, FoodItem food, LocalDate today) {
+        if (ptId == null || food == null) {
+            return;
+        }
+        selfPlanItemRepository
+                .findByCustomerIdAndPlanDateOrderByMealTypeAscCreatedAtAsc(coached.getId(), today).stream()
+                .filter(i -> i.getMealPeriod() == MealPeriod.AFTERNOON)
+                .forEach(selfPlanItemRepository::delete);
+
+        SelfPlanSubmission rejected = selfPlanSubmissionRepository
+                .findByCustomerIdAndPlanDateAndStatus(coached.getId(), today, SelfPlanSubmissionStatus.REJECTED)
+                .orElseGet(() -> selfPlanSubmissionRepository.save(SelfPlanSubmission.builder()
+                        .customerId(coached.getId())
+                        .ptId(ptId)
+                        .planDate(today)
+                        .status(SelfPlanSubmissionStatus.REJECTED)
+                        .submittedAt(DietDates.nowVn().minusHours(5))
+                        .decidedAt(DietDates.nowVn().minusHours(4))
+                        .ptNote("Từ chối demo: khẩu phần chiều không phù hợp, giữ món PT.")
+                        .pendingUniqueKey(null)
+                        .build()));
+
+        SelfPlanItem rejectedItem = saveSelf(coached, food, today, MealPeriod.AFTERNOON, false, null);
+        rejectedItem.setSubmissionId(rejected.getId());
+        rejectedItem.setLockedByReview(false);
+        rejectedItem.setApplied(false);
+        rejectedItem.setDietLogId(null);
+        selfPlanItemRepository.save(rejectedItem);
     }
 
 

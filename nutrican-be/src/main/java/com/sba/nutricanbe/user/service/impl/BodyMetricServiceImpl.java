@@ -3,6 +3,7 @@ package com.sba.nutricanbe.user.service.impl;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
 import com.sba.nutricanbe.common.exception.UnauthorizedException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.user.dto.BodyMetricDto;
 import com.sba.nutricanbe.user.dto.BodyMetricReminderStatusDto;
 import com.sba.nutricanbe.user.dto.BodyMetricRequest;
@@ -56,8 +57,9 @@ public class BodyMetricServiceImpl implements BodyMetricService {
         }
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
-        LocalDate date = request.getRecordDate() != null ? request.getRecordDate() : LocalDate.now();
-        if (date.isAfter(LocalDate.now())) {
+        LocalDate today = DietDates.todayVn();
+        LocalDate date = request.getRecordDate() != null ? request.getRecordDate() : today;
+        if (date.isAfter(today)) {
             throw new BadRequestException("recordDate must not be in the future");
         }
         BodyMetric metric = bodyMetricRepository.findByUser_IdAndRecordDate(userId, date)
@@ -133,7 +135,7 @@ public class BodyMetricServiceImpl implements BodyMetricService {
 
     private int daysSinceLastLog(UUID userId) {
         return bodyMetricRepository.findTopByUserIdOrderByRecordDateDesc(userId)
-                .map(m -> (int) ChronoUnit.DAYS.between(m.getRecordDate(), LocalDate.now()))
+                .map(m -> (int) ChronoUnit.DAYS.between(m.getRecordDate(), DietDates.todayVn()))
                 .orElse(Integer.MAX_VALUE);
     }
 

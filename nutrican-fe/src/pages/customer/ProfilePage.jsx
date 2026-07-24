@@ -21,8 +21,10 @@ import {
     ShieldCheck, HelpCircle, AlertCircle
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
-import { ACTIVITY_LEVEL_OPTIONS, ActivityLevelInfoTooltip } from './components/activityLevelOptions';
+import { ACTIVITY_LEVEL_OPTIONS, ActivityLevelInfoTooltip, ActivityLoadInputs, deriveActivityLevel } from './components/activityLevelOptions';
 import AllergySelector from './components/AllergySelector';
+import { genderLabel, normalizeGender } from '../../utils/gender';
+import { todayVnIso } from '../../utils/vnDate';
 
 const DIET_OPTIONS = [
     { value: 'NORMAL', label: 'Ăn bình thường (Đầy đủ chất)' },
@@ -78,6 +80,8 @@ export default function ProfilePage() {
         gender: 'male',
         dateOfBirth: '',
         activityLevel: 'MODERATE',
+        sessionsPerWeek: '',
+        minutesPerSession: '',
         nutritionGoal: 'MAINTAIN',
         dietPreference: 'NORMAL',
         pregnancyTrimester: 1,
@@ -160,9 +164,11 @@ export default function ProfilePage() {
             const hData = {
                 heightCm: data.heightCm || '',
                 weightKg: latestWeight || '',
-                gender: data.gender || 'male',
+                gender: normalizeGender(data.gender) || 'male',
                 dateOfBirth: data.dateOfBirth || '',
                 activityLevel: data.activityLevel || 'MODERATE',
+                sessionsPerWeek: data.exerciseSessionsPerWeek ?? '',
+                minutesPerSession: data.exerciseMinutesPerSession ?? '',
                 nutritionGoal: data.nutritionGoal || 'MAINTAIN',
                 dietPreference: data.dietPreference || 'NORMAL',
                 pregnancyTrimester: data.pregnancyTrimester || 1,
@@ -292,49 +298,105 @@ export default function ProfilePage() {
 
     // --- HÀM LƯU CHỈ SỐ THỂ CHẤT & DINH DƯỠNG ---
     const handleSaveHealth = async () => {
+        const currentWeight = Number(editHealthForm.weightKg);
+        const targetWeight = Number(editHealthForm.targetWeight);
+        const hasTarget = editHealthForm.targetWeight !== '' && editHealthForm.targetWeight != null
+            && !Number.isNaN(targetWeight);
+
+        // Rule giống MacroTargets: giảm cân ⇒ target < hiện tại; tăng cân ⇒ target > hiện tại
+        let goalsConflict = false;
+        let goalsConflictMsg = '';
+        if (!hasActivePt && hasTarget && currentWeight > 0) {
+            if (editHealthForm.nutritionGoal === 'WEIGHT_LOSS' && targetWeight >= currentWeight) {
+                goalsConflict = true;
+                goalsConflictMsg =
+                    `Giảm cân cần cân mục tiêu < cân hiện tại (${currentWeight} kg). Hiện target ${targetWeight} kg — hãy hạ target (vd. 55) hoặc đổi mục tiêu sang Tăng cân.`;
+            } else if (
+                (editHealthForm.nutritionGoal === 'WEIGHT_GAIN' || editHealthForm.nutritionGoal === 'MUSCLE_GAIN')
+                && targetWeight <= currentWeight
+            ) {
+                goalsConflict = true;
+                goalsConflictMsg =
+                    `Tăng cân cần cân mục tiêu > cân hiện tại (${currentWeight} kg). Hiện target ${targetWeight} kg — hãy chỉnh lại.`;
+            }
+        }
+
         setIsSavingHealth(true);
+        const genderChanged =
+            normalizeGender(editHealthForm.gender) !== normalizeGender(healthData.gender);
         const macroFieldsChanged =
             editHealthForm.nutritionGoal !== healthData.nutritionGoal ||
             editHealthForm.activityLevel !== healthData.activityLevel ||
+            editHealthForm.sessionsPerWeek !== healthData.sessionsPerWeek ||
+            editHealthForm.minutesPerSession !== healthData.minutesPerSession ||
+            genderChanged ||
             (editHealthForm.nutritionGoal === 'PREGNANT' && editHealthForm.pregnancyTrimester !== healthData.pregnancyTrimester);
 
         try {
+            const gender = normalizeGender(editHealthForm.gender) || 'male';
             await userService.updateProfile({
                 heightCm: editHealthForm.heightCm ? Number(editHealthForm.heightCm) : null,
                 dateOfBirth: editHealthForm.dateOfBirth || null,
-                gender: editHealthForm.gender,
+                gender,
             });
+
+            const derived = deriveActivityLevel(editHealthForm.sessionsPerWeek, editHealthForm.minutesPerSession);
+            const activityPrefs = derived
+                ? {
+                    sessionsPerWeek: Number(editHealthForm.sessionsPerWeek),
+                    minutesPerSession: Number(editHealthForm.minutesPerSession),
+                    activityLevel: derived,
+                }
+                : { activityLevel: editHealthForm.activityLevel };
+
+            // Dùng ngày VN — toISOString() là UTC, lúc 0h–7h VN sẽ ghi nhầm ngày hôm trước
+            // → InBody 59.1 (hôm nay VN) vẫn là latest, cân 61 bị ghi vào hôm qua
+            const prevWeight = Number(healthData.weightKg);
+            if (editHealthForm.weightKg !== '' && currentWeight > 0 && currentWeight !== prevWeight) {
+                const latest = bodyMetricHistory[0];
+                await profileExtensionsService.recordBodyMetric({
+                    recordDate: todayVnIso(),
+                    weight: currentWeight,
+                    bodyFatPercent: latest?.bodyFatPercent ?? null,
+                    muscleMass: latest?.muscleMass ?? null,
+                    lbm: latest?.lbm ?? null,
+                });
+            }
 
             await userService.updatePreferences(hasActivePt
                 ? { dietPreference: editHealthForm.dietPreference }
                 : {
                     dietPreference: editHealthForm.dietPreference,
-                    nutritionGoal: editHealthForm.nutritionGoal,
-                    activityLevel: editHealthForm.activityLevel,
+                    // Không ghi nutritionGoal nếu đang conflict với target
+                    ...(goalsConflict ? {} : { nutritionGoal: editHealthForm.nutritionGoal }),
+                    ...activityPrefs,
                     pregnancyTrimester: editHealthForm.nutritionGoal === 'PREGNANT' ? editHealthForm.pregnancyTrimester : null,
                 });
 
             await userService.updateAllergies({ allergyNotes: editHealthForm.allergyNotes });
 
-            if (!hasActivePt && editHealthForm.targetWeight) {
+            if (!hasActivePt && hasTarget && !goalsConflict) {
                 await profileExtensionsService.saveGoals({
                     nutritionGoal: editHealthForm.nutritionGoal,
-                    targetWeight: Number(editHealthForm.targetWeight),
+                    targetWeight,
                     trimester: editHealthForm.nutritionGoal === 'PREGNANT' ? editHealthForm.pregnancyTrimester : null,
                 });
             }
 
-            if (editHealthForm.weightKg && editHealthForm.weightKg !== healthData.weightKg) {
-                await profileExtensionsService.recordBodyMetric({
-                    recordDate: new Date().toISOString().slice(0, 10),
-                    weight: Number(editHealthForm.weightKg),
-                });
-            }
-
-            if (!hasActivePt && macroFieldsChanged) {
+            if (goalsConflict) {
+                toast.error(goalsConflictMsg);
+                toast.success('Đã lưu cân nặng / chiều cao / vận động — mục tiêu cân chưa lưu vì đang mâu thuẫn.');
+            } else if (!hasActivePt && macroFieldsChanged) {
+                if (editHealthForm.sessionsPerWeek !== '' || editHealthForm.minutesPerSession !== '') {
+                    if (!derived) {
+                        toast.error('Nhập đủ buổi/tuần và phút/buổi hợp lệ');
+                        setIsSavingHealth(false);
+                        return;
+                    }
+                }
                 try {
                     const res = await userService.recalculateMacros({
-                        activityLevel: editHealthForm.activityLevel,
+                        ...activityPrefs,
                         nutritionGoal: editHealthForm.nutritionGoal,
                         pregnancyTrimester: editHealthForm.nutritionGoal === 'PREGNANT' ? editHealthForm.pregnancyTrimester : null,
                     });
@@ -346,15 +408,24 @@ export default function ProfilePage() {
                 } catch {
                     toast.warning('Đã lưu chỉ số thể chất, vui lòng kiểm tra lại bảng Macro');
                 }
+            } else if (hasActivePt && genderChanged) {
+                toast.success('Đã lưu giới tính — nhờ PT cập nhật macro nếu cần');
             } else {
                 toast.success('Cập nhật hồ sơ sức khỏe & dinh dưỡng thành công!');
             }
 
-            setHealthData({ ...editHealthForm });
+            setHealthData(goalsConflict
+                ? {
+                    ...editHealthForm,
+                    gender,
+                    nutritionGoal: healthData.nutritionGoal,
+                    targetWeight: healthData.targetWeight,
+                }
+                : { ...editHealthForm, gender });
             setIsHealthModalOpen(false);
             fetchAll();
         } catch (err) {
-            toast.error('Không thể lưu chỉ số sức khỏe, vui lòng kiểm tra lại');
+            toast.error(err.response?.data?.message || 'Không thể lưu chỉ số sức khỏe, vui lòng kiểm tra lại');
         } finally {
             setIsSavingHealth(false);
         }
@@ -545,7 +616,7 @@ export default function ProfilePage() {
                                 <div className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 text-center flex flex-col justify-center">
                                     <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Giới tính / Năm sinh</span>
                                     <p className="text-sm sm:text-base font-black text-slate-800 mt-1">
-                                        {healthData.gender === 'male' ? 'Nam' : 'Nữ'} {healthData.dateOfBirth ? `(${healthData.dateOfBirth.slice(0, 4)})` : ''}
+                                        {genderLabel(healthData.gender)} {healthData.dateOfBirth ? `(${healthData.dateOfBirth.slice(0, 4)})` : ''}
                                     </p>
                                 </div>
                             </div>
@@ -562,6 +633,11 @@ export default function ProfilePage() {
                                     <p className="text-sm font-black text-slate-800 pt-0.5">
                                         {ACTIVITY_LEVEL_OPTIONS.find(o => o.value === healthData.activityLevel)?.label || 'Vận động vừa phải'}
                                     </p>
+                                    {(healthData.sessionsPerWeek !== '' && healthData.sessionsPerWeek != null) && (
+                                        <p className="text-[11px] text-slate-500 font-semibold">
+                                            {healthData.sessionsPerWeek} buổi/tuần × {healthData.minutesPerSession ?? '—'} phút
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="p-5 rounded-2xl bg-amber-50/40 border border-amber-100/80 space-y-1.5 shadow-2xs">
@@ -575,6 +651,24 @@ export default function ProfilePage() {
                                         {GOAL_OPTIONS.find(o => o.value === healthData.nutritionGoal)?.label || 'Duy trì'} · {' '}
                                         <span className="text-emerald-700">{DIET_OPTIONS.find(o => o.value === healthData.dietPreference)?.label || 'Ăn thường'}</span>
                                     </p>
+                                    {hasActivePt && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const draft = `PT ơi, mình muốn điều chỉnh mục tiêu dinh dưỡng / mức vận động (hiện: ${healthData.nutritionGoal}, ${healthData.sessionsPerWeek || '?'} buổi × ${healthData.minutesPerSession || '?'}′). PT hỗ trợ mình nhé!`;
+                                                const mappingId = ptThreads[0]?.mappingId;
+                                                if (mappingId) {
+                                                    sessionStorage.setItem('nutrican_chat_draft', draft);
+                                                    navigate(`/chat?mappingId=${mappingId}&draft=1`);
+                                                } else {
+                                                    navigate('/coaching');
+                                                }
+                                            }}
+                                            className="mt-2 text-xs font-extrabold text-amber-800 underline underline-offset-2 hover:text-amber-950"
+                                        >
+                                            Nhắn PT để chỉnh mục tiêu
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
@@ -839,7 +933,7 @@ export default function ProfilePage() {
                         </div>
                         <div className="space-y-1.5 min-w-0">
                             <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Giới tính sinh học</label>
-                            <select value={editHealthForm.gender} onChange={(e) => setEditHealthForm((f) => ({ ...f, gender: e.target.value }))} className="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 font-extrabold text-sm text-slate-800 outline-none focus:bg-white focus:border-emerald-500 min-w-0 cursor-pointer">
+                            <select value={normalizeGender(editHealthForm.gender) || 'male'} onChange={(e) => setEditHealthForm((f) => ({ ...f, gender: e.target.value }))} className="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 font-extrabold text-sm text-slate-800 outline-none focus:bg-white focus:border-emerald-500 min-w-0 cursor-pointer">
                                 <option value="male">Nam giới (Male)</option>
                                 <option value="female">Nữ giới (Female)</option>
                             </select>
@@ -858,15 +952,33 @@ export default function ProfilePage() {
                             <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Mức độ vận động (TDEE)</label>
                             <ActivityLevelInfoTooltip />
                         </div>
-                        <select value={editHealthForm.activityLevel} onChange={(e) => setEditHealthForm((f) => ({ ...f, activityLevel: e.target.value }))} disabled={hasActivePt} className={`w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 font-extrabold text-sm text-slate-800 outline-none focus:bg-white focus:border-emerald-500 min-w-0 truncate ${hasActivePt ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
-                            {ACTIVITY_LEVEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        {hasActivePt && (
+                            <p className="text-xs text-amber-700 font-semibold bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                                Mục tiêu / vận động do PT quản lý — bạn vẫn sửa được chế độ ăn & dị ứng.
+                            </p>
+                        )}
+                        <ActivityLoadInputs
+                            sessionsPerWeek={editHealthForm.sessionsPerWeek}
+                            minutesPerSession={editHealthForm.minutesPerSession}
+                            disabled={hasActivePt}
+                            onSessionsChange={(v) => setEditHealthForm((f) => {
+                                const next = { ...f, sessionsPerWeek: v };
+                                const d = deriveActivityLevel(v, f.minutesPerSession);
+                                if (d) next.activityLevel = d;
+                                return next;
+                            })}
+                            onMinutesChange={(v) => setEditHealthForm((f) => {
+                                const next = { ...f, minutesPerSession: v };
+                                const d = deriveActivityLevel(f.sessionsPerWeek, v);
+                                if (d) next.activityLevel = d;
+                                return next;
+                            })}
+                        />
                     </div>
 
                     {/* Mục tiêu */}
                     <div className="space-y-1.5 min-w-0">
                         <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider block">Mục tiêu cân nặng / sức khỏe</label>
-                        {hasActivePt && <p className="text-xs text-amber-700 font-semibold bg-amber-50 p-2.5 rounded-xl border border-amber-200">Mục tiêu và mức vận động đang do PT quản lý — bạn vẫn có thể ghi cân nặng.</p>}
                         <select value={editHealthForm.nutritionGoal} onChange={(e) => setEditHealthForm((f) => ({ ...f, nutritionGoal: e.target.value }))} disabled={hasActivePt} className={`w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 font-extrabold text-sm text-slate-800 outline-none focus:bg-white focus:border-emerald-500 min-w-0 truncate ${hasActivePt ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
                             {GOAL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>

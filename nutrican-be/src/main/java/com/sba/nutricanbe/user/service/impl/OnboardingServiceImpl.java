@@ -2,8 +2,11 @@ package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.ActivityLoadMapper;
+import com.sba.nutricanbe.common.util.GenderNormalizer;
 import com.sba.nutricanbe.common.util.MacroSuggestionCalculator;
 import com.sba.nutricanbe.user.dto.BodyMetricRequest;
+import com.sba.nutricanbe.user.dto.ClientGoalRequest;
 import com.sba.nutricanbe.user.dto.MacroSuggestionResponse;
 import com.sba.nutricanbe.user.dto.MacroTargetRequest;
 import com.sba.nutricanbe.user.dto.OnboardingRequest;
@@ -14,6 +17,7 @@ import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.BodyMetricService;
+import com.sba.nutricanbe.user.service.ClientGoalService;
 import com.sba.nutricanbe.user.service.OnboardingService;
 import com.sba.nutricanbe.user.service.UserProfileService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +38,7 @@ public class OnboardingServiceImpl implements OnboardingService {
     private final MacroTargetRepository macroTargetRepository;
     private final BodyMetricService bodyMetricService;
     private final UserProfileService userProfileService;
+    private final ClientGoalService clientGoalService;
 
     @Override
     @Transactional(readOnly = true)
@@ -84,7 +89,7 @@ public class OnboardingServiceImpl implements OnboardingService {
             throw new BadRequestException("gender is required");
         }
         user.setHeightCm(request.getHeightCm());
-        user.setGender(request.getGender());
+        user.setGender(GenderNormalizer.requireCanonical(request.getGender()));
         if (request.getDateOfBirth() != null) {
             user.setDateOfBirth(request.getDateOfBirth());
         }
@@ -107,6 +112,10 @@ public class OnboardingServiceImpl implements OnboardingService {
         }
         ActivityLevel level = resolveActivityLevel(request);
         user.setActivityLevel(level);
+        if (ActivityLoadMapper.hasSessionInputs(request.getSessionsPerWeek(), request.getMinutesPerSession())) {
+            user.setExerciseSessionsPerWeek(request.getSessionsPerWeek());
+            user.setExerciseMinutesPerSession(request.getMinutesPerSession());
+        }
         MacroSuggestionResponse suggestion = MacroSuggestionCalculator.calculate(
                 user,
                 request.getWeightKg(),
@@ -122,10 +131,26 @@ public class OnboardingServiceImpl implements OnboardingService {
         macroReq.setCarb(suggestion.getCarb());
         macroReq.setFat(suggestion.getFat());
         userProfileService.setMacroTarget(user.getId(), macroReq);
+
+        if (request.getNutritionGoal() != null || request.getTargetWeight() != null) {
+            ClientGoalRequest goalReq = new ClientGoalRequest();
+            goalReq.setNutritionGoal(request.getNutritionGoal());
+            goalReq.setTargetWeight(request.getTargetWeight());
+            if (request.getPregnancyTrimester() != null) {
+                goalReq.setTrimester(request.getPregnancyTrimester());
+            }
+            if (request.getWeightKg() != null) {
+                goalReq.setBaselineWeight(request.getWeightKg());
+            }
+            clientGoalService.saveGoals(user.getId(), goalReq);
+        }
         user.setOnboardingStep(3);
     }
 
     static ActivityLevel resolveActivityLevel(OnboardingRequest request) {
+        if (ActivityLoadMapper.hasSessionInputs(request.getSessionsPerWeek(), request.getMinutesPerSession())) {
+            return ActivityLoadMapper.toLevel(request.getSessionsPerWeek(), request.getMinutesPerSession());
+        }
         if (request.getActivityLevel() != null) {
             return request.getActivityLevel();
         }

@@ -2,6 +2,8 @@ package com.sba.nutricanbe.user.config;
 
 import com.sba.nutricanbe.common.entity.SystemSetting;
 import com.sba.nutricanbe.common.repository.SystemSettingRepository;
+import com.sba.nutricanbe.common.util.DietDates;
+import com.sba.nutricanbe.common.util.GoalWeightConsistency;
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.DietLogFeedback;
 import com.sba.nutricanbe.diet.repository.DietLogFeedbackRepository;
@@ -42,7 +44,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DemoRichnessDataInitializer implements CommandLineRunner {
 
-    public static final String FLAG_KEY = "DEMO_RICHNESS_V1";
+    public static final String FLAG_KEY = "DEMO_RICHNESS_V2";
 
     private static final String[] REVIEW_COMMENTS = {
             "PT tận tình, chế độ ăn sát thực tế. Sau 2 tháng mình đã có kết quả rõ rệt!",
@@ -71,6 +73,7 @@ public class DemoRichnessDataInitializer implements CommandLineRunner {
     private final PtMappingSessionRepository sessionRepository;
     private final PtAppointmentRepository appointmentRepository;
     private final BodyMetricRepository bodyMetricRepository;
+    private final ClientGoalRepository clientGoalRepository;
     private final ClientGoalMilestoneRepository milestoneRepository;
     private final DietLogRepository dietLogRepository;
     private final DietLogFeedbackRepository dietLogFeedbackRepository;
@@ -209,25 +212,43 @@ public class DemoRichnessDataInitializer implements CommandLineRunner {
         }
     }
 
+    /**
+     * Chỉ bổ sung % mỡ / cơ / LBM lên metric đã có (từ Veteran).
+     * Không ghi đè cân nặng — tránh seed “ảo” lệch ClientGoal / User.nutritionGoal.
+     */
     private void seedBodyCompositionAndMilestones() {
         for (String email : List.of("customer@nutrican.com", "solo@nutrican.com")) {
             userRepository.findByEmail(email).ifPresent(user -> {
-                LocalDate base = LocalDate.now().minusWeeks(4);
+                LocalDate today = DietDates.todayVn();
+                clientGoalRepository.findByUserId(user.getId()).ifPresent(goal -> {
+                    bodyMetricRepository.findByUser_IdAndRecordDate(user.getId(), today)
+                            .or(() -> bodyMetricRepository.findTopByUserIdOrderByRecordDateDesc(user.getId()))
+                            .ifPresent(latest -> GoalWeightConsistency.requireConsistent(
+                                    goal.getNutritionGoal() != null ? goal.getNutritionGoal() : user.getNutritionGoal(),
+                                    latest.getWeight(),
+                                    goal.getTargetWeight()));
+                });
+
+                LocalDate base = today.minusWeeks(4);
                 for (int w = 0; w < 5; w++) {
-                    LocalDate date = base.plusWeeks(w);
-                    BodyMetric metric = bodyMetricRepository.findByUser_IdAndRecordDate(user.getId(), date)
-                            .orElse(BodyMetric.builder().user(user).recordDate(date).build());
-                    BigDecimal weight = BigDecimal.valueOf(
-                            email.startsWith("solo") ? 78.0 - w * 0.4 : 62.5 - w * 0.3);
-                    metric.setWeight(weight);
-                    metric.setBodyFatPercent(BigDecimal.valueOf(
-                            email.startsWith("solo") ? 22.0 - w * 0.3 : 28.0 - w * 0.4));
-                    metric.setMuscleMass(BigDecimal.valueOf(
-                            email.startsWith("solo") ? 32.0 + w * 0.15 : 24.0 + w * 0.1));
-                    metric.setLbm(BigDecimal.valueOf(
-                            email.startsWith("solo") ? 60.0 + w * 0.1 : 45.0 + w * 0.08));
-                    metric.setNote(w == 4 ? "InBody demo seed" : null);
-                    bodyMetricRepository.save(metric);
+                    final int week = w;
+                    LocalDate date = base.plusWeeks(week);
+                    bodyMetricRepository.findByUser_IdAndRecordDate(user.getId(), date).ifPresent(metric -> {
+                        boolean solo = email.startsWith("solo");
+                        if (metric.getBodyFatPercent() == null) {
+                            metric.setBodyFatPercent(BigDecimal.valueOf(solo ? 22.0 - week * 0.3 : 28.0 - week * 0.4));
+                        }
+                        if (metric.getMuscleMass() == null) {
+                            metric.setMuscleMass(BigDecimal.valueOf(solo ? 32.0 + week * 0.15 : 24.0 + week * 0.1));
+                        }
+                        if (metric.getLbm() == null) {
+                            metric.setLbm(BigDecimal.valueOf(solo ? 60.0 + week * 0.1 : 45.0 + week * 0.08));
+                        }
+                        if (week == 4 && metric.getNote() == null) {
+                            metric.setNote("InBody demo seed (composition only)");
+                        }
+                        bodyMetricRepository.save(metric);
+                    });
                 }
 
                 seedMilestone(user.getId(), "Hoàn thành tuần 1 theo dõi cân nặng",

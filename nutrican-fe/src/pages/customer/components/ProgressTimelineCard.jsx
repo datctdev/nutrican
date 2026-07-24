@@ -3,6 +3,9 @@ import { Card, CardContent } from '../../../components/ui/card';
 import { profileExtensionsService } from '../../../services/profileExtensionsService';
 import BodyCompositionChart from '../../../components/charts/BodyCompositionChart';
 
+/**
+ * Prefer metrics with `recordDate` (BodyMetricDto). Chart also accepts legacy `date`.
+ */
 export default function ProgressTimelineCard({
   goals,
   milestones,

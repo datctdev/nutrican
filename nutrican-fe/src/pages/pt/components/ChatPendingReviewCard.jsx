@@ -25,7 +25,7 @@ export default function ChatPendingReviewCard({
   loading,
   reviewingLogId,
   onApprove,
-  onReject,
+  onAdjust,
   onOpenFull,
 }) {
   return (
@@ -50,6 +50,10 @@ export default function ChatPendingReviewCard({
         ) : logs.length === 0 ? (
           <p className="text-xs text-slate-500 py-2">Không có bữa nào chờ duyệt.</p>
         ) : (
+          <>
+          <p className="text-[10px] font-medium text-slate-500">
+            Chỉ số sai? Chọn “Chỉnh lại” để nhập calo/macro đúng — bữa ăn vẫn được tính cho học viên.
+          </p>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {logs.map((log) => {
               const kcal = kcalOf(log);
@@ -71,22 +75,23 @@ export default function ChatPendingReviewCard({
                       onClick={() => onApprove?.(log.id)}
                       className="h-8 flex-1 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white"
                     >
-                      Duyệt
+                      {reviewingLogId === log.id ? 'Đang lưu…' : 'Duyệt đúng'}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       disabled={reviewingLogId === log.id}
-                      onClick={() => onReject?.(log.id)}
-                      className="h-8 flex-1 text-[11px] font-bold rounded-lg border-red-200 text-red-600 hover:bg-red-50"
+                      onClick={() => onAdjust?.(log.id)}
+                      className="h-8 flex-1 text-[11px] font-bold rounded-lg border-blue-200 text-blue-700 hover:bg-blue-50"
                     >
-                      Từ chối
+                      Chỉnh lại
                     </Button>
                   </div>
                 </div>
               );
             })}
           </div>
+          </>
         )}
 
         {onOpenFull && (

@@ -54,9 +54,13 @@ public class ProgressDataDto {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class BodyMetricData {
+        /** Preferred for BodyCompositionChart (same as BodyMetricDto.recordDate). */
+        private LocalDate recordDate;
+        /** Legacy alias — keep equal to recordDate for older clients. */
         private LocalDate date;
         private BigDecimal weight;
         private BigDecimal bodyFatPercent;
+        private BigDecimal muscleMass;
         private BigDecimal lbm;
     }
 

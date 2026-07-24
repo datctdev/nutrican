@@ -23,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+import jakarta.validation.Valid;
 
 import java.time.LocalDate;
 import java.util.UUID;
@@ -67,7 +68,7 @@ public class PtWorkspaceController {
     public ResponseEntity<ApiResponse<DietLogReviewResponse>> reviewLog(
             @PathVariable UUID id,
             @AuthenticationPrincipal User user,
-            @RequestBody ReviewActionRequest request) {
+            @Valid @RequestBody ReviewActionRequest request) {
         return ResponseEntity.ok(ptDietLogReviewService.reviewLog(id, user.getId(), request));
     }
 

@@ -13,6 +13,12 @@ public interface DietLogService {
 
     ApiResponse<DietLogResponse> createLog(UUID customerId, CreateDietLogRequest request);
 
+    /**
+     * Internal: meal-plan tick (PT plan / already-approved plan item). Always NOT_REQUIRED —
+     * do not expose a public API flag that clients could use to bypass PT review on manual logs.
+     */
+    ApiResponse<DietLogResponse> createPlanComplianceLog(UUID customerId, CreateDietLogRequest request);
+
     ApiResponse<PageResponse<DietLogResponse>> getLogs(UUID customerId, int page, int size,
                                                         LocalDate startDate, LocalDate endDate, String status);
 

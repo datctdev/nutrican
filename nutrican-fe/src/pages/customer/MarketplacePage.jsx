@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { marketplaceService } from '../../services/marketplaceService';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
+import { userService } from '../../services/userService';
 import { useAuthStore } from '../../stores/authStore';
 import ProvinceSelect from '../../components/common/ProvinceSelect';
 import {
@@ -20,7 +21,7 @@ const GENDER_LABEL = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' };
 
 const GOAL_LABELS = {
     'WEIGHT_LOSS': 'Giảm cân',
-    'WEIGHT_GAIN': 'Tăng cân',
+    'WEIGHT_GAIN': 'Tăng cân / Tăng cơ',
     'MUSCLE_GAIN': 'Tăng cơ',
     'FAT_LOSS': 'Đốt mỡ',
     'MAINTAIN': 'Duy trì',
@@ -35,6 +36,24 @@ const DIET_LABELS = {
     'KETO': 'Keto',
     'EAT_CLEAN': 'Eat clean'
 };
+
+const PRIMARY_GOAL_FILTERS = [
+    { value: '', label: 'Mọi mục tiêu' },
+    { value: 'WEIGHT_LOSS', label: 'Giảm cân' },
+    { value: 'WEIGHT_GAIN', label: 'Tăng cân / cơ' },
+    { value: 'MAINTAIN', label: 'Duy trì' },
+    { value: 'PREGNANT', label: 'Thai kỳ' },
+    { value: 'RECOVERY', label: 'Phục hồi' },
+];
+
+const PRIMARY_DIET_FILTERS = [
+    { value: '', label: 'Mọi chế độ ăn' },
+    { value: 'NORMAL', label: 'Ăn thường' },
+    { value: 'VEGETARIAN', label: 'Vegetarian' },
+    { value: 'VEGAN', label: 'Vegan' },
+    { value: 'KETO', label: 'Keto' },
+    { value: 'EAT_CLEAN', label: 'Eat clean' },
+];
 
 const getPermanentUrl = (url) => url ? url.split('?')[0] : '';
 
@@ -86,8 +105,35 @@ export default function MarketplacePage() {
     useEffect(() => {
         if (isAuthenticated && user?.role === 'CUSTOMER') {
             fetchCoachingHistory();
+            userService.getProfile().then((res) => {
+                const p = res.data?.data;
+                if (!p) return;
+                setAdvFilters((prev) => {
+                    const next = { ...prev };
+                    let changed = false;
+                    if (!prev.goalFilter && p.nutritionGoal) {
+                        next.goalFilter = p.nutritionGoal === 'MUSCLE_GAIN' ? 'WEIGHT_GAIN' : p.nutritionGoal;
+                        changed = true;
+                    }
+                    if (!prev.dietFilter && p.dietPreference) {
+                        next.dietFilter = p.dietPreference;
+                        changed = true;
+                    }
+                    if (changed) {
+                        setTimeout(() => fetchPts(search, next), 0);
+                    }
+                    return changed ? next : prev;
+                });
+            }).catch(() => {});
         }
     }, [isAuthenticated, user]);
+
+    const setPrimaryFilter = (key, value) => {
+        const next = { ...advFilters, [key]: value };
+        setAdvFilters(next);
+        setPage(0);
+        fetchPts(search, next);
+    };
 
     const fetchPts = async (searchTerm = search, customFilters = advFilters) => {
         try {
@@ -253,31 +299,69 @@ export default function MarketplacePage() {
                 )}
 
                 {/* --- THANH CÔNG CỤ TÌM KIẾM SIÊU GỌN (ĐÃ XÓA 2 PHẦN LỌC DƯ THỪA) --- */}
-                <div className="flex items-center justify-between gap-4 mb-8 px-2 border-t border-slate-100 pt-8">
-                    <div>
-                        <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
-                            Huấn Luyện Viên Nổi Bật
-                            <span className="text-xs font-extrabold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">{pts.length} HLV</span>
-                        </h2>
-                        <p className="text-sm font-medium text-slate-500 mt-1">Khám phá và chọn lọc chuyên gia phù hợp tuyệt đối với tiêu chí của bạn.</p>
+                <div className="flex flex-col gap-4 mb-8 px-2 border-t border-slate-100 pt-8">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+                                Huấn Luyện Viên Nổi Bật
+                                <span className="text-xs font-extrabold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">{pts.length} HLV</span>
+                            </h2>
+                            <p className="text-sm font-medium text-slate-500 mt-1">Khám phá và chọn lọc chuyên gia phù hợp tuyệt đối với tiêu chí của bạn.</p>
+                        </div>
+
+                        <div className="flex items-center shrink-0">
+                            <Button
+                                type="button"
+                                onClick={() => setShowFilterDrawer(true)}
+                                variant="outline"
+                                className={`h-12 px-5 rounded-2xl font-black text-sm border-2 transition-all cursor-pointer flex items-center gap-2.5 shadow-sm hover:scale-105 ${activeFilterCount > 0 ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                            >
+                                <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+                                <span>Bộ lọc tìm kiếm</span>
+                                {activeFilterCount > 0 && (
+                                    <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-black">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                            </Button>
+                        </div>
                     </div>
 
-                    <div className="flex items-center shrink-0">
-                        {/* NÚT MỞ BỘ LỌC NÂNG CAO (DUY NHẤT & NỔI BẬT) */}
-                        <Button
-                            type="button"
-                            onClick={() => setShowFilterDrawer(true)}
-                            variant="outline"
-                            className={`h-12 px-5 rounded-2xl font-black text-sm border-2 transition-all cursor-pointer flex items-center gap-2.5 shadow-sm hover:scale-105 ${activeFilterCount > 0 ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                        >
-                            <SlidersHorizontal className="w-4 h-4 text-blue-600" />
-                            <span>Bộ lọc tìm kiếm</span>
-                            {activeFilterCount > 0 && (
-                                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] flex items-center justify-center font-black">
-                                    {activeFilterCount}
-                                </span>
-                            )}
-                        </Button>
+                    <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2 items-center">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1">Mục tiêu</span>
+                            {PRIMARY_GOAL_FILTERS.map((g) => (
+                                <button
+                                    key={g.value || 'all-goal'}
+                                    type="button"
+                                    onClick={() => setPrimaryFilter('goalFilter', g.value)}
+                                    className={`text-xs font-extrabold px-3 py-1.5 rounded-full border transition-colors ${
+                                        advFilters.goalFilter === g.value
+                                            ? 'bg-emerald-600 text-white border-emerald-600'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
+                                    }`}
+                                >
+                                    {g.label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap gap-2 items-center">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1">Chế độ ăn</span>
+                            {PRIMARY_DIET_FILTERS.map((d) => (
+                                <button
+                                    key={d.value || 'all-diet'}
+                                    type="button"
+                                    onClick={() => setPrimaryFilter('dietFilter', d.value)}
+                                    className={`text-xs font-extrabold px-3 py-1.5 rounded-full border transition-colors ${
+                                        advFilters.dietFilter === d.value
+                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                                    }`}
+                                >
+                                    {d.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -403,6 +487,16 @@ export default function MarketplacePage() {
 
                                                         {/* PHÂN TÁCH 3 HÀNG CHUYÊN MÔN RÕ RÀNG */}
                                                         <div className="space-y-2 pt-4 border-t border-slate-100">
+                                                            {(pt.goalMatch || pt.dietMatch) && (
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    {pt.goalMatch && (
+                                                                        <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-2 py-0.5 rounded-md">Khớp mục tiêu</span>
+                                                                    )}
+                                                                    {pt.dietMatch && (
+                                                                        <span className="text-[10px] font-extrabold bg-indigo-600 text-white px-2 py-0.5 rounded-md">Khớp chế độ ăn</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                             {pt.specializations?.length > 0 && (
                                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                                     <span className="text-[10px] font-black text-slate-400 uppercase w-18 shrink-0">Chuyên môn:</span>
@@ -603,6 +697,7 @@ export default function MarketplacePage() {
                                         className="w-full h-12 px-4 rounded-xl border-2 border-slate-200 font-bold text-sm bg-white outline-none focus:border-blue-600 cursor-pointer"
                                     >
                                         <option value="">🥗 Tất cả chế độ ăn</option>
+                                        <option value="NORMAL">Ăn thường</option>
                                         <option value="EAT_CLEAN">Eat Clean</option>
                                         <option value="KETO">Chế độ Keto</option>
                                         <option value="VEGETARIAN">Ăn chay (Vegetarian)</option>

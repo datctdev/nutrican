@@ -1,7 +1,7 @@
 package com.sba.nutricanbe.diet.service.impl;
 
 import com.sba.nutricanbe.common.dto.MacroNutrients;
-import com.sba.nutricanbe.common.util.DayPlanRules;
+import com.sba.nutricanbe.diet.util.DayPlanRules;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.DietLogPeriods;
 import com.sba.nutricanbe.common.util.MacroUtils;

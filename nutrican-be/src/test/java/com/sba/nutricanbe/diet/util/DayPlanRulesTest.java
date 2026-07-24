@@ -1,4 +1,4 @@
-package com.sba.nutricanbe.common.util;
+package com.sba.nutricanbe.diet.util;
 
 import com.sba.nutricanbe.diet.entity.DietLog;
 import com.sba.nutricanbe.diet.entity.MealPlanItem;
@@ -68,7 +68,7 @@ class DayPlanRulesTest {
     }
 
     @Test
-    void notSettledWhenOnlyPendingReviewLogInPeriod() {
+    void settledWhenPendingReviewLogInPeriodBecauseMealWasEaten() {
         DietLog pending = DietLog.builder()
                 .logDate(DAY)
                 .mealPeriod(MealPeriod.EVENING)
@@ -81,7 +81,18 @@ class DayPlanRulesTest {
                 .mealType(MealType.DINNER)
                 .eaten(false)
                 .build();
-        assertFalse(DayPlanRules.isMealPeriodSettled(
+        assertTrue(DayPlanRules.isMealPeriodSettled(
                 DAY, MealPeriod.EVENING, List.of(), List.of(self), List.of(pending)));
+    }
+
+    @Test
+    void notSettledWhenDraftLogOnly() {
+        DietLog draft = DietLog.builder()
+                .logDate(DAY)
+                .mealPeriod(MealPeriod.EVENING)
+                .status(DietLogStatus.DRAFT)
+                .build();
+        assertFalse(DayPlanRules.isMealPeriodSettled(
+                DAY, MealPeriod.EVENING, List.of(), List.of(), List.of(draft)));
     }
 }

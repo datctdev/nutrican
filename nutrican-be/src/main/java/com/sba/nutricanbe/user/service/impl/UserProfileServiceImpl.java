@@ -10,6 +10,7 @@ import com.sba.nutricanbe.user.entity.PtUpdateRequest;
 import com.sba.nutricanbe.user.entity.User;
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.GenderNormalizer;
 import com.sba.nutricanbe.common.util.MacroCalorieValidator;
 import com.sba.nutricanbe.user.repository.MacroTargetRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
@@ -31,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -335,6 +337,15 @@ public class UserProfileServiceImpl implements UserProfileService {
         if (request.getDateOfBirth() != null) {
             user.setDateOfBirth(java.time.LocalDate.parse(request.getDateOfBirth()));
         }
+        if (request.getGender() != null && !request.getGender().isBlank()) {
+            user.setGender(GenderNormalizer.requireCanonical(request.getGender()));
+        }
+        if (request.getHeightCm() != null) {
+            if (request.getHeightCm() < 100 || request.getHeightCm() > 250) {
+                throw new BadRequestException("heightCm phải từ 100–250");
+            }
+            user.setHeightCm(request.getHeightCm());
+        }
 
         user = userRepository.save(user);
         log.info("Profile updated for user: {}", userId);
@@ -440,9 +451,11 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .dietPreference(user.getDietPreference())
                 .nutritionGoal(user.getNutritionGoal())
                 .activityLevel(ActivityLevel.orDefault(user.getActivityLevel()))
+                .exerciseSessionsPerWeek(user.getExerciseSessionsPerWeek())
+                .exerciseMinutesPerSession(user.getExerciseMinutesPerSession())
                 .pregnancyTrimester(user.getPregnancyTrimester())
                 .heightCm(user.getHeightCm())
-                .gender(user.getGender())
+                .gender(Optional.ofNullable(GenderNormalizer.normalize(user.getGender())).orElse(user.getGender()))
                 .notificationOptIn(user.getNotificationOptIn())
                 .createdAt(user.getCreatedAt())
                 .build();

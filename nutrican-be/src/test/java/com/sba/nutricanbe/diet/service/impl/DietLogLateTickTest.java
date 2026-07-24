@@ -1,6 +1,5 @@
 package com.sba.nutricanbe.diet.service.impl;
 
-import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MealPeriods;
 import com.sba.nutricanbe.diet.dto.request.CreateDietLogRequest;
@@ -31,7 +30,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -89,7 +87,7 @@ class DietLogLateTickTest {
     }
 
     @Test
-    void createLog_withoutLateTickReason_rejectsPastPeriodOnToday() {
+    void createLog_withoutLateTickReason_coercesPastPeriodToCurrent() {
         MealPeriod pastPeriod = MealPeriod.NOON;
         Assumptions.assumeTrue(MealPeriods.isPastPeriodForLateTick(pastPeriod));
         Assumptions.assumeTrue(MealPeriods.current() != pastPeriod);
@@ -103,6 +101,19 @@ class DietLogLateTickTest {
         request.setLogDate(DietDates.todayVn());
         request.setCalories(BigDecimal.valueOf(300));
 
-        assertThrows(BadRequestException.class, () -> dietLogService.createLog(customerId, request));
+        MealPeriod current = MealPeriods.current();
+        when(dietLogRepository.save(any(DietLog.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(dietLogHelper.resolveReviewStatus(eq(customerId), eq(false)))
+                .thenReturn(DietLogReviewStatus.NOT_REQUIRED);
+        when(dietLogHelper.toResponse(any())).thenAnswer(invocation -> {
+            DietLog saved = invocation.getArgument(0);
+            return DietLogResponse.builder().mealPeriod(saved.getMealPeriod()).build();
+        });
+        when(intakeControlLoopService.evaluateAfterLog(eq(customerId), any(), any(Boolean.class)))
+                .thenReturn(IntakeControlResult.builder().intakeStatus(IntakeStatus.OK).build());
+
+        var result = dietLogService.createLog(customerId, request);
+
+        assertEquals(current, result.getData().getMealPeriod());
     }
 }

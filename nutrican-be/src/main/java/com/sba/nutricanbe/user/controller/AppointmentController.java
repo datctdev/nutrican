@@ -31,7 +31,7 @@ public class AppointmentController {
             @PathVariable UUID ptId,
             @RequestBody BookAppointmentRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                AppointmentResponse.from(appointmentService.book(customer.getId(), ptId, request)),
+                appointmentService.book(customer.getId(), ptId, request),
                 "Appointment requested"));
     }
 
@@ -40,9 +40,7 @@ public class AppointmentController {
     public ResponseEntity<ApiResponse<List<AppointmentResponse>>> upcomingCustomer(
             @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(ApiResponse.success(
-                appointmentService.upcomingForCustomer(user.getId()).stream()
-                        .map(AppointmentResponse::from)
-                        .toList()));
+                appointmentService.upcomingForCustomer(user.getId())));
     }
 
     @GetMapping("/api/v1/workspace/appointments")
@@ -50,9 +48,7 @@ public class AppointmentController {
     public ResponseEntity<ApiResponse<List<AppointmentResponse>>> upcomingPt(
             @AuthenticationPrincipal User pt) {
         return ResponseEntity.ok(ApiResponse.success(
-                appointmentService.upcomingForPt(pt.getId()).stream()
-                        .map(AppointmentResponse::from)
-                        .toList()));
+                appointmentService.upcomingForPt(pt.getId())));
     }
 
     @PutMapping("/api/v1/workspace/appointments/{id}")

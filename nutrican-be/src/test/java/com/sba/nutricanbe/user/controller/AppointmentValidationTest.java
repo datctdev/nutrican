@@ -11,6 +11,7 @@ import com.sba.nutricanbe.user.repository.PtAppointmentRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
 import com.sba.nutricanbe.user.repository.PtProfileRepository;
+import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.AppointmentSlotHelper;
 import com.sba.nutricanbe.user.service.OfflinePackageAppointmentService;
 import com.sba.nutricanbe.user.service.impl.AppointmentServiceImpl;
@@ -40,6 +41,7 @@ class AppointmentValidationTest {
     @Mock private AppointmentSlotHelper appointmentSlotHelper;
     @Mock private PtProfileRepository ptProfileRepository;
     @Mock private OfflinePackageAppointmentService offlinePackageAppointmentService;
+    @Mock private UserRepository userRepository;
 
     private AppointmentServiceImpl appointmentService;
 
@@ -47,7 +49,7 @@ class AppointmentValidationTest {
     void setUp() {
         appointmentService = new AppointmentServiceImpl(
                 appointmentRepository, mappingRepository, mappingSessionRepository, walletService,
-                appointmentSlotHelper, ptProfileRepository, offlinePackageAppointmentService);
+                appointmentSlotHelper, ptProfileRepository, offlinePackageAppointmentService, userRepository);
     }
 
     @Test

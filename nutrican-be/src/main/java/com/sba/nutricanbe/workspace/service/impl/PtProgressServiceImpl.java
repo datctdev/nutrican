@@ -134,11 +134,15 @@ public class PtProgressServiceImpl implements PtProgressService {
                 mealPlanAdherence != null ? mealPlanAdherence.getLogCoverageRate() : null,
                 mealPlanAdherence != null ? mealPlanAdherence.getAdherenceRate() : null);
 
+        // Chart UI should prefer GET /workspace/clients/{id}/body-metrics (BodyMetricDto).
+        // This list stays for progress range helpers; keep shape aligned with BodyMetricDto.
         List<ProgressDataDto.BodyMetricData> metricData = metrics.stream()
                 .map(m -> ProgressDataDto.BodyMetricData.builder()
+                        .recordDate(m.getRecordDate())
                         .date(m.getRecordDate())
                         .weight(m.getWeight())
                         .bodyFatPercent(m.getBodyFatPercent())
+                        .muscleMass(m.getMuscleMass())
                         .lbm(m.getLbm())
                         .build())
                 .toList();

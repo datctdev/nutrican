@@ -35,6 +35,8 @@ public class PtClientProfileDto {
     private DietPreference dietPreference;
     private String specialNotes;
     private ActivityLevel activityLevel;
+    private Integer exerciseSessionsPerWeek;
+    private Integer exerciseMinutesPerSession;
 
     private NutritionGoal nutritionGoal;
     private BigDecimal protein;

@@ -2,6 +2,7 @@ package com.sba.nutricanbe.user.service.impl;
 
 import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.common.exception.ResourceNotFoundException;
+import com.sba.nutricanbe.common.util.ActivityLoadMapper;
 import com.sba.nutricanbe.common.util.MacroSuggestionCalculator;
 import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.user.dto.AllergyProfileRequest;
@@ -13,6 +14,7 @@ import com.sba.nutricanbe.user.dto.RecalculateMacrosResponse;
 import com.sba.nutricanbe.user.dto.UserPreferencesRequest;
 import com.sba.nutricanbe.user.entity.BodyMetric;
 import com.sba.nutricanbe.user.entity.User;
+import com.sba.nutricanbe.user.enums.ActivityLevel;
 import com.sba.nutricanbe.user.repository.BodyMetricRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.ProfileExtensionsService;
@@ -64,12 +66,22 @@ public class ProfileExtensionsServiceImpl implements ProfileExtensionsService {
             }
             user.setNutritionGoal(request.getNutritionGoal());
         }
-        if (request.getActivityLevel() != null) {
+        boolean changingActivity = request.getActivityLevel() != null
+                || ActivityLoadMapper.hasSessionInputs(request.getSessionsPerWeek(), request.getMinutesPerSession());
+        if (changingActivity) {
             if (coached) {
                 throw new BadRequestException(
                         "Mức vận động đang do PT quản lý — liên hệ PT để thay đổi");
             }
-            user.setActivityLevel(request.getActivityLevel());
+            ActivityLevel level = ActivityLoadMapper.resolveLevel(
+                    request.getActivityLevel(),
+                    request.getSessionsPerWeek(),
+                    request.getMinutesPerSession());
+            user.setActivityLevel(level);
+            if (ActivityLoadMapper.hasSessionInputs(request.getSessionsPerWeek(), request.getMinutesPerSession())) {
+                user.setExerciseSessionsPerWeek(request.getSessionsPerWeek());
+                user.setExerciseMinutesPerSession(request.getMinutesPerSession());
+            }
         }
         if (request.getPregnancyTrimester() != null) {
             if (coached) {
@@ -97,9 +109,8 @@ public class ProfileExtensionsServiceImpl implements ProfileExtensionsService {
             resolvedHeight = query.heightCm().intValue();
         }
         String resolvedGender = query.gender() != null ? query.gender() : user.getGender();
-        BigDecimal factor = MacroSuggestionCalculator.resolveFactor(
-                query.activityLevel() != null ? query.activityLevel() : user.getActivityLevel(),
-                query.activityFactor());
+        ActivityLevel level = resolveSuggestionLevel(user, query);
+        BigDecimal factor = MacroSuggestionCalculator.resolveFactor(level, query.activityFactor());
         return MacroSuggestionCalculator.calculate(
                 user,
                 resolvedWeight,
@@ -114,15 +125,21 @@ public class ProfileExtensionsServiceImpl implements ProfileExtensionsService {
     @Override
     @Transactional
     public RecalculateMacrosResponse recalculateMacros(UUID userId, RecalculateMacrosRequest request) {
-        if (request.getActivityLevel() == null) {
-            throw new BadRequestException("activityLevel is required");
-        }
         if (dietLogHelper.hasActivePt(userId)) {
             throw new BadRequestException(
                     "Mục tiêu dinh dưỡng đang do PT quản lý — liên hệ PT để thay đổi macro");
         }
+        ActivityLevel level = ActivityLoadMapper.resolveLevel(
+                request.getActivityLevel(),
+                request.getSessionsPerWeek(),
+                request.getMinutesPerSession());
+
         User user = loadUser(userId);
-        user.setActivityLevel(request.getActivityLevel());
+        user.setActivityLevel(level);
+        if (ActivityLoadMapper.hasSessionInputs(request.getSessionsPerWeek(), request.getMinutesPerSession())) {
+            user.setExerciseSessionsPerWeek(request.getSessionsPerWeek());
+            user.setExerciseMinutesPerSession(request.getMinutesPerSession());
+        }
         if (request.getNutritionGoal() != null) {
             user.setNutritionGoal(request.getNutritionGoal());
         }
@@ -139,7 +156,7 @@ public class ProfileExtensionsServiceImpl implements ProfileExtensionsService {
                 height != null ? BigDecimal.valueOf(height) : null,
                 null,
                 user.getGender(),
-                request.getActivityLevel().toFactor(),
+                level.toFactor(),
                 request.getNutritionGoal() != null ? request.getNutritionGoal() : user.getNutritionGoal(),
                 request.getPregnancyTrimester() != null
                         ? request.getPregnancyTrimester() : user.getPregnancyTrimester());
@@ -161,6 +178,16 @@ public class ProfileExtensionsServiceImpl implements ProfileExtensionsService {
     @Transactional(readOnly = true)
     public boolean hasActivePt(UUID userId) {
         return dietLogHelper.hasActivePt(userId);
+    }
+
+    private ActivityLevel resolveSuggestionLevel(User user, MacroSuggestionQuery query) {
+        if (ActivityLoadMapper.hasSessionInputs(query.sessionsPerWeek(), query.minutesPerSession())) {
+            return ActivityLoadMapper.toLevel(query.sessionsPerWeek(), query.minutesPerSession());
+        }
+        if (query.activityLevel() != null) {
+            return query.activityLevel();
+        }
+        return ActivityLevel.orDefault(user.getActivityLevel());
     }
 
     private User loadUser(UUID userId) {

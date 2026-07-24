@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -12,7 +12,6 @@ import {
 import { toast } from 'sonner';
 import { workspaceService } from '../../services/workspaceService';
 import { dietService } from '../../services/dietService';
-import Modal from '../../components/common/Modal';
 import ImageLightbox from '../../components/common/ImageLightbox';
 
 const getFullImageUrl = (url) => {
@@ -84,11 +83,11 @@ export default function ReviewDietLogPage({ clientPage = false }) {
 
     const [adjustingLog, setAdjustingLog] = useState(null);
     const [adjustForm, setAdjustForm] = useState({
+        adjustedFoodDescription: '',
         adjustedCalories: 0, adjustedProtein: 0, adjustedCarb: 0, adjustedFat: 0, note: '', correctionReason: 'OTHER',
     });
-
-    const [rejectModalLog, setRejectModalLog] = useState(null);
-    const [rejectReason, setRejectReason] = useState('WRONG_FOOD');
+    const [adjustError, setAdjustError] = useState('');
+    const autoOpenedLogRef = useRef(null);
 
     const [blindMode, setBlindMode] = useState({});
     const [blindRevealed, setBlindRevealed] = useState({});
@@ -133,6 +132,20 @@ export default function ReviewDietLogPage({ clientPage = false }) {
     };
 
     const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'HV';
+
+    // Đỏ chỉ dành cho dữ liệu cũ còn ở REJECTED; luồng mới chỉ có duyệt đúng hoặc chỉnh lại
+    const getReviewBadge = (log) => {
+        if (log.reviewStatus === 'REJECTED') {
+            return { label: 'Từ chối (dữ liệu cũ)', Icon: XCircle, text: 'text-red-700', icon: 'text-red-500', chip: 'bg-red-50 border-red-200' };
+        }
+        if (log.reviewStatus === 'APPROVED' && log.ptAction === 'ADJUST') {
+            return { label: 'Đã chỉnh lại', Icon: SlidersHorizontal, text: 'text-blue-700', icon: 'text-blue-500', chip: 'bg-blue-50 border-blue-200' };
+        }
+        if (log.reviewStatus === 'APPROVED') {
+            return { label: 'Đã duyệt', Icon: CheckCircle2, text: 'text-emerald-700', icon: 'text-emerald-500', chip: 'bg-emerald-50 border-emerald-200' };
+        }
+        return { label: 'Chờ duyệt', Icon: Clock, text: 'text-amber-700', icon: 'text-amber-500', chip: 'bg-amber-50 border-amber-200' };
+    };
 
     const fetchPendingLogs = useCallback(async ({ append = false, page = 0 } = {}) => {
         try {
@@ -293,11 +306,11 @@ export default function ReviewDietLogPage({ clientPage = false }) {
         try {
             setActionLoading(logId);
             await workspaceService.reviewLog(logId, { action, ...extra });
-            toast.success(
-                action === 'APPROVE' ? 'Đã phê duyệt bữa ăn!' :
-                    action === 'REJECT' ? 'Đã từ chối bữa ăn.' :
-                        'Đã điều chỉnh chỉ số thành công!'
-            );
+            toast.success(action === 'APPROVE'
+                ? 'Đã duyệt bữa ăn là đúng!'
+                : 'Đã chỉnh lại kết quả — học viên thấy số mới ngay.');
+            setAdjustingLog(null);
+            setAdjustError('');
             fetchPendingLogs();
             if (clientPage) {
                 fetchReviewedLogs();
@@ -308,14 +321,15 @@ export default function ReviewDietLogPage({ clientPage = false }) {
             toast.error(err.response?.data?.message || 'Lỗi khi thao tác');
         } finally {
             setActionLoading(null);
-            setAdjustingLog(null);
         }
     };
 
     const openAdjust = (log) => {
         setAdjustingLog(log.id);
+        setAdjustError('');
         const macros = log.macrosJson || {};
         setAdjustForm({
+            adjustedFoodDescription: log.foodDescription || log.matchedFoodName || '',
             adjustedCalories: macros.calories || 0,
             adjustedProtein: macros.protein || 0,
             adjustedCarb: macros.carbs || macros.carb || 0,
@@ -325,26 +339,81 @@ export default function ReviewDietLogPage({ clientPage = false }) {
         });
     };
 
-    const handleAdjustOrApproveSubmit = (log) => {
-        const originalMacros = log.macrosJson || {};
-        const isUnchanged =
-            (parseFloat(adjustForm.adjustedCalories) || 0) === (originalMacros.calories || 0) &&
-            (parseFloat(adjustForm.adjustedProtein) || 0) === (originalMacros.protein || 0) &&
-            (parseFloat(adjustForm.adjustedCarb) || 0) === (originalMacros.carbs || originalMacros.carb || 0) &&
-            (parseFloat(adjustForm.adjustedFat) || 0) === (originalMacros.fat || 0);
+    // Vào từ nút "Chỉnh lại" trong chat: mở luôn form của đúng bữa đó
+    useEffect(() => {
+        if (!selectedLogId || listLoading || autoOpenedLogRef.current === selectedLogId) return undefined;
+        const target = pendingLogs.find((item) => item.id === selectedLogId);
+        if (!target) return undefined;
+        const frameId = requestAnimationFrame(() => {
+            autoOpenedLogRef.current = selectedLogId;
+            openAdjust(target);
+        });
+        return () => cancelAnimationFrame(frameId);
+    }, [listLoading, pendingLogs, selectedLogId]);
 
-        if (isUnchanged) {
-            handleReview(log.id, 'APPROVE');
-        } else {
-            handleReview(log.id, 'ADJUST_MACROS', {
-                adjustedCalories: parseFloat(adjustForm.adjustedCalories) || 0,
-                adjustedProtein: parseFloat(adjustForm.adjustedProtein) || 0,
-                adjustedCarb: parseFloat(adjustForm.adjustedCarb) || 0,
-                adjustedFat: parseFloat(adjustForm.adjustedFat) || 0,
-                note: adjustForm.note,
-                correctionReason: adjustForm.correctionReason,
-            });
+    const readAdjustedMacros = () => ({
+        calories: parseFloat(adjustForm.adjustedCalories),
+        protein: parseFloat(adjustForm.adjustedProtein),
+        carb: parseFloat(adjustForm.adjustedCarb),
+        fat: parseFloat(adjustForm.adjustedFat),
+    });
+
+    const normalizeFoodName = (value) => (value || '').trim().replace(/\s+/g, ' ');
+
+    const isAdjustUnchanged = (log) => {
+        const original = log.macrosJson || {};
+        const next = readAdjustedMacros();
+        const sameMacros =
+            (next.calories || 0) === Number(original.calories || 0) &&
+            (next.protein || 0) === Number(original.protein || 0) &&
+            (next.carb || 0) === Number(original.carbs ?? original.carb ?? 0) &&
+            (next.fat || 0) === Number(original.fat || 0);
+        const sameName = normalizeFoodName(adjustForm.adjustedFoodDescription)
+            === normalizeFoodName(log.foodDescription);
+        return sameMacros && sameName;
+    };
+
+    const handleAdjustOrApproveSubmit = (log) => {
+        if (isAdjustUnchanged(log)) {
+            setAdjustError('');
+            handleReview(log.id, 'APPROVE', { note: adjustForm.note || undefined });
+            return;
         }
+
+        const name = normalizeFoodName(adjustForm.adjustedFoodDescription);
+        if (!name) {
+            setAdjustError('Tên món không được để trống — học viên cần biết bữa ăn thực tế là gì.');
+            return;
+        }
+        const { calories, protein, carb, fat } = readAdjustedMacros();
+        if (!Number.isFinite(calories) || calories <= 0) {
+            setAdjustError('Calo phải là số lớn hơn 0.');
+            return;
+        }
+        const invalidMacro = [
+            ['Protein', protein],
+            ['Carb', carb],
+            ['Fat', fat],
+        ].find(([, value]) => !Number.isFinite(value) || value < 0);
+        if (invalidMacro) {
+            setAdjustError(`${invalidMacro[0]} phải là số không âm.`);
+            return;
+        }
+        if ([calories, protein, carb, fat].some((value) => value > 20000)) {
+            setAdjustError('Calo/macro không được vượt quá 20000.');
+            return;
+        }
+
+        setAdjustError('');
+        handleReview(log.id, 'ADJUST_MACROS', {
+            adjustedFoodDescription: name,
+            adjustedCalories: calories,
+            adjustedProtein: protein,
+            adjustedCarb: carb,
+            adjustedFat: fat,
+            note: adjustForm.note,
+            correctionReason: adjustForm.correctionReason,
+        });
     };
 
     const handleBlindSubmit = async (logId) => {
@@ -487,7 +556,7 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                         </span>
                         <span className="min-w-0 flex-1">
                             <span className="block font-extrabold">Đã xử lý</span>
-                            <span className="mt-0.5 block text-xs font-medium opacity-70">Đã duyệt hoặc từ chối</span>
+                            <span className="mt-0.5 block text-xs font-medium opacity-70">Đã duyệt đúng hoặc đã chỉnh lại</span>
                         </span>
                         <span className={`rounded-full px-3 py-1 text-sm font-black ${activeList === 'APPROVED' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}>
                             {reviewedLogs.length}
@@ -530,12 +599,12 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                         : <CheckCircle2 className="w-20 h-20 text-emerald-400 mx-auto mb-5" />}
                     <h3 className="text-2xl font-black text-slate-800 tracking-tight">
                         {isReviewedList
-                            ? 'Chưa có bữa ăn đã duyệt'
+                            ? 'Chưa có bữa đã xử lý'
                             : selectedClientId ? 'Không có bữa ăn chờ duyệt' : 'Tuyệt vời! Đã hoàn thành.'}
                     </h3>
                     <p className="text-slate-500 mt-2 font-medium text-lg">
                         {isReviewedList
-                            ? 'Các bữa ăn sau khi được PT phê duyệt sẽ xuất hiện tại đây.'
+                            ? 'Bữa ăn bạn duyệt đúng hoặc chỉnh lại kết quả sẽ xuất hiện tại đây.'
                             : selectedClientId
                             ? `${selectedClientName || 'Học viên này'} hiện không có bữa ăn nào cần bạn kiểm tra.`
                             : 'Tất cả bữa ăn của học viên đã được bạn phê duyệt.'}
@@ -545,6 +614,8 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                 <div className="space-y-6">
                     {logs.map((log) => {
                         const reviewImage = previewImage[log.id] || getReviewImageUrl(log);
+                        const badge = getReviewBadge(log);
+                        const isLegacyRejected = log.reviewStatus === 'REJECTED';
 
                         return (
                         <Card
@@ -574,19 +645,9 @@ export default function ReviewDietLogPage({ clientPage = false }) {
 
                                         <div className="absolute top-4 left-4 flex flex-col gap-2">
                                             <div className="bg-white/95 backdrop-blur px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm border border-slate-200/50">
-                                                {log.reviewStatus === 'REJECTED'
-                                                    ? <XCircle className="w-3.5 h-3.5 text-red-500" />
-                                                    : isReviewedList
-                                                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                                        : <Clock className="w-3.5 h-3.5 text-amber-500" />}
-                                                <span className={`text-[10px] font-black uppercase tracking-widest ${
-                                                    log.reviewStatus === 'REJECTED'
-                                                        ? 'text-red-700'
-                                                        : isReviewedList ? 'text-emerald-700' : 'text-amber-700'
-                                                }`}>
-                                                    {log.reviewStatus === 'REJECTED'
-                                                        ? 'Từ chối'
-                                                        : isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
+                                                <badge.Icon className={`w-3.5 h-3.5 ${badge.icon}`} />
+                                                <span className={`text-[10px] font-black uppercase tracking-widest ${badge.text}`}>
+                                                    {badge.label}
                                                 </span>
                                             </div>
                                             {log.lateTickReason && (
@@ -618,24 +679,10 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                             </div>
                                             {!reviewImage && (
                                                 <div className="flex flex-wrap justify-end gap-2">
-                                                    <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 border ${
-                                                        log.reviewStatus === 'REJECTED'
-                                                            ? 'bg-red-50 border-red-200'
-                                                            : isReviewedList ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
-                                                    }`}>
-                                                        {log.reviewStatus === 'REJECTED'
-                                                            ? <XCircle className="w-3.5 h-3.5 text-red-500" />
-                                                            : isReviewedList
-                                                                ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                                                : <Clock className="w-3.5 h-3.5 text-amber-500" />}
-                                                        <span className={`text-[10px] font-black uppercase tracking-widest ${
-                                                            log.reviewStatus === 'REJECTED'
-                                                                ? 'text-red-700'
-                                                                : isReviewedList ? 'text-emerald-700' : 'text-amber-700'
-                                                        }`}>
-                                                            {log.reviewStatus === 'REJECTED'
-                                                                ? 'Từ chối'
-                                                                : isReviewedList ? 'Đã duyệt' : 'Chờ duyệt'}
+                                                    <div className={`px-3 py-1.5 rounded-xl flex items-center gap-1.5 border ${badge.chip}`}>
+                                                        <badge.Icon className={`w-3.5 h-3.5 ${badge.icon}`} />
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest ${badge.text}`}>
+                                                            {badge.label}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -644,40 +691,48 @@ export default function ReviewDietLogPage({ clientPage = false }) {
 
                                         {isReviewedList && (
                                             <div className={`mb-4 flex flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
-                                                log.reviewStatus === 'REJECTED'
+                                                isLegacyRejected
                                                     ? 'border-red-200 bg-red-50/70'
-                                                    : 'border-emerald-200 bg-emerald-50/70'
+                                                    : log.ptAction === 'ADJUST'
+                                                        ? 'border-blue-200 bg-blue-50/70'
+                                                        : 'border-emerald-200 bg-emerald-50/70'
                                             }`}>
                                                 <div className="flex items-center gap-3">
                                                     <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                                                        log.reviewStatus === 'REJECTED'
+                                                        isLegacyRejected
                                                             ? 'bg-red-100 text-red-600'
-                                                            : 'bg-emerald-100 text-emerald-600'
+                                                            : log.ptAction === 'ADJUST'
+                                                                ? 'bg-blue-100 text-blue-600'
+                                                                : 'bg-emerald-100 text-emerald-600'
                                                     }`}>
-                                                        {log.reviewStatus === 'REJECTED'
-                                                            ? <XCircle className="h-5 w-5" />
-                                                            : <CheckCircle2 className="h-5 w-5" />}
+                                                        <badge.Icon className="h-5 w-5" />
                                                     </span>
                                                     <div>
                                                         <p className={`text-sm font-extrabold ${
-                                                            log.reviewStatus === 'REJECTED' ? 'text-red-900' : 'text-emerald-900'
+                                                            isLegacyRejected
+                                                                ? 'text-red-900'
+                                                                : log.ptAction === 'ADJUST' ? 'text-blue-900' : 'text-emerald-900'
                                                         }`}>
-                                                            {log.reviewStatus === 'REJECTED'
-                                                                ? 'PT đã từ chối'
+                                                            {isLegacyRejected
+                                                                ? 'PT đã từ chối (luồng cũ)'
                                                                 : log.ptAction === 'ADJUST'
-                                                                    ? 'Đã điều chỉnh và phê duyệt'
-                                                                    : 'PT đã phê duyệt'}
+                                                                    ? 'PT đã chỉnh lại kết quả'
+                                                                    : 'PT đã duyệt đúng'}
                                                         </p>
                                                         {log.ptNote && (
                                                             <p className={`mt-0.5 text-xs font-medium ${
-                                                                log.reviewStatus === 'REJECTED' ? 'text-red-800/75' : 'text-emerald-800/75'
+                                                                isLegacyRejected
+                                                                    ? 'text-red-800/75'
+                                                                    : log.ptAction === 'ADJUST' ? 'text-blue-800/75' : 'text-emerald-800/75'
                                                             }`}>“{log.ptNote}”</p>
                                                         )}
                                                     </div>
                                                 </div>
                                                 {log.ptReviewedAt && (
                                                     <time className={`text-xs font-bold ${
-                                                        log.reviewStatus === 'REJECTED' ? 'text-red-700/70' : 'text-emerald-700/70'
+                                                        isLegacyRejected
+                                                            ? 'text-red-700/70'
+                                                            : log.ptAction === 'ADJUST' ? 'text-blue-700/70' : 'text-emerald-700/70'
                                                     }`} dateTime={log.ptReviewedAt}>
                                                         {new Date(log.ptReviewedAt).toLocaleString('vi-VN')}
                                                     </time>
@@ -802,44 +857,61 @@ export default function ReviewDietLogPage({ clientPage = false }) {
 
                                         {!isReviewedList && adjustingLog === log.id && (
                                             <div className="mt-4 p-6 bg-blue-50 border border-blue-100 rounded-2xl animate-fade-in shadow-inner">
-                                                <div className="flex items-center gap-2 mb-4">
+                                                <div className="flex items-center gap-2 mb-2">
                                                     <SlidersHorizontal className="w-5 h-5 text-blue-600" />
-                                                    <h4 className="text-base font-black text-blue-900">Điều chỉnh Chỉ số Bữa ăn</h4>
+                                                    <h4 className="text-base font-black text-blue-900">Chỉnh lại kết quả bữa ăn</h4>
+                                                </div>
+                                                <p className="text-xs font-medium text-blue-800/80 mb-4">
+                                                    Học viên đã ăn bữa này nên số liệu vẫn được tính vào mục tiêu ngày. Hãy sửa tên món và chỉ số cho đúng thay vì bỏ qua.
+                                                </p>
+
+                                                <div className="mb-4">
+                                                    <label htmlFor={`adjust-name-${log.id}`} className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Tên món đúng</label>
+                                                    <input
+                                                        id={`adjust-name-${log.id}`}
+                                                        type="text"
+                                                        value={adjustForm.adjustedFoodDescription}
+                                                        onChange={(e) => setAdjustForm({ ...adjustForm, adjustedFoodDescription: e.target.value })}
+                                                        placeholder="Ví dụ: Cơm gà xối mỡ"
+                                                        className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                                                    />
                                                 </div>
 
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                                                     <div>
-                                                        <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Calo (kcal)</label>
-                                                        <input type="number" value={adjustForm.adjustedCalories} onChange={(e) => setAdjustForm({...adjustForm, adjustedCalories: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                                                        <label htmlFor={`adjust-cal-${log.id}`} className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Calo (kcal)</label>
+                                                        <input id={`adjust-cal-${log.id}`} type="number" min="0" step="1" value={adjustForm.adjustedCalories} onChange={(e) => setAdjustForm({...adjustForm, adjustedCalories: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Protein (g)</label>
-                                                        <input type="number" value={adjustForm.adjustedProtein} onChange={(e) => setAdjustForm({...adjustForm, adjustedProtein: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                                                        <label htmlFor={`adjust-pro-${log.id}`} className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Protein (g)</label>
+                                                        <input id={`adjust-pro-${log.id}`} type="number" min="0" step="0.1" value={adjustForm.adjustedProtein} onChange={(e) => setAdjustForm({...adjustForm, adjustedProtein: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Carb (g)</label>
-                                                        <input type="number" value={adjustForm.adjustedCarb} onChange={(e) => setAdjustForm({...adjustForm, adjustedCarb: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                                                        <label htmlFor={`adjust-carb-${log.id}`} className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Carb (g)</label>
+                                                        <input id={`adjust-carb-${log.id}`} type="number" min="0" step="0.1" value={adjustForm.adjustedCarb} onChange={(e) => setAdjustForm({...adjustForm, adjustedCarb: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Fat (g)</label>
-                                                        <input type="number" value={adjustForm.adjustedFat} onChange={(e) => setAdjustForm({...adjustForm, adjustedFat: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                                                        <label htmlFor={`adjust-fat-${log.id}`} className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Fat (g)</label>
+                                                        <input id={`adjust-fat-${log.id}`} type="number" min="0" step="0.1" value={adjustForm.adjustedFat} onChange={(e) => setAdjustForm({...adjustForm, adjustedFat: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                                                     </div>
                                                 </div>
+                                                {adjustError && (
+                                                    <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+                                                        {adjustError}
+                                                    </p>
+                                                )}
                                                 {(() => {
-                                                    const isUnchanged =
-                                                        (parseFloat(adjustForm.adjustedCalories) || 0) === (log.macrosJson?.calories || 0) &&
-                                                        (parseFloat(adjustForm.adjustedProtein) || 0) === (log.macrosJson?.protein || 0) &&
-                                                        (parseFloat(adjustForm.adjustedCarb) || 0) === (log.macrosJson?.carbs || log.macrosJson?.carb || 0) &&
-                                                        (parseFloat(adjustForm.adjustedFat) || 0) === (log.macrosJson?.fat || 0);
+                                                    const isUnchanged = isAdjustUnchanged(log);
                                                     return (
                                                         <>
                                                             <div className="grid md:grid-cols-2 gap-4 mb-5">
                                                                 <div>
-                                                                    <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest block mb-1">
-                                                                        Lý do điều chỉnh {isUnchanged && <span className="text-slate-400 font-normal">(Chỉ cần chọn khi thay đổi chỉ số)</span>}
+                                                                    <label htmlFor={`adjust-reason-${log.id}`} className="text-[10px] font-black text-blue-700 uppercase tracking-widest block mb-1">
+                                                                        Lý do chỉnh lại {isUnchanged && <span className="text-slate-400 font-normal">(chỉ cần khi có thay đổi)</span>}
                                                                     </label>
                                                                     <div className="relative">
                                                                         <select
+                                                                            id={`adjust-reason-${log.id}`}
                                                                             disabled={isUnchanged}
                                                                             value={adjustForm.correctionReason}
                                                                             onChange={(e) => setAdjustForm({...adjustForm, correctionReason: e.target.value})}
@@ -850,11 +922,11 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                                                     </div>
                                                                 </div>
                                                                 <div>
-                                                                    <label className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Lời khuyên cho Học viên</label>
-                                                                    <input type="text" placeholder="Nhập lời khuyên hoặc giải thích..." value={adjustForm.note} onChange={(e) => setAdjustForm({...adjustForm, note: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                                                                    <label htmlFor={`adjust-note-${log.id}`} className="text-[10px] font-black text-blue-700 uppercase tracking-widest">Lời khuyên cho Học viên</label>
+                                                                    <input id={`adjust-note-${log.id}`} type="text" placeholder="Nhập lời khuyên hoặc giải thích..." value={adjustForm.note} onChange={(e) => setAdjustForm({...adjustForm, note: e.target.value})} className="w-full mt-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
                                                                 </div>
                                                             </div>
-                                                            <div className="flex gap-3">
+                                                            <div className="flex flex-col gap-3 sm:flex-row">
                                                                 <Button
                                                                     onClick={() => handleAdjustOrApproveSubmit(log)}
                                                                     disabled={actionLoading === log.id}
@@ -865,9 +937,11 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                                                     }`}
                                                                 >
                                                                     <CheckCircle2 className="w-4 h-4 mr-2"/>
-                                                                    {isUnchanged ? 'Xác nhận Phê duyệt' : 'Xác nhận Điều chỉnh'}
+                                                                    {actionLoading === log.id
+                                                                        ? 'Đang lưu…'
+                                                                        : isUnchanged ? 'Duyệt đúng' : 'Lưu kết quả đã chỉnh'}
                                                                 </Button>
-                                                                <Button onClick={() => setAdjustingLog(null)} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-100 bg-white rounded-xl h-11 px-6 font-bold">
+                                                                <Button onClick={() => { setAdjustingLog(null); setAdjustError(''); }} variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-100 bg-white rounded-xl h-11 px-6 font-bold">
                                                                     Hủy bỏ
                                                                 </Button>
                                                             </div>
@@ -893,23 +967,21 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                                             </Button>
 
                                             <Button
-                                                variant="outline"
-                                                onClick={() => {
-                                                    setRejectModalLog(log);
-                                                    setRejectReason('WRONG_FOOD');
-                                                }}
-                                                disabled={actionLoading === log.id}
-                                                className="w-full sm:w-auto text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 bg-white rounded-xl h-11 px-4 font-bold transition-all"
-                                            >
-                                                <XCircle className="w-4 h-4 mr-2" /> Từ chối
-                                            </Button>
-
-                                            <Button
-                                                onClick={() => openAdjust(log)}
+                                                onClick={() => handleReview(log.id, 'APPROVE')}
                                                 disabled={actionLoading === log.id}
                                                 className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl h-11 px-6 font-black shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5"
                                             >
-                                                <SlidersHorizontal className="w-4 h-4 mr-2" /> Phê duyệt Hoặc Điều chỉnh
+                                                <CheckCircle2 className="w-4 h-4 mr-2" />
+                                                {actionLoading === log.id ? 'Đang lưu…' : 'Duyệt đúng'}
+                                            </Button>
+
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => openAdjust(log)}
+                                                disabled={actionLoading === log.id}
+                                                className="w-full sm:w-auto text-blue-700 border-blue-200 hover:bg-blue-50 bg-white rounded-xl h-11 px-4 font-bold transition-all"
+                                            >
+                                                <SlidersHorizontal className="w-4 h-4 mr-2" /> Chỉnh lại kết quả
                                             </Button>
                                         </div>
                                     )}
@@ -946,48 +1018,6 @@ export default function ReviewDietLogPage({ clientPage = false }) {
                     )}
                 </div>
             )}
-
-            <Modal
-                isOpen={!!rejectModalLog}
-                onClose={() => setRejectModalLog(null)}
-                title="Từ chối bữa ăn"
-            >
-                <div className="space-y-4">
-                    <p className="text-sm text-slate-600 leading-relaxed">
-                        Bạn đang từ chối bữa ăn của học viên <strong>{rejectModalLog?.customerName}</strong>. Vui lòng chọn lý do từ chối để thông báo cho học viên:
-                    </p>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Lý do từ chối</label>
-                        <select
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
-                        >
-                            {CORRECTION_REASONS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-                        </select>
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                        <Button
-                            variant="outline"
-                            onClick={() => setRejectModalLog(null)}
-                            className="flex-1 rounded-xl h-11 font-bold"
-                        >
-                            Hủy
-                        </Button>
-                        <Button
-                            onClick={async () => {
-                                const logId = rejectModalLog.id;
-                                setRejectModalLog(null);
-                                await handleReview(logId, 'REJECT', { correctionReason: rejectReason });
-                            }}
-                            disabled={actionLoading === rejectModalLog?.id}
-                            className="flex-1 rounded-xl h-11 bg-red-600 hover:bg-red-700 text-white font-bold shadow-md shadow-red-500/20"
-                        >
-                            Xác nhận Từ chối
-                        </Button>
-                    </div>
-                </div>
-            </Modal>
 
             <ImageLightbox
                 isOpen={!!lightboxImage}

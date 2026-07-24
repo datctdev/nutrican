@@ -5,34 +5,30 @@ import { Button } from '../../components/ui/button';
 import { workspaceService } from '../../services/workspaceService';
 import { dietService } from '../../services/dietService';
 import { profileExtensionsService } from '../../services/profileExtensionsService';
-import FoodAllergySelector from '../../components/common/FoodAllergySelector';
 import ProgressTimelineCard from '../customer/components/ProgressTimelineCard';
-import { ACTIVITY_LEVEL_OPTIONS } from '../customer/components/activityLevelOptions';
+import { ACTIVITY_LEVEL_OPTIONS, ActivityLoadInputs, deriveActivityLevel } from '../customer/components/activityLevelOptions';
 import MealPlanSuggestionReviewList from '../../components/pt/meal-plan/MealPlanSuggestionReviewList';
 import MealPlanWeekPicker from '../customer/components/MealPlanWeekPicker';
 import { toast } from 'sonner';
 import { ArrowLeft, TrendingUp, Utensils, Camera, Loader2 } from 'lucide-react';
 import { validateInbodyFile } from '../../utils/inbodyUpload';
-
-function normalizeGender(value) {
-  if (!value) return '';
-  const g = String(value).trim().toUpperCase();
-  if (g === 'MALE' || g === 'FEMALE') return g;
-  if (g === 'M') return 'MALE';
-  if (g === 'F') return 'FEMALE';
-  return '';
-}
-
-function genderLabel(value) {
-  const g = normalizeGender(value);
-  if (g === 'MALE') return 'Nam';
-  if (g === 'FEMALE') return 'Nữ';
-  return '—';
-}
+import { genderLabel, normalizeGender } from '../../utils/gender';
 
 function activityLevelLabel(value) {
   const opt = ACTIVITY_LEVEL_OPTIONS.find((o) => o.value === value);
   return opt?.shortLabel || opt?.label || '—';
+}
+
+const DIET_PREF_LABELS = {
+  NORMAL: 'Bình thường',
+  VEGETARIAN: 'Ăn chay',
+  VEGAN: 'Thuần chay',
+  KETO: 'Chế độ Keto',
+  EAT_CLEAN: 'Ăn Eat Clean',
+};
+
+function dietPreferenceLabel(value) {
+  return DIET_PREF_LABELS[value] || value || '—';
 }
 
 function validateProfileForm(form) {
@@ -48,9 +44,7 @@ function validateProfileForm(form) {
     const bf = Number(form.bodyFatPercent);
     if (!Number.isFinite(bf) || bf < 3 || bf > 60) return 'Tỷ lệ mỡ phải từ 3–60%';
   }
-  if (form.phoneNumber && String(form.phoneNumber).length > 20) return 'Số điện thoại tối đa 20 ký tự';
   if (form.specialNotes && String(form.specialNotes).length > 1000) return 'Ghi chú tối đa 1000 ký tự';
-  if (form.gender && !normalizeGender(form.gender)) return 'Giới tính chỉ nhận Nam hoặc Nữ';
   return null;
 }
 
@@ -142,6 +136,8 @@ export default function ClientProgressPage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  // BodyCompositionChart: use /clients/{id}/body-metrics (BodyMetricDto), NOT progress.bodyMetrics
+  const [chartMetrics, setChartMetrics] = useState([]);
   const [profile, setProfile] = useState(null);
   const [editForm, setEditForm] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -169,6 +165,16 @@ export default function ClientProgressPage() {
     fat: '',
   });
 
+  const loadChartMetrics = useCallback(async () => {
+    try {
+      const res = await workspaceService.getClientBodyMetrics(clientId, { page: 0, size: 20 });
+      const page = res.data?.data;
+      setChartMetrics(page?.content || page || []);
+    } catch {
+      setChartMetrics([]);
+    }
+  }, [clientId]);
+
   const loadProgress = useCallback(async (weekStart) => {
     const params = weekStart ? { mealPlanWeekStart: weekStart } : undefined;
     const response = await workspaceService.getClientProgress(clientId, params);
@@ -184,8 +190,9 @@ export default function ClientProgressPage() {
       baselineWeight: g?.baselineWeight ?? '',
       targetDate: g?.targetDate || '',
     });
+    await loadChartMetrics();
     return progressData;
-  }, [clientId]);
+  }, [clientId, loadChartMetrics]);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -195,6 +202,8 @@ export default function ClientProgressPage() {
         ...profileData,
         gender: normalizeGender(profileData.gender) || profileData.gender || '',
         activityLevel: profileData.activityLevel || 'MODERATE',
+        exerciseSessionsPerWeek: profileData.exerciseSessionsPerWeek ?? '',
+        exerciseMinutesPerSession: profileData.exerciseMinutesPerSession ?? '',
       };
       setProfile(normalized);
       setEditForm(normalized);
@@ -257,21 +266,22 @@ export default function ClientProgressPage() {
     }
     setSavingProfile(true);
     try {
+      const derived = deriveActivityLevel(editForm.exerciseSessionsPerWeek, editForm.exerciseMinutesPerSession);
+      // Student-owned fields (name/phone/DOB/gender/diet/allergies) are view-only for PT.
       const payload = {
-        fullName: editForm.fullName || null,
-        phoneNumber: editForm.phoneNumber || null,
         heightCm: editForm.heightCm !== '' && editForm.heightCm != null ? Number(editForm.heightCm) : null,
         weight: editForm.weight !== '' && editForm.weight != null ? Number(editForm.weight) : null,
         bodyFatPercent: editForm.bodyFatPercent !== '' && editForm.bodyFatPercent != null
           ? Number(editForm.bodyFatPercent) : null,
-        dateOfBirth: editForm.dateOfBirth || null,
-        gender: normalizeGender(editForm.gender) || null,
-        activityLevel: editForm.activityLevel || null,
-        dietPreference: editForm.dietPreference || null,
-        allergicFoodCodes: editForm.allergicFoodCodes || [],
         specialNotes: editForm.specialNotes ?? null,
-        allergyNotes: editForm.allergyNotes ?? null,
       };
+      if (derived) {
+        payload.exerciseSessionsPerWeek = Number(editForm.exerciseSessionsPerWeek);
+        payload.exerciseMinutesPerSession = Number(editForm.exerciseMinutesPerSession);
+        payload.activityLevel = derived;
+      } else if (editForm.activityLevel) {
+        payload.activityLevel = editForm.activityLevel;
+      }
       const res = await workspaceService.updateClientProfile(clientId, payload);
       const updatedData = {
         ...res.data.data,
@@ -282,6 +292,7 @@ export default function ClientProgressPage() {
       setIsEditing(false);
       toast.success('Cập nhật hồ sơ học viên thành công!');
       await loadProgress(selectedMealPlanWeek || undefined);
+      await loadChartMetrics();
       if (updatedData.allergicFoodCodes && updatedData.allergicFoodCodes.length > 0) {
         dietService.getFoodsByCodes(updatedData.allergicFoodCodes)
           .then(resFoods => setAllergicFoods(resFoods.data?.data || []))
@@ -344,7 +355,6 @@ export default function ClientProgressPage() {
           weight: inbodyData.weight || prev.weight,
           bodyFatPercent: inbodyData.bodyFatPercent ?? inbodyData.body_fat_percent ?? prev.bodyFatPercent,
           heightCm: inbodyData.height || prev.heightCm,
-          gender: normalizeGender(inbodyData.gender) || prev.gender,
         }));
         toast.success('Phân tích ảnh InBody thành công! Các số đo đã tự động điền.');
       } else {
@@ -425,7 +435,7 @@ export default function ClientProgressPage() {
   };
 
   const summary = data?.macroSummary;
-  const weights = data?.bodyMetrics || [];
+  // Do not use data.bodyMetrics for the composition chart — wrong shape/order vs HV.
   const calorieHistory = data?.calorieHistory || [];
   const rolling7 = calorieHistory.slice(-7);
   const rollingAvg = rolling7.length
@@ -553,7 +563,9 @@ export default function ClientProgressPage() {
               <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                 <div>
                   <h3 className="font-extrabold text-slate-800">Hồ sơ học viên</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Nhân trắc, giới tính, mức vận động và lưu ý ăn uống.</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    PT chỉnh vận động &amp; số đo. Họ tên, SĐT, ngày sinh, giới tính, chế độ ăn và dị ứng do học viên cập nhật — chỉ xem.
+                  </p>
                 </div>
                 {!isEditing && (
                   <Button size="sm" onClick={() => setIsEditing(true)} className="rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white">
@@ -564,65 +576,55 @@ export default function ClientProgressPage() {
               <CardContent className="p-6">
                 {isEditing ? (
                   <form onSubmit={handleUpdateProfile} className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Họ và tên</label>
-                        <input
-                          type="text"
-                          required
-                          value={editForm.fullName || ''}
-                          onChange={(e) => setEditForm({...editForm, fullName: e.target.value})}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                        />
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4 space-y-3">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Thông tin học viên (chỉ xem)</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm font-semibold text-slate-700">
+                        <div><span className="font-normal text-slate-500">Họ và tên:</span> {profile.fullName || '—'}</div>
+                        <div><span className="font-normal text-slate-500">Số điện thoại:</span> {profile.phoneNumber || '—'}</div>
+                        <div><span className="font-normal text-slate-500">Ngày sinh:</span> {profile.dateOfBirth || '—'}</div>
+                        <div><span className="font-normal text-slate-500">Giới tính:</span> {genderLabel(profile.gender)}</div>
+                        <div><span className="font-normal text-slate-500">Chế độ ăn:</span> {dietPreferenceLabel(profile.dietPreference)}</div>
+                        <div>
+                          <span className="font-normal text-slate-500">Calo hiện tại:</span>{' '}
+                          {profile.tdee ? `${profile.tdee} kcal/ngày` : '— (chỉnh ở Macro)'}
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Số điện thoại</label>
-                        <input
-                          type="text"
-                          value={editForm.phoneNumber || ''}
-                          onChange={(e) => setEditForm({...editForm, phoneNumber: e.target.value})}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ngày sinh</label>
-                        <input
-                          type="date"
-                          value={editForm.dateOfBirth || ''}
-                          onChange={(e) => setEditForm({...editForm, dateOfBirth: e.target.value})}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Giới tính</label>
-                        <select
-                          value={normalizeGender(editForm.gender) || ''}
-                          onChange={(e) => setEditForm({...editForm, gender: e.target.value})}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                        >
-                          <option value="">— Chọn —</option>
-                          <option value="MALE">Nam</option>
-                          <option value="FEMALE">Nữ</option>
-                        </select>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-sm font-normal text-slate-500">Dị ứng:</span>
+                        {allergicFoods && allergicFoods.length > 0 ? (
+                          allergicFoods.map((food, idx) => (
+                            <span key={food.foodCode || idx} className="bg-red-50 text-red-700 border border-red-100 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                              {food.nameVi}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                            Không có dị ứng
+                          </span>
+                        )}
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mức vận động</label>
-                      <select
-                        value={editForm.activityLevel || 'MODERATE'}
-                        onChange={(e) => setEditForm({...editForm, activityLevel: e.target.value})}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                      >
-                        {ACTIVITY_LEVEL_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Mức vận động (buổi × phút)</label>
+                      <ActivityLoadInputs
+                        sessionsPerWeek={editForm.exerciseSessionsPerWeek}
+                        minutesPerSession={editForm.exerciseMinutesPerSession}
+                        onSessionsChange={(v) => setEditForm((f) => {
+                          const next = { ...f, exerciseSessionsPerWeek: v };
+                          const d = deriveActivityLevel(v, f.exerciseMinutesPerSession);
+                          if (d) next.activityLevel = d;
+                          return next;
+                        })}
+                        onMinutesChange={(v) => setEditForm((f) => {
+                          const next = { ...f, exerciseMinutesPerSession: v };
+                          const d = deriveActivityLevel(f.exerciseSessionsPerWeek, v);
+                          if (d) next.activityLevel = d;
+                          return next;
+                        })}
+                      />
                       <p className="mt-1 text-[11px] text-slate-400">
-                        {ACTIVITY_LEVEL_OPTIONS.find((o) => o.value === (editForm.activityLevel || 'MODERATE'))?.desc}
+                        Lưu sẽ tự tính lại MacroTarget nếu mức vận động đổi.
                       </p>
                     </div>
 
@@ -688,47 +690,15 @@ export default function ClientProgressPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Calo hiện tại (chỉ đọc)</label>
-                        <div className="w-full rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                          {profile.tdee ? `${profile.tdee} kcal/ngày` : '— (chỉnh ở Macro)'}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chế độ ăn</label>
-                        <select
-                          value={editForm.dietPreference || 'NORMAL'}
-                          onChange={(e) => setEditForm({...editForm, dietPreference: e.target.value})}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                        >
-                          <option value="NORMAL">Bình thường</option>
-                          <option value="VEGETARIAN">Ăn chay</option>
-                          <option value="VEGAN">Thuần chay</option>
-                          <option value="KETO">Chế độ Keto</option>
-                          <option value="EAT_CLEAN">Ăn Eat Clean</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Thành phần dị ứng</label>
-                        <FoodAllergySelector
-                          selectedFoodCodes={editForm.allergicFoodCodes || []}
-                          onChange={(codes) => setEditForm({ ...editForm, allergicFoodCodes: codes })}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ghi chú dinh dưỡng / lưu ý của PT</label>
-                        <input
-                          type="text"
-                          value={editForm.specialNotes || ''}
-                          placeholder="vd. Không ăn cay, hạn chế sữa"
-                          onChange={(e) => setEditForm({...editForm, specialNotes: e.target.value})}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ghi chú dinh dưỡng / lưu ý của PT</label>
+                      <input
+                        type="text"
+                        value={editForm.specialNotes || ''}
+                        placeholder="vd. Không ăn cay, hạn chế sữa"
+                        onChange={(e) => setEditForm({...editForm, specialNotes: e.target.value})}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                      />
                     </div>
 
                     <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
@@ -750,7 +720,11 @@ export default function ClientProgressPage() {
                           <div><span className="text-slate-450 font-normal">Cân nặng:</span> {profile.weight ? `${profile.weight} kg` : '—'}</div>
                           <div><span className="text-slate-450 font-normal">Tỷ lệ mỡ:</span> {profile.bodyFatPercent ? `${profile.bodyFatPercent}%` : '—'}</div>
                           <div><span className="text-slate-450 font-normal">Ngày sinh:</span> {profile.dateOfBirth || '—'}</div>
-                          <div className="col-span-2"><span className="text-slate-450 font-normal">Mức vận động:</span> {activityLevelLabel(profile.activityLevel)}</div>
+                          <div className="col-span-2"><span className="text-slate-450 font-normal">Mức vận động:</span> {activityLevelLabel(profile.activityLevel)}
+                            {(profile.exerciseSessionsPerWeek != null && profile.exerciseSessionsPerWeek !== '') && (
+                              <span className="text-slate-500"> ({profile.exerciseSessionsPerWeek} buổi × {profile.exerciseMinutesPerSession ?? '—'}′)</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div>
@@ -767,7 +741,7 @@ export default function ClientProgressPage() {
                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Chế độ ăn & calo</h4>
                         <div className="mt-2 grid grid-cols-2 gap-3 text-sm font-semibold text-slate-700">
                           <div><span className="text-slate-450 font-normal">Calo hiện tại:</span> {profile.tdee ? `${profile.tdee} kcal` : '—'}</div>
-                          <div><span className="text-slate-450 font-normal">Chế độ ăn:</span> {profile.dietPreference === 'NORMAL' ? 'Bình thường' : profile.dietPreference || '—'}</div>
+                          <div><span className="text-slate-450 font-normal">Chế độ ăn:</span> {dietPreferenceLabel(profile.dietPreference)}</div>
                         </div>
                       </div>
                       <div>
@@ -1119,7 +1093,7 @@ export default function ClientProgressPage() {
             milestones={data?.milestones}
             regressionAlert={data?.regressionAlert}
             projectedCompletion={data?.projectedCompletion}
-            bodyMetrics={weights}
+            bodyMetrics={chartMetrics}
             allowSelfMetricsFallback={false}
           />
 
