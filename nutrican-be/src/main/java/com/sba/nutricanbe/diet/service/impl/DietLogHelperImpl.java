@@ -14,9 +14,11 @@ import com.sba.nutricanbe.diet.enums.DietLogStatus;
 import com.sba.nutricanbe.diet.enums.MealSource;
 import com.sba.nutricanbe.diet.enums.MealType;
 import com.sba.nutricanbe.common.event.DietLogCreatedEvent;
+import com.sba.nutricanbe.diet.repository.DietLogRepository;
 import com.sba.nutricanbe.diet.repository.FoodItemRepository;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.common.exception.BadRequestException;
+import com.sba.nutricanbe.common.util.DietDates;
 import com.sba.nutricanbe.common.util.MacroUtils;
 import com.sba.nutricanbe.diet.dto.request.DietLogItemRequest;
 import com.sba.nutricanbe.diet.dto.response.DietLogImageDto;
@@ -49,6 +51,7 @@ public class DietLogHelperImpl implements DietLogHelper {
     private static final BigDecimal MAX_MACRO = BigDecimal.valueOf(20_000);
 
     private final FoodItemRepository foodItemRepository;
+    private final DietLogRepository dietLogRepository;
     private final PtClientMappingRepository ptClientMappingRepository;
     private final FoodCatalogService foodCatalogService;
     private final ApplicationEventPublisher eventPublisher;
@@ -197,6 +200,25 @@ public class DietLogHelperImpl implements DietLogHelper {
         return ptClientMappingRepository.findFirstByClient_IdAndStatusIn(
                 customerId,
                 List.of(ClientMappingStatus.ACTIVE, ClientMappingStatus.END_REQUESTED));
+    }
+
+    @Override
+    public int closePendingReviews(UUID customerId, String systemNote) {
+        List<DietLog> pending = dietLogRepository.findByCustomerIdAndReviewStatus(
+                customerId, DietLogReviewStatus.PENDING);
+        if (pending.isEmpty()) {
+            return 0;
+        }
+        String note = systemNote != null && !systemNote.isBlank()
+                ? systemNote
+                : "Tự động đóng review do kết thúc / tạm dừng coaching";
+        for (DietLog log : pending) {
+            log.setReviewStatus(DietLogReviewStatus.REJECTED);
+            log.setPtNote(note);
+            log.setPtReviewedAt(DietDates.nowVn());
+        }
+        dietLogRepository.saveAll(pending);
+        return pending.size();
     }
 
     @Override

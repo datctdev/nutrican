@@ -1,0 +1,152 @@
+﻿[
+    {
+        "id":  "W1.1 login solo/customer/pt/admin",
+        "ok":  true,
+        "detail":  "all tokens"
+    },
+    {
+        "id":  "W1.2 bad pwd",
+        "ok":  true,
+        "detail":  "rejected"
+    },
+    {
+        "id":  "W1.3 customer blocked admin",
+        "ok":  true,
+        "detail":  "code=403"
+    },
+    {
+        "id":  "W2.1 solo no PT",
+        "ok":  true,
+        "detail":  "hasActivePt=False"
+    },
+    {
+        "id":  "W2.2 solo metrics",
+        "ok":  true,
+        "detail":  "count=5"
+    },
+    {
+        "id":  "W2.3 solo goals",
+        "ok":  true,
+        "detail":  "goal=WEIGHT_LOSS"
+    },
+    {
+        "id":  "W2.4 solo milestones",
+        "ok":  true,
+        "detail":  "count=2"
+    },
+    {
+        "id":  "W3.1 customer has PT",
+        "ok":  true,
+        "detail":  "hasActivePt=True"
+    },
+    {
+        "id":  "W3.2 customer goals",
+        "ok":  true,
+        "detail":  "goal=MAINTAIN"
+    },
+    {
+        "id":  "W3.3 pt clients",
+        "ok":  true,
+        "detail":  "n=1"
+    },
+    {
+        "id":  "W3.4 pt pending diet logs",
+        "ok":  true,
+        "detail":  "ok"
+    },
+    {
+        "id":  "W3.5 coaching history",
+        "ok":  true,
+        "detail":  "ok"
+    },
+    {
+        "id":  "W4.1 login customer3 + pt.offline",
+        "ok":  true,
+        "detail":  "tokens"
+    },
+    {
+        "id":  "W4.2 customer3 no active PT (hireable)",
+        "ok":  true,
+        "detail":  "hasActivePt=False"
+    },
+    {
+        "id":  "W4.3 marketplace list",
+        "ok":  true,
+        "detail":  "code=200"
+    },
+    {
+        "id":  "W4.4 login PENDING pair",
+        "ok":  true,
+        "detail":  "customer2 + freelance"
+    },
+    {
+        "id":  "W4.5 freelance clients (expect PENDING)",
+        "ok":  true,
+        "detail":  "ok"
+    },
+    {
+        "id":  "W5.1 login escrow HVs + endreq",
+        "ok":  true,
+        "detail":  "tokens"
+    },
+    {
+        "id":  "W5.2 hv.an hasActivePt",
+        "ok":  true,
+        "detail":  "hasActivePt=True"
+    },
+    {
+        "id":  "W5.2 hv.bao hasActivePt",
+        "ok":  true,
+        "detail":  "hasActivePt=True"
+    },
+    {
+        "id":  "W5.2 hv.chi hasActivePt",
+        "ok":  true,
+        "detail":  "hasActivePt=True"
+    },
+    {
+        "id":  "W5.2 hv.endreq hasActivePt",
+        "ok":  true,
+        "detail":  "hasActivePt=True"
+    },
+    {
+        "id":  "W5.3 pt wallet",
+        "ok":  false,
+        "detail":  "code=500"
+    },
+    {
+        "id":  "W5.4 admin finance overview",
+        "ok":  true,
+        "detail":  "held=3 disputes=0"
+    },
+    {
+        "id":  "W5.5 admin finance txs",
+        "ok":  true,
+        "detail":  "ok"
+    },
+    {
+        "id":  "W5.6 pt profile me",
+        "ok":  true,
+        "detail":  "ok"
+    },
+    {
+        "id":  "W6.1 admin pending pts",
+        "ok":  true,
+        "detail":  "code=200"
+    },
+    {
+        "id":  "W6.2 admin update requests",
+        "ok":  true,
+        "detail":  "code=200"
+    },
+    {
+        "id":  "W6.3 admin users",
+        "ok":  true,
+        "detail":  "code=200"
+    },
+    {
+        "id":  "W6.4 coaching history for reviews context",
+        "ok":  true,
+        "detail":  "history entries=0"
+    }
+]

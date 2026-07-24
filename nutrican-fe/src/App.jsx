@@ -7,6 +7,7 @@ import LoginPage from './pages/auth/LoginPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import SetPasswordPage from './pages/auth/SetPasswordPage';
+import ChangePasswordPage from './pages/auth/ChangePasswordPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import CheckEmailPage from './pages/auth/CheckEmailPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
@@ -54,6 +55,10 @@ function App() {
                 {
                     path: '/set-password',
                     element: <SetPasswordPage />,
+                },
+                {
+                    path: '/change-password',
+                    element: <ProtectedRoute><ChangePasswordPage /></ProtectedRoute>,
                 },
                 {
                     path: '/onboarding',

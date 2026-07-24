@@ -9,7 +9,10 @@ import java.util.UUID;
 
 public interface ClientGoalService {
     ClientGoalDto getGoals(UUID userId);
+    /** PT workspace / trusted callers — no hasActivePt gate. */
     ClientGoalDto saveGoals(UUID userId, ClientGoalRequest request);
+    /** Customer self-service — blocked while ACTIVE|END_REQUESTED coaching. */
+    ClientGoalDto saveGoalsForSelf(UUID userId, ClientGoalRequest request);
     List<MilestoneDto> listMilestones(UUID userId);
     MilestoneDto addManualMilestone(UUID userId, String title, String note);
 }

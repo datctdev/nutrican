@@ -2,7 +2,6 @@ package com.sba.nutricanbe.user.controller;
 
 import com.sba.nutricanbe.common.dto.ApiResponse;
 import com.sba.nutricanbe.common.dto.PageResponse;
-import com.sba.nutricanbe.common.exception.BadRequestException;
 import com.sba.nutricanbe.user.dto.AllergyProfileRequest;
 import com.sba.nutricanbe.user.dto.BodyMetricDto;
 import com.sba.nutricanbe.user.dto.BodyMetricReminderStatusDto;
@@ -114,12 +113,8 @@ public class ProfileExtensionsController {
     public ResponseEntity<ApiResponse<ClientGoalDto>> saveGoals(
             @AuthenticationPrincipal User user,
             @RequestBody ClientGoalRequest request) {
-        if (profileExtensionsService.hasActivePt(user.getId())) {
-            throw new BadRequestException(
-                    "Bạn đang có PT đồng hành — vui lòng nhờ PT cập nhật mục tiêu");
-        }
         return ResponseEntity.ok(ApiResponse.success(
-                clientGoalService.saveGoals(user.getId(), request), "Goals saved"));
+                clientGoalService.saveGoalsForSelf(user.getId(), request), "Goals saved"));
     }
 
     @GetMapping("/milestones")

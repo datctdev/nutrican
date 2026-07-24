@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.auth.service;
 
 import com.sba.nutricanbe.auth.dto.AuthResponse;
+import com.sba.nutricanbe.auth.dto.ChangePasswordRequest;
 import com.sba.nutricanbe.auth.dto.GoogleAuthRequest;
 import com.sba.nutricanbe.auth.dto.LoginRequest;
 import com.sba.nutricanbe.auth.dto.RegisterRequest;
@@ -28,6 +29,10 @@ public interface AuthService {
     ApiResponse<AuthResponse> googleAuth(GoogleAuthRequest request);
 
     ApiResponse<AuthResponse> setPassword(UUID userId, SetPasswordRequest request);
+
+    ApiResponse<AuthResponse> skipPasswordSetup(UUID userId);
+
+    ApiResponse<AuthResponse> changePassword(UUID userId, ChangePasswordRequest request);
 
     void sendPasswordResetEmail(String email);
 

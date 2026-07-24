@@ -133,8 +133,8 @@ public class User extends BaseEntity {
                 .avatarUrl(picture)
                 .googlePictureUrl(picture)
                 .role(UserRole.CUSTOMER)
-                .status(UserStatus.PENDING_PASSWORD)
-                .passwordSetRequired(true)
+                .status(UserStatus.ACTIVE)
+                .passwordSetRequired(false)
                 .build();
     }
 

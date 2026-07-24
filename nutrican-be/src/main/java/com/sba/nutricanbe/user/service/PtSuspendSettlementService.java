@@ -1,6 +1,7 @@
 package com.sba.nutricanbe.user.service;
 
 import com.sba.nutricanbe.common.util.DietDates;
+import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.payment.service.CoachingWalletService;
 import com.sba.nutricanbe.user.dto.NotificationPayload;
 import com.sba.nutricanbe.user.entity.PtAppointment;
@@ -42,6 +43,7 @@ public class PtSuspendSettlementService {
     private final SlotHoldService slotHoldService;
     private final NotificationService notificationService;
     private final WebSocketSessionService webSocketSessionService;
+    private final DietLogHelper dietLogHelper;
 
     @Transactional
     public void settleAllForSuspendedPt(UUID ptId) {
@@ -71,10 +73,12 @@ public class PtSuspendSettlementService {
             mapping.setCompletedAt(DietDates.nowVn());
         }
         mappingRepository.save(mapping);
-        emitMappingInactiveWs(mapping, "PT đã bị khóa. Quan hệ coaching của bạn đã được đóng.");
 
         UUID clientId = mapping.getClient() != null ? mapping.getClient().getId() : null;
         if (clientId != null) {
+            dietLogHelper.closePendingReviews(
+                    clientId,
+                    "Tự động đóng review do PT bị khóa / coaching dừng");
             notificationService.notify(clientId, NotificationPayload.builder()
                     .type("PT_SUSPENDED_REFUND")
                     .title("PT đã bị khóa — tiền đã hoàn")
@@ -83,6 +87,7 @@ public class PtSuspendSettlementService {
                     .linkRefId(mapping.getId())
                     .build());
         }
+        emitMappingInactiveWs(mapping, "PT đã bị khóa. Quan hệ coaching của bạn đã được đóng.");
     }
 
     private void closePendingHire(PtClientMapping mapping) {

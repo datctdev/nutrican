@@ -25,10 +25,12 @@ import com.sba.nutricanbe.user.enums.SessionDisputeStatus;
 import com.sba.nutricanbe.user.enums.TrainingMode;
 import com.sba.nutricanbe.user.repository.PtClientMappingRepository;
 import com.sba.nutricanbe.user.repository.PtMappingSessionRepository;
+import com.sba.nutricanbe.user.repository.RefundRequestRepository;
 import com.sba.nutricanbe.user.repository.SessionDisputeMessageRepository;
 import com.sba.nutricanbe.user.repository.SessionDisputeRepository;
 import com.sba.nutricanbe.user.repository.UserRepository;
 import com.sba.nutricanbe.user.service.MappingSessionConfirmService;
+import com.sba.nutricanbe.user.enums.RefundStatus;
 import com.sba.nutricanbe.workspace.service.WebSocketSessionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +64,7 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
     private final UserRepository userRepository;
     private final CoachingWalletService walletService;
     private final WebSocketSessionService webSocketSessionService;
+    private final RefundRequestRepository refundRequestRepository;
     private final MappingSessionConfirmService self;
 
     @Value("${app.session.confirm-timeout-hours:24}")
@@ -75,6 +78,7 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
             UserRepository userRepository,
             CoachingWalletService walletService,
             WebSocketSessionService webSocketSessionService,
+            RefundRequestRepository refundRequestRepository,
             @Lazy MappingSessionConfirmService self) {
         this.sessionRepository = sessionRepository;
         this.mappingRepository = mappingRepository;
@@ -83,6 +87,7 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
         this.userRepository = userRepository;
         this.walletService = walletService;
         this.webSocketSessionService = webSocketSessionService;
+        this.refundRequestRepository = refundRequestRepository;
         this.self = self;
     }
 
@@ -169,6 +174,16 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
                 .authorRole(SessionDisputeAuthorRole.CUSTOMER)
                 .body(reason)
                 .build());
+
+        try {
+            if (!walletService.markEscrowDisputedIfPresent(mapping.getId())) {
+                log.warn("Session dispute {} created without held escrow for mapping {}",
+                        dispute.getId(), mapping.getId());
+            }
+        } catch (BadRequestException ex) {
+            log.warn("Session dispute {} could not lock escrow for mapping {}: {}",
+                    dispute.getId(), mapping.getId(), ex.getMessage());
+        }
 
         Map<String, Object> payload = basePayload(mapping, session);
         payload.put("disputeId", dispute.getId());
@@ -403,7 +418,29 @@ public class MappingSessionConfirmServiceImpl implements MappingSessionConfirmSe
         webSocketSessionService.sendToUser(mapping.getClient().getId(), "SESSION_DISPUTE_RESOLVED", payload);
         webSocketSessionService.sendToUser(mapping.getPt().getId(), "SESSION_DISPUTE_RESOLVED", payload);
 
+        maybeUnlockEscrowAfterDisputeResolve(mapping.getId());
+
         return enrichOne(dispute);
+    }
+
+    /**
+     * Unlock escrow only when no PENDING session disputes remain and no package refund is PENDING_REVIEW.
+     */
+    private void maybeUnlockEscrowAfterDisputeResolve(UUID mappingId) {
+        long pendingDisputes = disputeRepository.countByMappingIdAndStatus(
+                mappingId, SessionDisputeStatus.PENDING);
+        if (pendingDisputes > 0) {
+            return;
+        }
+        if (refundRequestRepository.existsByMappingIdAndStatus(mappingId, RefundStatus.PENDING_REVIEW)) {
+            return;
+        }
+        try {
+            walletService.rejectEscrowDisputeIfPresent(mappingId);
+        } catch (BadRequestException ex) {
+            log.warn("Skip escrow unlock after session dispute resolve for mapping {}: {}",
+                    mappingId, ex.getMessage());
+        }
     }
 
     @Override

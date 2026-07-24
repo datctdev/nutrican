@@ -5,6 +5,9 @@ export const authService = {
   register: (data) => api.post('/auth/register', data),
   googleAuth: (googleIdToken) => api.post('/auth/google', { googleIdToken }),
   setPassword: (password) => api.post('/auth/set-password', { password }),
+  skipPasswordSetup: () => api.post('/auth/skip-password-setup'),
+  changePassword: (currentPassword, newPassword) =>
+    api.post('/auth/change-password', { currentPassword, newPassword }),
   refreshToken: () => api.post('/auth/refresh', {}),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/profile/me'),

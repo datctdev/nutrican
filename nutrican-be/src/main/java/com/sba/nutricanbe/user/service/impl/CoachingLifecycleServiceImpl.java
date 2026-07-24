@@ -7,6 +7,7 @@ import com.sba.nutricanbe.diet.entity.SelfPlanSubmission;
 import com.sba.nutricanbe.diet.enums.SelfPlanSubmissionStatus;
 import com.sba.nutricanbe.diet.repository.SelfPlanItemRepository;
 import com.sba.nutricanbe.diet.repository.SelfPlanSubmissionRepository;
+import com.sba.nutricanbe.diet.service.DietLogHelper;
 import com.sba.nutricanbe.user.dto.NotificationPayload;
 import com.sba.nutricanbe.user.dto.CoachingHistoryDto;
 import com.sba.nutricanbe.user.dto.PtClientMappingResponse;
@@ -54,6 +55,7 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
     private final SelfPlanItemRepository selfPlanItemRepository;
     private final NotificationService notificationService;
     private final PtMappingSessionRepository mappingSessionRepository;
+    private final DietLogHelper dietLogHelper;
 
     @Override
     @Transactional
@@ -126,6 +128,9 @@ public class CoachingLifecycleServiceImpl implements CoachingLifecycleService {
         settleEscrowOnCompletion(saved);
 
         autoRejectPendingSubmissions(saved);
+        dietLogHelper.closePendingReviews(
+                saved.getClient().getId(),
+                "Tự động đóng review do kết thúc hợp đồng PT");
         Map<String, Object> completedPayload = new HashMap<>();
         completedPayload.put("mappingId", saved.getId());
         completedPayload.put("clientId", saved.getClient().getId());

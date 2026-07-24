@@ -43,11 +43,13 @@ public class GoogleIdTokenServiceImpl implements GoogleIdTokenService {
 
         try {
             FirebaseToken decodedToken = firebaseAuth.verifyIdToken(idToken);
+            Boolean emailVerified = decodedToken.isEmailVerified();
             return new GoogleTokenPayload(
                     decodedToken.getEmail(),
                     decodedToken.getUid(),
                     decodedToken.getName(),
-                    decodedToken.getPicture()
+                    decodedToken.getPicture(),
+                    Boolean.TRUE.equals(emailVerified)
             );
         } catch (FirebaseException e) {
             String fullMessage = e.getMessage();
